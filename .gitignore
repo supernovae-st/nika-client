@@ -1,0 +1,5 @@
+node_modules/
+dist/
+.nika/
+.env
+.env.*

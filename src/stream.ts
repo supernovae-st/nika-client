@@ -15,12 +15,14 @@ import { NikaError } from './errors.js';
 export async function* streamEvents(
   url: string,
   headers: Record<string, string>,
+  signal?: AbortSignal,
 ): AsyncGenerator<NikaEvent> {
   const res = await fetch(url, {
     headers: {
       ...headers,
       'Accept': 'text/event-stream',
     },
+    signal,
   });
 
   if (!res.ok) {
@@ -54,8 +56,9 @@ export async function* streamEvents(
         let data: string | undefined;
 
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            data = line.slice(6);
+          // Handle both "data: value" and "data:value" (SSE spec)
+          if (line.startsWith('data:')) {
+            data = line[5] === ' ' ? line.slice(6) : line.slice(5);
           }
           // Skip event:, id:, retry:, comments (:), and keep-alive pings
         }

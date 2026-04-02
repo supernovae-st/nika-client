@@ -8,7 +8,7 @@ import type {
   ArtifactsResponse,
   CancelResponse,
 } from './types.js';
-import { NikaError, NikaJobError } from './errors.js';
+import { NikaError } from './errors.js';
 import { pollUntilDone } from './poll.js';
 import { streamEvents } from './stream.js';
 
@@ -30,6 +30,12 @@ export class Nika {
   private readonly pollBackoff: number;
 
   constructor(config: NikaConfig) {
+    if (!config.url.startsWith('http://') && !config.url.startsWith('https://')) {
+      throw new TypeError(`NikaConfig.url must be an http(s) URL, got: ${config.url}`);
+    }
+    if (!config.token) {
+      throw new TypeError('NikaConfig.token must not be empty');
+    }
     this.url = config.url.replace(/\/$/, '');
     this.token = config.token;
     this.timeout = config.timeout ?? DEFAULTS.timeout;
@@ -63,7 +69,8 @@ export class Nika {
 
         if ((res.status === 429 || res.status >= 500) && attempt < this.retries) {
           const retryAfter = res.headers.get('Retry-After');
-          const delay = retryAfter ? parseInt(retryAfter) * 1000 : 1000 * (attempt + 1);
+          const parsed = retryAfter ? parseInt(retryAfter) : NaN;
+          const delay = Number.isFinite(parsed) ? parsed * 1000 : 1000 * (attempt + 1);
           await sleep(delay);
           continue;
         }
@@ -92,7 +99,11 @@ export class Nika {
   async health(): Promise<NikaHealth> {
     const res = await globalThis.fetch(`${this.url}/health`);
     if (!res.ok) {
-      throw new NikaError(`Health check failed: ${res.status}`, res.status);
+      const body = await res.text().catch(() => '');
+      throw new NikaError(
+        `Health check failed: ${res.status} ${body}`.trim(),
+        res.status,
+      );
     }
     return res.json() as Promise<NikaHealth>;
   }
@@ -108,7 +119,7 @@ export class Nika {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         workflow,
-        inputs: inputs ?? {},
+        ...(inputs !== undefined ? { inputs } : {}),
         ...(resumeFrom ? { resume_from: resumeFrom } : {}),
       }),
     });
@@ -141,11 +152,12 @@ export class Nika {
     );
   }
 
-  /** Stream job events via SSE (AsyncIterable). */
-  stream(jobId: string): AsyncIterable<NikaEvent> {
+  /** Stream job events via SSE (AsyncIterable). Pass signal to abort. */
+  stream(jobId: string, signal?: AbortSignal): AsyncIterable<NikaEvent> {
     return streamEvents(
       `${this.url}/v1/events/${jobId}`,
       { 'Authorization': `Bearer ${this.token}` },
+      signal,
     );
   }
 
@@ -176,11 +188,8 @@ export class Nika {
     workflow: string,
     inputs?: Record<string, unknown>,
   ): Promise<Record<string, unknown>> {
+    // run() throws NikaJobError on failure — no need to check status after
     const job = await this.run(workflow, inputs);
-
-    if (job.status === 'failed') {
-      throw new NikaJobError(job);
-    }
 
     const result: Record<string, unknown> = {};
     const artifactList = await this.artifacts(job.job_id);

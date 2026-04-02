@@ -21,11 +21,11 @@ export async function pollUntilDone(
     if (job.status === 'failed') throw new NikaJobError(job);
     if (job.status === 'cancelled') throw new NikaJobError(job);
 
-    if (Date.now() - start + delay > opts.timeout) {
-      throw new NikaTimeoutError(job.job_id, opts.timeout);
-    }
-
     await new Promise(r => setTimeout(r, delay));
     delay = Math.min(delay * opts.backoff, 10_000); // cap at 10s
+
+    if (Date.now() - start > opts.timeout) {
+      throw new NikaTimeoutError(job.job_id, opts.timeout);
+    }
   }
 }

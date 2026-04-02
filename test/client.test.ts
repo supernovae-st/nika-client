@@ -127,6 +127,19 @@ describe('submit()', () => {
     const headers = fetchSpy.mock.calls[0][1]?.headers as Record<string, string>;
     expect(headers['Authorization']).toBe(`Bearer ${TOKEN}`);
   });
+
+  it('omits inputs when undefined', async () => {
+    const client = makeClient();
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({ job_id: 'x', status: 'pending' }),
+    );
+
+    await client.submit('flow.nika.yaml');
+
+    const body = JSON.parse(fetchSpy.mock.calls[0][1]?.body as string);
+    expect(body.inputs).toBeUndefined();
+    expect(body.workflow).toBe('flow.nika.yaml');
+  });
 });
 
 // ── Status ──────────────────────────────────────────────────
@@ -385,5 +398,156 @@ describe('runAndCollect()', () => {
     expect(result['data.json']).toEqual({ result: 42 });
     expect(result['report.md']).toBe('# Report');
     expect(result['audio.mp3']).toBeUndefined();
+  });
+});
+
+// ── Constructor validation ──────────────────────────────────
+
+describe('constructor validation', () => {
+  it('rejects non-http URL', () => {
+    expect(() => new Nika({ url: 'ftp://bad', token: 'tok' })).toThrow(TypeError);
+  });
+
+  it('rejects empty URL', () => {
+    expect(() => new Nika({ url: '', token: 'tok' })).toThrow(TypeError);
+  });
+
+  it('rejects empty token', () => {
+    expect(() => new Nika({ url: 'http://localhost:3000', token: '' })).toThrow(TypeError);
+  });
+
+  it('accepts http URL', () => {
+    expect(new Nika({ url: 'http://localhost:3000', token: 'tok' })).toBeInstanceOf(Nika);
+  });
+
+  it('accepts https URL', () => {
+    expect(new Nika({ url: 'https://nika.example.com', token: 'tok' })).toBeInstanceOf(Nika);
+  });
+});
+
+// ── NikaJobError fields ─────────────────────────────────────
+
+describe('NikaJobError', () => {
+  it('exposes exitCode from job', () => {
+    const job: NikaJob = {
+      job_id: 'j1',
+      status: 'failed',
+      workflow: 'bad.nika.yaml',
+      created_at: '2026-04-02T10:00:00Z',
+      exit_code: -1,
+      output: 'segfault',
+    };
+    const err = new NikaJobError(job);
+    expect(err.exitCode).toBe(-1);
+    expect(err.job).toBe(job);
+    expect(err.message).toContain('segfault');
+    expect(err.name).toBe('NikaJobError');
+  });
+
+  it('handles missing exit_code and output', () => {
+    const job: NikaJob = {
+      job_id: 'j2',
+      status: 'cancelled',
+      workflow: 'cancel.nika.yaml',
+      created_at: '2026-04-02T10:00:00Z',
+    };
+    const err = new NikaJobError(job);
+    expect(err.exitCode).toBeUndefined();
+    expect(err.message).toContain('unknown error');
+  });
+});
+
+// ── stream() integration ────────────────────────────────────
+
+describe('stream()', () => {
+  function sseResponse(chunks: string[]): Response {
+    let index = 0;
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (index < chunks.length) {
+          controller.enqueue(encoder.encode(chunks[index]));
+          index++;
+        } else {
+          controller.close();
+        }
+      },
+    });
+    return new Response(stream, {
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream' },
+    });
+  }
+
+  it('passes auth header and streams events', async () => {
+    const client = makeClient();
+    fetchSpy.mockResolvedValueOnce(
+      sseResponse([
+        'event: started\ndata: {"type":"started","job_id":"s1"}\n\n',
+        'event: completed\ndata: {"type":"completed","job_id":"s1","output":null}\n\n',
+      ]),
+    );
+
+    const events = [];
+    for await (const event of client.stream('s1')) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(2);
+    expect(events[0].type).toBe('started');
+
+    const headers = fetchSpy.mock.calls[0][1]?.headers as Record<string, string>;
+    expect(headers['Authorization']).toBe(`Bearer ${TOKEN}`);
+  });
+
+  it('passes AbortSignal to fetch', async () => {
+    const client = makeClient();
+    const controller = new AbortController();
+
+    fetchSpy.mockResolvedValueOnce(
+      sseResponse([
+        'event: started\ndata: {"type":"started","job_id":"s2"}\n\n',
+        'event: completed\ndata: {"type":"completed","job_id":"s2","output":null}\n\n',
+      ]),
+    );
+
+    const events = [];
+    for await (const event of client.stream('s2', controller.signal)) {
+      events.push(event);
+    }
+
+    const init = fetchSpy.mock.calls[0][1];
+    expect(init?.signal).toBe(controller.signal);
+  });
+});
+
+// ── Retry-After header ──────────────────────────────────────
+
+describe('Retry-After header', () => {
+  it('respects valid Retry-After header', async () => {
+    const client = makeClient({ retries: 1 });
+
+    const res429 = new Response('rate limited', { status: 429, headers: { 'Retry-After': '1' } });
+    fetchSpy
+      .mockResolvedValueOnce(res429)
+      .mockResolvedValueOnce(jsonResponse({ job_id: 'ra1', status: 'pending' }));
+
+    const start = Date.now();
+    await client.submit('flow.nika.yaml');
+    const elapsed = Date.now() - start;
+    // Retry-After: 1 second = 1000ms
+    expect(elapsed).toBeGreaterThanOrEqual(900);
+  });
+
+  it('falls back to default delay on malformed Retry-After', async () => {
+    const client = makeClient({ retries: 1 });
+
+    const res429 = new Response('rate limited', { status: 429, headers: { 'Retry-After': 'abc' } });
+    fetchSpy
+      .mockResolvedValueOnce(res429)
+      .mockResolvedValueOnce(jsonResponse({ job_id: 'ra2', status: 'pending' }));
+
+    const res = await client.submit('flow.nika.yaml');
+    expect(res.job_id).toBe('ra2');
   });
 });

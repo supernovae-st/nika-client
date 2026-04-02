@@ -81,26 +81,16 @@ export interface NikaHealth {
   service: string;
 }
 
-// ── SSE Events ──────────────────────────────────────────────
+// ── SSE Events (discriminated union matching Rust ServeEvent) ──
 
-export type NikaEventType =
-  | 'started'
-  | 'task_start'
-  | 'task_complete'
-  | 'task_failed'
-  | 'artifact_written'
-  | 'completed'
-  | 'failed'
-  | 'cancelled';
+export type NikaEvent =
+  | { type: 'started'; job_id: string }
+  | { type: 'task_start'; job_id: string; task_id: string; verb: string }
+  | { type: 'task_complete'; job_id: string; task_id: string; duration_ms: number }
+  | { type: 'task_failed'; job_id: string; task_id: string; error: string; duration_ms: number }
+  | { type: 'artifact_written'; job_id: string; task_id: string; path: string; size: number }
+  | { type: 'completed'; job_id: string; output: string | null }
+  | { type: 'failed'; job_id: string; error: string | null }
+  | { type: 'cancelled'; job_id: string };
 
-export interface NikaEvent {
-  type: NikaEventType;
-  job_id: string;
-  task_id?: string;
-  verb?: string;
-  duration_ms?: number;
-  error?: string;
-  output?: string;
-  path?: string;
-  size?: number;
-}
+export type NikaEventType = NikaEvent['type'];

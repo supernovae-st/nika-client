@@ -5,23 +5,32 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
+      "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
     }
   },
-  "files": ["dist"],
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "tsup src/index.ts --format esm --dts",
+    "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
+    "check:coverage": "node scripts/check-sdk-coverage.js",
+    "generate:types": "node scripts/generate-types.js",
     "prepublishOnly": "npm run build"
   },
-  "dependencies": {},
   "devDependencies": {
-    "typescript": "^5.5",
+    "openapi-typescript": "^7.13.0",
     "tsup": "^8.0",
+    "typescript": "^5.5",
     "vitest": "^2.0"
   },
-  "engines": { "node": ">=18" },
-  "license": "MIT"
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "AGPL-3.0-or-later"
 }

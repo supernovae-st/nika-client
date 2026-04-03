@@ -1,5 +1,14 @@
 // Types aligned with nika-serve Rust source (routes/workflows.rs, routes/artifacts.rs, events.rs)
 
+// ── Config ─────────────────────────────────────────────────
+
+export interface NikaLogger {
+  debug: (message: string, ...args: unknown[]) => void;
+  info: (message: string, ...args: unknown[]) => void;
+  warn: (message: string, ...args: unknown[]) => void;
+  error: (message: string, ...args: unknown[]) => void;
+}
+
 export interface NikaConfig {
   /** URL of nika serve (e.g. http://localhost:3000) */
   url: string;
@@ -15,6 +24,10 @@ export interface NikaConfig {
   pollTimeout?: number;
   /** Backoff multiplier for polling. Default: 1.5 */
   pollBackoff?: number;
+  /** Custom fetch function. Default: globalThis.fetch */
+  fetch?: typeof globalThis.fetch;
+  /** Logger for request/response tracing. Default: silent */
+  logger?: NikaLogger;
 }
 
 // ── Run ─────────────────────────────────────────────────────
@@ -29,6 +42,11 @@ export interface RunRequest {
 export interface RunResponse {
   job_id: string;
   status: string;
+}
+
+export interface RunOptions {
+  resumeFrom?: string;
+  signal?: AbortSignal;
 }
 
 // ── Status ──────────────────────────────────────────────────
@@ -81,6 +99,19 @@ export interface NikaHealth {
   service: string;
 }
 
+// ── Workflows ───────────────────────────────────────────────
+
+export interface WorkflowInfo {
+  name: string;
+  size: number;
+}
+
+/** GET /v1/workflows response */
+export interface ListWorkflowsResponse {
+  workflows: WorkflowInfo[];
+  count: number;
+}
+
 // ── SSE Events (discriminated union matching Rust ServeEvent) ──
 
 export type NikaEvent =
@@ -94,3 +125,20 @@ export type NikaEvent =
   | { type: 'cancelled'; job_id: string };
 
 export type NikaEventType = NikaEvent['type'];
+
+// ── Stream options ──────────────────────────────────────────
+
+export interface StreamOptions {
+  signal?: AbortSignal;
+  /** Max ms without any event before treating connection as dead. Default: 60_000 */
+  idleTimeout?: number;
+}
+
+// ── Poll options (internal) ─────────────────────────────────
+
+export interface PollOptions {
+  interval: number;
+  timeout: number;
+  backoff: number;
+  signal?: AbortSignal;
+}

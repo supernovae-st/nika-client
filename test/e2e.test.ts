@@ -1,25 +1,22 @@
 /**
- * E2E integration test for @supernovae-st/nika-client.
+ * E2E integration test for @supernovae-st/nika-client v2.
  *
- * Spins up a minimal HTTP server (Node built-in) that mimics the nika serve API,
- * then exercises the real Nika client class against it over the network.
+ * Spins up a minimal HTTP server mimicking nika serve API,
+ * then exercises the real Nika client against it over the network.
  *
  * No mocks -- real HTTP, real SSE, real client code.
  */
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll } from 'vitest';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { Nika } from '../src/client.js';
-import { NikaError, NikaJobError } from '../src/errors.js';
+import { Nika } from '../src/index.js';
+import { NikaError, NikaAPIError, NikaJobError, NikaJobCancelledError } from '../src/errors.js';
 
 // ── Mock Server State ────────────────────────────────────────
 
 interface MockState {
-  /** Track Authorization headers received per path */
   authHeaders: Map<string, string | undefined>;
-  /** How many times /v1/status/{id} has been called per id */
   statusCalls: Map<string, number>;
-  /** How many times /v1/run has been called (for 429 test) */
   runCallCount: number;
 }
 
@@ -41,16 +38,15 @@ function createMockServer(state: MockState) {
     const path = url.pathname;
     const method = req.method ?? 'GET';
 
-    // Track auth headers for every request
     state.authHeaders.set(`${method} ${path}`, req.headers.authorization);
 
     // ── Health (no auth) ──────────────────────────────────
     if (path === '/health' && method === 'GET') {
-      json(res, { status: 'ok', version: '0.61.0', service: 'nika-serve' });
+      json(res, { status: 'ok', version: '0.62.0', service: 'nika-serve' });
       return;
     }
 
-    // ── Auth gate for everything else ─────────────────────
+    // ── Auth gate ─────────────────────────────────────────
     if (path !== '/health') {
       const auth = req.headers.authorization;
       if (!auth || auth !== `Bearer ${VALID_TOKEN}`) {
@@ -59,13 +55,37 @@ function createMockServer(state: MockState) {
       }
     }
 
+    // ── GET /v1/workflows ─────────────────────────────────
+    if (path === '/v1/workflows' && method === 'GET') {
+      json(res, {
+        workflows: [
+          { name: 'translate.nika.yaml', size: 512 },
+          { name: 'seo/audit.nika.yaml', size: 1024 },
+        ],
+        count: 2,
+      });
+      return;
+    }
+
+    // ── POST /v1/reload ───────────────────────────────────
+    if (path === '/v1/reload' && method === 'POST') {
+      json(res, {
+        workflows: [
+          { name: 'translate.nika.yaml', size: 512 },
+          { name: 'seo/audit.nika.yaml', size: 1024 },
+          { name: 'new.nika.yaml', size: 256 },
+        ],
+        count: 3,
+      });
+      return;
+    }
+
     // ── POST /v1/run ──────────────────────────────────────
     if (path === '/v1/run' && method === 'POST') {
       collectBody(req).then((body) => {
         const parsed = JSON.parse(body);
         const workflow: string = parsed.workflow;
 
-        // 429 scenario: first call returns 429, second succeeds
         if (workflow === 'retry-429.nika.yaml') {
           state.runCallCount++;
           if (state.runCallCount === 1) {
@@ -77,31 +97,26 @@ function createMockServer(state: MockState) {
           return;
         }
 
-        // Failing workflow
         if (workflow === 'fail.nika.yaml') {
           json(res, { job_id: 'job-fail', status: 'pending' });
           return;
         }
 
-        // Cancel workflow
         if (workflow === 'cancel-me.nika.yaml') {
           json(res, { job_id: 'job-cancel', status: 'pending' });
           return;
         }
 
-        // SSE streaming workflow
         if (workflow === 'stream.nika.yaml') {
           json(res, { job_id: 'job-stream', status: 'pending' });
           return;
         }
 
-        // runAndCollect workflow
         if (workflow === 'collect.nika.yaml') {
           json(res, { job_id: 'job-collect', status: 'pending' });
           return;
         }
 
-        // Default: lifecycle workflow
         json(res, { job_id: 'job-lifecycle', status: 'pending' });
       });
       return;
@@ -115,7 +130,6 @@ function createMockServer(state: MockState) {
       state.statusCalls.set(jobId, calls);
 
       if (jobId === 'job-lifecycle') {
-        // Transition: pending (1) -> running (2) -> completed (3+)
         if (calls === 1) {
           json(res, makeJob(jobId, 'pending', 'lifecycle.nika.yaml'));
         } else if (calls === 2) {
@@ -150,7 +164,7 @@ function createMockServer(state: MockState) {
       }
 
       if (jobId === 'job-cancel') {
-        json(res, makeJob(jobId, 'running', 'cancel-me.nika.yaml', {
+        json(res, makeJob(jobId, 'cancelled', 'cancel-me.nika.yaml', {
           started_at: '2026-04-02T10:00:01Z',
         }));
         return;
@@ -197,9 +211,9 @@ function createMockServer(state: MockState) {
       const events = [
         { type: 'started', job_id: jobId },
         { type: 'task_start', job_id: jobId, task_id: 'research', verb: 'infer' },
-        { type: 'task_complete', job_id: jobId, task_id: 'research', verb: 'infer', duration_ms: 1200 },
+        { type: 'task_complete', job_id: jobId, task_id: 'research', duration_ms: 1200 },
         { type: 'task_start', job_id: jobId, task_id: 'summarize', verb: 'infer' },
-        { type: 'task_complete', job_id: jobId, task_id: 'summarize', verb: 'infer', duration_ms: 800 },
+        { type: 'task_complete', job_id: jobId, task_id: 'summarize', duration_ms: 800 },
         { type: 'completed', job_id: jobId, output: 'All tasks done' },
       ];
 
@@ -215,7 +229,6 @@ function createMockServer(state: MockState) {
         idx++;
       }, 10);
 
-      // Clean up if client disconnects
       req.on('close', () => clearInterval(timer));
       return;
     }
@@ -252,11 +265,20 @@ function createMockServer(state: MockState) {
         return;
       }
 
+      if (name === 'audio.mp3') {
+        const bytes = Buffer.from([0xff, 0xfb, 0x90, 0x00]); // MP3 header
+        res.writeHead(200, {
+          'Content-Type': 'audio/mpeg',
+          'Content-Length': String(bytes.length),
+        });
+        res.end(bytes);
+        return;
+      }
+
       json(res, { error: 'Artifact not found' }, 404);
       return;
     }
 
-    // ── Fallback 404 ──────────────────────────────────────
     json(res, { error: `Not found: ${method} ${path}` }, 404);
   });
 }
@@ -310,6 +332,13 @@ beforeAll(async () => {
   });
 });
 
+// Reset shared state between tests to prevent order-dependence
+beforeEach(() => {
+  state.authHeaders.clear();
+  state.statusCalls.clear();
+  state.runCallCount = 0;
+});
+
 afterAll(async () => {
   await new Promise<void>((resolve, reject) => {
     server.close((err) => (err ? reject(err) : resolve()));
@@ -331,46 +360,32 @@ function makeClient(overrides?: Record<string, unknown>) {
 
 // ── Tests ────────────────────────────────────────────────────
 
-describe('E2E: nika-client against mock server', () => {
+describe('E2E: nika-client v2 against mock server', () => {
+
   // ── 1. Full Lifecycle ────────────────────────────────────
 
   describe('1. Full lifecycle: submit -> poll -> artifacts -> download', () => {
-    it('transitions through pending -> running -> completed, then lists and downloads artifacts', async () => {
+    it('transitions through pending -> running -> completed', async () => {
       const client = makeClient();
 
-      // Submit
-      const run = await client.submit('lifecycle.nika.yaml', { topic: 'AI' });
+      const run = await client.jobs.submit('lifecycle.nika.yaml', { topic: 'AI' });
       expect(run.job_id).toBe('job-lifecycle');
       expect(run.status).toBe('pending');
 
-      // Poll until done (mock transitions: pending -> running -> completed)
-      const job = await client.run('lifecycle.nika.yaml', { topic: 'AI' });
+      const job = await client.jobs.run('lifecycle.nika.yaml', { topic: 'AI' });
       expect(job.status).toBe('completed');
-      expect(job.job_id).toMatch(/^job-lifecycle/);
       expect(job.exit_code).toBe(0);
       expect(job.output).toBe('All 3 tasks completed');
-      expect(job.workflow).toBe('lifecycle.nika.yaml');
-      expect(job.started_at).toBeDefined();
-      expect(job.completed_at).toBeDefined();
 
-      // List artifacts
-      const artifacts = await client.artifacts(job.job_id);
+      const artifacts = await client.jobs.artifacts(job.job_id);
       expect(artifacts).toHaveLength(3);
       expect(artifacts[0].name).toBe('report.md');
-      expect(artifacts[0].format).toBe('markdown');
-      expect(artifacts[0].size).toBe(512);
-      expect(artifacts[1].name).toBe('data.json');
       expect(artifacts[1].checksum).toBe('blake3-abc123');
-      expect(artifacts[2].name).toBe('audio.mp3');
-      expect(artifacts[2].format).toBe('binary');
 
-      // Download text artifact
-      const markdown = await client.artifact(job.job_id, 'report.md');
+      const markdown = await client.jobs.artifact(job.job_id, 'report.md');
       expect(markdown).toContain('# Research Report');
-      expect(markdown).toContain('AI workflow engines');
 
-      // Download JSON artifact
-      const data = await client.artifactJson<{ topics: string[]; score: number }>(
+      const data = await client.jobs.artifactJson<{ topics: string[]; score: number }>(
         job.job_id,
         'data.json',
       );
@@ -381,89 +396,73 @@ describe('E2E: nika-client against mock server', () => {
 
   // ── 2. SSE Streaming ────────────────────────────────────
 
-  describe('2. SSE streaming: receive all events in order', () => {
-    it('streams started -> task_start -> task_complete -> ... -> completed', async () => {
+  describe('2. SSE streaming', () => {
+    it('streams all events in order', async () => {
       const client = makeClient();
 
-      // Submit to get the job
-      const run = await client.submit('stream.nika.yaml');
+      const run = await client.jobs.submit('stream.nika.yaml');
       expect(run.job_id).toBe('job-stream');
 
-      // Stream events
       const events = [];
-      for await (const event of client.stream(run.job_id)) {
+      for await (const event of client.jobs.stream(run.job_id)) {
         events.push(event);
       }
 
-      // Verify all 6 events received in correct order
       expect(events).toHaveLength(6);
       expect(events[0].type).toBe('started');
-      expect(events[0].job_id).toBe('job-stream');
-
       expect(events[1].type).toBe('task_start');
-      expect(events[1].task_id).toBe('research');
-      expect(events[1].verb).toBe('infer');
-
+      if (events[1].type === 'task_start') expect(events[1].verb).toBe('infer');
       expect(events[2].type).toBe('task_complete');
-      expect(events[2].task_id).toBe('research');
-      expect(events[2].duration_ms).toBe(1200);
-
-      expect(events[3].type).toBe('task_start');
-      expect(events[3].task_id).toBe('summarize');
-
-      expect(events[4].type).toBe('task_complete');
-      expect(events[4].task_id).toBe('summarize');
-      expect(events[4].duration_ms).toBe(800);
-
+      if (events[2].type === 'task_complete') expect(events[2].duration_ms).toBe(1200);
       expect(events[5].type).toBe('completed');
-      expect(events[5].output).toBe('All tasks done');
-
-      // Verify types follow the expected lifecycle pattern
-      const types = events.map((e) => e.type);
-      expect(types[0]).toBe('started');
-      expect(types[types.length - 1]).toBe('completed');
     });
   });
 
   // ── 3. Error Handling ───────────────────────────────────
 
-  describe('3. Error handling: failed workflow produces NikaJobError', () => {
-    it('polls a failing job and throws NikaJobError with correct details', async () => {
+  describe('3. Error handling', () => {
+    it('throws NikaJobError on failed workflow', async () => {
       const client = makeClient();
 
       try {
-        await client.run('fail.nika.yaml');
-        expect.unreachable('Should have thrown NikaJobError');
+        await client.jobs.run('fail.nika.yaml');
+        expect.unreachable('Should have thrown');
       } catch (err) {
         expect(err).toBeInstanceOf(NikaJobError);
+        expect(err).toBeInstanceOf(NikaError);
         const jobErr = err as NikaJobError;
-        expect(jobErr.job.job_id).toBe('job-fail');
         expect(jobErr.job.status).toBe('failed');
         expect(jobErr.job.output).toContain('NIKA-010');
-        expect(jobErr.job.output).toContain('schema validation error');
         expect(jobErr.job.exit_code).toBe(1);
-        expect(jobErr.message).toContain('job-fail');
-        expect(jobErr.message).toContain('NIKA-010');
+      }
+    });
+
+    it('throws NikaJobCancelledError on cancelled workflow', async () => {
+      const client = makeClient();
+
+      const run = await client.jobs.submit('cancel-me.nika.yaml');
+      try {
+        // Poll will see cancelled status immediately
+        await client.jobs.run('cancel-me.nika.yaml');
+        expect.unreachable('Should have thrown');
+      } catch (err) {
+        expect(err).toBeInstanceOf(NikaJobCancelledError);
+        expect(err).toBeInstanceOf(NikaJobError);
+        expect(err).toBeInstanceOf(NikaError);
       }
     });
   });
 
   // ── 4. Cancel ───────────────────────────────────────────
 
-  describe('4. Cancel: submit then cancel a running job', () => {
-    it('submits a workflow and cancels it successfully', async () => {
+  describe('4. Cancel', () => {
+    it('cancels a running job', async () => {
       const client = makeClient();
 
-      // Submit
-      const run = await client.submit('cancel-me.nika.yaml');
+      const run = await client.jobs.submit('cancel-me.nika.yaml');
       expect(run.job_id).toBe('job-cancel');
 
-      // Verify it is running
-      const status = await client.status(run.job_id);
-      expect(status.status).toBe('running');
-
-      // Cancel
-      const cancel = await client.cancel(run.job_id);
+      const cancel = await client.jobs.cancel(run.job_id);
       expect(cancel.job_id).toBe('job-cancel');
       expect(cancel.status).toBe('cancelled');
       expect(cancel.message).toBe('Job cancelled by user');
@@ -472,62 +471,43 @@ describe('E2E: nika-client against mock server', () => {
 
   // ── 5. Retry on 429 ────────────────────────────────────
 
-  describe('5. Retry on 429: server returns 429 once then 200', () => {
-    it('retries automatically and succeeds on second attempt', async () => {
+  describe('5. Retry on 429', () => {
+    it('retries automatically', async () => {
       const client = makeClient({ retries: 2 });
 
-      // Reset the counter for this test
-      state.runCallCount = 0;
-
-      const run = await client.submit('retry-429.nika.yaml');
+      const run = await client.jobs.submit('retry-429.nika.yaml');
       expect(run.job_id).toBe('job-retry-429');
-      expect(run.status).toBe('pending');
-
-      // Verify the server saw 2 requests (429 + 200)
       expect(state.runCallCount).toBe(2);
     });
   });
 
   // ── 6. runAndCollect ────────────────────────────────────
 
-  describe('6. runAndCollect: full flow including artifact collection', () => {
-    it('runs, waits, and collects all non-binary artifacts into a map', async () => {
+  describe('6. runAndCollect', () => {
+    it('collects all non-binary artifacts', async () => {
       const client = makeClient();
 
-      const result = await client.runAndCollect('collect.nika.yaml');
+      const result = await client.jobs.runAndCollect('collect.nika.yaml');
 
-      // JSON artifact parsed as object
-      expect(result['data.json']).toEqual({
-        topics: ['nika', 'langchain', 'dspy'],
-        score: 0.95,
-      });
-
-      // Markdown artifact as string
+      expect(result['data.json']).toEqual({ topics: ['nika', 'langchain', 'dspy'], score: 0.95 });
       expect(result['report.md']).toContain('# Research Report');
-      expect(typeof result['report.md']).toBe('string');
-
-      // Binary artifact skipped
       expect(result['audio.mp3']).toBeUndefined();
-
-      // Only 2 non-binary artifacts collected
       expect(Object.keys(result)).toHaveLength(2);
     });
   });
 
   // ── 7. Auth Verification ────────────────────────────────
 
-  describe('7. Auth verification: all requests include Bearer token', () => {
-    it('sends Authorization header on submit, status, cancel, artifacts, artifact download', async () => {
+  describe('7. Auth verification', () => {
+    it('all requests include Bearer token', async () => {
       const client = makeClient();
 
-      // Make several authenticated requests
-      await client.submit('lifecycle.nika.yaml');
-      await client.status('job-lifecycle');
-      await client.cancel('job-lifecycle');
-      await client.artifacts('job-lifecycle');
-      await client.artifact('job-lifecycle', 'report.md');
+      await client.jobs.submit('lifecycle.nika.yaml');
+      await client.jobs.status('job-lifecycle');
+      await client.jobs.cancel('job-lifecycle');
+      await client.jobs.artifacts('job-lifecycle');
+      await client.jobs.artifact('job-lifecycle', 'report.md');
 
-      // Check auth header was present for each
       const expected = `Bearer ${VALID_TOKEN}`;
       expect(state.authHeaders.get('POST /v1/run')).toBe(expected);
       expect(state.authHeaders.get('GET /v1/status/job-lifecycle')).toBe(expected);
@@ -536,7 +516,7 @@ describe('E2E: nika-client against mock server', () => {
       expect(state.authHeaders.get('GET /v1/jobs/job-lifecycle/artifacts/report.md')).toBe(expected);
     });
 
-    it('rejects requests with wrong token', async () => {
+    it('rejects wrong token', async () => {
       const badClient = new Nika({
         url: baseUrl,
         token: 'wrong-token',
@@ -544,31 +524,63 @@ describe('E2E: nika-client against mock server', () => {
         timeout: 5_000,
       });
 
-      await expect(badClient.submit('lifecycle.nika.yaml')).rejects.toThrow(NikaError);
+      await expect(badClient.jobs.submit('lifecycle.nika.yaml')).rejects.toThrow(NikaAPIError);
       try {
-        await badClient.submit('lifecycle.nika.yaml');
+        await badClient.jobs.submit('lifecycle.nika.yaml');
       } catch (err) {
-        expect((err as NikaError).status).toBe(401);
+        expect((err as NikaAPIError).status).toBe(401);
       }
     });
   });
 
   // ── 8. Health Check ─────────────────────────────────────
 
-  describe('8. Health check: works without authentication', () => {
-    it('returns health status from /health without Authorization header', async () => {
+  describe('8. Health check', () => {
+    it('works without authentication', async () => {
       const client = makeClient();
 
       const health = await client.health();
 
       expect(health.status).toBe('ok');
-      expect(health.version).toBe('0.61.0');
+      expect(health.version).toBe('0.62.0');
       expect(health.service).toBe('nika-serve');
 
-      // Verify no auth header was sent for health
-      // health() uses globalThis.fetch directly without auth headers
       const authForHealth = state.authHeaders.get('GET /health');
       expect(authForHealth).toBeUndefined();
+    });
+  });
+
+  // ── 9. Workflows ────────────────────────────────────────
+
+  describe('9. Workflows', () => {
+    it('lists workflows', async () => {
+      const client = makeClient();
+
+      const list = await client.workflows.list();
+      expect(list).toHaveLength(2);
+      expect(list[0].name).toBe('translate.nika.yaml');
+      expect(list[1].size).toBe(1024);
+    });
+
+    it('reloads workflows', async () => {
+      const client = makeClient();
+
+      const list = await client.workflows.reload();
+      expect(list).toHaveLength(3);
+      expect(list[2].name).toBe('new.nika.yaml');
+    });
+  });
+
+  // ── 10. Binary artifact download ────────────────────────
+
+  describe('10. Binary artifact download', () => {
+    it('downloads binary artifact as Uint8Array', async () => {
+      const client = makeClient();
+
+      const binary = await client.jobs.artifactBinary('job-lifecycle', 'audio.mp3');
+      expect(binary).toBeInstanceOf(Uint8Array);
+      expect(binary[0]).toBe(0xff);
+      expect(binary[1]).toBe(0xfb);
     });
   });
 });

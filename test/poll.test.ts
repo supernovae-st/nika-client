@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { pollUntilDone } from '../src/poll.js';
-import { NikaJobError, NikaTimeoutError } from '../src/errors.js';
+import { pollUntilDone } from '../src/lib/polling.js';
+import { NikaJobError, NikaJobCancelledError, NikaTimeoutError } from '../src/errors.js';
 import type { NikaJob } from '../src/types.js';
 
 function makeJob(status: string, extra?: Partial<NikaJob>): NikaJob {
@@ -45,11 +45,13 @@ describe('pollUntilDone', () => {
     expect(err.job.output).toBe('boom');
   });
 
-  it('throws NikaJobError on cancelled', async () => {
+  it('throws NikaJobCancelledError on cancelled', async () => {
     const fetchStatus = vi.fn()
       .mockResolvedValueOnce(makeJob('cancelled'));
 
-    await expect(pollUntilDone(fetchStatus, fastOpts)).rejects.toThrow(NikaJobError);
+    const err = await pollUntilDone(fetchStatus, fastOpts).catch(e => e);
+    expect(err).toBeInstanceOf(NikaJobCancelledError);
+    expect(err).toBeInstanceOf(NikaJobError);
   });
 
   it('throws NikaTimeoutError when deadline exceeded', async () => {
@@ -57,6 +59,22 @@ describe('pollUntilDone', () => {
 
     const err = await pollUntilDone(fetchStatus, { interval: 10, timeout: 30, backoff: 1.0 }).catch(e => e);
     expect(err).toBeInstanceOf(NikaTimeoutError);
+  });
+
+  it('checks deadline BEFORE sleep (no overshoot)', async () => {
+    let callCount = 0;
+    const fetchStatus = vi.fn().mockImplementation(async () => {
+      callCount++;
+      return makeJob('pending');
+    });
+
+    const start = Date.now();
+    await pollUntilDone(fetchStatus, { interval: 50, timeout: 80, backoff: 1.0 }).catch(() => {});
+    const elapsed = Date.now() - start;
+
+    // With timeout=80 and interval=50, should timeout after 1 poll + check
+    // NOT after poll + sleep(50) + check which would be ~100ms+
+    expect(elapsed).toBeLessThan(150);
   });
 
   it('applies backoff to delay', async () => {
@@ -72,13 +90,10 @@ describe('pollUntilDone', () => {
 
     await pollUntilDone(fetchStatus, { interval: 20, timeout: 5000, backoff: 2.0 });
 
-    // With backoff 2.0, delays should grow: ~20, ~40, ~80
-    // Check that later intervals are longer than earlier ones
     expect(fetchStatus).toHaveBeenCalledTimes(4);
     if (timestamps.length >= 4) {
       const gap1 = timestamps[2] - timestamps[1];
       const gap2 = timestamps[3] - timestamps[2];
-      // gap2 should be >= gap1 (within timing tolerance)
       expect(gap2).toBeGreaterThanOrEqual(gap1 * 0.8);
     }
   });

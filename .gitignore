@@ -3,3 +3,5 @@ dist/
 .nika/
 .env
 .env.*
+.openapi-cache.json
+src/generated/

@@ -418,6 +418,47 @@ describe('jobs.artifactBinary()', () => {
   });
 });
 
+// ── artifactStream ─────────────────────────────────────────
+
+describe('jobs.artifactStream()', () => {
+  it('returns a ReadableStream', async () => {
+    const client = makeClient();
+    const chunks = [new Uint8Array([1, 2]), new Uint8Array([3, 4])];
+    let index = 0;
+    const stream = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (index < chunks.length) {
+          controller.enqueue(chunks[index]);
+          index++;
+        } else {
+          controller.close();
+        }
+      },
+    });
+    fetchSpy.mockResolvedValueOnce(new Response(stream, { status: 200 }));
+
+    const result = await client.jobs.artifactStream('a1', 'big.csv');
+    expect(result).toBeInstanceOf(ReadableStream);
+
+    // Read all chunks and verify content
+    const reader = result.getReader();
+    const collected: number[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      collected.push(...value);
+    }
+    expect(collected).toEqual([1, 2, 3, 4]);
+  });
+
+  it('throws NikaError when body is null', async () => {
+    const client = makeClient();
+    // Response with null body
+    fetchSpy.mockResolvedValueOnce(new Response(null, { status: 200 }));
+    await expect(client.jobs.artifactStream('a1', 'file.bin')).rejects.toThrow('Artifact response has no body');
+  });
+});
+
 // ── runAndCollect ───────────────────────────────────────────
 
 describe('jobs.runAndCollect()', () => {
@@ -458,12 +499,51 @@ describe('jobs.runAndCollect()', () => {
     expect(result['report.md']).toBe('# Report');
     expect(result['audio.mp3']).toBeUndefined();
   });
+
+  it('batches artifact downloads (max 6 per batch)', async () => {
+    const client = makeClient({ pollInterval: 10, pollTimeout: 5000 });
+
+    // submit
+    fetchSpy.mockResolvedValueOnce(jsonResponse({ job_id: 'b1', status: 'pending' }));
+    // poll: completed
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        job_id: 'b1',
+        status: 'completed',
+        workflow: 'big.nika.yaml',
+        created_at: '2026-04-02T10:00:00Z',
+        completed_at: '2026-04-02T10:01:00Z',
+      }),
+    );
+    // artifacts list — 8 text artifacts
+    const arts = Array.from({ length: 8 }, (_, i) => ({
+      name: `file-${i}.txt`,
+      size: 100,
+      format: 'text',
+      content_type: 'text/plain',
+    }));
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({ job_id: 'b1', count: arts.length, artifacts: arts }),
+    );
+    // 8 download responses
+    for (let i = 0; i < 8; i++) {
+      fetchSpy.mockResolvedValueOnce(textResponse(`content-${i}`));
+    }
+
+    const result = await client.jobs.runAndCollect('big.nika.yaml');
+
+    expect(Object.keys(result)).toHaveLength(8);
+    expect(result['file-0.txt']).toBe('content-0');
+    expect(result['file-7.txt']).toBe('content-7');
+    // 1 submit + 1 poll + 1 artifacts + 8 downloads = 11
+    expect(fetchSpy).toHaveBeenCalledTimes(11);
+  });
 });
 
 // ── Workflows ───────────────────────────────────────────────
 
 describe('workflows.list()', () => {
-  it('returns workflow list', async () => {
+  it('returns workflow list (single page, no has_more)', async () => {
     const client = makeClient();
     fetchSpy.mockResolvedValueOnce(
       jsonResponse({
@@ -479,6 +559,85 @@ describe('workflows.list()', () => {
     expect(list).toHaveLength(2);
     expect(list[0].name).toBe('translate.nika.yaml');
     expect(list[1].size).toBe(1024);
+  });
+
+  it('auto-paginates across multiple pages', async () => {
+    const client = makeClient();
+    // Page 1: has_more=true
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        workflows: [
+          { name: 'a.nika.yaml', size: 100 },
+          { name: 'b.nika.yaml', size: 200 },
+        ],
+        count: 2,
+        has_more: true,
+      }),
+    );
+    // Page 2: has_more=false (last page)
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        workflows: [
+          { name: 'c.nika.yaml', size: 300 },
+        ],
+        count: 1,
+        has_more: false,
+      }),
+    );
+
+    const list = await client.workflows.list();
+    expect(list).toHaveLength(3);
+    expect(list.map(w => w.name)).toEqual(['a.nika.yaml', 'b.nika.yaml', 'c.nika.yaml']);
+
+    // Second call should have after=b.nika.yaml
+    const url2 = fetchSpy.mock.calls[1][0] as string;
+    expect(url2).toContain('after=b.nika.yaml');
+    expect(url2).toContain('limit=200');
+  });
+});
+
+describe('workflows.listPage()', () => {
+  it('returns a single page with has_more', async () => {
+    const client = makeClient();
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({
+        workflows: [{ name: 'a.nika.yaml', size: 100 }],
+        count: 1,
+        has_more: true,
+      }),
+    );
+
+    const page = await client.workflows.listPage({ limit: 1 });
+    expect(page.workflows).toHaveLength(1);
+    expect(page.has_more).toBe(true);
+
+    const url = fetchSpy.mock.calls[0][0] as string;
+    expect(url).toContain('limit=1');
+  });
+
+  it('passes after cursor', async () => {
+    const client = makeClient();
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({ workflows: [], count: 0, has_more: false }),
+    );
+
+    await client.workflows.listPage({ limit: 10, after: 'z.nika.yaml' });
+
+    const url = fetchSpy.mock.calls[0][0] as string;
+    expect(url).toContain('after=z.nika.yaml');
+  });
+
+  it('works without options', async () => {
+    const client = makeClient();
+    fetchSpy.mockResolvedValueOnce(
+      jsonResponse({ workflows: [{ name: 'x.nika.yaml', size: 50 }], count: 1 }),
+    );
+
+    const page = await client.workflows.listPage();
+    expect(page.count).toBe(1);
+
+    const url = fetchSpy.mock.calls[0][0] as string;
+    expect(url).toBe(`${BASE}/v1/workflows`);
   });
 });
 
@@ -646,6 +805,37 @@ describe('logger', () => {
     expect(logger.debug).toHaveBeenCalled();
     const calls = logger.debug.mock.calls.map((c: unknown[]) => c[0]);
     expect(calls.some((m: string) => m.includes('POST /v1/run'))).toBe(true);
+  });
+});
+
+// ── Concurrency ────────────────────────────────────────────
+
+describe('concurrency', () => {
+  it('limits concurrent requests via semaphore', async () => {
+    const client = makeClient({ concurrency: 2 });
+    let inflight = 0;
+    let maxInflight = 0;
+
+    fetchSpy.mockImplementation(() => {
+      inflight++;
+      if (inflight > maxInflight) maxInflight = inflight;
+      return new Promise<Response>(resolve => {
+        setTimeout(() => {
+          inflight--;
+          resolve(jsonResponse({ job_id: 'x', status: 'pending' }));
+        }, 20);
+      });
+    });
+
+    // Fire 5 requests in parallel
+    await Promise.all(
+      Array.from({ length: 5 }, () =>
+        client.jobs.submit('flow.nika.yaml'),
+      ),
+    );
+
+    expect(maxInflight).toBeLessThanOrEqual(2);
+    expect(fetchSpy).toHaveBeenCalledTimes(5);
   });
 });
 

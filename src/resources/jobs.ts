@@ -9,6 +9,7 @@ import type {
   StreamOptions,
 } from '../types.js';
 import type { ApiClient } from '../lib/api-client.js';
+import { NikaError } from '../errors.js';
 import { pollUntilDone } from '../lib/polling.js';
 import { streamEvents } from '../lib/streaming.js';
 
@@ -106,6 +107,17 @@ export class Jobs {
     return new Uint8Array(buffer);
   }
 
+  /** Stream an artifact as a ReadableStream (for large files). */
+  async artifactStream(jobId: string, name: string): Promise<ReadableStream<Uint8Array>> {
+    const res = await this.api.request(
+      `/v1/jobs/${jobId}/artifacts/${encodeURIComponent(name)}`,
+    );
+    if (!res.body) {
+      throw new NikaError('Artifact response has no body');
+    }
+    return res.body;
+  }
+
   /** Run workflow, wait, and collect all non-binary artifacts into a map. */
   async runAndCollect(
     workflow: string,
@@ -115,17 +127,24 @@ export class Jobs {
     const job = await this.run(workflow, inputs, options);
     const artifactList = await this.artifacts(job.job_id);
 
-    // Download artifacts in parallel
-    const entries = await Promise.all(
-      artifactList
-        .filter(art => art.format !== 'binary')
-        .map(async (art): Promise<[string, unknown]> => {
+    const downloadable = artifactList.filter(art => art.format !== 'binary');
+
+    // Download in batches of 6 to avoid overwhelming the server
+    const batchSize = 6;
+    const entries: [string, unknown][] = [];
+
+    for (let i = 0; i < downloadable.length; i += batchSize) {
+      const batch = downloadable.slice(i, i + batchSize);
+      const results = await Promise.all(
+        batch.map(async (art): Promise<[string, unknown]> => {
           if (art.format === 'json') {
             return [art.name, await this.artifactJson(job.job_id, art.name)];
           }
           return [art.name, await this.artifact(job.job_id, art.name)];
         }),
-    );
+      );
+      entries.push(...results);
+    }
 
     return Object.fromEntries(entries);
   }

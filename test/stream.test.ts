@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { streamEvents } from '../src/lib/streaming.js';
-import { NikaAPIError } from '../src/errors.js';
+import { NikaAPIError, NikaConnectionError } from '../src/errors.js';
 import { ApiClient } from '../src/lib/api-client.js';
 
 afterEach(() => {
@@ -35,6 +35,7 @@ function makeApiClient(fetchFn: typeof fetch): ApiClient {
     30_000,
     2,
     fetchFn,
+    24,
   );
 }
 
@@ -190,5 +191,84 @@ describe('streamEvents', () => {
     const headers = fetchFn.mock.calls[0][1]?.headers as Record<string, string>;
     expect(headers['Authorization']).toBe('Bearer test-token');
     expect(headers['Accept']).toBe('text/event-stream');
+  });
+
+  it('tracks event IDs from id: field', async () => {
+    const fetchFn = vi.fn().mockResolvedValueOnce(
+      sseResponse([
+        'event: started\nid: 1\ndata: {"type":"started","job_id":"j1"}\n\n',
+        'event: completed\nid: 2\ndata: {"type":"completed","job_id":"j1","output":null}\n\n',
+      ]),
+    );
+    const client = makeApiClient(fetchFn as typeof fetch);
+
+    const events = [];
+    for await (const event of streamEvents(client, 'j1')) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(2);
+    expect(events[0].type).toBe('started');
+    expect(events[1].type).toBe('completed');
+  });
+
+  it('reconnects with Last-Event-Id on stream drop', async () => {
+    const fetchFn = vi.fn()
+      // First connection: 2 events then stream closes (no terminal)
+      .mockResolvedValueOnce(
+        sseResponse([
+          'event: started\nid: 1\ndata: {"type":"started","job_id":"j1"}\n\n',
+          'event: task_start\nid: 2\ndata: {"type":"task_start","job_id":"j1","task_id":"s1","verb":"infer"}\n\n',
+          // stream closes without terminal event
+        ]),
+      )
+      // Second connection (reconnect): resume + terminal
+      .mockResolvedValueOnce(
+        sseResponse([
+          'event: task_complete\nid: 3\ndata: {"type":"task_complete","job_id":"j1","task_id":"s1","duration_ms":500}\n\n',
+          'event: completed\nid: 4\ndata: {"type":"completed","job_id":"j1","output":"done"}\n\n',
+        ]),
+      );
+    const client = makeApiClient(fetchFn as typeof fetch);
+
+    const events = [];
+    for await (const event of streamEvents(client, 'j1', {
+      maxReconnects: 3,
+      reconnectDelay: 10, // fast for tests
+    })) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(4);
+    expect(events.map(e => e.type)).toEqual([
+      'started', 'task_start', 'task_complete', 'completed',
+    ]);
+
+    // Second call should have Last-Event-Id header
+    const headers2 = fetchFn.mock.calls[1][1]?.headers as Record<string, string>;
+    expect(headers2['Last-Event-Id']).toBe('2');
+  });
+
+  it('gives up after maxReconnects', async () => {
+    const fetchFn = vi.fn().mockResolvedValue(
+      // Always closes without terminal
+      sseResponse([
+        'event: started\nid: 1\ndata: {"type":"started","job_id":"j1"}\n\n',
+      ]),
+    );
+    const client = makeApiClient(fetchFn as typeof fetch);
+
+    const events = [];
+    await expect(async () => {
+      for await (const event of streamEvents(client, 'j1', {
+        maxReconnects: 2,
+        reconnectDelay: 10,
+      })) {
+        events.push(event);
+      }
+    }).rejects.toThrow(NikaConnectionError);
+
+    // 1 initial + 2 reconnects = 3 calls
+    expect(fetchFn).toHaveBeenCalledTimes(3);
   });
 });

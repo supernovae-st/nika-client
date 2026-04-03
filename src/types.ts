@@ -24,6 +24,8 @@ export interface NikaConfig {
   pollTimeout?: number;
   /** Backoff multiplier for polling. Default: 1.5 */
   pollBackoff?: number;
+  /** Max concurrent HTTP requests to nika serve. Default: 24 */
+  concurrency?: number;
   /** Custom fetch function. Default: globalThis.fetch */
   fetch?: typeof globalThis.fetch;
   /** Logger for request/response tracing. Default: silent */
@@ -110,6 +112,8 @@ export interface WorkflowInfo {
 export interface ListWorkflowsResponse {
   workflows: WorkflowInfo[];
   count: number;
+  /** Whether more results exist (present when `limit` is set). */
+  has_more?: boolean;
 }
 
 // ── SSE Events (discriminated union matching Rust ServeEvent) ──
@@ -132,6 +136,10 @@ export interface StreamOptions {
   signal?: AbortSignal;
   /** Max ms without any event before treating connection as dead. Default: 60_000 */
   idleTimeout?: number;
+  /** Max reconnection attempts on stream drop. Default: 3 */
+  maxReconnects?: number;
+  /** Initial reconnect delay in ms (multiplied by attempt). Default: 1000 */
+  reconnectDelay?: number;
 }
 
 // ── Poll options (internal) ─────────────────────────────────

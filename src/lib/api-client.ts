@@ -1,5 +1,6 @@
 import type { NikaLogger } from '../types.js';
 import { NikaAPIError, NikaConnectionError, NikaTimeoutError } from '../errors.js';
+import { Semaphore } from './semaphore.js';
 
 export class ApiClient {
   readonly url: string;
@@ -8,6 +9,7 @@ export class ApiClient {
   readonly logger?: NikaLogger;
   private readonly token: string;
   private readonly _fetch: typeof globalThis.fetch;
+  private readonly semaphore: Semaphore;
 
   constructor(
     url: string,
@@ -15,6 +17,7 @@ export class ApiClient {
     timeout: number,
     retries: number,
     fetchFn: typeof globalThis.fetch,
+    concurrency: number,
     logger?: NikaLogger,
   ) {
     this.url = url;
@@ -22,12 +25,22 @@ export class ApiClient {
     this.timeout = timeout;
     this.retries = retries;
     this._fetch = fetchFn;
+    this.semaphore = new Semaphore(concurrency);
     this.logger = logger;
   }
 
   // ── Standard request: auth + retry + timeout ──────────────
 
   async request(path: string, init?: RequestInit): Promise<Response> {
+    await this.semaphore.acquire();
+    try {
+      return await this._request(path, init);
+    } finally {
+      this.semaphore.release();
+    }
+  }
+
+  private async _request(path: string, init?: RequestInit): Promise<Response> {
     const url = `${this.url}${path}`;
     const headers: Record<string, string> = {
       'Authorization': `Bearer ${this.token}`,
@@ -120,12 +133,17 @@ export class ApiClient {
 
   // ── SSE connect: auth but no retry/timeout (stream has its own idle timeout) ──
 
-  async connectSSE(path: string, signal?: AbortSignal): Promise<Response> {
+  async connectSSE(
+    path: string,
+    signal?: AbortSignal,
+    extraHeaders?: Record<string, string>,
+  ): Promise<Response> {
     const url = `${this.url}${path}`;
     const res = await this._fetch(url, {
       headers: {
         'Authorization': `Bearer ${this.token}`,
         'Accept': 'text/event-stream',
+        ...extraHeaders,
       },
       signal,
     });

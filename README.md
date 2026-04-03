@@ -7,10 +7,12 @@ TypeScript client for the [Nika](https://github.com/SuperNovae-studio/nika) work
 - Namespace pattern: `nika.jobs.*`, `nika.workflows.*`
 - 6 typed error classes with full hierarchy
 - Automatic retry on 429/5xx with exponential backoff
-- SSE streaming via `AsyncIterable` with idle timeout
-- Binary artifact download (`Uint8Array`)
+- Client-side concurrency limiter (semaphore, default: 24)
+- SSE streaming via `AsyncIterable` with idle timeout + auto-reconnect
+- Binary artifact download (`Uint8Array`) + streaming (`ReadableStream`)
+- Auto-paginating workflow listing
 - AbortSignal support on long-running operations
-- Webhook HMAC-SHA256 verification
+- Webhook HMAC-SHA256 verification (async, Web Crypto API)
 - Dual CJS/ESM build
 - Node.js 18+
 
@@ -82,6 +84,33 @@ const bytes = await nika.jobs.artifactBinary('job-id', 'audio.mp3');
 // bytes is Uint8Array
 ```
 
+### Stream large artifacts without loading into memory
+
+```typescript
+import * as fs from 'node:fs';
+
+const stream = await nika.jobs.artifactStream('job-id', 'dataset.csv');
+const writer = fs.createWriteStream('output.csv');
+for await (const chunk of stream) {
+  writer.write(chunk);
+}
+writer.end();
+```
+
+### Paginate workflow listing
+
+```typescript
+// Auto-pagination (default) — fetches all pages transparently
+const all = await nika.workflows.list();
+
+// Manual pagination for large lists
+const page1 = await nika.workflows.listPage({ limit: 50 });
+if (page1.has_more) {
+  const last = page1.workflows[page1.workflows.length - 1].name;
+  const page2 = await nika.workflows.listPage({ limit: 50, after: last });
+}
+```
+
 ### Cancel a running job with AbortSignal
 
 ```typescript
@@ -113,8 +142,9 @@ const nika = new Nika({
 ```typescript
 import { Nika } from '@supernovae-st/nika-client';
 
-// Stripe-style HMAC-SHA256 verification
-const isValid = Nika.verifyWebhook(
+// Stripe-style HMAC-SHA256 verification (async — uses Web Crypto API)
+// Works in Node.js 18+, Deno, Cloudflare Workers, and Bun.
+const isValid = await Nika.verifyWebhook(
   rawBody,
   signatureHeader, // 't=1234567890,v1=abc123...'
   webhookSecret,
@@ -131,6 +161,7 @@ const isValid = Nika.verifyWebhook(
 | `token` | `string` | (required) | Bearer token (`NIKA_SERVE_TOKEN`) |
 | `timeout` | `number` | `30000` | HTTP request timeout in ms |
 | `retries` | `number` | `2` | Retries on 429/5xx |
+| `concurrency` | `number` | `24` | Max concurrent HTTP requests |
 | `pollInterval` | `number` | `2000` | Initial poll interval in ms |
 | `pollTimeout` | `number` | `300000` | Max poll duration in ms |
 | `pollBackoff` | `number` | `1.5` | Poll backoff multiplier |
@@ -152,13 +183,15 @@ const isValid = Nika.verifyWebhook(
 | `artifact(jobId, name)` | `string` | Download artifact as text |
 | `artifactJson<T>(jobId, name)` | `T` | Download artifact as parsed JSON |
 | `artifactBinary(jobId, name)` | `Uint8Array` | Download artifact as raw bytes |
+| `artifactStream(jobId, name)` | `ReadableStream<Uint8Array>` | Stream artifact (for large files) |
 | `runAndCollect(workflow, inputs?, opts?)` | `Record<string, unknown>` | Run + collect all non-binary artifacts |
 
 ### Workflows — `nika.workflows.*`
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `list()` | `WorkflowInfo[]` | List available workflows |
+| `list()` | `WorkflowInfo[]` | List all workflows (auto-paginates) |
+| `listPage(opts?)` | `ListWorkflowsResponse` | List single page (manual pagination) |
 | `reload()` | `WorkflowInfo[]` | Rescan workflows directory |
 | `source(name)` | `string` | Get raw YAML source |
 
@@ -212,6 +245,18 @@ try {
 | `cancelled` | `job_id` | Yes |
 
 Terminal events close the SSE stream automatically.
+
+The SDK auto-reconnects on stream drops (up to 3 attempts), using the `Last-Event-Id` header to resume without losing events. Configure via `StreamOptions`:
+
+```typescript
+for await (const event of nika.jobs.stream(jobId, {
+  maxReconnects: 5,
+  reconnectDelay: 2000,
+  idleTimeout: 120_000,
+})) {
+  // events are guaranteed in order, even across reconnects
+}
+```
 
 ## License
 

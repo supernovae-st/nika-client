@@ -27,6 +27,7 @@ export class Nika {
       config.timeout ?? 30_000,
       config.retries ?? 2,
       config.fetch ?? globalThis.fetch.bind(globalThis),
+      config.concurrency ?? 24,
       config.logger,
     );
 
@@ -68,6 +69,7 @@ export class Nika {
 
 export { Jobs } from './resources/jobs.js';
 export { Workflows } from './resources/workflows.js';
+export type { ListPageOptions } from './resources/workflows.js';
 export { verifyWebhookSignature } from './webhook.js';
 
 export {

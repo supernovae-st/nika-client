@@ -4,9 +4,9 @@
   "description": "TypeScript client for nika serve API",
   "repository": {
     "type": "git",
-    "url": "https://github.com/supernovae-studio/nika-client.git"
+    "url": "https://github.com/supernovae-st/nika-client.git"
   },
-  "homepage": "https://github.com/supernovae-studio/nika-client#readme",
+  "homepage": "https://github.com/supernovae-st/nika-client#readme",
   "author": "SuperNovae Studio <nika@supernovae.studio>",
   "keywords": ["nika", "workflow", "ai", "llm", "sdk", "typescript", "sse", "openapi"],
   "type": "module",

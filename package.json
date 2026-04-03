@@ -1,6 +1,6 @@
 {
   "name": "@supernovae-st/nika-client",
-  "version": "0.63.0",
+  "version": "0.64.0",
   "description": "TypeScript client for nika serve API",
   "repository": {
     "type": "git",
@@ -8,12 +8,27 @@
   },
   "homepage": "https://github.com/supernovae-st/nika-client#readme",
   "author": "SuperNovae Studio <nika@supernovae.studio>",
-  "keywords": ["nika", "workflow", "ai", "llm", "sdk", "typescript", "sse", "openapi"],
+  "keywords": [
+    "nika",
+    "workflow",
+    "ai",
+    "llm",
+    "sdk",
+    "typescript",
+    "sse",
+    "openapi"
+  ],
   "type": "module",
   "exports": {
     ".": {
-      "import": { "types": "./dist/index.d.ts", "default": "./dist/index.js" },
-      "require": { "types": "./dist/index.d.cts", "default": "./dist/index.cjs" }
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
     }
   },
   "main": "./dist/index.cjs",

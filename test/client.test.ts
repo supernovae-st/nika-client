@@ -500,6 +500,27 @@ describe('workflows.reload()', () => {
   });
 });
 
+// ── Workflow Source ─────────────────────────────────────────
+
+describe('workflows.source()', () => {
+  it('returns raw YAML as text', async () => {
+    const client = makeClient();
+    fetchSpy.mockResolvedValueOnce(textResponse('schema: "nika/workflow@0.12"\nworkflow: test'));
+    const yaml = await client.workflows.source('test.nika.yaml');
+    expect(yaml).toContain('nika/workflow@0.12');
+    const [url] = fetchSpy.mock.calls[0];
+    expect(url).toContain('/v1/workflows/test.nika.yaml/source');
+  });
+
+  it('encodes workflow name with slashes', async () => {
+    const client = makeClient();
+    fetchSpy.mockResolvedValueOnce(textResponse('schema: "nika/workflow@0.12"'));
+    await client.workflows.source('sub/dir/flow.nika.yaml');
+    const url = fetchSpy.mock.calls[0][0] as string;
+    expect(url).toContain('sub%2Fdir%2Fflow.nika.yaml');
+  });
+});
+
 // ── Constructor validation ──────────────────────────────────
 
 describe('constructor validation', () => {

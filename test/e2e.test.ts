@@ -80,6 +80,19 @@ function createMockServer(state: MockState) {
       return;
     }
 
+    // ── GET /v1/workflows/{name}/source ─────────────────
+    const sourceMatch = path.match(/^\/v1\/workflows\/(.+)\/source$/);
+    if (sourceMatch && method === 'GET') {
+      const name = decodeURIComponent(sourceMatch[1]);
+      if (name === 'translate.nika.yaml') {
+        res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+        res.end('schema: "nika/workflow@0.12"\nworkflow: translate\ndescription: "Translate files"');
+        return;
+      }
+      json(res, { error: `Workflow not found: ${name}` }, 404);
+      return;
+    }
+
     // ── POST /v1/run ──────────────────────────────────────
     if (path === '/v1/run' && method === 'POST') {
       collectBody(req).then((body) => {
@@ -571,9 +584,21 @@ describe('E2E: nika-client v2 against mock server', () => {
     });
   });
 
-  // ── 10. Binary artifact download ────────────────────────
+  // ── 10. Workflow source ──────────────────────────────────
 
-  describe('10. Binary artifact download', () => {
+  describe('10. Workflow source', () => {
+    it('returns raw YAML content', async () => {
+      const client = makeClient();
+
+      const yaml = await client.workflows.source('translate.nika.yaml');
+      expect(yaml).toContain('nika/workflow@0.12');
+      expect(yaml).toContain('workflow: translate');
+    });
+  });
+
+  // ── 11. Binary artifact download ────────────────────────
+
+  describe('11. Binary artifact download', () => {
     it('downloads binary artifact as Uint8Array', async () => {
       const client = makeClient();
 

@@ -13,12 +13,48 @@ export class Nika {
 
   private readonly api: ApiClient;
 
+  /**
+   * Create a Nika client from environment variables.
+   * Reads `NIKA_URL` and `NIKA_TOKEN`. Throws if either is missing.
+   *
+   * @param overrides — optional config fields to override env values
+   */
+  static fromEnv(overrides?: Partial<NikaConfig>): Nika {
+    const url = overrides?.url ?? process.env.NIKA_URL;
+    const token = overrides?.token ?? process.env.NIKA_TOKEN;
+    if (!url) {
+      throw new TypeError(
+        'NIKA_URL environment variable is not set. '
+        + 'Set it or pass url explicitly: new Nika({ url: "http://localhost:3000", token: "..." })',
+      );
+    }
+    if (!token) {
+      throw new TypeError(
+        'NIKA_TOKEN environment variable is not set. '
+        + 'Set it or pass token explicitly: new Nika({ url: "...", token: "your-token" })',
+      );
+    }
+    return new Nika({ ...overrides, url, token } as NikaConfig);
+  }
+
   constructor(config: NikaConfig) {
+    if (!config.url) {
+      throw new TypeError(
+        'NikaConfig.url is required — pass the nika serve URL.\n'
+        + '  Example: new Nika({ url: "http://localhost:3000", token: "..." })\n'
+        + '  Or use:  Nika.fromEnv() to read NIKA_URL and NIKA_TOKEN from environment',
+      );
+    }
     if (!config.url.startsWith('http://') && !config.url.startsWith('https://')) {
-      throw new TypeError(`NikaConfig.url must be an http(s) URL, got: ${config.url}`);
+      throw new TypeError(
+        `NikaConfig.url must start with http:// or https://, got: "${config.url}"`,
+      );
     }
     if (!config.token) {
-      throw new TypeError('NikaConfig.token must not be empty');
+      throw new TypeError(
+        'NikaConfig.token is required — set NIKA_TOKEN env var or pass token in config.\n'
+        + '  Or use:  Nika.fromEnv() to read both from environment',
+      );
     }
 
     this.api = new ApiClient(

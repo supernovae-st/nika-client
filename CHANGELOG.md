@@ -2,14 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-```
-╔═══════════════════════════════════════════════════════════════════════════════╗
-║  @supernovae-st/nika-client v0.63.0 — INITIAL PUBLIC RELEASE               ║
-║  Namespace API | 6 error classes | SSE streaming | Webhook HMAC             ║
-╚═══════════════════════════════════════════════════════════════════════════════╝
-```
+## [Unreleased]
+
+The SDK tracks the `nika serve` HTTP surface. The engine is in the
+Diamond rewrite (`supernovae-st/nika` v0.80.0 — foundation crates).
+`nika serve` will re-admit to the workspace during the v0.9x arc;
+until then, treat this SDK as target-facing and pin to a tagged
+release. Granular `[0.64.0]` → `[0.74.0]` entries predate public
+changelog discipline and are collapsed here.
+
+## [0.74.0] — 2026-04-14
+
+- v2 hardening exports: explicit concurrency limiter, pagination helper,
+  SSE reconnect with `Last-Event-Id` resume. See `fff73d8`.
 
 ## [0.63.0] — 2026-04-03
 

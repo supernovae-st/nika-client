@@ -16,12 +16,9 @@ TypeScript client for the [Nika](https://github.com/supernovae-st/nika) workflow
 - Dual CJS/ESM build
 - Node.js 18+
 
-> **Status (2026-04):** this SDK was published ahead of the current
-> Diamond rewrite of the engine (`supernovae-st/nika` at **v0.80.0**,
-> foundation-crates phase, `nika serve` not yet re-admitted). The API
-> surface documented below targets the forthcoming **v0.90** server.
-> Pin to a tagged release of this package; do not run `main` against
-> the current engine.
+> **Status:** this SDK is published ahead of the engine, which is
+> pre-launch. The API surface below targets the forthcoming `v0.90`
+> server. Pin to a tagged release of this package.
 
 ## Install
 

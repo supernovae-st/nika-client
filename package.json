@@ -1,6 +1,6 @@
 {
   "name": "@supernovae-st/nika-client",
-  "version": "0.74.0",
+  "version": "0.90.0",
   "description": "TypeScript client for nika serve API",
   "repository": {
     "type": "git",

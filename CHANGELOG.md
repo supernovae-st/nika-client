@@ -8,11 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 The SDK tracks the `nika serve` HTTP surface. The engine is in the
-Diamond rewrite (`supernovae-st/nika` v0.80.0 — foundation crates).
+Diamond rewrite (`supernovae-st/nika` v0.90.0 — release-candidate grade).
 `nika serve` will re-admit to the workspace during the v0.9x arc;
 until then, treat this SDK as target-facing and pin to a tagged
 release. Granular `[0.64.0]` → `[0.74.0]` entries predate public
 changelog discipline and are collapsed here.
+
+## [0.90.0] — 2026-06-21
+
+- Version alignment with the Nika engine (0.90.0) under the real-semver-to-1.0
+  decision (D-2026-06-20-N1). No functional SDK change — the SDK number now
+  tracks the engine/extension and converges to 1.0 at the public launch.
 
 ## [0.74.0] — 2026-04-14
 

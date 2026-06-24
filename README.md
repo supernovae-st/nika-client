@@ -16,9 +16,9 @@ TypeScript client for the [Nika](https://github.com/supernovae-st/nika) workflow
 - Dual CJS/ESM build
 - Node.js 18+
 
-> **Status:** this SDK is published ahead of the engine, which is
-> pre-launch. The API surface below targets the forthcoming `v0.90`
-> server. Pin to a tagged release of this package.
+> **Status:** this SDK targets the future `nika serve` HTTP API. The current
+> engine release-candidate ships the CLI/LSP/MCP front door; keep this package
+> pinned until the serve surface is released and versioned.
 
 ## Install
 

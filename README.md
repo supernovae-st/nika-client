@@ -1,6 +1,12 @@
 # @supernovae-st/nika-client
 
-TypeScript client for the [Nika](https://github.com/supernovae-st/nika) workflow engine HTTP API (`nika serve`).
+TypeScript client for [Nika](https://github.com/supernovae-st/nika) — the
+workflow language for AI (one file · 4 verbs · one binary) — over the
+engine's HTTP API (`nika serve`).
+
+> **Status:** this SDK targets the **future** `nika serve` HTTP API. The
+> current engine release-candidate ships the CLI/LSP/MCP front door; keep
+> this package pinned until the serve surface is released and versioned.
 
 - Zero runtime dependencies (uses native `fetch`)
 - Full TypeScript types aligned with nika serve OpenAPI 3.1 spec
@@ -15,10 +21,6 @@ TypeScript client for the [Nika](https://github.com/supernovae-st/nika) workflow
 - Webhook HMAC-SHA256 verification (async, Web Crypto API)
 - Dual CJS/ESM build
 - Node.js 18+
-
-> **Status:** this SDK targets the future `nika serve` HTTP API. The current
-> engine release-candidate ships the CLI/LSP/MCP front door; keep this package
-> pinned until the serve surface is released and versioned.
 
 ## Install
 

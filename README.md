@@ -1,7 +1,7 @@
 # @supernovae-st/nika-client
 
-TypeScript client for [Nika](https://github.com/supernovae-st/nika) — the
-workflow language for AI (one file · 4 verbs · one binary) — over the
+TypeScript client for [Nika](https://github.com/supernovae-st/nika), the
+workflow language for AI (one file, 4 verbs, one binary), over the
 engine's HTTP API (`nika serve`).
 
 > **Status:** this SDK targets the **future** `nika serve` HTTP API. The
@@ -106,7 +106,7 @@ writer.end();
 ### Paginate workflow listing
 
 ```typescript
-// Auto-pagination (default) — fetches all pages transparently
+// Auto-pagination (default): fetches all pages transparently
 const all = await nika.workflows.list();
 
 // Manual pagination for large lists
@@ -148,7 +148,7 @@ const nika = new Nika({
 ```typescript
 import { Nika } from '@supernovae-st/nika-client';
 
-// Stripe-style HMAC-SHA256 verification (async — uses Web Crypto API)
+// Stripe-style HMAC-SHA256 verification (async, uses Web Crypto API)
 // Works in Node.js 18+, Deno, Cloudflare Workers, and Bun.
 const isValid = await Nika.verifyWebhook(
   rawBody,
@@ -176,7 +176,7 @@ const isValid = await Nika.verifyWebhook(
 
 ## API reference
 
-### Jobs — `nika.jobs.*`
+### Jobs: `nika.jobs.*`
 
 | Method | Returns | Description |
 |--------|---------|-------------|
@@ -192,7 +192,7 @@ const isValid = await Nika.verifyWebhook(
 | `artifactStream(jobId, name)` | `ReadableStream<Uint8Array>` | Stream artifact (for large files) |
 | `runAndCollect(workflow, inputs?, opts?)` | `Record<string, unknown>` | Run + collect all non-binary artifacts |
 
-### Workflows — `nika.workflows.*`
+### Workflows: `nika.workflows.*`
 
 | Method | Returns | Description |
 |--------|---------|-------------|

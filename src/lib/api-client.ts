@@ -2,6 +2,12 @@ import type { NikaLogger } from '../types.js';
 import { NikaAPIError, NikaConnectionError, NikaTimeoutError } from '../errors.js';
 import { Semaphore } from './semaphore.js';
 
+// A server's Retry-After is advisory, not a mandate: a hostile or
+// misconfigured one returning `Retry-After: 999999` must not pin the client
+// asleep for ~16 minutes (and with no caller signal, unabortably). Honor it,
+// but never past this ceiling — every other wait in this client is bounded.
+const MAX_RETRY_DELAY_MS = 30_000;
+
 export class ApiClient {
   readonly url: string;
   readonly timeout: number;
@@ -83,7 +89,8 @@ export class ApiClient {
         if ((res.status === 429 || res.status >= 500) && attempt < this.retries) {
           const retryAfter = res.headers.get('Retry-After');
           const parsed = retryAfter ? parseInt(retryAfter, 10) : NaN;
-          const delay = Number.isFinite(parsed) ? parsed * 1000 : 1000 * (attempt + 1);
+          const requested = Number.isFinite(parsed) ? parsed * 1000 : 1000 * (attempt + 1);
+          const delay = Math.min(Math.max(requested, 0), MAX_RETRY_DELAY_MS);
           this.logger?.warn(`${res.status} ${path} — retrying in ${delay}ms`);
           await sleep(delay, init?.signal ?? undefined);
           continue;

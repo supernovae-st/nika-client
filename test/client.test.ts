@@ -348,6 +348,26 @@ describe('retry', () => {
     const elapsed = Date.now() - start;
     expect(elapsed).toBeGreaterThanOrEqual(900);
   });
+
+  it('caps Retry-After so a hostile server cannot pin the client', async () => {
+    // Retry-After is advisory: a huge value must be clamped to the 30s
+    // ceiling, not honored literally. Fake timers prove the clamp without a
+    // real wait — advancing 30s resolves the retry; an uncapped ~999999s
+    // delay would leave the promise pending here.
+    vi.useFakeTimers();
+    try {
+      const client = makeClient({ retries: 1 });
+      fetchSpy
+        .mockResolvedValueOnce(new Response('rate limited', { status: 429, headers: { 'Retry-After': '999999' } }))
+        .mockResolvedValueOnce(jsonResponse({ job_id: 'racap', status: 'pending' }));
+
+      const p = client.jobs.submit('flow.nika.yaml');
+      await vi.advanceTimersByTimeAsync(30_000);
+      await expect(p).resolves.toMatchObject({ job_id: 'racap' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 // ── Artifacts ───────────────────────────────────────────────

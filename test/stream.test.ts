@@ -69,6 +69,29 @@ describe('streamEvents', () => {
     }
   });
 
+  it('joins multiple data: lines in one event with newlines (SSE spec)', async () => {
+    // A spec-compliant producer may split one JSON payload across several
+    // data: lines; they must be re-joined with '\n' before parsing. The old
+    // code kept only the last line, dropping the head and failing to parse.
+    const fetchFn = vi.fn().mockResolvedValueOnce(
+      sseResponse([
+        'event: completed\ndata: {"type":"completed",\ndata: "job_id":"j1",\ndata: "output":"multi"}\n\n',
+      ]),
+    );
+    const client = makeApiClient(fetchFn as typeof fetch);
+
+    const events = [];
+    for await (const event of streamEvents(client, 'j1')) {
+      events.push(event);
+    }
+
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe('completed');
+    if (events[0].type === 'completed') {
+      expect(events[0].output).toBe('multi');
+    }
+  });
+
   it('stops on terminal event (completed)', async () => {
     const fetchFn = vi.fn().mockResolvedValueOnce(
       sseResponse([

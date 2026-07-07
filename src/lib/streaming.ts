@@ -130,9 +130,15 @@ async function* streamOnce(
         let eventId: string | undefined;
 
         for (const line of lines) {
-          // Handle both "data: value" and "data:value" (SSE spec)
+          // Handle both "data: value" and "data:value" (SSE spec). Multiple
+          // data: lines in ONE event are JOINED with '\n' per the spec — the
+          // previous code kept only the last line, silently dropping the head
+          // of any multi-line payload. nika serve emits single-line JSON today
+          // so this was latent, but a spec-compliant producer (or a
+          // pretty-printed reply) would otherwise arrive truncated + unparseable.
           if (line.startsWith('data:')) {
-            data = line[5] === ' ' ? line.slice(6) : line.slice(5);
+            const value = line[5] === ' ' ? line.slice(6) : line.slice(5);
+            data = data === undefined ? value : `${data}\n${value}`;
           }
           // Parse id: field for reconnect tracking
           if (line.startsWith('id:')) {

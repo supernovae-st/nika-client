@@ -283,4 +283,7 @@ for await (const event of nika.jobs.stream(jobId, {
 
 ## License
 
-[AGPL-3.0-or-later](LICENSE)
+[Apache-2.0](LICENSE) — the adoption side of the Nika license split, same as
+the [spec](https://github.com/supernovae-st/nika-spec). The engine stays
+AGPL-3.0-or-later; this SDK talks to it over HTTP, and importing this package
+carries no copyleft obligation for your code.

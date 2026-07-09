@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- License: AGPL-3.0-or-later → **Apache-2.0**. The SDK moves to the adoption
+  side of the Nika license split (spec = Apache-2.0 · engine =
+  AGPL-3.0-or-later): an in-process client library must be freely importable
+  by any codebase. Sole-author relicense — no external code contributors at
+  change time.
+
 ### Removed
 
 - Release: the `repository_dispatch: nika-release` trigger — the engine's

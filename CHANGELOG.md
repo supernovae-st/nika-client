@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- Release: the `repository_dispatch: nika-release` trigger — the engine's
+  release workflow never emitted it (dead wiring, 2026-07-09 audit).
+  Releases stay manual (`workflow_dispatch`, with `dry_run`) until the
+  SDK rides the engine release train.
+
+
 The SDK tracks the `nika serve` HTTP surface. The engine ships the
 Diamond rewrite (`supernovae-st/nika`, v0.9x releasing — 0.96.0 at time
 of writing). `nika serve` will re-admit to the workspace during the v0.9x arc;

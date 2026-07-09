@@ -1,10 +1,8 @@
 name: Release
 on:
-  # Triggered automatically by nika's release workflow
-  repository_dispatch:
-    types: [nika-release]
-
-  # Manual trigger for standalone releases
+  # Manual releases only for now: the engine's release workflow never
+  # emitted the old `repository_dispatch: nika-release` (dead wiring,
+  # 2026-07-09 audit) - it returns when the SDK rides the release train.
   workflow_dispatch:
     inputs:
       version:

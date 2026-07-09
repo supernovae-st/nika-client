@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- CI: the `sdk-coverage` and `type-drift` jobs tested a phantom world —
+  they targeted `nika serve` (absent from the Diamond engine), downloaded
+  a release asset name that no longer exists, and wrote the legacy
+  `nika/workflow@0.12` envelope. They could never pass truthfully; they
+  return written against the real surface when `nika serve` ships.
+- Release: the `repository_dispatch: nika-release` trigger — the engine's
+  release workflow never emitted it (dead wiring). Releases stay manual
+  (`workflow_dispatch`, with `dry_run`) until the SDK rides the engine
+  release train; the npm version stays pinned at 0.90.0 until then.
+
 The SDK tracks the `nika serve` HTTP surface. The engine is in the
 Diamond rewrite (`supernovae-st/nika` v0.90.0 — release-candidate grade).
 `nika serve` will re-admit to the workspace during the v0.9x arc;

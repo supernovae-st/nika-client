@@ -295,6 +295,7 @@ for await (const event of nika.jobs.stream(jobId, {
 
 ## Links
 
+- **Every door in one page** — install paths, IDEs, agents, skills, MCP, CI, SDKs: [docs.nika.sh/integrations/everywhere](https://docs.nika.sh/integrations/everywhere)
 - Engine: [github.com/supernovae-st/nika](https://github.com/supernovae-st/nika) (Rust, AGPL-3.0-or-later)
 - Language spec: [github.com/supernovae-st/nika-spec](https://github.com/supernovae-st/nika-spec) (Apache-2.0)
 - Docs: [docs.nika.sh](https://docs.nika.sh)

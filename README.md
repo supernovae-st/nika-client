@@ -13,9 +13,29 @@ TypeScript client for [Nika](https://github.com/supernovae-st/nika), the
 workflow language for AI (one file, 4 verbs, one binary), over the
 engine's HTTP API (`nika serve`).
 
-> **Status:** this SDK targets the **future** `nika serve` HTTP API. The
-> current engine release-candidate ships the CLI/LSP/MCP front door; keep
-> this package pinned until the serve surface is released and versioned.
+> **Status:** two modules, two horizons. **`@supernovae-st/nika-client/local`
+> works TODAY** — a typed, zero-dependency driver for the shipped binary
+> (`check --json` · `run --json` event stream · the dry-run plan object ·
+> `test` · `trace verify`). The root module targets the **future**
+> `nika serve` HTTP API and stays clearly target-facing until the engine
+> ships it.
+
+```ts
+import { LocalNika } from '@supernovae-st/nika-client/local';
+
+const nika = new LocalNika();                       // PATH · or NIKA_BIN · or { bin }
+const report = await nika.check('flow.nika.yaml');  // typed · report_version-guarded
+if (report.clean && !report.cost?.has_unbounded) {
+  const run = await nika.runToEnd('flow.nika.yaml', { maxCostUsd: 0.25 });
+  console.log(run.ok, run.events.length);
+}
+```
+
+Honesty is typed in: `cost.min_path_total_usd` is a FLOOR and
+`has_unbounded` lives beside it; an unpriced model's `usd` stays `null`
+(never coerced to 0); an unknown `report_version` degrades to warnings,
+never throws; a parse-fatal file returns a typed PARSE finding on both
+engine voices (plain-text 0.99.0 and the later JSON form).
 
 - Zero runtime dependencies (uses native `fetch`)
 - Full TypeScript types aligned with nika serve OpenAPI 3.1 spec

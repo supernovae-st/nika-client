@@ -1,7 +1,7 @@
 {
   "name": "@supernovae-st/nika-client",
-  "version": "0.90.0",
-  "description": "TypeScript client for nika serve API",
+  "version": "0.99.0",
+  "description": "TypeScript client for Nika \u2014 the local driver for the shipped binary today, the nika serve HTTP client at serve-time",
   "repository": {
     "type": "git",
     "url": "https://github.com/supernovae-st/nika-client.git"
@@ -16,7 +16,9 @@
     "sdk",
     "typescript",
     "sse",
-    "openapi"
+    "openapi",
+    "local",
+    "cli"
   ],
   "type": "module",
   "exports": {
@@ -28,6 +30,16 @@
       "require": {
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
+      }
+    },
+    "./local": {
+      "import": {
+        "types": "./dist/local/index.d.ts",
+        "default": "./dist/local/index.js"
+      },
+      "require": {
+        "types": "./dist/local/index.d.cts",
+        "default": "./dist/local/index.cjs"
       }
     }
   },
@@ -56,5 +68,6 @@
   "engines": {
     "node": ">=18"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "mcpName": "io.github.supernovae-st/nika"
 }

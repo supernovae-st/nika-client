@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.99.0] — 2026-07-10
+
+Version alignment with the Nika engine (0.99.0) — same real-semver-to-1.0
+ladder as the 0.90.0 alignment below. What rode this alignment:
+
+### Added
+
+- `LocalNika` — the typed driver for the shipped binary: run workflows
+  against the local `nika` CLI today, no `nika serve` required (#9).
+
 ### Changed
 
 - License: AGPL-3.0-or-later → **Apache-2.0**. The SDK moves to the adoption
@@ -14,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   AGPL-3.0-or-later): an in-process client library must be freely importable
   by any codebase. Sole-author relicense — no external code contributors at
   change time.
+
+### Fixed
+
+- Streaming: multiple `data:` lines inside one SSE event join per the SSE
+  spec instead of dropping (#2).
+- Client: `Retry-After` honoring is capped; the serve-dependent CI gates
+  un-broke (#1).
 
 ### Removed
 
@@ -24,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 The SDK tracks the `nika serve` HTTP surface. The engine ships the
-Diamond rewrite (`supernovae-st/nika`, v0.9x releasing — 0.96.0 at time
+Diamond rewrite (`supernovae-st/nika`, v0.9x releasing — 0.99.0 at time
 of writing). `nika serve` will re-admit to the workspace during the v0.9x arc;
 until then, treat this SDK as target-facing and pin to a tagged
 release. Granular `[0.64.0]` → `[0.74.0]` entries predate public

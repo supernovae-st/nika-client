@@ -7,11 +7,10 @@
   </a>
 </p>
 
-# @supernovae-st/nika-client
+<h1 align="center">@supernovae-st/nika-client</h1>
 
-TypeScript client for [Nika](https://github.com/supernovae-st/nika), the
-workflow language for AI (one file, 4 verbs, one binary), over the
-engine's HTTP API (`nika serve`).
+<p align="center"><strong>The TypeScript client for <a href="https://github.com/supernovae-st/nika">Nika</a>, the workflow language for AI.<br>
+One file, 4 verbs, one binary. Typed, zero-dependency, honest about what ships today.</strong></p>
 
 > **Status:** two modules, two horizons. **`@supernovae-st/nika-client/local`
 > works TODAY**: a typed, zero-dependency driver for the shipped binary
@@ -312,3 +311,9 @@ for await (const event of nika.jobs.stream(jobId, {
 the [spec](https://github.com/supernovae-st/nika-spec). The engine stays
 AGPL-3.0-or-later; this SDK talks to it over HTTP, and importing this package
 carries no copyleft obligation for your code.
+
+---
+
+<p align="center">
+  <sub>Docs: <a href="https://docs.nika.sh">docs.nika.sh</a> · Spec (Apache-2.0): <a href="https://github.com/supernovae-st/nika-spec">nika-spec</a> · Engine (AGPL-3.0): <a href="https://github.com/supernovae-st/nika">nika</a> · Templates: <a href="https://github.com/supernovae-st/nika-starter">nika-starter</a> · <a href="https://github.com/supernovae-st/nika-actions-starter">nika-actions-starter</a></sub>
+</p>

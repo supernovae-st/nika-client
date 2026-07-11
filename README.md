@@ -14,7 +14,7 @@ workflow language for AI (one file, 4 verbs, one binary), over the
 engine's HTTP API (`nika serve`).
 
 > **Status:** two modules, two horizons. **`@supernovae-st/nika-client/local`
-> works TODAY** — a typed, zero-dependency driver for the shipped binary
+> works TODAY**: a typed, zero-dependency driver for the shipped binary
 > (`check --json` · `run --json` event stream · the dry-run plan object ·
 > `test` · `trace verify`). The root module targets the **future**
 > `nika serve` HTTP API and stays clearly target-facing until the engine
@@ -243,11 +243,11 @@ All SDK errors extend `NikaError`. Catch it to handle any SDK error:
 
 ```
 NikaError (base)
-├── NikaAPIError        — HTTP errors (status, body, requestId)
-├── NikaConnectionError — Network errors (DNS, TCP, abort)
-├── NikaTimeoutError    — Request or poll timeout
-└── NikaJobError        — Job failed (exitCode, job object)
-    └── NikaJobCancelledError — Job was cancelled
+├── NikaAPIError        : HTTP errors (status, body, requestId)
+├── NikaConnectionError : Network errors (DNS, TCP, abort)
+├── NikaTimeoutError    : Request or poll timeout
+└── NikaJobError        : Job failed (exitCode, job object)
+    └── NikaJobCancelledError : Job was cancelled
 ```
 
 ```typescript
@@ -295,7 +295,7 @@ for await (const event of nika.jobs.stream(jobId, {
 
 ## Links
 
-- **Every door in one page** — install paths, IDEs, agents, skills, MCP, CI, SDKs: [docs.nika.sh/integrations/everywhere](https://docs.nika.sh/integrations/everywhere)
+- **Every door in one page**: install paths, IDEs, agents, skills, MCP, CI, SDKs: [docs.nika.sh/integrations/everywhere](https://docs.nika.sh/integrations/everywhere)
 - Engine: [github.com/supernovae-st/nika](https://github.com/supernovae-st/nika) (Rust, AGPL-3.0-or-later)
 - Language spec: [github.com/supernovae-st/nika-spec](https://github.com/supernovae-st/nika-spec) (Apache-2.0)
 - Docs: [docs.nika.sh](https://docs.nika.sh)
@@ -304,7 +304,7 @@ for await (const event of nika.jobs.stream(jobId, {
 
 ## License
 
-[Apache-2.0](LICENSE) — the adoption side of the Nika license split, same as
+[Apache-2.0](LICENSE): the adoption side of the Nika license split, same as
 the [spec](https://github.com/supernovae-st/nika-spec). The engine stays
 AGPL-3.0-or-later; this SDK talks to it over HTTP, and importing this package
 carries no copyleft obligation for your code.

@@ -102,6 +102,12 @@ describe.skipIf(!posix)('LocalNika · canned engine', () => {
     });
   });
 
+  it('dryRunPlan on a pre-#370 binary: the error teaches the floor, names the version', async () => {
+    await expect(nika.dryRunPlan('pre370.nika.yaml')).rejects.toThrow(
+      /needs the engine's machine dry-run.*this binary is nika 0\.99\.0.*brew upgrade/s,
+    );
+  });
+
   it('test + traceVerify map their exits', async () => {
     expect((await nika.test('golden-ok.nika.yaml')).passed).toBe(true);
     expect((await nika.test('golden-bad.nika.yaml')).passed).toBe(false);

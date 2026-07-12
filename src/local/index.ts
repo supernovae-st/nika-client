@@ -159,11 +159,27 @@ export class LocalNika {
    * `nika run <file> --dry-run --json` — the #370 plan object
    * (`plan_version: 1`). A DIRTY file answers the check report on the
    * refusal path — surfaced as a typed rejection carrying that report.
+   *
+   * Min engine: the first release after 0.99.0 (engine #370). An older
+   * binary's clap refusal is translated into a teaching error naming
+   * the probed version — never the raw flag-pair message.
    */
   async dryRunPlan(file: string): Promise<LocalPlan> {
     const r = await this.capture(['run', file, '--dry-run', '--json']);
     const raw = tryJson(r.stdout) as Record<string, unknown> | null;
     if (!raw) {
+      // The released-binary skew (#12): engines tagged ≤0.99.0 predate the
+      // machine dry-run (engine #370) and clap refuses the flag pair. Teach
+      // the floor instead of relaying the raw refusal.
+      if (r.stderr.includes('cannot be used with')) {
+        const version = await this.version().catch(() => 'unknown');
+        throw new Error(
+          `dryRunPlan() needs the engine's machine dry-run (run --dry-run --json, ` +
+            `first released AFTER 0.99.0) — this binary is ${version}. ` +
+            `Upgrade the engine (brew upgrade supernovae-st/tap/nika) or use check() ` +
+            `for the audit surface it already ships.`,
+        );
+      }
       throw new Error(`dry-run emitted no JSON (exit ${r.exitCode}): ${r.stderr.trim()}`);
     }
     if (!('plan_version' in raw)) {

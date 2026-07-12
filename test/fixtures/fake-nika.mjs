@@ -51,6 +51,12 @@ if (argv[0] === 'check') {
   process.exit(0);
 }
 
+if (argv[0] === 'run' && has('--dry-run') && has('--json') && file.includes('pre370')) {
+  // The RELEASED 0.99.0 voice: clap refuses the pair before reading the file.
+  console.error("error: the argument '--dry-run' cannot be used with '--json'");
+  process.exit(2);
+}
+
 if (argv[0] === 'run' && has('--dry-run') && has('--json')) {
   if (file.includes('dirty')) {
     // The refusal path answers the CHECK report (report_version key).

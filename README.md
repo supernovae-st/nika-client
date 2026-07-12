@@ -35,7 +35,11 @@ Honesty is typed in: `cost.min_path_total_usd` is a FLOOR and
 `has_unbounded` lives beside it; an unpriced model's `usd` stays `null`
 (never coerced to 0); an unknown `report_version` degrades to warnings,
 never throws; a parse-fatal file returns a typed PARSE finding on both
-engine voices (plain-text 0.99.0 and the later JSON form).
+engine voices (plain-text 0.99.0 and the later JSON form). Where a
+method needs a NEWER engine than the last tag (`dryRunPlan()` → the
+machine dry-run, engine #370, first release after 0.99.0), an older
+binary's refusal is translated into an error that names the floor and
+the probed version — never a raw clap message.
 
 - Zero runtime dependencies (uses native `fetch`)
 - Full TypeScript types aligned with nika serve OpenAPI 3.1 spec

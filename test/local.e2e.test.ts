@@ -24,12 +24,13 @@ function realNika(): string | null {
 const BIN = realNika();
 
 const WF = `nika: v1
-workflow: sdk-live
+workflow:
+  id: sdk-live
 model: mock/echo
 tasks:
-  - id: fetch
+  fetch:
     exec: { command: ["echo", "data"] }
-  - id: think
+  think:
     depends_on: [fetch]
     infer: { prompt: "sum \${{ tasks.fetch.output }}", max_tokens: 30 }
 `;

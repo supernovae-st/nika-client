@@ -38,7 +38,7 @@ engine voices (plain-text 0.99.0 and the later JSON form). Where a
 method needs a NEWER engine than the last tag (`dryRunPlan()` → the
 machine dry-run, engine #370, first release after 0.99.0), an older
 binary's refusal is translated into an error that names the floor and
-the probed version — never a raw clap message.
+the probed version · never a raw clap message.
 
 - Zero runtime dependencies (uses native `fetch`)
 - Full TypeScript types aligned with nika serve OpenAPI 3.1 spec

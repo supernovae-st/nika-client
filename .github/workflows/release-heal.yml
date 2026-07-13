@@ -1,0 +1,33 @@
+name: release-heal
+
+# The SDK rides every wave without a hand on the dispatch button
+# (dispatched by hand for 0.100/0.101/0.102): when the engine's latest
+# release moves past npm's published version, this triggers the repo's
+# own Release workflow with that version. SECURITY: no github.event
+# data in the shell; the tag is validated before use.
+
+on:
+  schedule:
+    - cron: '33 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  actions: write
+
+jobs:
+  heal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: npm follows the engine release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="$(gh release view --repo supernovae-st/nika --json tagName --jq .tagName)"
+          [[ "$tag" =~ ^v[0-9][0-9.]*$ ]] || { echo "::error::unexpected tag: $tag"; exit 1; }
+          ver="${tag#v}"
+          npm_v="$(curl -fsSL https://registry.npmjs.org/@supernovae-st%2Fnika-client | python3 -c 'import json,sys;print(json.load(sys.stdin)["dist-tags"]["latest"])')"
+          if [ "$npm_v" = "$ver" ]; then echo "npm already $ver — nothing to heal"; exit 0; fi
+          gh workflow run Release --repo "$GITHUB_REPOSITORY" -f version="$ver"
+          echo "dispatched Release $ver (npm was $npm_v)"

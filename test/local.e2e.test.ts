@@ -31,8 +31,9 @@ tasks:
   fetch:
     exec: { command: ["echo", "data"] }
   think:
-    depends_on: [fetch]
-    infer: { prompt: "sum \${{ tasks.fetch.output }}", max_tokens: 30 }
+    with:
+      data: \${{ tasks.fetch.output }}
+    infer: { prompt: "sum \${{ with.data }}", max_tokens: 30 }
 `;
 
 describe.skipIf(!BIN)('LocalNika · live engine (skip-honest)', () => {

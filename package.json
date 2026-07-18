@@ -1,6 +1,6 @@
 {
   "name": "@supernovae-st/nika-client",
-  "version": "0.103.0",
+  "version": "0.104.0",
   "description": "TypeScript client for Nika — the local driver for the shipped binary today, the nika serve HTTP client at serve-time",
   "repository": {
     "type": "git",

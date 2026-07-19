@@ -13,9 +13,9 @@
  * Zero dependencies. Process spawning is deliberately `spawn` with an
  * ARGV ARRAY and no shell (`exec`/shell-string forms are banned here —
  * the workflow path is attacker-adjacent input, and argv+no-shell is
- * the injection-safe form). Exit codes are the spec §4 contract (0 ok ·
- * 1 workflow failed · 2 file findings · 3 environment), mapped, never
- * guessed.
+ * the injection-safe form). Exit codes are the engine CLI exit-code
+ * contract (locked · additive-only): 0 ok · 1 workflow failed · 2 file
+ * findings · 3 environment · 4 paused, mapped, never guessed.
  */
 
 import { spawn } from 'node:child_process';

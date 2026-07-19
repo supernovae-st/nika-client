@@ -68,7 +68,8 @@ export interface LocalCheckReport {
    * plain-text voice the driver synthesizes the one row. */
   findings: LocalFinding[];
   permits: LocalPermits | null;
-  /** Spec §4: 0 ok · 2 file findings · 3 environment. */
+  /** The engine CLI exit-code contract (locked · additive-only), for
+   * `check`: 0 ok · 2 file findings · 3 environment. */
   exitCode: number;
   /** Driver-level honesty notes (unknown report_version · missing
    * sections) — never exceptions. */
@@ -87,7 +88,10 @@ export interface NikaEvent {
 
 /** The run outcome after the stream closes. */
 export interface LocalRunOutcome {
-  /** Spec §4: 0 ok · 1 workflow failed · 2 findings · 3 environment. */
+  /** The engine CLI exit-code contract (locked · additive-only), for
+   * `run`: 0 ok · 1 workflow failed · 2 findings · 3 environment ·
+   * 4 paused (nika:prompt durable pause · ADR-099 · resume via
+   * RunOptions.resume). */
   exitCode: number;
   ok: boolean;
   events: NikaEvent[];
@@ -102,7 +106,8 @@ export interface TraceVerdict {
   output: string;
 }
 
-/** `nika test` (mock golden · offline). Exit 0 pass · others per §4. */
+/** `nika test` (mock golden · offline). Exit 0 pass · others per the
+ * engine CLI exit-code contract. */
 export interface GoldenVerdict {
   passed: boolean;
   exitCode: number;

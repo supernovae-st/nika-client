@@ -59,11 +59,11 @@
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
-    "@types/node": "^22.20.0",
+    "@types/node": "^26.1.1",
     "openapi-typescript": "^7.13.0",
     "tsup": "^8.0",
     "typescript": "^5.5",
-    "vitest": "^2.0"
+    "vitest": "^4.1"
   },
   "engines": {
     "node": ">=18"

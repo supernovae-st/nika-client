@@ -30,9 +30,20 @@ jobs:
           node-version: 20
 
       # Checkout nika repo for server source analysis
+      # clock: released · the SDK serves RELEASED users, so coverage judges
+      # against the latest release tag, never a floating engine main (the
+      # clock-sweep caught the HEAD checkout 2026-07-20 · a sister engine
+      # merge could flip this gate at constant SDK content).
+      - id: engine-tag
+        run: |
+          set -euo pipefail
+          tag=$(curl -fsSL -o /dev/null -w '%{url_effective}'             https://github.com/supernovae-st/nika/releases/latest | sed 's|.*/tag/||')
+          case "$tag" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "bad tag: $tag" >&2; exit 1 ;; esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: supernovae-st/nika
+          ref: ${{ steps.engine-tag.outputs.tag }}
           path: nika
           # NIKA_REPO_TOKEN is withheld on dependabot/fork PR runs, so the
           # expression resolves empty and checkout errors "Input required and

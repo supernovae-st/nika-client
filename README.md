@@ -34,11 +34,11 @@ Honesty is typed in: `cost.min_path_total_usd` is a FLOOR and
 `has_unbounded` lives beside it; an unpriced model's `usd` stays `null`
 (never coerced to 0); an unknown `report_version` degrades to warnings,
 never throws; a parse-fatal file returns a typed PARSE finding on both
-engine voices (plain-text 0.99.0 and the later JSON form). Where a
-method needs a NEWER engine than the last tag (`dryRunPlan()` → the
-machine dry-run, engine #370, first release after 0.99.0), an older
-binary's refusal is translated into an error that names the floor and
-the probed version · never a raw clap message.
+engine voices (the plain-text voice of pre-0.100 binaries and the JSON
+form since). Where a method needs a newer engine than the binary
+answering (`dryRunPlan()` → the machine dry-run, shipped in 0.100.0),
+an older binary's refusal is translated into an error that names the
+floor and the probed version · never a raw clap message.
 
 - Zero runtime dependencies (uses native `fetch`)
 - Full TypeScript types aligned with nika serve OpenAPI 3.1 spec
@@ -303,6 +303,7 @@ for await (const event of nika.jobs.stream(jobId, {
 - Language spec: [github.com/supernovae-st/nika-spec](https://github.com/supernovae-st/nika-spec) (Apache-2.0)
 - Docs: [docs.nika.sh](https://docs.nika.sh)
 - Website: [nika.sh](https://nika.sh)
+- Timeline: [nika.sh/timeline](https://nika.sh/timeline) (the verifiable record — eras, releases, claims re-proven in CI)
 - Studio: [supernovae.studio](https://supernovae.studio)
 
 ## License

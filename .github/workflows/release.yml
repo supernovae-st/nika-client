@@ -92,7 +92,10 @@ jobs:
           gh pr create --head "$branch" \
             --title "chore: bump version to $VERSION" \
             --body "Release-lane bump (auto-merges on green · release.yml)."
-          gh pr merge "$branch" --squash --auto
+          # belt: a repo with auto-merge off must not kill the release —
+          # the PR stays open (loud) and npm still ships from the tree
+          gh pr merge "$branch" --squash --auto \
+            || echo "::warning::auto-merge unavailable — merge the bump PR by hand; the release continues"
 
       # Publish to npm
       - name: Publish to npm

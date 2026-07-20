@@ -21,6 +21,15 @@ const SERVE_EVENTS = join(NIKA_ROOT, 'tools/nika-serve/src/events.rs');
 const SERVE_WORKFLOWS = join(NIKA_ROOT, 'tools/nika-serve/src/routes/workflows.rs');
 const SERVE_ARTIFACTS = join(NIKA_ROOT, 'tools/nika-serve/src/routes/artifacts.rs');
 
+// `nika serve` left the tree in the Diamond refonte and re-admits during
+// the 0.9x arc (docs reference/cli) — on a modern checkout the serve tree
+// is absent and coverage has NOTHING to judge. Skip honestly (exit 0,
+// loud) instead of failing every release forever.
+if (!existsSync(SERVE_ROUTES)) {
+  console.log(`nika-serve not present at ${NIKA_ROOT} (re-admits in the 0.9x arc) — coverage SKIPPED`);
+  process.exit(0);
+}
+
 const SDK_JOBS = join(SDK_ROOT, 'src/resources/jobs.ts');
 const SDK_WORKFLOWS_FILE = join(SDK_ROOT, 'src/resources/workflows.ts');
 const SDK_INDEX = join(SDK_ROOT, 'src/index.ts');

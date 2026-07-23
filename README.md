@@ -40,6 +40,20 @@ answering (`dryRunPlan()` → the machine dry-run, shipped in 0.100.0),
 an older binary's refusal is translated into an error that names the
 floor and the probed version · never a raw clap message.
 
+**Nika workflows are contract-carrying, and this client is a thin, honest
+window onto that contract, never its enforcer.** A `permits:` block in
+the workflow declares a default-deny boundary over filesystem paths,
+`net.http` hosts, `exec` programs and tool ids; an absent block means
+zero extra authority beyond the engine's own hardened floor. The engine
+enforces that boundary at runtime, not just at parse time, and this
+SDK types the result: `LocalCheckReport.permits` and `LocalPlan.permits`
+carry the declared/needed boundary before a run starts, `cost` carries
+the honest floor above, and `runToEnd(..., { maxCostUsd })` refuses to
+start past it. Every run can leave a hash-chained trace; `TraceVerdict`
+types `nika trace verify`'s intact/broken/unchained result, never a raw
+exit code. This repo's own CI pins every action by commit SHA and
+checks against the latest released engine tag, never a floating `main`.
+
 - Zero runtime dependencies (uses native `fetch`)
 - Full TypeScript types aligned with nika serve OpenAPI 3.1 spec
 - Namespace pattern: `nika.jobs.*`, `nika.workflows.*`

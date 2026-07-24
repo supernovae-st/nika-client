@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.105.0] — 2026-07-20
+
+Lockstep on the engine's 0.105 line. What rode the 0.100 → 0.105 alignments
+(each a same-day version alignment with the engine release):
+
+### Added
+
+- E2E: the local harness binds through the w2 door (#16) · test fixtures
+  speak the key-is-identity grammar (#15).
+- Docs: the engine CLI exit-code contract gains exit 4 (paused — the
+  ADR-099 human gate) (#17) · the engine voices date themselves in the
+  README (pre-0.100 plain text · JSON since) · the contract surfaces
+  typed, not just the wire.
+
+### Changed
+
+- README: SOTA pass — hero, the nika-drawn DAG, plain punctuation, the
+  family footer (#11) · em dashes out, house middots in (#14).
+
+### Fixed
+
+- `LocalNika.dryRunPlan` teaches the engine floor instead of relaying
+  clap noise (#13).
+- Release line: the version bump rides a PR and coverage skips honestly
+  (#24) · the coverage judge reads the released engine, never HEAD (#23) ·
+  an auto-merge refusal never kills the release (#26).
+- CI: actions SHA-pinned + grouped weekly dependabot (npm + actions)
+  (#18 · #21) · release-heal drives this cascade leg itself.
+
 ## [0.99.0] — 2026-07-10
 
 Version alignment with the Nika engine (0.99.0) — same real-semver-to-1.0
@@ -40,12 +69,11 @@ ladder as the 0.90.0 alignment below. What rode this alignment:
   SDK rides the engine release train.
 
 
-The SDK tracks the `nika serve` HTTP surface. The engine ships the
-Diamond rewrite (`supernovae-st/nika`, v0.9x releasing — 0.99.0 at time
-of writing). `nika serve` will re-admit to the workspace during the v0.9x arc;
-until then, treat this SDK as target-facing and pin to a tagged
-release. Granular `[0.64.0]` → `[0.74.0]` entries predate public
-changelog discipline and are collapsed here.
+The SDK tracks the `nika serve` HTTP surface as target-facing (the
+`LocalNika` driver runs workflows against the shipped binary today);
+`nika serve` re-admits on the engine's own schedule — pin to a tagged
+release meanwhile. Granular `[0.64.0]` → `[0.74.0]` entries predate
+public changelog discipline and are collapsed here.
 
 ## [0.90.0] — 2026-06-21
 

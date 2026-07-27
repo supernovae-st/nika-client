@@ -27,6 +27,8 @@ const WF = `nika: v1
 workflow:
   id: sdk-live
 model: mock/echo
+permits:
+  exec: ["echo"]
 tasks:
   fetch:
     exec: { command: ["echo", "data"] }

@@ -25,3 +25,12 @@ updates:
       npm-all:
         patterns:
           - "*"
+    # TypeScript majors are a migration, not a bump. TS 7 is the native
+    # port: it changes emit and type-checking behaviour, and PR #29
+    # (2026-07-26) took down three real legs at once (sdk-coverage, test,
+    # type-drift). A published SDK crosses that line deliberately, with the
+    # legs adapted in the same commit, not on a weekly robot's schedule.
+    # Minors and patches keep flowing.
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]

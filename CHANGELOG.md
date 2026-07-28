@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.106.1] — 2026-07-28
+
+Lockstep on the engine's v0.106.1 (the browser release — the engine's check
+half now ships as a wasm artifact on every release, headed for npm as
+`@supernovae-st/nika-check-wasm`: a different seat from this SDK — the
+client talks to a serve daemon, the wasm package is the checker in-page).
+No SDK-side changes: a pure same-day version alignment.
+
+## [0.106.0] — 2026-07-28
+
+Lockstep on the engine's 0.106 line (the authority release).
+
+### Changed
+
+- E2E: the live workflow grants the exec it spends.
+- Deps: TypeScript majors held for a deliberate migration ·
+  actions/checkout group bumped.
+
 ## [0.105.0] — 2026-07-20
 
 Lockstep on the engine's 0.105 line. What rode the 0.100 → 0.105 alignments

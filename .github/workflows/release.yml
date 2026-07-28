@@ -19,6 +19,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+      id-token: write # npm --provenance (Sigstore OIDC · the engine train's parity)
     env:
       # Version comes from either dispatch source
       VERSION: ${{ github.event.client_payload.version || github.event.inputs.version }}
@@ -97,12 +98,14 @@ jobs:
           gh pr merge "$branch" --squash --auto \
             || echo "::warning::auto-merge unavailable — merge the bump PR by hand; the release continues"
 
-      # Publish to npm
+      # Publish to npm — with provenance: the attestation binds the package
+      # to this repo + workflow + commit (the engine's nika-check-wasm ships
+      # attested; the SDK publishes at the same bar). Requires id-token above.
       - name: Publish to npm
         if: env.DRY_RUN != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
+        run: npm publish --access public --provenance
 
       # Create GitHub release
       - name: Create GitHub release

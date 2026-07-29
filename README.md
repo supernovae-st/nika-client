@@ -333,6 +333,8 @@ for await (const event of nika.jobs.stream(jobId, {
 
 **Truth lives** · Apache-2.0, the adoption side of the license split · no copyleft crosses this door.
 
+All the buildings: [nika-spec](https://github.com/supernovae-st/nika-spec) · [nika](https://github.com/supernovae-st/nika) · [nika.sh](https://github.com/supernovae-st/nika.sh) · [nika-docs](https://github.com/supernovae-st/nika-docs) · [nika-client](https://github.com/supernovae-st/nika-client) · [nika-vscode](https://github.com/supernovae-st/nika-vscode) · [nika-agents](https://github.com/supernovae-st/nika-agents) · [homebrew-tap](https://github.com/supernovae-st/homebrew-tap) · [nika-registry](https://github.com/supernovae-st/nika-registry) · [nika-site-audit](https://github.com/supernovae-st/nika-site-audit)
+
 Every fact has one home · everything else is a gated projection.
 The living map: [nika.sh/map](https://nika.sh/map).
 <!-- /city:map -->

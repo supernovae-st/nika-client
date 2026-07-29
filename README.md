@@ -329,6 +329,8 @@ for await (const event of nika.jobs.stream(jobId, {
 
 **This building** · THE CODE DOOR · the TypeScript SDK; your program talks to the engine over HTTP/SSE.
 
+**Root** · neither · this building speaks to the ENGINE's surface. Language facts come from nika-spec, engine behaviour from nika · nothing authoritative is typed here.
+
 **Consumes** · the engine's serve API.
 
 **Serves** · TS/JS applications (npm, published with provenance).

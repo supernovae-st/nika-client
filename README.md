@@ -310,6 +310,33 @@ for await (const event of nika.jobs.stream(jobId, {
 }
 ```
 
+<!-- city:map -->
+## The city · where this repo sits
+
+```
+📜 nika-spec ──── the civil code · the law tables, the corpus, the exam
+    │ sync-pack: byte-gated mirror        │ projectors: drift-gated
+    ▼                                     ▼
+⚙️ nika ───────── the engine + the catalog (the yellow pages)
+    │ the release train                  🖥️ nika.sh · 📖 nika-docs
+    ▼                                     the showroom · the manual
+📦 homebrew-tap · npm · Docker ── the docks
+🔌 nika-client · 🎨 nika-vscode · 🤖 nika-agents ── the doors   ◀── you are here
+🏪 nika-registry ── the market · 🔍 nika-site-audit ── the witness
+```
+
+**This building** · THE CODE DOOR · the TypeScript SDK; your program talks to the engine over HTTP/SSE.
+
+**Consumes** · the engine's serve API.
+
+**Serves** · TS/JS applications (npm, published with provenance).
+
+**Truth lives** · Apache-2.0, the adoption side of the license split · no copyleft crosses this door.
+
+Every fact has one home · everything else is a gated projection.
+The living map: [nika.sh/map](https://nika.sh/map).
+<!-- /city:map -->
+
 ## Links
 
 - **Every door in one page**: install paths, IDEs, agents, skills, MCP, CI, SDKs: [docs.nika.sh/integrations/everywhere](https://docs.nika.sh/integrations/everywhere)

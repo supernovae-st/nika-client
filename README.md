@@ -30,6 +30,8 @@ if (report.clean && !report.cost?.has_unbounded) {
 }
 ```
 
+![Eight lines of TypeScript: LocalNika checks the workflow, prints the typed clean verdict, then runs it to the end budget-capped over the released binary · recorded live, mock provider, zero keys](media/local-driver.gif)
+
 Honesty is typed in: `cost.min_path_total_usd` is a FLOOR and
 `has_unbounded` lives beside it; an unpriced model's `usd` stays `null`
 (never coerced to 0); an unknown `report_version` degrades to warnings,

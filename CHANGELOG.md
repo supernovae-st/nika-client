@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.107.0] — 2026-08-01
+
+Lockstep on the engine's trust wave (v0.107.0). SDK-side since 0.106.1:
+
+- **The SDK publishes attested** — npm provenance joins the release
+  lane (the package on the registry proves the workflow that built it).
+- **The city island README** — the building names its place in the
+  13-building city, links every neighbor, and states it holds no
+  authoritative root.
+- The driver's demo recording lands (eight lines, two verdicts).
+
 ## [0.106.1] — 2026-07-28
 
 Lockstep on the engine's v0.106.1 (the browser release — the engine's check

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Voice correction for the 0.107.0 note below: read it as **the SDK
+  publishes verified** — the fact stands (npm provenance proves the
+  workflow that built the package); the printed section stays as released.
+
 ## [0.107.0] — 2026-08-01
 
 Lockstep on the engine's trust wave (v0.107.0). SDK-side since 0.106.1:

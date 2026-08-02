@@ -16,19 +16,28 @@ import { resolve, join } from 'node:path';
 const NIKA_ROOT = process.argv[2] || resolve('..', 'nika');
 const SDK_ROOT = resolve(import.meta.dirname, '..');
 
-const SERVE_ROUTES = join(NIKA_ROOT, 'tools/nika-serve/src/routes/mod.rs');
-const SERVE_EVENTS = join(NIKA_ROOT, 'tools/nika-serve/src/events.rs');
-const SERVE_WORKFLOWS = join(NIKA_ROOT, 'tools/nika-serve/src/routes/workflows.rs');
-const SERVE_ARTIFACTS = join(NIKA_ROOT, 'tools/nika-serve/src/routes/artifacts.rs');
-
 // `nika serve` left the tree in the Diamond refonte and re-admits during
 // the 0.9x arc (docs reference/cli) — on a modern checkout the serve tree
 // is absent and coverage has NOTHING to judge. Skip honestly (exit 0,
-// loud) instead of failing every release forever.
-if (!existsSync(SERVE_ROUTES)) {
-  console.log(`nika-serve not present at ${NIKA_ROOT} (re-admits in the 0.9x arc) — coverage SKIPPED`);
+// loud) instead of failing every release forever. Probe the Diamond home
+// (`crates/`) first — the pre-refonte `tools/` address kept last so the
+// day serve re-admits, coverage wakes without a maintainer flip.
+const SERVE_HOMES = ['crates/nika-serve', 'tools/nika-serve'];
+const SERVE_SRC = SERVE_HOMES.map((home) => join(NIKA_ROOT, home, 'src')).find(
+  (src) => existsSync(join(src, 'routes/mod.rs')),
+);
+
+if (!SERVE_SRC) {
+  console.log(
+    `nika-serve not present at ${NIKA_ROOT} (probed ${SERVE_HOMES.join(' · ')} — re-admits in the 0.9x arc) — coverage SKIPPED`,
+  );
   process.exit(0);
 }
+
+const SERVE_ROUTES = join(SERVE_SRC, 'routes/mod.rs');
+const SERVE_EVENTS = join(SERVE_SRC, 'events.rs');
+const SERVE_WORKFLOWS = join(SERVE_SRC, 'routes/workflows.rs');
+const SERVE_ARTIFACTS = join(SERVE_SRC, 'routes/artifacts.rs');
 
 const SDK_JOBS = join(SDK_ROOT, 'src/resources/jobs.ts');
 const SDK_WORKFLOWS_FILE = join(SDK_ROOT, 'src/resources/workflows.ts');

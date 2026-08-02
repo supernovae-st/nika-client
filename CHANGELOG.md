@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: the dormant type-drift fixture speaks the shipped `nika: v1`
   envelope (proven clean by `nika check` on the released v0.107.0) —
   the day serve lands, the gate wakes on a file the engine accepts.
+- Coverage: the serve probe learns the Diamond address — it checks
+  `crates/nika-serve` before the pre-refonte `tools/nika-serve`, so the
+  gate wakes without a maintainer flip when serve re-admits.
 
 ## [0.107.0] — 2026-08-01
 

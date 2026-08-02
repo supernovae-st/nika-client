@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hero · the engine hero GIF pins to the release tag it demonstrates
   (was floating `main`) · a lockstep section names `nika doctor` as the
   freshness probe.
+- CI: the dormant type-drift fixture speaks the shipped `nika: v1`
+  envelope (proven clean by `nika check` on the released v0.107.0) —
+  the day serve lands, the gate wakes on a file the engine accepts.
 
 ## [0.107.0] — 2026-08-01
 

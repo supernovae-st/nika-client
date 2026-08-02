@@ -101,7 +101,20 @@ jobs:
             echo "::warning::type-drift advisory — nika serve is not yet shipped (target-facing SDK). Re-activates automatically when serve lands."
             exit 0
           fi
-          mkdir -p /tmp/wf && echo 'schema: "nika/workflow@0.12"' > /tmp/wf/test.nika.yaml
+          # The fixture speaks the shipped envelope — this exact file passes
+          # `nika check` clean (rc=0) on the released v0.107.0.
+          mkdir -p /tmp/wf
+          cat > /tmp/wf/test.nika.yaml <<'EOF'
+          nika: v1
+          workflow:
+            id: test
+          tasks:
+            hello:
+              infer:
+                model: mock/fast
+                prompt: "say hello"
+                max_tokens: 64
+          EOF
           nika serve --bind 127.0.0.1:3000 --workflows /tmp/wf &
           sleep 2
           npm run generate:types

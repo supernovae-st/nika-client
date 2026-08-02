@@ -19,6 +19,15 @@ One file, 4 verbs, one binary. Typed, zero-dependency, honest about what ships t
 > `nika serve` HTTP API and stays clearly target-facing until the engine
 > ships it.
 
+Zero keys first — the shipped binary rehearses a canonical workflow
+offline, nothing written, nothing owned (bare `nika try` lists them all):
+
+```sh
+nika try 01-hello
+```
+
+The same engine, driven typed from TypeScript:
+
 ```ts
 import { LocalNika } from '@supernovae-st/nika-client/local';
 
@@ -312,7 +321,24 @@ for await (const event of nika.jobs.stream(jobId, {
 }
 ```
 
-![nika check audits the workflow (plan, permits, cost, secrets, types, the lethal-trifecta gate), then nika run executes it locally and seals the hash-chained trace — the audit-then-run story](https://raw.githubusercontent.com/supernovae-st/nika/main/media/nika-hero.gif)
+<!-- engine hero pinned to the release tag it demonstrates · re-pin on lockstep bumps -->
+![nika check audits the workflow (plan, permits, cost, secrets, types, the lethal-trifecta gate), then nika run executes it locally and seals the hash-chained trace — the audit-then-run story](https://raw.githubusercontent.com/supernovae-st/nika/v0.107.0/media/nika-hero.gif)
+
+## Keeping it fresh · the lockstep
+
+This package versions in lockstep with the engine's release train —
+SDK 0.107.0 speaks about engine 0.107.0, and CI warns on a gap. When
+the binary moves and a seat stays behind, one command names it:
+
+```sh
+nika doctor    # reads what this machine actually runs · names any kit
+               # lagging the binary's train · prints the exact fix
+```
+
+Update gestures: `brew upgrade nika` for the binary ·
+`npm update @supernovae-st/nika-client` for this package. Drift is
+advisory (`nika doctor` warns · exit 0) and every fix line it prints
+is copy-paste ready.
 
 <!-- city:map -->
 ## The city · where this repo sits

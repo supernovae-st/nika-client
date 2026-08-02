@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Voice correction for the 0.107.0 note below: read it as **the SDK
   publishes verified** — the fact stands (npm provenance proves the
   workflow that built the package); the printed section stays as released.
+- README: the zero-key rehearsal (`nika try 01-hello`) now leads the
+  hero · the engine hero GIF pins to the release tag it demonstrates
+  (was floating `main`) · a lockstep section names `nika doctor` as the
+  freshness probe.
 
 ## [0.107.0] — 2026-08-01
 

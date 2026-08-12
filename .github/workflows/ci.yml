@@ -118,6 +118,20 @@ jobs:
           nika serve --bind 127.0.0.1:3000 --workflows /tmp/wf &
           sleep 2
           npm run generate:types
+          # The re-activation clause above promises this check comes back when
+          # `serve` lands. Measured 2026-08-12, that promise could not be kept:
+          # `src/generated/` has ZERO tracked files (the directory does not even
+          # exist), and `git diff` is blind to untracked files by construction.
+          # So the day `serve` shipped, this would have gone green without
+          # comparing anything — a gate that re-arms into a vacuum.
+          # Two assertions close it: the generator must produce its file, and
+          # the file must be VISIBLE to the diff (intent-to-add is what makes an
+          # untracked path count). No untrusted input reaches these lines.
+          if [ ! -f src/generated/openapi.d.ts ]; then
+            echo "::error::type-drift is blind — the generator produced no src/generated/openapi.d.ts. A drift check whose subject is absent proves nothing."
+            exit 1
+          fi
+          git add --intent-to-add src/generated/
           if git diff --exit-code src/generated/; then
             echo "Types in sync"
           else

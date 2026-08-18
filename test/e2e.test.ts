@@ -86,7 +86,7 @@ function createMockServer(state: MockState) {
       const name = decodeURIComponent(sourceMatch[1]);
       if (name === 'translate.nika.yaml') {
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('nika: v1\nworkflow:\n  id: translate\n  description: "Translate files"');
+        res.end('# Translate files\nnika: translate\nmodel: mock/echo\ntasks: {}');
         return;
       }
       json(res, { error: `Workflow not found: ${name}` }, 404);
@@ -591,8 +591,8 @@ describe('E2E: nika-client v2 against mock server', () => {
       const client = makeClient();
 
       const yaml = await client.workflows.source('translate.nika.yaml');
-      expect(yaml).toContain('nika: v1');
-      expect(yaml).toContain('  id: translate');
+      expect(yaml).toContain('nika: translate');
+      expect(yaml).toContain('# Translate files');
     });
   });
 

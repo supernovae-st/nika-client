@@ -17,9 +17,8 @@ command -v nika >/dev/null || { echo "nika not on PATH" >&2; exit 1; }
 rm -rf /tmp/sdk-demo
 mkdir -p /tmp/sdk-demo
 cat > /tmp/sdk-demo/flow.nika.yaml <<'EOF'
-nika: v1
-workflow:
-  id: brief
+# a two-step launch brief · outline first, then the brief written from it
+nika: brief
 model: mock/echo
 permits: {}
 tasks:

@@ -101,13 +101,12 @@ jobs:
             echo "::warning::type-drift advisory — nika serve is not yet shipped (target-facing SDK). Re-activates automatically when serve lands."
             exit 0
           fi
-          # The fixture speaks the shipped envelope — this exact file passes
-          # `nika check` clean (rc=0) on the released v0.107.0.
+          # The fixture speaks the shipped nine-key envelope — this exact file
+          # passes `nika check` clean (rc=0) on the released v0.109.0
+          # (`nika: <id>` names the file · no `workflow:` block).
           mkdir -p /tmp/wf
           cat > /tmp/wf/test.nika.yaml <<'EOF'
-          nika: v1
-          workflow:
-            id: test
+          nika: test
           tasks:
             hello:
               infer:

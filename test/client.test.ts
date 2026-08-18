@@ -684,16 +684,16 @@ describe('workflows.reload()', () => {
 describe('workflows.source()', () => {
   it('returns raw YAML as text', async () => {
     const client = makeClient();
-    fetchSpy.mockResolvedValueOnce(textResponse('nika: v1\nworkflow: test'));
+    fetchSpy.mockResolvedValueOnce(textResponse('nika: test\ntasks: {}'));
     const yaml = await client.workflows.source('test.nika.yaml');
-    expect(yaml).toContain('nika: v1');
+    expect(yaml).toContain('nika: test');
     const [url] = fetchSpy.mock.calls[0];
     expect(url).toContain('/v1/workflows/test.nika.yaml/source');
   });
 
   it('encodes workflow name with slashes', async () => {
     const client = makeClient();
-    fetchSpy.mockResolvedValueOnce(textResponse('nika: v1'));
+    fetchSpy.mockResolvedValueOnce(textResponse('nika: flow'));
     await client.workflows.source('sub/dir/flow.nika.yaml');
     const url = fetchSpy.mock.calls[0][0] as string;
     expect(url).toContain('sub%2Fdir%2Fflow.nika.yaml');

@@ -11,11 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The live leg speaks the nine keys: the e2e workflow, the demo tape's
   staged workflow and the dormant type-drift fixture carry the
-  nine-key envelope of the released 0.109.0 (`nika: <id>` names the
+  nine-key envelope of the released 0.109.1 (`nika: <id>` names the
   file · the `workflow:` block is gone) · every one proven clean by
-  `nika check` on 0.109.0. The negative parse-fatal fixture stays as it
-  was: 0.109.0 refuses it with NIKA-PARSE-005 (unknown field `name`).
-  Package version follows the engine to 0.109.0.
+  `nika check` on 0.109.1. The negative parse-fatal fixture stays as it
+  was: 0.109.1 refuses it with NIKA-PARSE-005 (unknown field `name`).
+  Package version follows the engine to 0.109.1.
 - Voice correction for the 0.107.0 note below: read it as **the SDK
   publishes verified** — the fact stands (npm provenance proves the
   workflow that built the package); the printed section stays as released.
@@ -25,7 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   freshness probe.
 - CI: the dormant type-drift fixture speaks the shipped envelope
   (proven clean by `nika check` on the released v0.107.0 when written ·
-  re-proven on 0.109.0 in nine-key form, see above) · the day serve
+  re-proven on 0.109.1 in nine-key form, see above) · the day serve
   lands, the gate wakes on a file the engine accepts.
 - Coverage: the serve probe learns the Diamond address — it checks
   `crates/nika-serve` before the pre-refonte `tools/nika-serve`, so the

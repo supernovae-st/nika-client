@@ -9,13 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Leftover teaching: the live-e2e negative fixture no longer writes
+  `nika: v1` or a `tasks:` list. It is a nine-key file (`nika: sdk-bad`)
+  with an unknown `name:` field, still parse-fatal as NIKA-PARSE-005
+  on 0.109.2. Mock serve-source YAML in the HTTP tests, and the dormant
+  type-drift fixture, carry a non-empty `tasks:` map plus `permits:`
+  and `outputs:`. Live comments name `nika: <id>`.
 - The live leg speaks the nine keys: the e2e workflow, the demo tape's
   staged workflow and the dormant type-drift fixture carry the
   nine-key envelope of the released 0.109.2 (`nika: <id>` names the
-  file · the `workflow:` block is gone) · every one proven clean by
-  `nika check` on 0.109.2. The negative parse-fatal fixture stays as it
-  was: 0.109.2 refuses it with NIKA-PARSE-005 (unknown field `name`).
-  Package version follows the published engine to 0.109.2.
+  file) · every one proven clean by `nika check` on 0.109.2. Package
+  version follows the published engine to 0.109.2.
 - README: the engine hero GIF and the lockstep sentence pin to the
   published v0.109.2 tag (was v0.107.0 · #38 left them until a nine-key
   engine release existed).

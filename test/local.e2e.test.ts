@@ -23,7 +23,7 @@ function realNika(): string | null {
 
 const BIN = realNika();
 
-// The nine-key envelope of the released engine (0.109.1 · `nika: <id>` is
+// The nine-key envelope of the released engine (0.109.2 · `nika: <id>` is
 // the file's name · no `workflow:` block) · `nika check` clean on it.
 const WF = `nika: sdk-live
 model: mock/echo
@@ -66,7 +66,7 @@ describe.skipIf(!BIN)('LocalNika · live engine (skip-honest)', () => {
 
   it('parse-fatal file → typed result, BOTH engine voices accepted', async () => {
     const bad = path.join(dir, 'bad.nika.yaml');
-    // A NEGATIVE fixture: it must stay parse-fatal. On 0.109.1 the engine
+    // A NEGATIVE fixture: it must stay parse-fatal. On 0.109.2 the engine
     // dies on it with NIKA-PARSE-005 (unknown field `name` in the strict
     // nine-key envelope) — verified against the 0.109 oracle 2026-08-19.
     writeFileSync(bad, 'nika: v1\nname: nope\ntasks: []\n');

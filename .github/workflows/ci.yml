@@ -115,7 +115,7 @@ jobs:
                 prompt: "say hello"
                 max_tokens: 64
           outputs:
-            greeting: ${{ tasks.hello.output }}
+            greeting: ${{ '${{ tasks.hello.output }}' }}
           EOF
           nika serve --bind 127.0.0.1:3000 --workflows /tmp/wf &
           sleep 2

@@ -87,18 +87,19 @@ jobs:
           chmod +x nika && sudo mv nika /usr/local/bin/
 
       - run: npm ci
-      # The type-drift check needs a live `nika serve`. That surface is
-      # target-facing (see CHANGELOG) — until it ships, `nika serve --help`
-      # fails and the gate is advisory. It re-activates automatically the day
-      # serve lands (no maintainer flip needed).
+      # The type-drift check needs the target-facing HTTP `nika serve` surface
+      # (see CHANGELOG). The released CLI already owns `nika serve` for its
+      # resident scheduler, so command existence alone is not a capability
+      # probe. Re-activate only when help exposes both HTTP contract flags.
       - name: Type drift (against live nika serve)
         env:
           NIKA_SERVE_TOKEN: ci-test-token-32-chars-minimum!!
           NIKA_URL: http://127.0.0.1:3000
           NIKA_TOKEN: ci-test-token-32-chars-minimum!!
         run: |
-          if ! nika serve --help >/dev/null 2>&1; then
-            echo "::warning::type-drift advisory — nika serve is not yet shipped (target-facing SDK). Re-activates automatically when serve lands."
+          serve_help=$(nika serve --help 2>&1 || true)
+          if [[ "$serve_help" != *"--bind"* || "$serve_help" != *"--workflows"* ]]; then
+            echo "::warning::type-drift advisory — nika serve currently exposes the resident scheduler, not the target-facing HTTP surface. Re-activates when --bind and --workflows ship."
             exit 0
           fi
           # The fixture speaks the shipped nine-key envelope — this exact file

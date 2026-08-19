@@ -322,12 +322,12 @@ for await (const event of nika.jobs.stream(jobId, {
 ```
 
 <!-- engine hero pinned to the release tag it demonstrates · re-pin on lockstep bumps -->
-![nika check audits the workflow (plan, permits, cost, secrets, types, the lethal-trifecta gate), then nika run executes it locally and seals the hash-chained trace — the audit-then-run story](https://raw.githubusercontent.com/supernovae-st/nika/v0.107.0/media/nika-hero.gif)
+![nika check audits the workflow (plan, permits, cost, secrets, types, the lethal-trifecta gate), then nika run executes it locally and seals the hash-chained trace — the audit-then-run story](https://raw.githubusercontent.com/supernovae-st/nika/v0.109.2/media/nika-hero.gif)
 
 ## Keeping it fresh · the lockstep
 
 This package versions in lockstep with the engine's release train —
-SDK 0.107.0 speaks about engine 0.107.0, and CI warns on a gap. When
+SDK 0.109.2 speaks about engine 0.109.2, and CI warns on a gap. When
 the binary moves and a seat stays behind, one command names it:
 
 ```sh

@@ -102,7 +102,7 @@ jobs:
             exit 0
           fi
           # The fixture speaks the shipped nine-key envelope — this exact file
-          # passes `nika check` clean (rc=0) on the released v0.109.1
+          # passes `nika check` clean (rc=0) on the released v0.109.2
           # (`nika: <id>` names the file · no `workflow:` block).
           mkdir -p /tmp/wf
           cat > /tmp/wf/test.nika.yaml <<'EOF'

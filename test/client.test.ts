@@ -684,7 +684,20 @@ describe('workflows.reload()', () => {
 describe('workflows.source()', () => {
   it('returns raw YAML as text', async () => {
     const client = makeClient();
-    fetchSpy.mockResolvedValueOnce(textResponse('nika: test\ntasks: {}'));
+    fetchSpy.mockResolvedValueOnce(
+      textResponse(
+        [
+          'nika: test',
+          'model: mock/echo',
+          'permits: {}',
+          'tasks:',
+          '  hello:',
+          '    infer: { prompt: "hi", max_tokens: 8 }',
+          'outputs:',
+          '  greeting: ${{ tasks.hello.output }}',
+        ].join('\n'),
+      ),
+    );
     const yaml = await client.workflows.source('test.nika.yaml');
     expect(yaml).toContain('nika: test');
     const [url] = fetchSpy.mock.calls[0];

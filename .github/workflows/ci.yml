@@ -103,16 +103,19 @@ jobs:
           fi
           # The fixture speaks the shipped nine-key envelope — this exact file
           # passes `nika check` clean (rc=0) on the released v0.109.2
-          # (`nika: <id>` names the file · no `workflow:` block).
+          # (`nika: <id>` names the file).
           mkdir -p /tmp/wf
           cat > /tmp/wf/test.nika.yaml <<'EOF'
           nika: test
+          permits: {}
           tasks:
             hello:
               infer:
                 model: mock/fast
                 prompt: "say hello"
                 max_tokens: 64
+          outputs:
+            greeting: ${{ '${{ tasks.hello.output }}' }}
           EOF
           nika serve --bind 127.0.0.1:3000 --workflows /tmp/wf &
           sleep 2

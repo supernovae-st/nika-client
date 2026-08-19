@@ -23,8 +23,8 @@ function realNika(): string | null {
 
 const BIN = realNika();
 
-// The nine-key envelope of the released engine (0.109.2 · `nika: <id>` is
-// the file's name · no `workflow:` block) · `nika check` clean on it.
+// The nine-key envelope of the released engine (0.109.2 · `nika: <id>`
+// names the file) · `nika check` clean on it.
 const WF = `nika: sdk-live
 model: mock/echo
 permits:
@@ -36,6 +36,8 @@ tasks:
     with:
       data: \${{ tasks.fetch.output }}
     infer: { prompt: "sum \${{ with.data }}", max_tokens: 30 }
+outputs:
+  summary: \${{ tasks.think.output }}
 `;
 
 describe.skipIf(!BIN)('LocalNika · live engine (skip-honest)', () => {
@@ -66,10 +68,21 @@ describe.skipIf(!BIN)('LocalNika · live engine (skip-honest)', () => {
 
   it('parse-fatal file → typed result, BOTH engine voices accepted', async () => {
     const bad = path.join(dir, 'bad.nika.yaml');
-    // A NEGATIVE fixture: it must stay parse-fatal. On 0.109.2 the engine
-    // dies on it with NIKA-PARSE-005 (unknown field `name` in the strict
-    // nine-key envelope) — verified against the 0.109 oracle 2026-08-19.
-    writeFileSync(bad, 'nika: v1\nname: nope\ntasks: []\n');
+    // A NEGATIVE fixture: it must stay parse-fatal. Identity is a kebab
+    // id and `tasks:` is a map; the unknown `name:` field is what
+    // 0.109.2 refuses (NIKA-PARSE-005) — `nika check --json` on the
+    // published 0.109.2 (`1da35b685`).
+    writeFileSync(
+      bad,
+      [
+        'nika: sdk-bad',
+        'name: nope',
+        'tasks:',
+        '  hello:',
+        '    infer: { prompt: "x", max_tokens: 8 }',
+        '',
+      ].join('\n'),
+    );
     const r = await nika.check(bad);
     expect(r.clean).toBe(false);
     expect(r.exitCode).toBeGreaterThan(0);

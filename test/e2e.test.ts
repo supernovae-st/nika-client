@@ -86,7 +86,19 @@ function createMockServer(state: MockState) {
       const name = decodeURIComponent(sourceMatch[1]);
       if (name === 'translate.nika.yaml') {
         res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
-        res.end('# Translate files\nnika: translate\nmodel: mock/echo\ntasks: {}');
+        res.end(
+          [
+            '# Translate files',
+            'nika: translate',
+            'model: mock/echo',
+            'permits: {}',
+            'tasks:',
+            '  greet:',
+            '    infer: { prompt: "say hello", max_tokens: 8 }',
+            'outputs:',
+            '  greeting: ${{ tasks.greet.output }}',
+          ].join('\n'),
+        );
         return;
       }
       json(res, { error: `Workflow not found: ${name}` }, 404);

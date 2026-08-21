@@ -16,8 +16,8 @@ One file, 4 verbs, one binary. Typed, zero-dependency, honest about what ships t
 > works TODAY**: a typed, zero-dependency driver for the shipped binary
 > (`check --json` · `run --json` event stream · the dry-run plan object ·
 > `test` · `trace verify`). The root module targets the **future**
-> `nika serve` HTTP API and stays clearly target-facing until the engine
-> ships it.
+> workflow HTTP and SSE API. The reference engine does not ship a compatible
+> service today. `nika serve` is the resident cadence firer, not that API.
 
 Zero keys first — the shipped binary rehearses a canonical workflow
 offline, nothing written, nothing owned (bare `nika try` lists them all):
@@ -66,7 +66,7 @@ exit code. This repo's own CI pins every action by commit SHA and
 checks against the latest released engine tag, never a floating `main`.
 
 - Zero runtime dependencies (uses native `fetch`)
-- Full TypeScript types aligned with nika serve OpenAPI 3.1 spec
+- Full TypeScript types for the intended workflow HTTP contract
 - Namespace pattern: `nika.jobs.*`, `nika.workflows.*`
 - 6 typed error classes with full hierarchy
 - Automatic retry on 429/5xx with exponential backoff
@@ -220,8 +220,8 @@ const isValid = await Nika.verifyWebhook(
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `url` | `string` | (required) | nika serve URL (http/https) |
-| `token` | `string` | (required) | Bearer token (`NIKA_SERVE_TOKEN`) |
+| `url` | `string` | (required) | Compatible workflow service URL (http/https) |
+| `token` | `string` | (required) | Bearer token (`NIKA_TOKEN`) |
 | `timeout` | `number` | `30000` | HTTP request timeout in ms |
 | `retries` | `number` | `2` | Retries on 429/5xx |
 | `concurrency` | `number` | `24` | Max concurrent HTTP requests |
@@ -322,13 +322,13 @@ for await (const event of nika.jobs.stream(jobId, {
 ```
 
 <!-- engine hero pinned to the release tag it demonstrates · re-pin on lockstep bumps -->
-![nika check audits the workflow (plan, permits, cost, secrets, types, the lethal-trifecta gate), then nika run executes it locally and seals the hash-chained trace — the audit-then-run story](https://raw.githubusercontent.com/supernovae-st/nika/v0.109.2/media/nika-hero.gif)
+![nika check audits the workflow (plan, permits, cost, secrets, types, the lethal-trifecta gate), then nika run executes it locally and seals the hash-chained trace — the audit-then-run story](https://raw.githubusercontent.com/supernovae-st/nika/v0.112.0/media/nika-hero.gif)
 
 ## Keeping it fresh · the lockstep
 
-This package versions in lockstep with the engine's release train —
-SDK 0.109.2 speaks about engine 0.109.2, and CI warns on a gap. When
-the binary moves and a seat stays behind, one command names it:
+This package versions in lockstep with the engine's release train. CI warns
+when the package and binary leave the same release line. When the binary
+moves and a seat stays behind, one command names it:
 
 ```sh
 nika doctor    # reads what this machine actually runs · names any kit

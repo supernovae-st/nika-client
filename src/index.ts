@@ -40,7 +40,7 @@ export class Nika {
   constructor(config: NikaConfig) {
     if (!config.url) {
       throw new TypeError(
-        'NikaConfig.url is required — pass the nika serve URL.\n'
+        'NikaConfig.url is required — pass a compatible workflow service URL.\n'
         + '  Example: new Nika({ url: "http://localhost:3000", token: "..." })\n'
         + '  Or use:  Nika.fromEnv() to read NIKA_URL and NIKA_TOKEN from environment',
       );
@@ -91,7 +91,7 @@ export class Nika {
   }
 
   /**
-   * Verify a webhook signature from nika serve.
+   * Verify a webhook signature from a compatible workflow service.
    *
    * @param payload — raw request body string
    * @param signature — value of X-Nika-Signature header

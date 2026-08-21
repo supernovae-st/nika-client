@@ -4,8 +4,8 @@
 /**
  * `LocalNika` — the typed driver for the SHIPPED engine binary.
  *
- * The main module targets the future `nika serve` HTTP surface; THIS
- * module works the day it ships, by driving the machine-stable CLI
+ * The main module targets an intended workflow HTTP service; THIS
+ * module works today, by driving the machine-stable CLI
  * contracts the engine already carries: `check --json`
  * (report_version-guarded) · `run --json` (NDJSON event stream) ·
  * `run --dry-run --json` (the plan object) · `test` · `trace verify`.

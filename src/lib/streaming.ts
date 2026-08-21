@@ -5,9 +5,9 @@ import type { ApiClient } from './api-client.js';
 const DEFAULT_IDLE_TIMEOUT = 60_000; // 60s without any event = dead connection
 
 /**
- * Parse SSE stream from nika serve into typed events.
+ * Parse a compatible workflow service SSE stream into typed events.
  *
- * nika serve emits SSE in the format:
+ * The intended service emits SSE in the format:
  *   event: <type>
  *   id: <incrementing_number>
  *   data: <json>
@@ -133,8 +133,8 @@ async function* streamOnce(
           // Handle both "data: value" and "data:value" (SSE spec). Multiple
           // data: lines in ONE event are JOINED with '\n' per the spec — the
           // previous code kept only the last line, silently dropping the head
-          // of any multi-line payload. nika serve emits single-line JSON today
-          // so this was latent, but a spec-compliant producer (or a
+          // of any multi-line payload. The fixtures emit single-line JSON, but
+          // a spec-compliant producer (or a
           // pretty-printed reply) would otherwise arrive truncated + unparseable.
           if (line.startsWith('data:')) {
             const value = line[5] === ' ' ? line.slice(6) : line.slice(5);

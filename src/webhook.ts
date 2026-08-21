@@ -1,5 +1,5 @@
 /**
- * Verify nika serve webhook signatures (Stripe-style HMAC-SHA256).
+ * Verify compatible workflow service webhook signatures (Stripe-style HMAC-SHA256).
  *
  * Signature header format: "t=<unix_timestamp>,v1=<hmac_sha256_hex>"
  * Signed payload: "<timestamp>.<body>"

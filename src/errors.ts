@@ -8,7 +8,7 @@ export class NikaError extends Error {
   }
 }
 
-/** HTTP error from nika serve (non-2xx response). */
+/** HTTP error from the compatible workflow service (non-2xx response). */
 export class NikaAPIError extends NikaError {
   public readonly status: number;
   public readonly body: string;

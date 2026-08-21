@@ -1,7 +1,7 @@
 /**
  * E2E integration test for @supernovae-st/nika-client v2.
  *
- * Spins up a minimal HTTP server mimicking nika serve API,
+ * Spins up a minimal HTTP server implementing the preview workflow API fixture,
  * then exercises the real Nika client against it over the network.
  *
  * No mocks -- real HTTP, real SSE, real client code.

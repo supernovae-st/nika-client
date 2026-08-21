@@ -1,4 +1,4 @@
-// Types aligned with nika-serve Rust source (routes/workflows.rs, routes/artifacts.rs, events.rs)
+// Preview wire types for the intended workflow HTTP + SSE service contract.
 
 // ── Config ─────────────────────────────────────────────────
 
@@ -10,7 +10,7 @@ export interface NikaLogger {
 }
 
 export interface NikaConfig {
-  /** URL of nika serve (e.g. http://localhost:3000) */
+  /** URL of a compatible workflow service (e.g. https://api.example.test) */
   url: string;
   /** Bearer token for authentication */
   token: string;
@@ -24,7 +24,7 @@ export interface NikaConfig {
   pollTimeout?: number;
   /** Backoff multiplier for polling. Default: 1.5 */
   pollBackoff?: number;
-  /** Max concurrent HTTP requests to nika serve. Default: 24 */
+  /** Max concurrent HTTP requests to the workflow service. Default: 24 */
   concurrency?: number;
   /** Custom fetch function. Default: globalThis.fetch */
   fetch?: typeof globalThis.fetch;

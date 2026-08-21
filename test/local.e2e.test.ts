@@ -23,8 +23,8 @@ function realNika(): string | null {
 
 const BIN = realNika();
 
-// The nine-key envelope of the released engine (0.109.2 · `nika: <id>`
-// names the file) · `nika check` clean on it.
+// The nine-key envelope of the released engine (`nika: <id>` names the
+// file) · `nika check` stays clean on the moving released binary.
 const WF = `nika: sdk-live
 model: mock/echo
 permits:
@@ -70,8 +70,8 @@ describe.skipIf(!BIN)('LocalNika · live engine (skip-honest)', () => {
     const bad = path.join(dir, 'bad.nika.yaml');
     // A NEGATIVE fixture: it must stay parse-fatal. Identity is a kebab
     // id and `tasks:` is a map; the unknown `name:` field is what
-    // 0.109.2 refuses (NIKA-PARSE-005) — `nika check --json` on the
-    // published 0.109.2 (`1da35b685`).
+    // the released parser refuses (NIKA-PARSE-005). Keeping the unknown
+    // field versionless makes the negative fixture follow the release train.
     writeFileSync(
       bad,
       [

@@ -45,6 +45,12 @@ export type JobStatus =
   | 'succeeded'
   | 'failed';
 
+/** Redacted diagnosis on a failed job (NIKA code + message, no paths). */
+export interface JobErrorBody {
+  code: string;
+  message: string;
+}
+
 /** POST /v1/jobs and GET /v1/jobs/{id} body. */
 export interface NikaJob {
   id: string;
@@ -53,6 +59,8 @@ export interface NikaJob {
   execution_id?: string;
   /** Present after the worker readmits the POST-time snapshot. */
   trace_id?: string;
+  /** Present on `failed` when the engine named a redacted diagnosis. */
+  error?: JobErrorBody;
 }
 
 /** GET /v1/jobs/{id}/status body. */

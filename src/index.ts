@@ -121,6 +121,7 @@ export type {
   NikaConfig,
   NikaLogger,
   NikaJob,
+  JobErrorBody,
   NikaArtifact,
   NikaEvent,
   NikaEventType,

@@ -48,7 +48,10 @@ export class NikaJobError extends NikaError {
   public readonly exitCode: number | undefined;
 
   constructor(job: NikaJob) {
-    super(`Job ${job.id} ${job.status}`);
+    const diagnosis = job.error
+      ? `${job.error.code} · ${job.error.message}`
+      : job.status;
+    super(`Job ${job.id} ${diagnosis}`);
     this.name = 'NikaJobError';
     this.job = job;
     this.exitCode = undefined;

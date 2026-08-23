@@ -2,22 +2,23 @@ import type { NikaEvent, StreamOptions } from '../types.js';
 import { NikaConnectionError, NikaError, NikaTimeoutError } from '../errors.js';
 import type { ApiClient } from './api-client.js';
 
-const DEFAULT_IDLE_TIMEOUT = 60_000; // 60s without any event = dead connection
+const DEFAULT_IDLE_TIMEOUT = 60_000;
+
+const TERMINAL_STATUS = new Set(['succeeded', 'failed', 'interrupted']);
+
+function isTerminal(event: NikaEvent): boolean {
+  return typeof event.status === 'string' && TERMINAL_STATUS.has(event.status);
+}
 
 /**
- * Parse a compatible workflow service SSE stream into typed events.
+ * Parse nika serve SSE (`GET /v1/jobs/{id}/events`) into typed events.
  *
- * The intended service emits SSE in the format:
- *   event: <type>
- *   id: <incrementing_number>
- *   data: <json>
- *   \n
+ * Wire format:
+ *   id: <sequence>
+ *   data: {"sequence":N,"kind":"...","status":"..."}
  *
- * Terminal events (completed, failed, cancelled) end the generator.
- * An idle timeout detects dead connections (server died without closing TCP).
- *
- * Auto-reconnects on stream drop (up to maxReconnects), using
- * Last-Event-Id header to resume from where it left off.
+ * Terminal when status is succeeded | failed | interrupted.
+ * Last-Event-ID resumes from the last sequence.
  */
 export async function* streamEvents(
   client: ApiClient,
@@ -32,35 +33,23 @@ export async function* streamEvents(
   while (true) {
     try {
       const extraHeaders: Record<string, string> = {};
-      if (lastEventId) extraHeaders['Last-Event-Id'] = lastEventId;
+      if (lastEventId) extraHeaders['Last-Event-ID'] = lastEventId;
 
       yield* streamOnce(client, jobId, options, extraHeaders, (id) => {
         lastEventId = id;
       });
-
-      // If streamOnce returns normally, a terminal event was received — done
       return;
     } catch (err) {
-      // Don't reconnect on user abort
       if (options?.signal?.aborted) throw err;
-
-      // Don't reconnect on non-retryable errors (4xx, timeout by choice)
       if (err instanceof NikaTimeoutError) throw err;
       if (err instanceof NikaError && !(err instanceof NikaConnectionError)) throw err;
-
-      // NikaConnectionError = stream dropped without terminal event
       if (reconnects >= maxReconnects) throw err;
       reconnects++;
       await sleep(reconnectDelay * reconnects, options?.signal);
-      continue; // retry with Last-Event-Id
     }
   }
 }
 
-/**
- * Single SSE connection attempt. Yields events, tracks last event ID.
- * Returns normally on terminal event. Throws on unexpected disconnect.
- */
 async function* streamOnce(
   client: ApiClient,
   jobId: string,
@@ -71,7 +60,7 @@ async function* streamOnce(
   const idleTimeout = options?.idleTimeout ?? DEFAULT_IDLE_TIMEOUT;
 
   const res = await client.connectSSE(
-    `/v1/events/${jobId}`,
+    `/v1/jobs/${jobId}/events`,
     options?.signal,
     extraHeaders,
   );
@@ -86,7 +75,6 @@ async function* streamOnce(
   let receivedTerminal = false;
   let timedOut = false;
 
-  // Idle timeout: reset on every chunk received
   let idleTimer: ReturnType<typeof setTimeout> | undefined;
 
   function resetIdleTimer() {
@@ -111,7 +99,7 @@ async function* streamOnce(
         }
         if (!receivedTerminal) {
           throw new NikaConnectionError(
-            'SSE stream closed without terminal event (completed/failed/cancelled)',
+            'SSE stream closed without terminal event (succeeded/failed/interrupted)',
           );
         }
         break;
@@ -120,9 +108,8 @@ async function* streamOnce(
       resetIdleTimer();
       buffer += decoder.decode(value, { stream: true });
 
-      // SSE blocks are separated by double newlines
       const parts = buffer.split('\n\n');
-      buffer = parts.pop()!; // keep incomplete chunk
+      buffer = parts.pop()!;
 
       for (const part of parts) {
         const lines = part.split('\n');
@@ -130,21 +117,13 @@ async function* streamOnce(
         let eventId: string | undefined;
 
         for (const line of lines) {
-          // Handle both "data: value" and "data:value" (SSE spec). Multiple
-          // data: lines in ONE event are JOINED with '\n' per the spec — the
-          // previous code kept only the last line, silently dropping the head
-          // of any multi-line payload. The fixtures emit single-line JSON, but
-          // a spec-compliant producer (or a
-          // pretty-printed reply) would otherwise arrive truncated + unparseable.
           if (line.startsWith('data:')) {
             const value = line[5] === ' ' ? line.slice(6) : line.slice(5);
             data = data === undefined ? value : `${data}\n${value}`;
           }
-          // Parse id: field for reconnect tracking
           if (line.startsWith('id:')) {
             eventId = line[3] === ' ' ? line.slice(4) : line.slice(3);
           }
-          // Skip event:, retry:, comments (:), and keep-alive pings
         }
 
         if (eventId) {
@@ -155,13 +134,7 @@ async function* streamOnce(
           try {
             const event = JSON.parse(data) as NikaEvent;
             yield event;
-
-            // Terminal events end the stream
-            if (
-              event.type === 'completed' ||
-              event.type === 'failed' ||
-              event.type === 'cancelled'
-            ) {
+            if (isTerminal(event)) {
               receivedTerminal = true;
               return;
             }
@@ -173,7 +146,6 @@ async function* streamOnce(
     }
   } finally {
     if (idleTimer !== undefined) clearTimeout(idleTimer);
-    // Cancel first (if not already done by idle timer), then release
     await reader.cancel().catch(() => {});
     reader.releaseLock();
   }

@@ -3,8 +3,8 @@
  * Generate TypeScript types from nika serve OpenAPI spec.
  *
  * Usage:
- *   node scripts/generate-types.js                          # from running server (localhost:3000)
- *   node scripts/generate-types.js http://vps:3000          # from remote server
+ *   node scripts/generate-types.js                          # from ./openapi.json
+ *   node scripts/generate-types.js http://127.0.0.1:8787    # from a live server
  *   node scripts/generate-types.js ./openapi.json           # from local file
  *
  * Requires NIKA_TOKEN env var when fetching from a server.
@@ -19,7 +19,7 @@ const SDK_ROOT = resolve(import.meta.dirname, '..');
 const OUTPUT_DIR = join(SDK_ROOT, 'src', 'generated');
 const OUTPUT_FILE = join(OUTPUT_DIR, 'openapi.d.ts');
 
-const source = process.argv[2] || 'http://localhost:3000';
+const source = process.argv[2] || join(SDK_ROOT, 'openapi.json');
 
 async function main() {
   let specPath;

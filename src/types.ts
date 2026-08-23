@@ -1,6 +1,5 @@
-// Preview wire types for the intended workflow HTTP + SSE service contract.
-
-// ── Config ─────────────────────────────────────────────────
+// Live wire types for nika serve HTTP + SSE (W06/W07).
+// Pin: ./openapi.json · generated: src/generated/openapi.d.ts
 
 export interface NikaLogger {
   debug: (message: string, ...args: unknown[]) => void;
@@ -10,9 +9,9 @@ export interface NikaLogger {
 }
 
 export interface NikaConfig {
-  /** URL of a compatible workflow service (e.g. https://api.example.test) */
+  /** URL of a nika serve listener (e.g. http://127.0.0.1:8787) */
   url: string;
-  /** Bearer token for authentication */
+  /** Bearer token matching the server --token-file */
   token: string;
   /** Global HTTP request timeout in ms. Default: 30_000 */
   timeout?: number;
@@ -24,7 +23,7 @@ export interface NikaConfig {
   pollTimeout?: number;
   /** Backoff multiplier for polling. Default: 1.5 */
   pollBackoff?: number;
-  /** Max concurrent HTTP requests to the workflow service. Default: 24 */
+  /** Max concurrent HTTP requests. Default: 24 */
   concurrency?: number;
   /** Custom fetch function. Default: globalThis.fetch */
   fetch?: typeof globalThis.fetch;
@@ -32,105 +31,68 @@ export interface NikaConfig {
   logger?: NikaLogger;
 }
 
-// ── Run ─────────────────────────────────────────────────────
-
-export interface RunRequest {
+/** POST /v1/jobs body. The live server deny_unknown_fields this object. */
+export interface CreateJobRequest {
   workflow: string;
-  inputs?: Record<string, unknown>;
-  resume_from?: string;
 }
 
-/** POST /v1/run response */
-export interface RunResponse {
-  job_id: string;
-  status: string;
+/** Live JobStatus enum from OpenAPI. */
+export type JobStatus =
+  | 'queued'
+  | 'running'
+  | 'interrupted'
+  | 'paused'
+  | 'succeeded'
+  | 'failed';
+
+/** POST /v1/jobs and GET /v1/jobs/{id} body. */
+export interface NikaJob {
+  id: string;
+  status: JobStatus;
+}
+
+/** GET /v1/jobs/{id}/status body. */
+export interface JobStatusOnly {
+  status: JobStatus;
 }
 
 export interface RunOptions {
-  resumeFrom?: string;
+  /** Caller-supplied Idempotency-Key (1–255 bytes). Default: a random UUID. */
+  idempotencyKey?: string;
   signal?: AbortSignal;
 }
 
-// ── Status ──────────────────────────────────────────────────
-
-export type JobStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
-
-/** GET /v1/status/{id} response */
-export interface NikaJob {
-  job_id: string;
-  status: JobStatus;
-  workflow: string;
-  created_at: string;
-  started_at?: string;
-  completed_at?: string;
-  exit_code?: number;
-  output?: string;
-}
-
-// ── Cancel ──────────────────────────────────────────────────
-
-export interface CancelResponse {
-  job_id: string;
-  status: string;
-  message?: string;
-}
-
-// ── Artifacts ───────────────────────────────────────────────
-
-export interface NikaArtifact {
-  name: string;
-  size: number;
-  format: string;
-  content_type: string;
-  checksum?: string;
-}
-
-/** GET /v1/jobs/{id}/artifacts response */
-export interface ArtifactsResponse {
-  job_id: string;
-  count: number;
-  artifacts: NikaArtifact[];
-}
-
-// ── Health ──────────────────────────────────────────────────
-
-/** GET /health response */
+/** GET /health — public process identity, no Bearer. */
 export interface NikaHealth {
   status: 'ok';
-  version: string;
   service: string;
+  engine_version?: string;
+  build_sha?: string;
+  spec_sha?: string;
+  api_version?: string;
 }
 
-// ── Workflows ───────────────────────────────────────────────
-
-export interface WorkflowInfo {
-  name: string;
-  size: number;
-}
-
-/** GET /v1/workflows response */
+/** GET /v1/workflows — contained relative names. */
 export interface ListWorkflowsResponse {
-  workflows: WorkflowInfo[];
-  count: number;
-  /** Whether more results exist (present when `limit` is set). */
-  has_more?: boolean;
+  workflows: string[];
 }
 
-// ── SSE Events (discriminated union matching Rust ServeEvent) ──
+/** GET /v1/workflows/{name} */
+export interface WorkflowMetadata {
+  workflow: string;
+}
 
-export type NikaEvent =
-  | { type: 'started'; job_id: string }
-  | { type: 'task_start'; job_id: string; task_id: string; verb: string }
-  | { type: 'task_complete'; job_id: string; task_id: string; duration_ms: number }
-  | { type: 'task_failed'; job_id: string; task_id: string; error: string; duration_ms: number }
-  | { type: 'artifact_written'; job_id: string; task_id: string; path: string; size: number }
-  | { type: 'completed'; job_id: string; output: string | null }
-  | { type: 'failed'; job_id: string; error: string | null }
-  | { type: 'cancelled'; job_id: string };
+/**
+ * SSE data payload from GET /v1/jobs/{id}/events.
+ * Allowlisted to {sequence, kind, status} — never a rich task log.
+ */
+export interface NikaEvent {
+  sequence: number;
+  kind?: string;
+  status?: JobStatus | string;
+}
 
-export type NikaEventType = NikaEvent['type'];
-
-// ── Stream options ──────────────────────────────────────────
+export type NikaEventType = string;
 
 export interface StreamOptions {
   signal?: AbortSignal;
@@ -142,11 +104,35 @@ export interface StreamOptions {
   reconnectDelay?: number;
 }
 
-// ── Poll options (internal) ─────────────────────────────────
-
 export interface PollOptions {
   interval: number;
   timeout: number;
   backoff: number;
   signal?: AbortSignal;
 }
+
+/** @deprecated Preview-dialect leftover. Cancel is not on the live HTTP surface. */
+export interface CancelResponse {
+  id: string;
+  status: string;
+  message?: string;
+}
+
+/** @deprecated Preview-dialect leftover. Artifacts are not on the live HTTP surface. */
+export interface NikaArtifact {
+  name: string;
+  size: number;
+  format: string;
+  content_type: string;
+  checksum?: string;
+}
+
+/** @deprecated Preview-dialect leftover. */
+export interface ArtifactsResponse {
+  id: string;
+  count: number;
+  artifacts: NikaArtifact[];
+}
+
+/** @deprecated Use NikaJob. Kept as an alias so existing imports compile. */
+export type RunResponse = NikaJob;

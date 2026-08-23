@@ -8,7 +8,7 @@ export class NikaError extends Error {
   }
 }
 
-/** HTTP error from the compatible workflow service (non-2xx response). */
+/** HTTP error from nika serve (non-2xx response). */
 export class NikaAPIError extends NikaError {
   public readonly status: number;
   public readonly body: string;
@@ -42,23 +42,40 @@ export class NikaTimeoutError extends NikaError {
   }
 }
 
-/** Job terminated with status 'failed'. */
+/** Job terminated with status 'failed' or 'interrupted'. */
 export class NikaJobError extends NikaError {
   public readonly job: NikaJob;
   public readonly exitCode: number | undefined;
 
   constructor(job: NikaJob) {
-    super(`Job ${job.job_id} ${job.status}: ${job.output ?? 'unknown error'}`);
+    super(`Job ${job.id} ${job.status}`);
     this.name = 'NikaJobError';
     this.job = job;
-    this.exitCode = job.exit_code;
+    this.exitCode = undefined;
   }
 }
 
-/** Job was cancelled. Extends NikaJobError — catch NikaJobError to get both. */
+/**
+ * Kept for the exported hierarchy. Live HTTP has no cancel route and no
+ * `cancelled` status — poll never throws this.
+ */
 export class NikaJobCancelledError extends NikaJobError {
   constructor(job: NikaJob) {
     super(job);
     this.name = 'NikaJobCancelledError';
+  }
+}
+
+/** A helper that would hit a route the live server keeps 404. */
+export class NikaUnavailableError extends NikaError {
+  public readonly surface: string;
+
+  constructor(surface: string) {
+    super(
+      `${surface} is not on the live nika serve HTTP surface. `
+      + 'Cancel and artifacts stay 404 until those authorities exist.',
+    );
+    this.name = 'NikaUnavailableError';
+    this.surface = surface;
   }
 }

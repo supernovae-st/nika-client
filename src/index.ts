@@ -6,9 +6,9 @@ import { Workflows } from './resources/workflows.js';
 import { verifyWebhookSignature } from './webhook.js';
 
 export class Nika {
-  /** Job operations: submit, status, cancel, run, stream, artifacts. */
+  /** Job operations: submit, status, run, stream. Cancel/artifacts throw. */
   readonly jobs: Jobs;
-  /** Workflow operations: list, reload. */
+  /** Workflow operations: list, metadata. Reload/source throw. */
   readonly workflows: Workflows;
 
   private readonly api: ApiClient;
@@ -25,7 +25,7 @@ export class Nika {
     if (!url) {
       throw new TypeError(
         'NIKA_URL environment variable is not set. '
-        + 'Set it or pass url explicitly: new Nika({ url: "http://localhost:3000", token: "..." })',
+        + 'Set it or pass url explicitly: new Nika({ url: "http://127.0.0.1:8787", token: "..." })',
       );
     }
     if (!token) {
@@ -41,7 +41,7 @@ export class Nika {
     if (!config.url) {
       throw new TypeError(
         'NikaConfig.url is required — pass a compatible workflow service URL.\n'
-        + '  Example: new Nika({ url: "http://localhost:3000", token: "..." })\n'
+        + '  Example: new Nika({ url: "http://127.0.0.1:8787", token: "..." })\n'
         + '  Or use:  Nika.fromEnv() to read NIKA_URL and NIKA_TOKEN from environment',
       );
     }
@@ -105,7 +105,6 @@ export class Nika {
 
 export { Jobs } from './resources/jobs.js';
 export { Workflows } from './resources/workflows.js';
-export type { ListPageOptions } from './resources/workflows.js';
 export { verifyWebhookSignature } from './webhook.js';
 
 export {
@@ -115,6 +114,7 @@ export {
   NikaTimeoutError,
   NikaJobError,
   NikaJobCancelledError,
+  NikaUnavailableError,
 } from './errors.js';
 
 export type {
@@ -126,12 +126,13 @@ export type {
   NikaEventType,
   NikaHealth,
   JobStatus,
-  RunRequest,
+  JobStatusOnly,
+  CreateJobRequest,
   RunResponse,
   RunOptions,
   CancelResponse,
   ArtifactsResponse,
-  WorkflowInfo,
+  WorkflowMetadata,
   ListWorkflowsResponse,
   StreamOptions,
   PollOptions,

@@ -49,6 +49,10 @@ export type JobStatus =
 export interface NikaJob {
   id: string;
   status: JobStatus;
+  /** Present after the worker readmits the POST-time snapshot. */
+  execution_id?: string;
+  /** Present after the worker readmits the POST-time snapshot. */
+  trace_id?: string;
 }
 
 /** GET /v1/jobs/{id}/status body. */

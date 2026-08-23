@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.114.0] - 2026-08-23
+
+Lockstep with engine **v0.114.0**. GET job identity may include
+`execution_id` and `trace_id` after snapshot readmit. Cancel, artifacts
+and `/v1/run` stay unclaimed.
+
 ### Changed
 
 - **HTTP client retargets the live `nika serve` door (W09).** Paths are

@@ -42,7 +42,7 @@ describe('config', () => {
     fetchSpy.mockResolvedValueOnce(jsonResponse({
       status: 'ok',
       service: 'nika-serve',
-      engine_version: '0.113.0',
+      engine_version: '0.114.0',
     }));
     await client.health();
     expect(fetchSpy.mock.calls[0][0]).toBe('http://nika:8787/health');
@@ -61,14 +61,14 @@ describe('health()', () => {
     fetchSpy.mockResolvedValueOnce(jsonResponse({
       status: 'ok',
       service: 'nika-serve',
-      engine_version: '0.113.0',
+      engine_version: '0.114.0',
       api_version: 'v1',
     }));
 
     const health = await client.health();
     expect(health.status).toBe('ok');
     expect(health.service).toBe('nika-serve');
-    expect(health.engine_version).toBe('0.113.0');
+    expect(health.engine_version).toBe('0.114.0');
 
     const headers = fetchSpy.mock.calls[0][1]?.headers as Record<string, string> | undefined;
     expect(headers?.['Authorization']).toBeUndefined();

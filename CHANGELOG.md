@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **HTTP client retargets the live `nika serve` door (W09).** Paths are
+  `POST /v1/jobs` (Idempotency-Key required), `GET /v1/jobs/{id}`,
+  `GET /v1/jobs/{id}/status`, `GET /v1/jobs/{id}/events`. Job identity is
+  `{ id, status }` with statuses `queued|running|interrupted|paused|succeeded|failed`.
+  SSE payloads are `{ sequence, kind, status }`. The OpenAPI pin lives at
+  `openapi.json`. Cancel, artifacts, `/v1/run`, workflow source and reload
+  are not claimed — those helpers throw `NikaUnavailableError`. Inputs are
+  refused at submit because the live body is `{ workflow }` only.
 - Leftover teaching: the live-e2e negative fixture no longer writes
   `nika: v1` or a `tasks:` list. It is a nine-key file (`nika: sdk-bad`)
   with an unknown `name:` field, still parse-fatal as NIKA-PARSE-005

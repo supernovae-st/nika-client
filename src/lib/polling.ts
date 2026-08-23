@@ -1,5 +1,7 @@
 import type { NikaJob, PollOptions } from '../types.js';
-import { NikaTimeoutError, NikaJobError, NikaJobCancelledError, NikaConnectionError } from '../errors.js';
+import { NikaTimeoutError, NikaJobError, NikaConnectionError } from '../errors.js';
+
+const TERMINAL_FAIL = new Set(['failed', 'interrupted']);
 
 export async function pollUntilDone(
   fetchStatus: () => Promise<NikaJob>,
@@ -9,24 +11,21 @@ export async function pollUntilDone(
   let delay = opts.interval;
 
   while (true) {
-    // Check caller abort
     if (opts.signal?.aborted) {
       throw new NikaConnectionError('Poll aborted by caller');
     }
 
     const job = await fetchStatus();
 
-    if (job.status === 'completed') return job;
-    if (job.status === 'failed') throw new NikaJobError(job);
-    if (job.status === 'cancelled') throw new NikaJobCancelledError(job);
+    if (job.status === 'succeeded') return job;
+    if (TERMINAL_FAIL.has(job.status)) throw new NikaJobError(job);
 
-    // Check deadline BEFORE sleeping — prevents overshoot
     if (Date.now() + delay > deadline) {
-      throw new NikaTimeoutError(`Job ${job.job_id} timed out after ${opts.timeout}ms`);
+      throw new NikaTimeoutError(`Job ${job.id} timed out after ${opts.timeout}ms`);
     }
 
     await sleep(delay, opts.signal);
-    delay = Math.min(delay * opts.backoff, 10_000); // cap at 10s
+    delay = Math.min(delay * opts.backoff, 10_000);
   }
 }
 

@@ -12,12 +12,14 @@
 <p align="center"><strong>The TypeScript client for <a href="https://github.com/supernovae-st/nika">Nika</a>, the workflow language for AI.<br>
 One file, 4 verbs, one binary. Typed, zero-dependency, honest about what ships today.</strong></p>
 
-> **Status:** two modules, two horizons. **`@supernovae-st/nika-client/local`
-> works TODAY**: a typed, zero-dependency driver for the shipped binary
-> (`check --json` · `run --json` event stream · the dry-run plan object ·
-> `test` · `trace verify`). The root module targets the **future**
-> workflow HTTP and SSE API. The reference engine does not ship a compatible
-> service today. `nika serve` is the resident cadence firer, not that API.
+> **Status:** two modules. **`@supernovae-st/nika-client/local` works TODAY**:
+> a typed, zero-dependency driver for the shipped binary (`check --json` ·
+> `run --json` event stream · the dry-run plan object · `test` ·
+> `trace verify`). The root module talks to **live `nika serve` HTTP**
+> (`--bind` + `--workflows` + `--token-file`): `POST /v1/jobs`,
+> `GET /v1/jobs/{id}`, `GET /v1/jobs/{id}/events`. Bare `nika serve` remains
+> the resident cadence firer. Cancel and artifacts are **not** on this
+> surface — those helpers throw rather than claim a 404.
 
 Zero keys first — the shipped binary rehearses a canonical workflow
 offline, nothing written, nothing owned (bare `nika try` lists them all):
@@ -66,14 +68,14 @@ exit code. This repo's own CI pins every action by commit SHA and
 checks against the latest released engine tag, never a floating `main`.
 
 - Zero runtime dependencies (uses native `fetch`)
-- Full TypeScript types for the intended workflow HTTP contract
+- Full TypeScript types pinned to live OpenAPI 3.1 (`openapi.json`)
 - Namespace pattern: `nika.jobs.*`, `nika.workflows.*`
 - 6 typed error classes with full hierarchy
 - Automatic retry on 429/5xx with exponential backoff
 - Client-side concurrency limiter (semaphore, default: 24)
 - SSE streaming via `AsyncIterable` with idle timeout + auto-reconnect
-- Binary artifact download (`Uint8Array`) + streaming (`ReadableStream`)
-- Auto-paginating workflow listing
+- Honest refusals for cancel/artifacts (not on the live HTTP surface)
+- Workflow list + metadata (no source bytes over HTTP)
 - AbortSignal support on long-running operations
 - Webhook HMAC-SHA256 verification (async, Web Crypto API)
 - Dual CJS/ESM build
@@ -91,16 +93,13 @@ npm install @supernovae-st/nika-client
 import { Nika } from '@supernovae-st/nika-client';
 
 const nika = new Nika({
-  url: 'http://localhost:3000',
+  url: 'http://127.0.0.1:8787',
   token: process.env.NIKA_TOKEN!,
 });
 
-// Submit + poll until done
-const job = await nika.jobs.run('translate.nika.yaml', {
-  file: 'ui.json',
-  locale: 'fr_FR',
-});
-console.log(job.status); // 'completed'
+// Submit + poll until succeeded. Body is { workflow } only.
+const job = await nika.jobs.run('translate.nika.yaml');
+console.log(job.status); // 'succeeded'
 ```
 
 ## Usage
@@ -108,71 +107,33 @@ console.log(job.status); // 'completed'
 ### Run a workflow and wait for completion
 
 ```typescript
-const job = await nika.jobs.run('pipeline.nika.yaml', { topic: 'AI' });
-console.log(job.status);       // 'completed'
-console.log(job.exit_code);    // 0
-console.log(job.completed_at); // '2026-04-02T10:01:00Z'
+const job = await nika.jobs.run('pipeline.nika.yaml');
+console.log(job.id, job.status); // uuid, 'succeeded'
 ```
 
 ### Stream events in real time (SSE)
 
 ```typescript
-const { job_id } = await nika.jobs.submit('pipeline.nika.yaml', { topic: 'AI' });
+const { id } = await nika.jobs.submit('pipeline.nika.yaml');
 
-for await (const event of nika.jobs.stream(job_id)) {
-  console.log(event.type, event.task_id ?? '', event.duration_ms ?? '');
-  // started
-  // task_start research infer
-  // task_complete research 1200
-  // completed
+for await (const event of nika.jobs.stream(id)) {
+  console.log(event.sequence, event.kind, event.status);
 }
 ```
 
-### Run and collect all artifacts
+### List workflows
 
 ```typescript
-const artifacts = await nika.jobs.runAndCollect('research.nika.yaml', {
-  topic: 'workflow engines',
-});
-
-console.log(artifacts['report.md']);   // markdown string
-console.log(artifacts['data.json']);   // parsed JSON object
-// binary artifacts (audio, images) are skipped
+const names = await nika.workflows.list();
+const meta = await nika.workflows.metadata('pipeline.nika.yaml');
 ```
 
-### Download binary artifacts
+### What is not on the wire yet
 
-```typescript
-const bytes = await nika.jobs.artifactBinary('job-id', 'audio.mp3');
-// bytes is Uint8Array
-```
-
-### Stream large artifacts without loading into memory
-
-```typescript
-import * as fs from 'node:fs';
-
-const stream = await nika.jobs.artifactStream('job-id', 'dataset.csv');
-const writer = fs.createWriteStream('output.csv');
-for await (const chunk of stream) {
-  writer.write(chunk);
-}
-writer.end();
-```
-
-### Paginate workflow listing
-
-```typescript
-// Auto-pagination (default): fetches all pages transparently
-const all = await nika.workflows.list();
-
-// Manual pagination for large lists
-const page1 = await nika.workflows.listPage({ limit: 50 });
-if (page1.has_more) {
-  const last = page1.workflows[page1.workflows.length - 1].name;
-  const page2 = await nika.workflows.listPage({ limit: 50, after: last });
-}
-```
+Cancel and artifacts stay 404 on the server. Those helpers throw
+`NikaUnavailableError` instead of claiming the route. `POST /v1/jobs`
+accepts `{ workflow }` only — inputs live in the workflow file or
+go through `LocalNika`.
 
 ### Cancel a running job with AbortSignal
 
@@ -180,7 +141,7 @@ if (page1.has_more) {
 const controller = new AbortController();
 setTimeout(() => controller.abort(), 60_000);
 
-const job = await nika.jobs.run('slow.nika.yaml', {}, {
+const job = await nika.jobs.run('slow.nika.yaml', undefined, {
   signal: controller.signal,
 });
 ```
@@ -189,7 +150,7 @@ const job = await nika.jobs.run('slow.nika.yaml', {}, {
 
 ```typescript
 const nika = new Nika({
-  url: 'http://localhost:3000',
+  url: 'http://127.0.0.1:8787',
   token: process.env.NIKA_TOKEN!,
   fetch: async (url, init) => {
     console.log(`>> ${init?.method ?? 'GET'} ${url}`);
@@ -220,7 +181,7 @@ const isValid = await Nika.verifyWebhook(
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `url` | `string` | (required) | Compatible workflow service URL (http/https) |
+| `url` | `string` | (required) | `nika serve --bind` URL (http/https) |
 | `token` | `string` | (required) | Bearer token (`NIKA_TOKEN`) |
 | `timeout` | `number` | `30000` | HTTP request timeout in ms |
 | `retries` | `number` | `2` | Retries on 429/5xx |
@@ -237,26 +198,22 @@ const isValid = await Nika.verifyWebhook(
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `submit(workflow, inputs?, opts?)` | `RunResponse` | Submit workflow, return `{ job_id, status }` |
-| `status(jobId)` | `NikaJob` | Get job status |
-| `cancel(jobId)` | `CancelResponse` | Cancel a running job |
-| `run(workflow, inputs?, opts?)` | `NikaJob` | Submit + poll until terminal state |
-| `stream(jobId, opts?)` | `AsyncIterable<NikaEvent>` | SSE event stream |
-| `artifacts(jobId)` | `NikaArtifact[]` | List job artifacts |
-| `artifact(jobId, name)` | `string` | Download artifact as text |
-| `artifactJson<T>(jobId, name)` | `T` | Download artifact as parsed JSON |
-| `artifactBinary(jobId, name)` | `Uint8Array` | Download artifact as raw bytes |
-| `artifactStream(jobId, name)` | `ReadableStream<Uint8Array>` | Stream artifact (for large files) |
-| `runAndCollect(workflow, inputs?, opts?)` | `Record<string, unknown>` | Run + collect all non-binary artifacts |
+| `submit(workflow, inputs?, opts?)` | `NikaJob` | `POST /v1/jobs` `{ workflow }` + Idempotency-Key. `inputs` throws. |
+| `status(jobId)` | `NikaJob` | `GET /v1/jobs/{id}` |
+| `statusOnly(jobId)` | `JobStatusOnly` | `GET /v1/jobs/{id}/status` |
+| `cancel(jobId)` | never | throws `NikaUnavailableError` (no live route) |
+| `run(workflow, inputs?, opts?)` | `NikaJob` | submit + poll until succeeded/failed/interrupted |
+| `stream(jobId, opts?)` | `AsyncIterable<NikaEvent>` | `GET /v1/jobs/{id}/events` |
+| `artifacts` / `artifact*` / `runAndCollect` | never | throws `NikaUnavailableError` (no live route) |
 
 ### Workflows: `nika.workflows.*`
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `list()` | `WorkflowInfo[]` | List all workflows (auto-paginates) |
-| `listPage(opts?)` | `ListWorkflowsResponse` | List single page (manual pagination) |
-| `reload()` | `WorkflowInfo[]` | Rescan workflows directory |
-| `source(name)` | `string` | Get raw YAML source |
+| `list()` | `string[]` | Contained `.nika.yaml` names |
+| `listPage()` | `ListWorkflowsResponse` | Same payload (no pagination on the live server) |
+| `metadata(name)` | `WorkflowMetadata` | Name only, no source bytes |
+| `reload()` / `source(name)` | never | throws `NikaUnavailableError` |
 
 ### System
 
@@ -271,11 +228,12 @@ All SDK errors extend `NikaError`. Catch it to handle any SDK error:
 
 ```
 NikaError (base)
-├── NikaAPIError        : HTTP errors (status, body, requestId)
-├── NikaConnectionError : Network errors (DNS, TCP, abort)
-├── NikaTimeoutError    : Request or poll timeout
-└── NikaJobError        : Job failed (exitCode, job object)
-    └── NikaJobCancelledError : Job was cancelled
+├── NikaAPIError          : HTTP errors (status, body, requestId)
+├── NikaConnectionError   : Network errors (DNS, TCP, abort)
+├── NikaTimeoutError      : Request or poll timeout
+├── NikaUnavailableError  : helper for a route the live server keeps 404
+└── NikaJobError          : Job failed or interrupted
+    └── NikaJobCancelledError : exported; live HTTP never throws it
 ```
 
 ```typescript
@@ -285,7 +243,7 @@ try {
   await nika.jobs.run('pipeline.nika.yaml');
 } catch (err) {
   if (err instanceof NikaJobError) {
-    console.error('Job failed:', err.job.output, 'exit:', err.exitCode);
+    console.error('Job failed:', err.job.id, err.job.status);
   } else if (err instanceof NikaAPIError) {
     console.error('HTTP error:', err.status, err.body);
   } else if (err instanceof NikaError) {
@@ -294,22 +252,13 @@ try {
 }
 ```
 
-## SSE event types
+## SSE events
 
-| Type | Fields | Terminal |
-|------|--------|----------|
-| `started` | `job_id` | No |
-| `task_start` | `job_id, task_id, verb` | No |
-| `task_complete` | `job_id, task_id, duration_ms` | No |
-| `task_failed` | `job_id, task_id, error, duration_ms` | No |
-| `artifact_written` | `job_id, task_id, path, size` | No |
-| `completed` | `job_id, output?` | Yes |
-| `failed` | `job_id, error?` | Yes |
-| `cancelled` | `job_id` | Yes |
+Each frame is `{ sequence, kind, status }`. Terminal when `status` is
+`succeeded`, `failed`, or `interrupted`. `paused` keeps the stream open.
 
-Terminal events close the SSE stream automatically.
-
-The SDK auto-reconnects on stream drops (up to 3 attempts), using the `Last-Event-Id` header to resume without losing events. Configure via `StreamOptions`:
+The SDK auto-reconnects on stream drops (up to 3 attempts), using the
+`Last-Event-ID` header to resume. Configure via `StreamOptions`:
 
 ```typescript
 for await (const event of nika.jobs.stream(jobId, {

@@ -2,276 +2,117 @@
 /**
  * SDK Coverage Checker
  *
- * Verifies that the TypeScript SDK covers all nika-serve endpoints.
- * Run from nika-client root: node scripts/check-sdk-coverage.js [path-to-nika]
+ * The live contract is the pinned OpenAPI at repo-root openapi.json
+ * (W09.B). SDK helpers must call every live path and must not call
+ * absent ones (cancel, artifacts, /v1/run).
  *
- * Exit 0 = all covered. Exit 1 = drift detected.
+ * Exit 0 = covered. Exit 1 = drift.
  */
 
 import { readFileSync, existsSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 
-// ── Config ──────────────────────────────────────────────────
-
-const NIKA_ROOT = process.argv[2] || resolve('..', 'nika');
 const SDK_ROOT = resolve(import.meta.dirname, '..');
+const SPEC = join(SDK_ROOT, 'openapi.json');
+const SDK_FILES = [
+  join(SDK_ROOT, 'src/resources/jobs.ts'),
+  join(SDK_ROOT, 'src/resources/workflows.ts'),
+  join(SDK_ROOT, 'src/index.ts'),
+  join(SDK_ROOT, 'src/lib/api-client.ts'),
+  join(SDK_ROOT, 'src/lib/streaming.ts'),
+];
 
-// `nika serve` left the tree in the Diamond refonte and re-admits during
-// the 0.9x arc (docs reference/cli) — on a modern checkout the serve tree
-// is absent and coverage has NOTHING to judge. Skip honestly (exit 0,
-// loud) instead of failing every release forever. Probe the Diamond home
-// (`crates/`) first — the pre-refonte `tools/` address kept last so the
-// day serve re-admits, coverage wakes without a maintainer flip.
-const SERVE_HOMES = ['crates/nika-serve', 'tools/nika-serve'];
-const SERVE_SRC = SERVE_HOMES.map((home) => join(NIKA_ROOT, home, 'src')).find(
-  (src) => existsSync(join(src, 'routes/mod.rs')),
-);
+const ABSENT = [
+  '/v1/run',
+  '/v1/status',
+  '/v1/cancel',
+  '/v1/events',
+  '/v1/reload',
+  '/v1/jobs/:param/cancel',
+  '/v1/jobs/:param/artifacts',
+];
 
-if (!SERVE_SRC) {
-  console.log(
-    `nika-serve not present at ${NIKA_ROOT} (probed ${SERVE_HOMES.join(' · ')} — re-admits in the 0.9x arc) — coverage SKIPPED`,
-  );
-  process.exit(0);
+function livePaths() {
+  const spec = JSON.parse(readFileSync(SPEC, 'utf-8'));
+  return Object.keys(spec.paths || {});
 }
 
-const SERVE_ROUTES = join(SERVE_SRC, 'routes/mod.rs');
-const SERVE_EVENTS = join(SERVE_SRC, 'events.rs');
-const SERVE_WORKFLOWS = join(SERVE_SRC, 'routes/workflows.rs');
-const SERVE_ARTIFACTS = join(SERVE_SRC, 'routes/artifacts.rs');
-
-const SDK_JOBS = join(SDK_ROOT, 'src/resources/jobs.ts');
-const SDK_WORKFLOWS_FILE = join(SDK_ROOT, 'src/resources/workflows.ts');
-const SDK_INDEX = join(SDK_ROOT, 'src/index.ts');
-const SDK_TYPES = join(SDK_ROOT, 'src/types.ts');
-const SDK_API_CLIENT = join(SDK_ROOT, 'src/lib/api-client.ts');
-const SDK_STREAMING = join(SDK_ROOT, 'src/lib/streaming.ts');
-
-// ── Extract routes from Rust ────────────────────────────────
-
-function extractRustRoutes(routesFile) {
-  const src = readFileSync(routesFile, 'utf-8');
-  const routes = [];
-
-  // Match both .route() and .api_route() with get/post/get_with/post_with
-  const routeRegex = /\.(?:api_)?route\(\s*"([^"]+)"\s*,\s*(get|post|put|delete|patch)(?:_with)?\s*\(/g;
-  let match;
-  while ((match = routeRegex.exec(src)) !== null) {
-    routes.push({ method: match[2].toUpperCase(), path: match[1] });
-  }
-
-  return routes;
-}
-
-// ── Extract SSE event types from Rust ───────────────────────
-
-function extractRustEvents(eventsFile) {
-  const src = readFileSync(eventsFile, 'utf-8');
-  const events = [];
-
-  // Match explicit serde renames: #[serde(rename = "event_name")]
-  const renameRegex = /#\[serde\(rename\s*=\s*"(\w+)"\)\]/g;
-  let match;
-  while ((match = renameRegex.exec(src)) !== null) {
-    events.push(match[1]);
-  }
-
-  return events;
-}
-
-// ── Extract response types from Rust ────────────────────────
-
-function extractRustTypes(files) {
-  const types = [];
-
-  for (const file of files) {
-    if (!existsSync(file)) continue;
-    const src = readFileSync(file, 'utf-8');
-
-    const structRegex = /pub\s+struct\s+(\w+)\s*\{/g;
-    let match;
-    while ((match = structRegex.exec(src)) !== null) {
-      types.push(match[1]);
-    }
-  }
-
-  return types;
-}
-
-// ── Extract SDK coverage ────────────────────────────────────
-
-function extractSdkEndpoints(files) {
+function extractSdkEndpoints() {
   const endpoints = [];
-
-  for (const file of files) {
+  for (const file of SDK_FILES) {
     if (!existsSync(file)) continue;
     const src = readFileSync(file, 'utf-8');
-
-    // Match API calls with string/template literal paths:
-    // this.api.json('/v1/run', ...) or client.connectSSE(`/v1/events/${jobId}`)
     const apiCallRegex = /(?:this\.api|client)\.\w+(?:<[^>]+>)?\(\s*[`'"]([^`'"]*)[`'"]/g;
     let match;
     while ((match = apiCallRegex.exec(src)) !== null) {
-      // Clean template expressions: `/v1/events/${jobId}` → `/v1/events/:param`
       const cleaned = match[1].replace(/\$\{[^}]+\}/g, ':param');
-      if (cleaned.startsWith('/')) {
-        endpoints.push(cleaned);
-      }
+      if (cleaned.startsWith('/')) endpoints.push(cleaned.split('?')[0]);
     }
-
-    if (src.includes('fetchHealth')) {
-      endpoints.push('/health');
-    }
+    if (src.includes('fetchHealth')) endpoints.push('/health');
   }
-
-  return endpoints;
+  return [...new Set(endpoints)];
 }
 
-function extractSdkEventTypes(typesFile) {
-  const src = readFileSync(typesFile, 'utf-8');
-  const events = [];
-
-  const eventRegex = /type:\s*'(\w+)'/g;
-  let match;
-  while ((match = eventRegex.exec(src)) !== null) {
-    events.push(match[1]);
-  }
-
-  return events;
+function normalize(path) {
+  return path
+    .replace(/\{[^}]+\}/g, ':param')
+    .replace(/:param/g, ':param');
 }
 
-function extractSdkTypes(typesFile) {
-  const src = readFileSync(typesFile, 'utf-8');
-  const types = [];
-
-  const typeRegex = /export\s+(?:interface|type)\s+(\w+)/g;
-  let match;
-  while ((match = typeRegex.exec(src)) !== null) {
-    types.push(match[1]);
-  }
-
-  return types;
+if (!existsSync(SPEC)) {
+  console.error(`missing pin: ${SPEC}`);
+  process.exit(1);
 }
 
-// ── Normalize route path for comparison ─────────────────────
+const live = livePaths().map(normalize);
+const sdk = extractSdkEndpoints();
+const sdkNorm = sdk.map(normalize);
 
-function normalizePath(path) {
-  return path.replace(/\{[^}]+\}/g, ':param');
-}
+let failed = false;
 
-function routeKey(method, path) {
-  return `${method} ${normalizePath(path)}`;
-}
-
-// ── Main ────────────────────────────────────────────────────
-
-function main() {
-  console.log('SDK Coverage Check');
-  console.log('==================\n');
-
-  if (!existsSync(SERVE_ROUTES)) {
-    console.error(`ERROR: nika-serve not found at ${NIKA_ROOT}`);
-    console.error(`Usage: node scripts/check-sdk-coverage.js [path-to-nika]`);
-    process.exit(1);
-  }
-
-  let hasIssues = false;
-
-  // ── 1. Route coverage ──────────────────────────────────
-
-  console.log('1. Route Coverage\n');
-
-  const rustRoutes = extractRustRoutes(SERVE_ROUTES);
-  const sdkEndpoints = extractSdkEndpoints([SDK_JOBS, SDK_WORKFLOWS_FILE, SDK_INDEX, SDK_API_CLIENT, SDK_STREAMING]);
-
-  const SKIP_ROUTES = new Set([
-    'GET /metrics',
-    'GET /v1/openapi.json',
-  ]);
-
-  for (const route of rustRoutes) {
-    const key = routeKey(route.method, route.path);
-    const normalized = normalizePath(route.path);
-
-    if (SKIP_ROUTES.has(key)) {
-      console.log(`  SKIP  ${key} (intentionally excluded)`);
+console.log('Live OpenAPI paths:');
+for (const path of live) {
+  const covered = sdkNorm.some(
+    (s) => s === path || s.startsWith(`${path}/`) || path.startsWith(`${s}/`),
+  );
+  // /v1/jobs/{id}/status is extra to /v1/jobs/{id}
+  const hit = sdkNorm.includes(path)
+    || (path === '/v1/jobs/:param' && sdkNorm.includes('/v1/jobs/:param'))
+    || (path === '/v1/jobs/:param/status' && sdkNorm.includes('/v1/jobs/:param/status'))
+    || (path === '/v1/jobs/:param/events' && sdkNorm.includes('/v1/jobs/:param/events'))
+    || (path === '/v1/workflows/:param' && sdkNorm.includes('/v1/workflows/:param'))
+    || (path === '/v1/openapi.json' && sdkNorm.includes('/v1/openapi.json'))
+    || (path === '/v1/jobs' && sdkNorm.includes('/v1/jobs'))
+    || (path === '/v1/workflows' && sdkNorm.includes('/v1/workflows'))
+    || (path === '/health' && sdkNorm.includes('/health'));
+  if (!hit) {
+    // openapi.json is fetched by generate-types, not the runtime client
+    if (path === '/v1/openapi.json') {
+      console.log(`  skip runtime  ${path} (pin/generate only)`);
       continue;
     }
-
-    const covered = sdkEndpoints.some(ep => {
-      const epNorm = ep.replace(/\$\{[^}]+\}/g, ':param');
-      return normalizePath(epNorm) === normalized;
-    });
-
-    if (covered) {
-      console.log(`  OK    ${key}`);
-    } else {
-      console.log(`  MISS  ${key} ← NOT in SDK!`);
-      hasIssues = true;
-    }
-  }
-
-  // ── 2. SSE Event coverage ──────────────────────────────
-
-  console.log('\n2. SSE Event Types\n');
-
-  const rustEvents = extractRustEvents(SERVE_EVENTS);
-  const sdkEvents = new Set(extractSdkEventTypes(SDK_TYPES));
-
-  for (const event of rustEvents) {
-    if (sdkEvents.has(event)) {
-      console.log(`  OK    ${event}`);
-    } else {
-      console.log(`  MISS  ${event} ← NOT in SDK types!`);
-      hasIssues = true;
-    }
-  }
-
-  for (const event of sdkEvents) {
-    if (!rustEvents.includes(event)) {
-      console.log(`  STALE ${event} ← in SDK but NOT in Rust`);
-      hasIssues = true;
-    }
-  }
-
-  // ── 3. Response type coverage ──────────────────────────
-
-  console.log('\n3. Response Types\n');
-
-  const rustTypes = extractRustTypes([SERVE_WORKFLOWS, SERVE_ARTIFACTS]);
-  const sdkTypes = new Set(extractSdkTypes(SDK_TYPES));
-
-  const TYPE_MAP = {
-    'RunRequest': 'RunRequest',
-    'RunResponse': 'RunResponse',
-    'StatusResponse': 'NikaJob',
-    'WorkflowInfo': 'WorkflowInfo',
-    'ListWorkflowsResponse': 'ListWorkflowsResponse',
-  };
-
-  for (const rustType of rustTypes) {
-    const sdkName = TYPE_MAP[rustType];
-    if (!sdkName) {
-      console.log(`  SKIP  ${rustType} (no SDK mapping defined)`);
-      continue;
-    }
-    if (sdkTypes.has(sdkName)) {
-      console.log(`  OK    ${rustType} → ${sdkName}`);
-    } else {
-      console.log(`  MISS  ${rustType} → ${sdkName} ← NOT in SDK types!`);
-      hasIssues = true;
-    }
-  }
-
-  // ── Summary ────────────────────────────────────────────
-
-  console.log('\n==================');
-  if (hasIssues) {
-    console.log('FAIL: SDK drift detected. Update the SDK to match nika-serve.');
-    process.exit(1);
+    console.log(`  MISSING  ${path}`);
+    failed = true;
   } else {
-    console.log('PASS: SDK covers all nika-serve endpoints and types.');
-    process.exit(0);
+    console.log(`  ok       ${path}`);
   }
 }
 
-main();
+console.log('\nSDK must not claim absent routes:');
+for (const path of ABSENT) {
+  const claimed = sdkNorm.some((s) => s === path || s.startsWith(`${path}/`));
+  if (claimed) {
+    console.log(`  CLAIMED  ${path}`);
+    failed = true;
+  } else {
+    console.log(`  absent   ${path}`);
+  }
+}
+
+console.log('\nSDK endpoints:', sdkNorm.join(', ') || '(none)');
+
+if (failed) {
+  console.error('\ncoverage DRIFT');
+  process.exit(1);
+}
+console.log('\ncoverage OK');

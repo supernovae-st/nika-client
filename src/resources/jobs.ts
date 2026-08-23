@@ -1,15 +1,12 @@
 import type {
   NikaJob,
-  NikaArtifact,
   NikaEvent,
-  RunResponse,
-  ArtifactsResponse,
-  CancelResponse,
+  JobStatusOnly,
   RunOptions,
   StreamOptions,
 } from '../types.js';
 import type { ApiClient } from '../lib/api-client.js';
-import { NikaError } from '../errors.js';
+import { NikaError, NikaUnavailableError } from '../errors.js';
 import { pollUntilDone } from '../lib/polling.js';
 import { streamEvents } from '../lib/streaming.js';
 
@@ -19,49 +16,71 @@ export interface JobsPollConfig {
   pollBackoff: number;
 }
 
+function newIdempotencyKey(): string {
+  return crypto.randomUUID();
+}
+
 export class Jobs {
   constructor(
     private readonly api: ApiClient,
     private readonly poll: JobsPollConfig,
   ) {}
 
-  /** Submit a workflow and return immediately with job ID. */
+  /**
+   * Admit a workflow. The live body is `{ workflow }` only.
+   * Passing `inputs` throws — the server deny_unknown_fields that object.
+   */
   async submit(
     workflow: string,
     inputs?: Record<string, unknown>,
     options?: RunOptions,
-  ): Promise<RunResponse> {
-    return this.api.json<RunResponse>('/v1/run', {
+  ): Promise<NikaJob> {
+    if (inputs !== undefined) {
+      throw new NikaError(
+        'nika serve POST /v1/jobs accepts { workflow } only. '
+        + 'Inputs stay on LocalNika / the workflow file defaults. '
+        + 'Sending them is a 422 on the live server.',
+      );
+    }
+    const key = options?.idempotencyKey ?? newIdempotencyKey();
+    if (key.length < 1 || key.length > 255) {
+      throw new NikaError('Idempotency-Key must be 1–255 bytes');
+    }
+    return this.api.json<NikaJob>('/v1/jobs', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        workflow,
-        ...(inputs !== undefined ? { inputs } : {}),
-        ...(options?.resumeFrom ? { resume_from: options.resumeFrom } : {}),
-      }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': key,
+      },
+      body: JSON.stringify({ workflow }),
       signal: options?.signal,
     });
   }
 
-  /** Get current job status. */
+  /** GET /v1/jobs/{id} — identity and status. */
   async status(jobId: string): Promise<NikaJob> {
-    return this.api.json<NikaJob>(`/v1/status/${jobId}`);
+    return this.api.json<NikaJob>(`/v1/jobs/${jobId}`);
   }
 
-  /** Cancel a running job. */
-  async cancel(jobId: string): Promise<CancelResponse> {
-    return this.api.json<CancelResponse>(`/v1/cancel/${jobId}`, { method: 'POST' });
+  /** GET /v1/jobs/{id}/status — status only. */
+  async statusOnly(jobId: string): Promise<JobStatusOnly> {
+    return this.api.json<JobStatusOnly>(`/v1/jobs/${jobId}/status`);
   }
 
-  /** Run a workflow and wait for completion (polling). */
+  /** Cancel is not on the live HTTP surface (W08 keep 404). */
+  async cancel(_jobId: string): Promise<never> {
+    throw new NikaUnavailableError('POST /v1/jobs/{id}/cancel');
+  }
+
+  /** Admit and poll until succeeded, failed, or interrupted. */
   async run(
     workflow: string,
     inputs?: Record<string, unknown>,
     options?: RunOptions,
   ): Promise<NikaJob> {
-    const { job_id } = await this.submit(workflow, inputs, options);
+    const { id } = await this.submit(workflow, inputs, options);
     return pollUntilDone(
-      () => this.status(job_id),
+      () => this.status(id),
       {
         interval: this.poll.pollInterval,
         timeout: this.poll.pollTimeout,
@@ -71,81 +90,39 @@ export class Jobs {
     );
   }
 
-  /** Stream job events via SSE (AsyncIterable). */
+  /** GET /v1/jobs/{id}/events as an AsyncIterable. */
   stream(jobId: string, options?: StreamOptions): AsyncIterable<NikaEvent> {
     return streamEvents(this.api, jobId, options);
   }
 
-  /** List artifacts for a job. */
-  async artifacts(jobId: string): Promise<NikaArtifact[]> {
-    const res = await this.api.json<ArtifactsResponse>(`/v1/jobs/${jobId}/artifacts`);
-    return res.artifacts;
+  async artifacts(_jobId: string): Promise<never> {
+    throw new NikaUnavailableError('GET /v1/jobs/{id}/artifacts');
   }
 
-  /** Download a specific artifact as string. */
-  async artifact(jobId: string, name: string): Promise<string> {
-    const res = await this.api.request(
-      `/v1/jobs/${jobId}/artifacts/${encodeURIComponent(name)}`,
-    );
-    return res.text();
+  async artifact(_jobId: string, _name: string): Promise<never> {
+    throw new NikaUnavailableError('GET /v1/jobs/{id}/artifacts/{name}');
   }
 
-  /** Download a specific artifact as parsed JSON. */
-  async artifactJson<T = unknown>(jobId: string, name: string): Promise<T> {
-    const res = await this.api.request(
-      `/v1/jobs/${jobId}/artifacts/${encodeURIComponent(name)}`,
-    );
-    return res.json() as Promise<T>;
+  async artifactJson<T = unknown>(_jobId: string, _name: string): Promise<T> {
+    throw new NikaUnavailableError('GET /v1/jobs/{id}/artifacts/{name}');
   }
 
-  /** Download a specific artifact as raw bytes. */
-  async artifactBinary(jobId: string, name: string): Promise<Uint8Array> {
-    const res = await this.api.request(
-      `/v1/jobs/${jobId}/artifacts/${encodeURIComponent(name)}`,
-    );
-    const buffer = await res.arrayBuffer();
-    return new Uint8Array(buffer);
+  async artifactBinary(_jobId: string, _name: string): Promise<Uint8Array> {
+    throw new NikaUnavailableError('GET /v1/jobs/{id}/artifacts/{name}');
   }
 
-  /** Stream an artifact as a ReadableStream (for large files). */
-  async artifactStream(jobId: string, name: string): Promise<ReadableStream<Uint8Array>> {
-    const res = await this.api.request(
-      `/v1/jobs/${jobId}/artifacts/${encodeURIComponent(name)}`,
-    );
-    if (!res.body) {
-      throw new NikaError('Artifact response has no body');
-    }
-    return res.body;
+  async artifactStream(
+    _jobId: string,
+    _name: string,
+  ): Promise<ReadableStream<Uint8Array>> {
+    throw new NikaUnavailableError('GET /v1/jobs/{id}/artifacts/{name}');
   }
 
-  /** Run workflow, wait, and collect all non-binary artifacts into a map. */
   async runAndCollect(
-    workflow: string,
-    inputs?: Record<string, unknown>,
-    options?: RunOptions,
+    _workflow: string,
+    _inputs?: Record<string, unknown>,
+    _options?: RunOptions,
   ): Promise<Record<string, unknown>> {
-    const job = await this.run(workflow, inputs, options);
-    const artifactList = await this.artifacts(job.job_id);
-
-    const downloadable = artifactList.filter(art => art.format !== 'binary');
-
-    // Download in batches of 6 to avoid overwhelming the server
-    const batchSize = 6;
-    const entries: [string, unknown][] = [];
-
-    for (let i = 0; i < downloadable.length; i += batchSize) {
-      const batch = downloadable.slice(i, i + batchSize);
-      const results = await Promise.all(
-        batch.map(async (art): Promise<[string, unknown]> => {
-          if (art.format === 'json') {
-            return [art.name, await this.artifactJson(job.job_id, art.name)];
-          }
-          return [art.name, await this.artifact(job.job_id, art.name)];
-        }),
-      );
-      entries.push(...results);
-    }
-
-    return Object.fromEntries(entries);
+    throw new NikaUnavailableError('job artifacts');
   }
 }

@@ -175,6 +175,22 @@ describe('jobs.run()', () => {
     await expect(client.jobs.run('bad.nika.yaml')).rejects.toThrow(NikaJobError);
   });
 
+  it('NikaJobError names the NIKA code when the job carries error', async () => {
+    const client = makeClient({ pollInterval: 10, pollTimeout: 5000 });
+    fetchSpy
+      .mockResolvedValueOnce(jsonResponse({ id: 'j2', status: 'queued' }, 202))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          id: 'j2',
+          status: 'failed',
+          error: { code: 'NIKA-ASSERT-001', message: 'task boom: expected true' },
+        }),
+      );
+    await expect(client.jobs.run('bad.nika.yaml')).rejects.toThrow(
+      /NIKA-ASSERT-001 · task boom: expected true/,
+    );
+  });
+
   it('throws NikaTimeoutError when polling exceeds timeout', async () => {
     const client = makeClient({ pollInterval: 10, pollTimeout: 50 });
     fetchSpy.mockResolvedValueOnce(jsonResponse({ id: 'j4', status: 'queued' }, 202));

@@ -243,7 +243,7 @@ try {
   await nika.jobs.run('pipeline.nika.yaml');
 } catch (err) {
   if (err instanceof NikaJobError) {
-    console.error('Job failed:', err.job.id, err.job.status);
+    console.error('Job failed:', err.job.id, err.job.status, err.job.error);
   } else if (err instanceof NikaAPIError) {
     console.error('HTTP error:', err.status, err.body);
   } else if (err instanceof NikaError) {
@@ -254,8 +254,10 @@ try {
 
 ## SSE events
 
-Each frame is `{ sequence, kind, status }`. Terminal when `status` is
-`succeeded`, `failed`, or `interrupted`. `paused` keeps the stream open.
+Each frame is `{ sequence, kind, status }`. A failed settled frame may
+also carry redacted `{ code, message }` (NIKA diagnosis, no paths).
+Terminal when `status` is `succeeded`, `failed`, or `interrupted`.
+`paused` keeps the stream open.
 
 The SDK auto-reconnects on stream drops (up to 3 attempts), using the
 `Last-Event-ID` header to resume. Configure via `StreamOptions`:

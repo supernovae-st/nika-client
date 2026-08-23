@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Failed jobs may carry `{ error: { code, message } }`.** Additive.
+  `NikaJobError` includes the NIKA code in its message when present.
+  SSE frames may forward the same redacted pair. Cancel, artifacts
+  and `/v1/run` stay unclaimed.
+- **Type-drift CI mints `--token-file`.** `nika serve --bind` no
+  longer starts without it. The job waits on `GET /health` and
+  generates from the OpenAPI pin.
+
 ## [0.114.0] - 2026-08-23
 
 Lockstep with engine **v0.114.0**. GET job identity may include

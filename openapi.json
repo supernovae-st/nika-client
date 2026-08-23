@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "nika serve",
-    "version": "0.113.0",
+    "version": "0.114.0",
     "description": "Authenticated loopback remote execution. Cancel and artifacts are absent."
   },
   "servers": [
@@ -55,7 +55,9 @@
         "required": ["id", "status"],
         "properties": {
           "id": { "type": "string", "format": "uuid" },
-          "status": { "$ref": "#/components/schemas/JobStatus" }
+          "status": { "$ref": "#/components/schemas/JobStatus" },
+          "execution_id": { "type": "string" },
+          "trace_id": { "type": "string" }
         }
       },
       "JobStatusOnly": {

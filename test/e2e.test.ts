@@ -31,7 +31,7 @@ function createMockServer(state: MockState) {
       json(res, {
         status: 'ok',
         service: 'nika-serve',
-        engine_version: '0.113.0',
+        engine_version: '0.114.0',
         api_version: 'v1',
       });
       return;
@@ -238,7 +238,7 @@ describe('E2E: live nika serve HTTP', () => {
     await client.jobs.status('job-lifecycle');
     const health = await client.health();
     expect(health.service).toBe('nika-serve');
-    expect(health.engine_version).toBe('0.113.0');
+    expect(health.engine_version).toBe('0.114.0');
     expect(state.authHeaders.get('POST /v1/jobs')).toBe(`Bearer ${VALID_TOKEN}`);
     expect(state.authHeaders.get('GET /v1/jobs/job-lifecycle')).toBe(`Bearer ${VALID_TOKEN}`);
     expect(state.authHeaders.get('GET /health')).toBeUndefined();

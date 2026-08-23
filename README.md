@@ -271,7 +271,7 @@ for await (const event of nika.jobs.stream(jobId, {
 ```
 
 <!-- engine hero pinned to the release tag it demonstrates · re-pin on lockstep bumps -->
-![nika check audits the workflow (plan, permits, cost, secrets, types, the lethal-trifecta gate), then nika run executes it locally and seals the hash-chained trace — the audit-then-run story](https://raw.githubusercontent.com/supernovae-st/nika/v0.112.0/media/nika-hero.gif)
+![nika check audits the workflow (plan, permits, cost, secrets, types, the lethal-trifecta gate), then nika run executes it locally and seals the hash-chained trace — the audit-then-run story](https://raw.githubusercontent.com/supernovae-st/nika/v0.114.0/media/nika-hero.gif)
 
 ## Keeping it fresh · the lockstep
 

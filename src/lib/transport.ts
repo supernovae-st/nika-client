@@ -6,6 +6,9 @@ import type {
   NikaReceipt,
   NikaRunOptions,
   NikaRunResult,
+  NikaScheduleApplyResult,
+  NikaScheduleOptions,
+  NikaScheduleStatus,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
   NikaTransportKind,
@@ -24,6 +27,8 @@ export interface Transport {
   readonly kind: NikaTransportKind;
   check(workflow: string, options: NikaCheckOptions): Promise<NikaCheckResult>;
   startRun(workflow: string, options: NikaRunOptions): Promise<TransportRun>;
+  schedule(workflow: string, options: NikaScheduleOptions): Promise<NikaScheduleApplyResult>;
+  scheduleStatus(id: string): Promise<NikaScheduleStatus>;
   traceVerify(
     receipt: NikaReceipt,
     options: NikaTraceVerifyOptions,

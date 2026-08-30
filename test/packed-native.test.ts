@@ -66,6 +66,51 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
     expect(result.stdout).toContain('cjs-packed.nika.yaml');
   });
 
+  it('lets the Node process exit immediately after a durable schedule apply', () => {
+    const project = stageProject(HOST_PACKAGE);
+    const result = runNode(project, 'schedule-exit.mjs', `
+      import { Nika } from '@supernovae-st/nika-client';
+      const identity = {
+        status: 'ok',
+        service: 'nika-serve',
+        engineVersion: '0.114.0',
+        machineProtocolVersion: 1,
+        snapshotFormatVersion: 1,
+        checkReportVersion: 1,
+        eventFormatVersion: 1,
+        traceFormatVersion: 1,
+        supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'schedule'],
+      };
+      const status = {
+        definition: {
+          id: 'exit', workflow: 'flow.nika.yaml',
+          when: { kind: 'once', at: '2099-09-01T07:00:00Z' },
+          maxCostUsd: 0.25, missed: 'skip', maxLatenessSeconds: null,
+          overlap: 'skip', afterSkip: 'next_slot', jitter: null,
+          tolerance: null, active: true, pauseReason: null, pauseUntil: null,
+        },
+        origin: 'api', revision: 'sha256:${'a'.repeat(64)}', active: true,
+        pause: null, due: { kind: 'not_due' }, next: [],
+        earliestWakeHint: null, lastDecision: null,
+      };
+      let request = 0;
+      const fetch = async () => new Response(JSON.stringify(
+        request++ === 0 ? identity : { applied: true, changed: true, status }
+      ), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      const nika = new Nika({
+        url: 'https://nika.example', token: 'secret', fetch,
+      });
+      const applied = await nika.schedule('flow.nika.yaml', {
+        id: 'exit', when: { kind: 'once', at: '2099-09-01T07:00:00Z' },
+        maxCostUsd: 0.25, missed: 'skip',
+      });
+      console.log(JSON.stringify({ applied: applied.applied, requests: request }));
+    `);
+    expect(result.error).toBeUndefined();
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual({ applied: true, requests: 2 });
+  });
+
   it('reports NikaEngineUnavailable after npm install --omit=optional', () => {
     const project = stageOmittingOptional();
     const result = runUnavailable(project);
@@ -217,6 +262,7 @@ function runNode(project: string, filename: string, source: string) {
     cwd: project,
     env: cleanEnv(),
     encoding: 'utf8',
+    timeout: 2_000,
   });
 }
 

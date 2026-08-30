@@ -17,6 +17,9 @@ import type {
   NikaReceipt,
   NikaRun,
   NikaRunOptions,
+  NikaScheduleApplyResult,
+  NikaScheduleOptions,
+  NikaScheduleStatus,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
   NikaTransportKind,
@@ -105,6 +108,18 @@ export class Nika {
     return this.session(run).cancel();
   }
 
+  schedule(
+    workflow: string,
+    options: NikaScheduleOptions,
+  ): Promise<NikaScheduleApplyResult> {
+    scheduleId(options?.id);
+    return this.transport.schedule(workflowName(workflow), options);
+  }
+
+  scheduleStatus(id: string): Promise<NikaScheduleStatus> {
+    return this.transport.scheduleStatus(scheduleId(id));
+  }
+
   traceVerify(
     receipt: NikaReceipt,
     options: NikaTraceVerifyOptions = {},
@@ -157,11 +172,19 @@ function workflowName(value: string): string {
   return value;
 }
 
+function scheduleId(value: string): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new TypeError('schedule id must be a non-empty string');
+  }
+  return value;
+}
+
 export {
   NikaCompatibilityError,
   NikaConfigurationError,
   NikaError,
   NikaEventBufferOverflowError,
+  NikaOperationError,
   NikaProtocolError,
   NikaRunOwnershipError,
   NikaTransportError,
@@ -180,10 +203,26 @@ export type {
   NikaEventsOptions,
   NikaMachineError,
   NikaReceipt,
+  NikaOperation,
+  NikaOperationFinding,
   NikaRun,
   NikaRunOptions,
   NikaRunResult,
   NikaRunStatus,
+  NikaScheduleAfterSkip,
+  NikaScheduleApplyResult,
+  NikaScheduleClaim,
+  NikaScheduleDefinition,
+  NikaScheduleDue,
+  NikaScheduleFinding,
+  NikaScheduleLastDecision,
+  NikaScheduleMissed,
+  NikaScheduleOptions,
+  NikaScheduleOverlap,
+  NikaSchedulePause,
+  NikaScheduleSlot,
+  NikaScheduleStatus,
+  NikaScheduleWhen,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
   NikaTransportKind,

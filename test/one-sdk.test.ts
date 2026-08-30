@@ -9,6 +9,7 @@ import {
   NikaCompatibilityError,
   NikaConfigurationError,
   NikaEventBufferOverflowError,
+  NikaOperationError,
   NikaRunOwnershipError,
 } from '../src/index.js';
 import type {
@@ -16,6 +17,7 @@ import type {
   NikaLocalConfig,
   NikaRun,
   NikaRunOptions,
+  NikaScheduleOptions,
 } from '../src/index.js';
 
 const FIXTURE = path.join(
@@ -75,6 +77,40 @@ function sseResponse(frames: NikaEvent[]): Response {
   });
 }
 
+function scheduleProjection(overrides: Record<string, unknown> = {}) {
+  return {
+    definition: {
+      id: 'daily',
+      workflow: 'flow.nika.yaml',
+      when: { kind: 'cadence', expression: 'daily at 09:00 Europe/Paris' },
+      maxCostUsd: 0.25,
+      missed: 'catch-up-once',
+      maxLatenessSeconds: 3600,
+      overlap: 'skip',
+      afterSkip: 'next_slot',
+      jitter: null,
+      tolerance: null,
+      active: true,
+      pauseReason: null,
+      pauseUntil: null,
+    },
+    origin: 'api',
+    revision: `sha256:${'a'.repeat(64)}`,
+    active: true,
+    pause: null,
+    due: { kind: 'not_due' },
+    next: [{
+      slotId: 'slot-1',
+      scheduledFor: '2026-08-31T07:00:00Z',
+      requestedCivil: '2026-08-31T09:00:00',
+      shift: 'exact',
+    }],
+    earliestWakeHint: '2026-08-31T07:00:00Z',
+    lastDecision: null,
+    ...overrides,
+  };
+}
+
 async function collect(iterable: AsyncIterable<NikaEvent>): Promise<NikaEvent[]> {
   const events: NikaEvent[] = [];
   for await (const event of iterable) events.push(event);
@@ -125,6 +161,24 @@ describe('one Nika surface', () => {
 });
 
 describe.skipIf(!posix)('native-process transport', () => {
+  it('refuses schedule operations without starting a direct local process', async () => {
+    const client = native();
+    await expect(client.schedule('flow.nika.yaml', {
+      id: 'daily',
+      when: { kind: 'once', at: '2026-09-01T07:00:00Z' },
+      maxCostUsd: 0.25,
+      missed: 'skip',
+    })).rejects.toMatchObject({
+      name: 'NikaCompatibilityError',
+      capability: 'schedule',
+      transport: 'native-process',
+    });
+    await expect(client.scheduleStatus('daily')).rejects.toMatchObject({
+      capability: 'schedule',
+      transport: 'native-process',
+    });
+  });
+
   it('rejects an incompatible explicit engine before workflow effects', async () => {
     const sentinel = path.join(tmpdir(), `nika-sdk-effect-${randomUUID()}`);
     process.env.NIKA_EFFECT_SENTINEL = sentinel;
@@ -256,6 +310,152 @@ describe('HTTP transport', () => {
       fetch,
     });
   }
+
+  const scheduleOptions: NikaScheduleOptions = {
+    id: 'daily',
+    when: { kind: 'cadence', expression: 'daily at 09:00 Europe/Paris' },
+    maxCostUsd: 0.25,
+    missed: 'catch-up-once',
+    maxLatenessSeconds: 3600,
+    overlap: 'skip',
+    afterSkip: 'next_slot',
+  };
+
+  it('uses only the advertised resident schedule authority and projects its machine facts', async () => {
+    const status = scheduleProjection();
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse({
+        supportedCapabilities: [
+          'check',
+          'executionSnapshot',
+          'eventStream',
+          'schedule',
+        ],
+      }))
+      .mockResolvedValueOnce(jsonResponse({ applied: true, changed: true, status }))
+      .mockResolvedValueOnce(jsonResponse(status));
+    const client = remote(fetch as typeof globalThis.fetch);
+
+    await expect(client.schedule('flow.nika.yaml', scheduleOptions)).resolves.toEqual({
+      applied: true,
+      changed: true,
+      status,
+    });
+    await expect(client.scheduleStatus('daily')).resolves.toEqual(status);
+
+    const [applyUrl, applyInit] = fetch.mock.calls[1] as [string, RequestInit];
+    expect(applyUrl).toBe('https://nika.example/v1/schedules/daily');
+    expect(applyInit.method).toBe('PUT');
+    const applyHeaders = new Headers(applyInit.headers);
+    expect(applyHeaders.get('If-None-Match')).toBe('*');
+    expect(applyHeaders.has('If-Match')).toBe(false);
+    expect(JSON.parse(String(applyInit.body))).toEqual({
+      workflow: 'flow.nika.yaml',
+      when: scheduleOptions.when,
+      maxCostUsd: 0.25,
+      missed: 'catch-up-once',
+      maxLatenessSeconds: 3600,
+      overlap: 'skip',
+      afterSkip: 'next_slot',
+    });
+    expect(String(fetch.mock.calls[2]?.[0])).toBe(
+      'https://nika.example/v1/schedules/daily',
+    );
+    expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/health'))).toHaveLength(1);
+  });
+
+  it('requires the remote schedule capability before calling its route', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(healthResponse());
+    await expect(remote(fetch as typeof globalThis.fetch).schedule(
+      'flow.nika.yaml',
+      scheduleOptions,
+    )).rejects.toMatchObject({
+      name: 'NikaCompatibilityError',
+      capability: 'schedule',
+      transport: 'http',
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(String(fetch.mock.calls[0]?.[0])).toBe('https://nika.example/health');
+  });
+
+  it('uses exact revisions and normalizes HTTP 412 into one operation error taxonomy', async () => {
+    const revision = `sha256:${'b'.repeat(64)}`;
+    const currentRevision = `sha256:${'c'.repeat(64)}`;
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse({
+        supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'schedule'],
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        error: {
+          code: 'schedule_precondition_failed',
+          message: 'create requires If-None-Match: *; update requires the exact current ETag',
+          currentRevision,
+        },
+      }, 412));
+    const client = remote(fetch as typeof globalThis.fetch);
+    let failure: unknown;
+    try {
+      await client.schedule('flow.nika.yaml', { ...scheduleOptions, revision });
+    } catch (cause) {
+      failure = cause;
+    }
+    expect(failure).toBeInstanceOf(NikaOperationError);
+    expect(failure).toMatchObject({
+      operation: 'schedule',
+      code: 'schedule_conflict',
+      machineCode: 'schedule_precondition_failed',
+      currentRevision,
+      status: 412,
+      transport: 'http',
+    });
+    const headers = new Headers(fetch.mock.calls[1]?.[1]?.headers);
+    expect(headers.get('If-Match')).toBe(`"${revision}"`);
+    expect(headers.has('If-None-Match')).toBe(false);
+  });
+
+  it('preserves engine findings without interpreting cadence or jitter', async () => {
+    const findings = [{
+      code: 'schedule.jitter',
+      detail: 'hash jitter has no canonical offset law',
+      future: { engineOwned: true },
+    }];
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse({
+        supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'schedule'],
+      }))
+      .mockResolvedValueOnce(jsonResponse({ findings }, 422));
+    await expect(remote(fetch as typeof globalThis.fetch).schedule(
+      'flow.nika.yaml',
+      { ...scheduleOptions, jitter: 'hash' },
+    )).rejects.toMatchObject({
+      name: 'NikaOperationError',
+      operation: 'schedule',
+      code: 'schedule_refused',
+      status: 422,
+      findings,
+    });
+  });
+
+  it('returns planner findings as status data rather than calculating a replacement', async () => {
+    const finding = {
+      code: 'schedule.cadence',
+      detail: 'canonical cadence cannot be planned by this engine',
+      future: true,
+    };
+    const status = scheduleProjection({
+      due: undefined,
+      finding,
+      next: [],
+      earliestWakeHint: null,
+    });
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse({
+        supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'schedule'],
+      }))
+      .mockResolvedValueOnce(jsonResponse(status));
+    await expect(remote(fetch as typeof globalThis.fetch).scheduleStatus('daily'))
+      .resolves.toMatchObject({ finding, next: [], earliestWakeHint: null });
+  });
 
   it('posts the exact opaque snapshot bytes with no legacy workflow envelope', async () => {
     const fetch = vi.fn()

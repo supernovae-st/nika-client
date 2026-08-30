@@ -140,3 +140,138 @@ export interface NikaTraceVerifyOptions {
   /** Stops only the verification request/process. */
   signal?: AbortSignal;
 }
+
+/** The two operations that can fail before returning an engine projection. */
+export type NikaOperation = 'schedule' | 'scheduleStatus';
+
+/** One engine-owned schedule finding. The vocabulary remains additive. */
+export interface NikaScheduleFinding {
+  code: string;
+  detail: string;
+  [key: string]: unknown;
+}
+
+/** Findings carried by the one operation-error taxonomy. */
+export type NikaOperationFinding = NikaScheduleFinding;
+
+export type NikaScheduleWhen =
+  | { kind: 'once'; at: string }
+  | { kind: 'cadence'; expression: string };
+
+/** Exact declarative input accepted by PUT /v1/schedules/{id}. */
+export interface NikaScheduleOptions {
+  /** Stable path identity for the resident schedule. */
+  id: string;
+  when: NikaScheduleWhen;
+  maxCostUsd: number;
+  missed: 'catch-up' | 'catch-up-once' | 'skip';
+  maxLatenessSeconds?: number;
+  overlap?: 'skip' | 'queue' | 'replace';
+  afterSkip?: 'next_slot' | 'on_completion';
+  jitter?: 'hash';
+  tolerance?: string;
+  active?: boolean;
+  pauseReason?: string;
+  pauseUntil?: string;
+  /** Exact prior revision for an update. Omit for create-if-absent. */
+  revision?: string;
+}
+
+export type NikaScheduleMissed =
+  | 'catch-up'
+  | 'catch-up-once'
+  | 'skip'
+  | (string & {});
+export type NikaScheduleOverlap = 'skip' | 'queue' | 'replace' | (string & {});
+export type NikaScheduleAfterSkip =
+  | 'next_slot'
+  | 'on_completion'
+  | (string & {});
+
+/** The engine-normalized schedule definition; the SDK never normalizes it. */
+export interface NikaScheduleDefinition {
+  id: string;
+  workflow: string;
+  when: NikaScheduleWhen | { kind: string; [key: string]: unknown };
+  maxCostUsd: number;
+  missed: NikaScheduleMissed;
+  maxLatenessSeconds: number | null;
+  overlap: NikaScheduleOverlap;
+  afterSkip: NikaScheduleAfterSkip;
+  jitter: 'hash' | (string & {}) | null;
+  tolerance: string | null;
+  active: boolean;
+  pauseReason: string | null;
+  pauseUntil: string | null;
+  [key: string]: unknown;
+}
+
+export interface NikaScheduleSlot {
+  slotId: string;
+  scheduledFor: string;
+  requestedCivil: string | null;
+  shift: 'exact' | 'advanced_first_valid' | 'folded_first' | (string & {});
+  [key: string]: unknown;
+}
+
+export type NikaScheduleDue =
+  | { kind: 'scheduled'; slot: NikaScheduleSlot }
+  | { kind: 'catch_up'; slot: NikaScheduleSlot; missedSlots: number }
+  | { kind: 'skipped_missed'; slot: NikaScheduleSlot; missedSlots: number }
+  | {
+      kind: 'skipped_too_late';
+      slot: NikaScheduleSlot;
+      latenessSeconds: number;
+      maximumSeconds: number;
+    }
+  | { kind: 'paused'; reason: string | null; pauseUntil: string | null }
+  | { kind: 'once_consumed'; slotId: string; scheduledFor: string }
+  | { kind: 'not_due' }
+  | { kind: string & {}; [key: string]: unknown };
+
+export interface NikaSchedulePause {
+  reason: string | null;
+  until: string | null;
+}
+
+export interface NikaScheduleClaim {
+  runId: string;
+  executionId: string;
+  traceId: string;
+  generation: string;
+  [key: string]: unknown;
+}
+
+export interface NikaScheduleLastDecision {
+  action: 'claimed' | 'skipped' | (string & {});
+  decision: 'scheduled' | 'catch_up' | (string & {});
+  revision: string;
+  slotId: string;
+  scheduledFor: string;
+  decidedAt: string;
+  reason: string | null;
+  claim: NikaScheduleClaim | null;
+  [key: string]: unknown;
+}
+
+/** Fresh engine planning facts. The SDK transports them without interpretation. */
+export interface NikaScheduleStatus {
+  definition: NikaScheduleDefinition;
+  origin: 'api' | (string & {});
+  revision: string;
+  active: boolean;
+  pause: NikaSchedulePause | null;
+  due?: NikaScheduleDue;
+  finding?: NikaScheduleFinding;
+  next: NikaScheduleSlot[];
+  earliestWakeHint: string | null;
+  lastDecision: NikaScheduleLastDecision | null;
+  [key: string]: unknown;
+}
+
+/** Durable apply acknowledgement. It does not wait for a scheduled fire. */
+export interface NikaScheduleApplyResult {
+  applied: true;
+  changed: boolean;
+  status: NikaScheduleStatus;
+}

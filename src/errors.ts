@@ -1,4 +1,8 @@
-import type { NikaTransportKind } from './types.js';
+import type {
+  NikaOperation,
+  NikaOperationFinding,
+  NikaTransportKind,
+} from './types.js';
 
 export class NikaError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -45,6 +49,40 @@ export class NikaProtocolError extends NikaTransportError {
   constructor(transport: NikaTransportKind, message: string, options?: ErrorOptions) {
     super(transport, message, options);
     this.name = 'NikaProtocolError';
+  }
+}
+
+/** One taxonomy for engine refusals returned by an SDK operation. */
+export class NikaOperationError extends NikaError {
+  readonly operation: NikaOperation;
+  readonly code: string;
+  readonly transport: NikaTransportKind;
+  readonly status: number;
+  readonly findings?: readonly NikaOperationFinding[];
+  readonly currentRevision?: string | null;
+  readonly machineCode?: string;
+
+  constructor(
+    operation: NikaOperation,
+    transport: NikaTransportKind,
+    code: string,
+    message: string,
+    details: {
+      status: number;
+      findings?: readonly NikaOperationFinding[];
+      currentRevision?: string | null;
+      machineCode?: string;
+    },
+  ) {
+    super(message);
+    this.name = 'NikaOperationError';
+    this.operation = operation;
+    this.code = code;
+    this.transport = transport;
+    this.status = details.status;
+    this.findings = details.findings;
+    this.currentRevision = details.currentRevision;
+    this.machineCode = details.machineCode;
   }
 }
 

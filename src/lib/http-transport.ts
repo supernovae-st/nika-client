@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   NikaCompatibilityError,
+  NikaOperationError,
   NikaProtocolError,
   NikaTransportError,
 } from '../errors.js';
@@ -12,6 +13,11 @@ import type {
   NikaReceipt,
   NikaRunOptions,
   NikaRunResult,
+  NikaOperation,
+  NikaOperationFinding,
+  NikaScheduleApplyResult,
+  NikaScheduleOptions,
+  NikaScheduleStatus,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
 } from '../types.js';
@@ -78,6 +84,7 @@ const RETRY_MAX_MILLISECONDS = 5_000;
 export class HttpTransport implements Transport {
   readonly kind = 'http' as const;
   private ready?: Promise<NikaEngineIdentity>;
+  private remoteIdentity?: NikaEngineIdentity;
 
   constructor(private readonly options: HttpTransportOptions) {}
 
@@ -138,6 +145,46 @@ export class HttpTransport implements Transport {
       throw new NikaProtocolError(this.kind, 'Job admission response omitted its id');
     }
     return this.httpRun(id);
+  }
+
+  async schedule(
+    workflow: string,
+    options: NikaScheduleOptions,
+  ): Promise<NikaScheduleApplyResult> {
+    await this.ensureScheduleCapability();
+    const path = `/v1/schedules/${encodeURIComponent(options.id)}`;
+    const headers = new Headers({ 'Content-Type': 'application/json' });
+    if (options.revision === undefined) {
+      headers.set('If-None-Match', '*');
+    } else {
+      headers.set('If-Match', `"${options.revision}"`);
+    }
+    const object = await this.operationJson('schedule', path, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(scheduleBody(workflow, options)),
+    });
+    if (
+      object.applied !== true
+      || typeof object.changed !== 'boolean'
+      || !scheduleStatusProjection(object.status)
+    ) {
+      throw new NikaProtocolError(this.kind, 'Schedule apply response was not an acknowledgement');
+    }
+    return object as unknown as NikaScheduleApplyResult;
+  }
+
+  async scheduleStatus(id: string): Promise<NikaScheduleStatus> {
+    await this.ensureScheduleCapability();
+    const path = `/v1/schedules/${encodeURIComponent(id)}`;
+    const object = await this.operationJson('scheduleStatus', path, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    });
+    if (!scheduleStatusProjection(object)) {
+      throw new NikaProtocolError(this.kind, 'Schedule status response omitted machine fields');
+    }
+    return object as unknown as NikaScheduleStatus;
   }
 
   async traceVerify(
@@ -582,8 +629,18 @@ export class HttpTransport implements Transport {
         'GET /health did not identify a live nika-serve engine',
       );
     }
-    compatibleEngineIdentity(health, this.kind, local);
+    this.remoteIdentity = compatibleEngineIdentity(health, this.kind, local);
     return local;
+  }
+
+  private async ensureScheduleCapability(): Promise<void> {
+    await this.ensureReady();
+    if (!this.remoteIdentity?.supportedCapabilities.includes('schedule')) {
+      throw this.gap(
+        'schedule',
+        'The connected nika serve process did not advertise resident schedule authority',
+      );
+    }
   }
 
   private async captureSnapshot(
@@ -659,11 +716,82 @@ export class HttpTransport implements Transport {
     return object;
   }
 
+  private async operationJson(
+    operation: NikaOperation,
+    path: string,
+    init: RequestInit,
+  ): Promise<Record<string, unknown>> {
+    const response = await this.fetchResponse(path, init, true, true, false);
+    const contentType = response.headers
+      .get('Content-Type')
+      ?.split(';', 1)[0]
+      ?.trim()
+      .toLowerCase();
+    if (contentType !== 'application/json') {
+      await discardResponse(response);
+      throw new NikaProtocolError(this.kind, `HTTP ${path} returned an invalid content-type`);
+    }
+    const object = await this.readObservationObject(response, path);
+    if (!response.ok) throw this.operationFailure(operation, response.status, object);
+    return object;
+  }
+
+  private operationFailure(
+    operation: NikaOperation,
+    status: number,
+    object: Record<string, unknown>,
+  ): NikaOperationError {
+    if (status === 412 && operation === 'schedule') {
+      const machine = machineObject(object.error);
+      const currentRevision = machine?.currentRevision;
+      return new NikaOperationError(
+        operation,
+        this.kind,
+        'schedule_conflict',
+        typeof machine?.message === 'string' ? machine.message : 'Schedule revision conflict',
+        {
+          status,
+          machineCode: typeof machine?.code === 'string' ? machine.code : undefined,
+          ...(typeof currentRevision === 'string' || currentRevision === null
+            ? { currentRevision }
+            : {}),
+        },
+      );
+    }
+
+    if (Array.isArray(object.findings)) {
+      const findings = operationFindings(object.findings);
+      if (!findings) {
+        throw new NikaProtocolError(this.kind, 'Schedule refusal findings were malformed');
+      }
+      return new NikaOperationError(
+        operation,
+        this.kind,
+        'schedule_refused',
+        'Schedule was refused by the resident authority',
+        { status, findings },
+      );
+    }
+
+    const machine = machineObject(object.error);
+    if (typeof machine?.code !== 'string' || typeof machine.message !== 'string') {
+      throw new NikaProtocolError(this.kind, `HTTP ${pathForOperation(operation)} error was malformed`);
+    }
+    return new NikaOperationError(
+      operation,
+      this.kind,
+      machine.code,
+      machine.message,
+      { status, machineCode: machine.code },
+    );
+  }
+
   private async fetchResponse(
     path: string,
     init: RequestInit,
     withTimeout: boolean,
     authenticated = true,
+    requireOk = true,
   ): Promise<Response> {
     const controller = withTimeout ? new AbortController() : undefined;
     const timer = controller
@@ -680,7 +808,7 @@ export class HttpTransport implements Transport {
         headers,
         signal: controller?.signal ?? callerSignal,
       });
-      if (!response.ok) {
+      if (requireOk && !response.ok) {
         await discardResponse(response);
         throw new NikaTransportError(
           this.kind,
@@ -705,6 +833,94 @@ export class HttpTransport implements Transport {
       callerSignal?.removeEventListener('abort', abort);
     }
   }
+}
+
+function scheduleBody(
+  workflow: string,
+  options: NikaScheduleOptions,
+): Record<string, unknown> {
+  return {
+    workflow,
+    when: options.when,
+    maxCostUsd: options.maxCostUsd,
+    missed: options.missed,
+    ...(options.maxLatenessSeconds !== undefined
+      ? { maxLatenessSeconds: options.maxLatenessSeconds }
+      : {}),
+    ...(options.overlap !== undefined ? { overlap: options.overlap } : {}),
+    ...(options.afterSkip !== undefined ? { afterSkip: options.afterSkip } : {}),
+    ...(options.jitter !== undefined ? { jitter: options.jitter } : {}),
+    ...(options.tolerance !== undefined ? { tolerance: options.tolerance } : {}),
+    ...(options.active !== undefined ? { active: options.active } : {}),
+    ...(options.pauseReason !== undefined ? { pauseReason: options.pauseReason } : {}),
+    ...(options.pauseUntil !== undefined ? { pauseUntil: options.pauseUntil } : {}),
+  };
+}
+
+function scheduleStatusProjection(value: unknown): value is Record<string, unknown> {
+  const status = machineObject(value);
+  const definition = machineObject(status?.definition);
+  const when = machineObject(definition?.when);
+  const due = machineObject(status?.due);
+  const finding = machineObject(status?.finding);
+  return !!status
+    && !!definition
+    && typeof definition.id === 'string'
+    && typeof definition.workflow === 'string'
+    && !!when
+    && typeof when.kind === 'string'
+    && typeof definition.maxCostUsd === 'number'
+    && typeof definition.missed === 'string'
+    && (definition.maxLatenessSeconds === null
+      || typeof definition.maxLatenessSeconds === 'number')
+    && typeof definition.overlap === 'string'
+    && typeof definition.afterSkip === 'string'
+    && (definition.jitter === null || typeof definition.jitter === 'string')
+    && (definition.tolerance === null || typeof definition.tolerance === 'string')
+    && typeof definition.active === 'boolean'
+    && (definition.pauseReason === null || typeof definition.pauseReason === 'string')
+    && (definition.pauseUntil === null || typeof definition.pauseUntil === 'string')
+    && typeof status.origin === 'string'
+    && typeof status.revision === 'string'
+    && typeof status.active === 'boolean'
+    && (status.pause === null || !!machineObject(status.pause))
+    && Array.isArray(status.next)
+    && status.next.every(scheduleSlotProjection)
+    && (status.earliestWakeHint === null || typeof status.earliestWakeHint === 'string')
+    && (status.lastDecision === null || !!machineObject(status.lastDecision))
+    && (
+      (typeof due?.kind === 'string' && status.finding === undefined)
+      || (status.due === undefined && scheduleFindingProjection(finding))
+    );
+}
+
+function scheduleSlotProjection(value: unknown): boolean {
+  const slot = machineObject(value);
+  return typeof slot?.slotId === 'string'
+    && typeof slot.scheduledFor === 'string'
+    && (slot.requestedCivil === null || typeof slot.requestedCivil === 'string')
+    && typeof slot.shift === 'string';
+}
+
+function scheduleFindingProjection(value: unknown): boolean {
+  const finding = machineObject(value);
+  return typeof finding?.code === 'string' && typeof finding.detail === 'string';
+}
+
+function operationFindings(values: unknown[]): NikaOperationFinding[] | undefined {
+  const findings: NikaOperationFinding[] = [];
+  for (const value of values) {
+    const finding = machineObject(value);
+    if (typeof finding?.code !== 'string' || typeof finding.detail !== 'string') {
+      return undefined;
+    }
+    findings.push(finding as unknown as NikaOperationFinding);
+  }
+  return findings;
+}
+
+function pathForOperation(operation: NikaOperation): string {
+  return operation === 'schedule' ? 'schedule apply' : 'schedule status';
 }
 
 function isTerminal(status: unknown): status is string {

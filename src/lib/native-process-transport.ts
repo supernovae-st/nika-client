@@ -14,6 +14,9 @@ import type {
   NikaReceipt,
   NikaRunOptions,
   NikaRunResult,
+  NikaScheduleApplyResult,
+  NikaScheduleOptions,
+  NikaScheduleStatus,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
 } from '../types.js';
@@ -81,6 +84,25 @@ export class NativeProcessTransport implements Transport {
       shell: false,
     });
     return this.processRun(randomUUID(), child);
+  }
+
+  async schedule(
+    _workflow: string,
+    _options: NikaScheduleOptions,
+  ): Promise<NikaScheduleApplyResult> {
+    throw new NikaCompatibilityError(
+      'schedule',
+      this.kind,
+      'A direct native process is not a proven resident schedule authority; connect to nika serve',
+    );
+  }
+
+  async scheduleStatus(_id: string): Promise<NikaScheduleStatus> {
+    throw new NikaCompatibilityError(
+      'schedule',
+      this.kind,
+      'A direct native process is not a proven resident schedule authority; connect to nika serve',
+    );
   }
 
   async traceVerify(

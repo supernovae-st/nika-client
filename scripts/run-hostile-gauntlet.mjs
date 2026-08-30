@@ -1,0 +1,317 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import {
+  appendFileSync,
+  chmodSync,
+  copyFileSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const resultsPath = path.join(root, 'gauntlet', 'results', 'hostile.json');
+const scratch = mkdtempSync(path.join(tmpdir(), 'nika-hostile-'));
+const nikaBin = process.env.NIKA_BIN;
+const rows = [];
+
+if (!nikaBin) throw new Error('NIKA_BIN must name the engine binary under test');
+
+execFileSync('npm', ['run', 'build'], { cwd: root, stdio: 'pipe' });
+const { Nika, NikaError } = await import('../dist/index.js');
+
+async function scenario(name, body) {
+  const started = performance.now();
+  try {
+    const evidence = await body();
+    rows.push({ name, result: 'green', duration_ms: Math.round(performance.now() - started), evidence });
+    process.stdout.write(`hostile ${rows.length}/13 · ${name} · green\n`);
+  } catch (cause) {
+    rows.push({
+      name,
+      result: 'red',
+      duration_ms: Math.round(performance.now() - started),
+      error: cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause),
+    });
+    process.stdout.write(`hostile ${rows.length}/13 · ${name} · red\n`);
+  }
+}
+
+function writeWorkflow(name, source) {
+  const target = path.join(scratch, name);
+  writeFileSync(target, source);
+  return target;
+}
+
+function bounded(promise, milliseconds, label) {
+  let timer;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} exceeded ${milliseconds}ms`)), milliseconds);
+  });
+  return Promise.race([promise, deadline]).finally(() => clearTimeout(timer));
+}
+
+function receiptPath(receipt) {
+  const locator = receipt.trace_path;
+  assert.equal(typeof locator, 'string');
+  return path.isAbsolute(locator) ? locator : path.join(scratch, locator);
+}
+
+const deterministic = writeWorkflow('deterministic.nika.yaml', `
+nika: hostile-deterministic
+permits:
+  tools: ["nika:hash"]
+tasks:
+  digest:
+    invoke:
+      tool: "nika:hash"
+      args: { content: "hostile", algo: sha256, encoding: hex }
+outputs:
+  digest: \${{ tasks.digest.output }}
+`);
+
+const malformed = writeWorkflow('malformed.nika.yaml', `
+nika: hostile-malformed
+tasks:
+  broken: [this is not a task]
+`);
+
+const cancellable = writeWorkflow('cancellable.nika.yaml', `
+nika: hostile-cancellable
+permits:
+  exec: ["sleep"]
+tasks:
+  wait:
+    exec:
+      command: ["sleep", "10"]
+`);
+
+const burstTasks = Array.from({ length: 12 }, (_, index) => `
+  digest_${index}:
+    invoke:
+      tool: "nika:hash"
+      args: { content: "${index}", algo: sha256, encoding: hex }`).join('');
+const burst = writeWorkflow('burst.nika.yaml', `
+nika: hostile-burst
+permits:
+  tools: ["nika:hash"]
+tasks:${burstTasks}
+`);
+
+const canaryValue = 'NIKA_CANARY_8c8901a4_DO_NOT_LEAK';
+const canary = writeWorkflow('canary.nika.yaml', `
+nika: hostile-canary
+secrets:
+  canary:
+    source: env
+    key: NIKA_HOSTILE_SECRET_CANARY
+permits:
+  tools: ["nika:hash"]
+tasks:
+  digest:
+    invoke:
+      tool: "nika:hash"
+      args: { content: "public", algo: sha256, encoding: hex }
+`);
+
+const fakeBin = path.join(scratch, 'fake-nika.mjs');
+writeFileSync(fakeBin, `#!/usr/bin/env node
+const identity = {
+  engineVersion: '0.115.0',
+  machineProtocolVersion: 1,
+  snapshotFormatVersion: 1,
+  checkReportVersion: 4,
+  eventFormatVersion: 1,
+  traceFormatVersion: 1,
+  supportedCapabilities: ['check', 'executionSnapshot', 'eventStream'],
+};
+if (process.argv.includes('--sdk-identity')) {
+  process.stdout.write(JSON.stringify(identity));
+} else {
+  const workflow = process.argv[3] ?? '';
+  if (workflow.includes('oversize')) process.stdout.write('x'.repeat(4096));
+  else if (workflow.includes('malformed-machine')) process.stdout.write('{"kind":');
+  else if (workflow.includes('crash')) process.exitCode = 23;
+  else process.stdout.write(JSON.stringify({ report_version: 4, clean: true }));
+}
+`);
+chmodSync(fakeBin, 0o755);
+
+await scenario('unsafe-http-refusal', async () => {
+  assert.throws(
+    () => new Nika({ url: 'http://example.test', token: 'not-a-secret' }),
+    /allowInsecureHttp/,
+  );
+  return { refusal: 'NikaConfigurationError', network_requests: 0 };
+});
+
+await scenario('missing-engine-refusal', async () => {
+  const client = new Nika({ bin: path.join(scratch, 'does-not-exist') });
+  const error = await client.check(deterministic).then(
+    () => undefined,
+    (cause) => cause,
+  );
+  assert(error instanceof NikaError);
+  return { error: error.name, bounded: true };
+});
+
+await scenario('oversize-machine-line', async () => {
+  const workflow = writeWorkflow('oversize.nika.yaml', 'nika: fake');
+  const run = await new Nika({ bin: fakeBin, machineBufferBytes: 1024 }).run(workflow);
+  const error = await bounded(run.done, 2_000, 'oversize refusal').then(
+    () => undefined,
+    (cause) => cause,
+  );
+  assert.equal(error?.name, 'NikaProtocolError');
+  return { error: error.name, limit_bytes: 1024 };
+});
+
+await scenario('malformed-machine-frame', async () => {
+  const workflow = writeWorkflow('malformed-machine.nika.yaml', 'nika: fake');
+  const run = await new Nika({ bin: fakeBin }).run(workflow);
+  const error = await bounded(run.done, 2_000, 'malformed frame refusal').then(
+    () => undefined,
+    (cause) => cause,
+  );
+  assert.equal(error?.name, 'NikaProtocolError');
+  return { error: error.name };
+});
+
+await scenario('child-crash-settlement', async () => {
+  const workflow = writeWorkflow('crash.nika.yaml', 'nika: fake');
+  const run = await new Nika({ bin: fakeBin }).run(workflow);
+  const result = await bounded(run.done, 2_000, 'crash settlement');
+  assert.equal(result.status, 'failed');
+  assert.equal(result.exitCode, 23);
+  return { status: result.status, exit_code: result.exitCode };
+});
+
+await scenario('malformed-workflow-domain-report', async () => {
+  const report = await new Nika({ bin: nikaBin, cwd: scratch }).check(malformed);
+  assert.equal(report.clean, false);
+  assert.notEqual(report.exitCode, 0);
+  return { clean: report.clean, exit_code: report.exitCode };
+});
+
+await scenario('explicit-bin-empty-path', async () => {
+  const previous = process.env.PATH;
+  process.env.PATH = '';
+  try {
+    const client = new Nika({ bin: nikaBin, cwd: scratch });
+    const report = await client.check(deterministic, { nativeStrict: true });
+    const run = await client.run(deterministic, { maxCostUsd: 0 });
+    const result = await run.done;
+    assert.equal(report.clean, true);
+    assert.equal(result.status, 'succeeded');
+    return { check: 'clean', status: result.status };
+  } finally {
+    process.env.PATH = previous;
+  }
+});
+
+await scenario('parallel-run-load', async () => {
+  const client = new Nika({ bin: nikaBin, cwd: scratch });
+  const runs = await Promise.all(Array.from({ length: 24 }, () => client.run(deterministic, { maxCostUsd: 0 })));
+  const results = await bounded(Promise.all(runs.map((run) => run.done)), 20_000, 'parallel runs');
+  assert.equal(results.filter((result) => result.status === 'succeeded').length, 24);
+  assert.equal(new Set(results.map((result) => result.id)).size, 24);
+  return { runs: 24, succeeded: 24, unique_run_ids: 24 };
+});
+
+await scenario('real-cancellation-race', async () => {
+  const client = new Nika({ bin: nikaBin, cwd: scratch });
+  const run = await client.run(cancellable, { maxCostUsd: 0 });
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  const first = client.cancel(run);
+  assert.equal(client.cancel(run), first);
+  const [cancelled, result] = await bounded(Promise.all([first, run.done]), 4_000, 'cancellation');
+  assert.equal(cancelled.accepted, true);
+  assert.equal(result.status, 'interrupted');
+  return { cancel_status: cancelled.status, run_status: result.status, exit_code: result.exitCode };
+});
+
+await scenario('trace-corruption-detection', async () => {
+  const client = new Nika({ bin: nikaBin, cwd: scratch });
+  const run = await client.run(deterministic, { maxCostUsd: 0 });
+  const result = await run.done;
+  assert(result.receipt);
+  const intact = await client.traceVerify(result.receipt);
+  assert.equal(intact.verified, true);
+  const source = receiptPath(result.receipt);
+  const corrupted = path.join(scratch, 'corrupted-trace.ndjson');
+  copyFileSync(source, corrupted);
+  appendFileSync(corrupted, '{"tampered":true}\n');
+  const broken = await client.traceVerify({ ...result.receipt, trace_path: corrupted });
+  assert.equal(broken.verified, false);
+  return { intact: intact.verified, corrupted: broken.verified };
+});
+
+await scenario('secret-canary-redaction', async () => {
+  const previous = process.env.NIKA_HOSTILE_SECRET_CANARY;
+  process.env.NIKA_HOSTILE_SECRET_CANARY = canaryValue;
+  try {
+    const client = new Nika({ bin: nikaBin, cwd: scratch });
+    const run = await client.run(canary, { maxCostUsd: 0 });
+    const result = await run.done;
+    assert.equal(result.status, 'succeeded');
+    assert(!JSON.stringify(result).includes(canaryValue));
+    assert(result.receipt);
+    const tracePath = receiptPath(result.receipt);
+    assert(!readFileSync(tracePath, 'utf8').includes(canaryValue));
+    return { result_redacted: true, trace_redacted: true };
+  } finally {
+    if (previous === undefined) delete process.env.NIKA_HOSTILE_SECRET_CANARY;
+    else process.env.NIKA_HOSTILE_SECRET_CANARY = previous;
+  }
+});
+
+await scenario('slow-subscriber-overflow-isolation', async () => {
+  const client = new Nika({ bin: nikaBin, cwd: scratch, eventBufferSize: 4 });
+  const run = await client.run(burst, { maxCostUsd: 0 });
+  const iterator = client.events(run, { bufferSize: 2 })[Symbol.asyncIterator]();
+  const result = await run.done;
+  assert.equal(result.status, 'succeeded');
+  const error = await iterator.next().then(
+    () => undefined,
+    (cause) => cause,
+  );
+  assert.equal(error?.name, 'NikaEventBufferOverflowError');
+  return { run_status: result.status, subscriber_error: error.name, subscriber_limit: 2 };
+});
+
+await scenario('sequential-soak', async () => {
+  const client = new Nika({ bin: nikaBin, cwd: scratch });
+  for (let index = 0; index < 40; index += 1) {
+    const run = await client.run(deterministic, { maxCostUsd: 0 });
+    const result = await run.done;
+    assert.equal(result.status, 'succeeded');
+  }
+  return { runs: 40, succeeded: 40 };
+});
+
+const report = {
+  schema_version: 1,
+  generated_at: new Date().toISOString(),
+  engine: execFileSync(nikaBin, ['--version'], { encoding: 'utf8' }).trim(),
+  scenarios: rows,
+  summary: {
+    total: rows.length,
+    green: rows.filter((row) => row.result === 'green').length,
+    red: rows.filter((row) => row.result === 'red').length,
+    real_engine_runs: 69,
+  },
+  result: rows.every((row) => row.result === 'green') ? 'green' : 'red',
+};
+writeFileSync(resultsPath, `${JSON.stringify(report, null, 2)}\n`);
+rmSync(scratch, { recursive: true, force: true });
+
+if (report.result !== 'green') {
+  process.stderr.write(`${report.summary.red}/${report.summary.total} hostile scenarios red · ${resultsPath}\n`);
+  process.exitCode = 1;
+} else {
+  process.stdout.write(`${report.summary.green}/${report.summary.total} hostile scenarios green · ${resultsPath}\n`);
+}

@@ -52,6 +52,7 @@
     "gauntlet:check": "node scripts/verify-gauntlet-corpus.mjs",
     "gauntlet:run": "node scripts/execute-gauntlet-corpus.mjs",
     "gauntlet:projects": "node scripts/run-mini-saas-gauntlet.mjs",
+    "gauntlet:hostile": "node scripts/run-hostile-gauntlet.mjs",
     "generate:types": "node scripts/generate-types.js",
     "sync:native-versions": "node scripts/sync-native-versions.mjs",
     "prepack": "npm run build",

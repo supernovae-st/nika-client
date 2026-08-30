@@ -4,6 +4,25 @@ const argv = process.argv.slice(2);
 const command = argv[0];
 const workflow = argv[1] ?? '';
 
+if (command === '--sdk-identity') {
+  console.log(JSON.stringify({
+    engineVersion: '0.114.0',
+    machineProtocolVersion: 1,
+    snapshotFormatVersion: 1,
+    checkReportVersion: 1,
+    eventFormatVersion: 1,
+    traceFormatVersion: 1,
+    supportedCapabilities: ['check', 'run', 'trace-verify'],
+  }));
+  return;
+}
+
+if (command === 'wait-for-signal') {
+  console.log('ready');
+  setTimeout(() => process.exit(0), 2_000);
+  return;
+}
+
 if (command === 'check') {
   console.log(JSON.stringify({
     report_version: 1,

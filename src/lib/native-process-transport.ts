@@ -25,6 +25,7 @@ import {
   parseMachineObject,
   receiptTraceLocator,
 } from './machine.js';
+import { verifyNikaEngine, type ResolvedNikaEngine } from './binary/index.js';
 import type { Transport, TransportRun } from './transport.js';
 
 interface Captured {
@@ -34,17 +35,19 @@ interface Captured {
 }
 
 export interface NativeProcessTransportOptions {
-  bin: string;
+  engine: ResolvedNikaEngine;
   cwd?: string;
   machineBufferBytes: number;
 }
 
 export class NativeProcessTransport implements Transport {
   readonly kind = 'native-process' as const;
+  private ready?: Promise<void>;
 
   constructor(private readonly options: NativeProcessTransportOptions) {}
 
   async check(workflow: string, options: NikaCheckOptions): Promise<NikaCheckResult> {
+    await this.ensureReady();
     const args = ['check', workflow, '--json'];
     if (options.model) args.push('--model', options.model);
     if (options.nativeStrict) args.push('--native-strict');
@@ -63,6 +66,7 @@ export class NativeProcessTransport implements Transport {
   }
 
   async startRun(workflow: string, options: NikaRunOptions): Promise<TransportRun> {
+    await this.ensureReady();
     if (options.idempotencyKey !== undefined) {
       throw new NikaCompatibilityError(
         'idempotencyKey',
@@ -71,7 +75,7 @@ export class NativeProcessTransport implements Transport {
       );
     }
     const args = ['run', workflow, '--json', ...runFlags(options)];
-    const child = spawn(this.options.bin, args, {
+    const child = spawn(this.options.engine.bin, args, {
       cwd: this.options.cwd,
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: false,
@@ -83,6 +87,7 @@ export class NativeProcessTransport implements Transport {
     receipt: NikaReceipt,
     options: NikaTraceVerifyOptions,
   ): Promise<NikaTraceVerifyResult> {
+    await this.ensureReady();
     const locator = receiptTraceLocator(receipt);
     if (!locator) {
       throw new NikaCompatibilityError(
@@ -121,7 +126,7 @@ export class NativeProcessTransport implements Transport {
       child.once('error', (cause) => {
         streamError = new NikaTransportError(
           this.kind,
-          `Cannot spawn ${this.options.bin}: ${cause.message}`,
+          `Cannot spawn ${this.options.engine.bin}: ${cause.message}`,
           { cause },
         );
         reject(streamError);
@@ -233,7 +238,7 @@ export class NativeProcessTransport implements Transport {
         reject(new NikaTransportError(this.kind, 'Operation aborted by caller'));
         return;
       }
-      const child = spawn(this.options.bin, args, {
+      const child = spawn(this.options.engine.bin, args, {
         cwd: this.options.cwd,
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: false,
@@ -254,7 +259,7 @@ export class NativeProcessTransport implements Transport {
         signal?.removeEventListener('abort', abort);
         reject(new NikaTransportError(
           this.kind,
-          `Cannot spawn ${this.options.bin}: ${cause.message}`,
+          `Cannot spawn ${this.options.engine.bin}: ${cause.message}`,
           { cause },
         ));
       });
@@ -267,6 +272,11 @@ export class NativeProcessTransport implements Transport {
         resolve({ exitCode: code ?? 3, stdout, stderr });
       });
     });
+  }
+
+  private ensureReady(): Promise<void> {
+    this.ready ??= verifyNikaEngine(this.options.engine).then(() => undefined);
+    return this.ready;
   }
 }
 

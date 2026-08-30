@@ -1,0 +1,28 @@
+{
+  "name": "@supernovae-st/nika-linux-arm64-gnu",
+  "version": "0.114.0",
+  "description": "Nika native engine payload for Linux arm64 GNU",
+  "license": "AGPL-3.0-or-later",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "files": [
+    "bin/nika",
+    "LICENSE",
+    "SOURCE.json",
+    "INTEGRITY.json"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "preferUnplugged": true,
+  "publishConfig": {
+    "access": "public"
+  }
+}

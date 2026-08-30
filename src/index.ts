@@ -4,6 +4,7 @@ import {
 } from './errors.js';
 import { HttpTransport } from './lib/http-transport.js';
 import { NativeProcessTransport } from './lib/native-process-transport.js';
+import { NikaEngineUnavailable, resolveNikaEngine } from './lib/binary/index.js';
 import { RunSession } from './lib/run-session.js';
 import type { Transport } from './lib/transport.js';
 import type {
@@ -76,9 +77,9 @@ export class Nika {
       ) {
         throw new NikaConfigurationError('token, allowInsecureHttp, requestTimeout, and fetch require url');
       }
-      const bin = config.bin ?? process.env.NIKA_BIN ?? 'nika';
+      const engine = resolveNikaEngine(config.bin);
       this.transport = new NativeProcessTransport({
-        bin,
+        engine,
         cwd: config.cwd,
         machineBufferBytes,
       });
@@ -166,6 +167,8 @@ export {
   NikaRunOwnershipError,
   NikaTransportError,
 } from './errors.js';
+
+export { NikaEngineUnavailable };
 
 export type {
   NikaCancelResult,

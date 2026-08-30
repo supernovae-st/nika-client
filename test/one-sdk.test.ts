@@ -1,3 +1,6 @@
+import { randomUUID } from 'node:crypto';
+import { existsSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
@@ -19,6 +22,11 @@ const FIXTURE = path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   'fixtures',
   'fake-nika.mjs',
+);
+const INCOMPATIBLE_FIXTURE = path.join(
+  path.dirname(fileURLToPath(import.meta.url)),
+  'fixtures',
+  'incompatible-nika.mjs',
 );
 const posix = process.platform !== 'win32';
 
@@ -61,7 +69,7 @@ describe('one Nika surface', () => {
   });
 
   it('defaults to the native-process transport', () => {
-    expect(new Nika().transportKind).toBe('native-process');
+    expect(new Nika({ bin: FIXTURE }).transportKind).toBe('native-process');
   });
 
   it('requires an explicit secure remote configuration', () => {
@@ -96,6 +104,23 @@ describe('one Nika surface', () => {
 });
 
 describe.skipIf(!posix)('native-process transport', () => {
+  it('rejects an incompatible explicit engine before workflow effects', async () => {
+    const sentinel = path.join(tmpdir(), `nika-sdk-effect-${randomUUID()}`);
+    process.env.NIKA_EFFECT_SENTINEL = sentinel;
+    try {
+      const client = new Nika({ bin: INCOMPATIBLE_FIXTURE });
+      await expect(client.run('must-not-run.nika.yaml'))
+        .rejects.toMatchObject({
+          name: 'NikaCompatibilityError',
+          capability: 'engineIdentity',
+        });
+      expect(existsSync(sentinel)).toBe(false);
+    } finally {
+      delete process.env.NIKA_EFFECT_SENTINEL;
+      rmSync(sentinel, { force: true });
+    }
+  });
+
   it('returns the engine-owned check report without interpreting the workflow', async () => {
     const report = await native().check('dirty.nika.yaml', {
       model: 'mock/echo',

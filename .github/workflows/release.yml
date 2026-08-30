@@ -1,128 +1,236 @@
 name: Release
+
+# SECURITY: no github.event text is interpolated directly into shell source.
+# npm trusted publishing must authorize this exact workflow for all five packages.
 on:
-  # Manual releases only for now: the engine's release workflow never
-  # emitted the old `repository_dispatch: nika-release` (dead wiring,
-  # 2026-07-09 audit) - it returns when the SDK rides the release train.
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to publish (e.g. 0.64.0)'
+        description: 'Checked-in SDK + engine release train version (e.g. 0.115.0)'
         required: true
       dry_run:
-        description: 'Dry run (skip npm publish)'
+        description: 'Build and inspect without staging on npm'
         type: boolean
         default: false
 
+concurrency:
+  group: nika-client-release-${{ github.event.inputs.version }}
+  cancel-in-progress: false
+
 jobs:
-  release:
+  prepare:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
-      contents: write
-      pull-requests: write
-      id-token: write # npm --provenance (Sigstore OIDC · the engine train's parity)
+      contents: read
     env:
-      # Version comes from either dispatch source
-      VERSION: ${{ github.event.client_payload.version || github.event.inputs.version }}
+      VERSION: ${{ github.event.inputs.version }}
       DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 20
+          node-version: 24
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
 
-      - name: Validate version
+      - name: Pin trusted-publishing npm CLI
+        run: npm install --global npm@11.5.1
+
+      - name: Validate checked-in release train
+        env:
+          GH_TOKEN: ${{ secrets.NIKA_REPO_TOKEN || github.token }}
         run: |
-          if [ -z "$VERSION" ]; then
-            echo "::error::No version specified"
+          set -euo pipefail
+          if ! [[ "$VERSION" =~ ^0\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid version: $VERSION (expected 0.x.y)"
             exit 1
           fi
-          # Validate semver format (0.x.y only)
-          if ! echo "$VERSION" | grep -qE '^0\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Invalid version format: $VERSION (expected 0.x.y)"
+          if [ "$(node -p "require('./package.json').version")" != "$VERSION" ]; then
+            echo "::error::package.json must already be version $VERSION"
             exit 1
           fi
-          echo "Releasing @supernovae-st/nika-client@$VERSION"
+          npm run sync:native-versions
+          git diff --exit-code -- package.json package-lock.json packages/native
 
-      # Bump version in package.json
-      - name: Bump version
-        run: npm version "$VERSION" --no-git-tag-version --allow-same-version
+          assets=(
+            "nika-macos-arm64-$VERSION.tar.gz"
+            "nika-macos-x64-$VERSION.tar.gz"
+            "nika-linux-arm64-$VERSION.tar.gz"
+            "nika-linux-x64-$VERSION.tar.gz"
+          )
+          release_json=$(gh release view "v$VERSION" --repo supernovae-st/nika --json assets,isDraft,tagName)
+          if [ "$(jq -r .isDraft <<<"$release_json")" != false ]; then
+            echo "::error::nika v$VERSION is still a draft"
+            exit 1
+          fi
+          for asset in "${assets[@]}" SHA256SUMS; do
+            if ! jq -e --arg asset "$asset" '.assets[] | select(.name == $asset)' <<<"$release_json" >/dev/null; then
+              echo "::error::nika v$VERSION is missing release asset $asset"
+              exit 1
+            fi
+          done
 
-      # Install, test, build
       - run: npm ci
       - run: npm test
       - run: npm run build
 
-      # SDK coverage check against nika source
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: supernovae-st/nika
           path: nika-source
           ref: "v${{ env.VERSION }}"
-          # Same fallback as ci.yml: keep the dedicated token when present,
-          # degrade to github.token if a release ever runs without the secret.
           token: ${{ secrets.NIKA_REPO_TOKEN || github.token }}
 
-      - name: SDK coverage check
+      - name: Enforce SDK coverage against tagged engine source
         run: npm run check:coverage -- ./nika-source
-        continue-on-error: true
 
-      # Commit version bump — via PR, never a push at main: the 2026-07-19
-      # protection wave (4 required checks) declines direct pushes, which
-      # silently killed this lane at 0.105 (issue #22). The bump branch
-      # auto-merges once CI is green; npm publishes from the working tree
-      # (already bumped), so the release never waits on the merge.
-      - name: Open the version-bump PR
+      - name: Download and verify engine release assets
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.NIKA_REPO_TOKEN || github.token }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          if git diff --cached --quiet; then
-            echo "version already $VERSION — no bump PR needed"
-            exit 0
-          fi
-          branch="bot/release-v$VERSION"
-          git checkout -b "$branch"
-          git commit -m "chore: bump version to $VERSION" -m "Co-Authored-By: Nika Release Bot <nika@supernovae.studio>"
-          git push -u origin "$branch"
-          gh pr create --head "$branch" \
-            --title "chore: bump version to $VERSION" \
-            --body "Release-lane bump (auto-merges on green · release.yml)."
-          # belt: a repo with auto-merge off must not kill the release —
-          # the PR stays open (loud) and npm still ships from the tree
-          gh pr merge "$branch" --squash --auto \
-            || echo "::warning::auto-merge unavailable — merge the bump PR by hand; the release continues"
+          set -euo pipefail
+          mkdir -p engine-assets
+          gh release download "v$VERSION" \
+            --repo supernovae-st/nika \
+            --dir engine-assets \
+            --pattern "nika-macos-arm64-$VERSION.tar.gz" \
+            --pattern "nika-macos-x64-$VERSION.tar.gz" \
+            --pattern "nika-linux-arm64-$VERSION.tar.gz" \
+            --pattern "nika-linux-x64-$VERSION.tar.gz" \
+            --pattern SHA256SUMS
+          cd engine-assets
+          for asset in nika-*"$VERSION".tar.gz; do
+            grep -E "[[:space:]]${asset}$" SHA256SUMS | sha256sum --check --strict
+          done
 
-      # Publish to npm — with provenance: the attestation binds the package
-      # to this repo + workflow + commit (the engine's nika-check-wasm ships
-      # attested; the SDK publishes at the same bar). Requires id-token above.
-      - name: Publish to npm
+      - name: Build native payload packages
+        run: |
+          set -euo pipefail
+          source_commit=$(git -C nika-source rev-parse HEAD)
+          packages=(
+            "packages/native/darwin-arm64:nika-macos-arm64-$VERSION.tar.gz"
+            "packages/native/darwin-x64:nika-macos-x64-$VERSION.tar.gz"
+            "packages/native/linux-arm64-gnu:nika-linux-arm64-$VERSION.tar.gz"
+            "packages/native/linux-x64-gnu:nika-linux-x64-$VERSION.tar.gz"
+          )
+          for pair in "${packages[@]}"; do
+            package_dir=${pair%%:*}
+            asset=${pair#*:}
+            extract_dir=$(mktemp -d)
+            tar -xzf "engine-assets/$asset" -C "$extract_dir" nika
+            archive_sha=$(awk -v asset="$asset" '$2 == asset { print $1 }' engine-assets/SHA256SUMS)
+            if [ -z "$archive_sha" ]; then
+              echo "::error::No checksum found for $asset"
+              exit 1
+            fi
+            node scripts/build-native-package.mjs \
+              --package "$package_dir" \
+              --binary "$extract_dir/nika" \
+              --license nika-source/LICENSE \
+              --asset "$asset" \
+              --asset-sha256 "$archive_sha" \
+              --source-commit "$source_commit"
+          done
+
+      - name: Pack and inspect all packages
+        run: |
+          set -euo pipefail
+          mkdir -p release-tarballs pack-reports
+          for package_dir in packages/native/*; do
+            report="pack-reports/$(basename "$package_dir").json"
+            npm pack "$package_dir" --json --pack-destination release-tarballs > "$report"
+            node scripts/verify-native-pack.mjs "$report"
+          done
+          npm pack --ignore-scripts --json --pack-destination release-tarballs \
+            > pack-reports/nika-client.json
+          node scripts/verify-client-pack.mjs pack-reports/nika-client.json
+
+      - name: Refuse an already-started public train
         if: env.DRY_RUN != 'true'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public --provenance
-
-      # Create GitHub release
-      - name: Create GitHub release
-        if: env.DRY_RUN != 'true'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "v$VERSION" \
-            --title "v$VERSION" \
-            --notes "Synced with [nika v$VERSION](https://github.com/supernovae-st/nika/releases/tag/v$VERSION).
+          set -euo pipefail
+          packages=(
+            @supernovae-st/nika-darwin-arm64
+            @supernovae-st/nika-darwin-x64
+            @supernovae-st/nika-linux-arm64-gnu
+            @supernovae-st/nika-linux-x64-gnu
+            @supernovae-st/nika-client
+          )
+          for package_name in "${packages[@]}"; do
+            if npm view "$package_name@$VERSION" version >/dev/null 2>&1; then
+              echo "::error::$package_name@$VERSION already exists publicly"
+              exit 1
+            fi
+          done
 
-          Install: \`npm install @supernovae-st/nika-client@$VERSION\`" \
-            --latest
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nika-client-release-${{ env.VERSION }}
+          path: |
+            release-tarballs/*.tgz
+            pack-reports/*.json
+          if-no-files-found: error
+          retention-days: 7
 
-      - name: Summary
+      - name: Dry-run summary
+        if: env.DRY_RUN == 'true'
         run: |
-          echo "### Release Summary" >> $GITHUB_STEP_SUMMARY
-          echo "- **Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
-          echo "- **npm:** [@supernovae-st/nika-client@$VERSION](https://www.npmjs.com/package/@supernovae-st/nika-client)" >> $GITHUB_STEP_SUMMARY
-          echo "- **Dry run:** $DRY_RUN" >> $GITHUB_STEP_SUMMARY
+          echo "### Nika client release candidate" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Version: $VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Result: built, tested, checksummed, packed, and inspected" >> "$GITHUB_STEP_SUMMARY"
+          echo "- npm staging: skipped by dry run" >> "$GITHUB_STEP_SUMMARY"
+
+  stage:
+    if: github.event.inputs.dry_run != 'true'
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: npm-staging
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      VERSION: ${{ github.event.inputs.version }}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nika-client-release-${{ env.VERSION }}
+          path: release-candidate
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Pin trusted-publishing npm CLI
+        run: npm install --global npm@11.5.1
+
+      - name: Stage payloads, then SDK through OIDC
+        run: |
+          set -euo pipefail
+          payloads=(
+            "release-candidate/release-tarballs/supernovae-st-nika-darwin-arm64-$VERSION.tgz"
+            "release-candidate/release-tarballs/supernovae-st-nika-darwin-x64-$VERSION.tgz"
+            "release-candidate/release-tarballs/supernovae-st-nika-linux-arm64-gnu-$VERSION.tgz"
+            "release-candidate/release-tarballs/supernovae-st-nika-linux-x64-gnu-$VERSION.tgz"
+          )
+          for tarball in "${payloads[@]}"; do
+            npm stage publish "$tarball" --access public
+          done
+          npm stage publish \
+            "release-candidate/release-tarballs/supernovae-st-nika-client-$VERSION.tgz" \
+            --access public
+
+      - name: Approval summary
+        run: |
+          echo "### Nika client release staged" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Version: $VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Order: four native payloads, then root SDK" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Authentication: npm trusted publishing (OIDC), no write token" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Next gate: inspect and approve all five staged packages with human 2FA" >> "$GITHUB_STEP_SUMMARY"

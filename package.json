@@ -36,6 +36,9 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "nika": "./dist/bin/nika.js"
+  },
   "files": [
     "dist",
     "LICENSE"
@@ -46,7 +49,15 @@
     "test:watch": "vitest",
     "check:coverage": "node scripts/check-sdk-coverage.js",
     "generate:types": "node scripts/generate-types.js",
+    "sync:native-versions": "node scripts/sync-native-versions.mjs",
+    "prepack": "npm run build",
     "prepublishOnly": "npm run build"
+  },
+  "optionalDependencies": {
+    "@supernovae-st/nika-darwin-arm64": "0.114.0",
+    "@supernovae-st/nika-darwin-x64": "0.114.0",
+    "@supernovae-st/nika-linux-arm64-gnu": "0.114.0",
+    "@supernovae-st/nika-linux-x64-gnu": "0.114.0"
   },
   "devDependencies": {
     "@types/node": "^26.1.1",
@@ -56,7 +67,7 @@
     "vitest": "^4.1"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "license": "Apache-2.0",
   "mcpName": "io.github.supernovae-st/nika"

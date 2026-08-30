@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 66/100 · business operations · request-guard
+# Actor: request coordinator for business operations
+# Trigger: request-guard request enters the business operations queue
+# Authority: tools only: nika:date; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: measured duration is positive and uses fixed ISO timestamps for uc-066-operations-request-guard
+# Business outcome: calculate an operational service window without ambient time for business operations
+
+nika: uc-066-operations-request-guard
+
+model: mock/echo
+
+const:
+  case: "uc-066-operations-request-guard"
+  start: "2026-08-07T09:00:00Z"
+  end: "2026-08-08T17:00:00Z"
+permits:
+  tools: ["nika:date"]
+tasks:
+  duration:
+    invoke:
+      tool: "nika:date"
+      args:
+        op: diff
+        start: ${{ const.start }}
+        end: ${{ const.end }}
+        unit: hours
+outputs:
+  case: ${{ const.case }}
+  hours: ${{ tasks.duration.output }}

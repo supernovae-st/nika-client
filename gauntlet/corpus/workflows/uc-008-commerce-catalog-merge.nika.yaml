@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 8/100 · commerce operations · catalog-merge
+# Actor: catalog manager for commerce operations
+# Trigger: catalog-merge request enters the commerce operations queue
+# Authority: tools only: nika:jq; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: parallel branches reconcile into one object with both values for uc-008-commerce-catalog-merge
+# Business outcome: reconcile two independent operational observations for commerce operations
+
+nika: uc-008-commerce-catalog-merge
+
+model: mock/echo
+
+const:
+  left: {"source":"primary","value":8}
+  right: {"source":"secondary","value":9}
+permits:
+  tools: ["nika:jq"]
+tasks:
+  primary:
+    invoke:
+      tool: "nika:jq"
+      args: { input: "${{ const.left }}", expression: "." }
+  secondary:
+    invoke:
+      tool: "nika:jq"
+      args: { input: "${{ const.right }}", expression: "." }
+  reconcile:
+    with:
+      primary: ${{ tasks.primary.output }}
+      secondary: ${{ tasks.secondary.output }}
+    invoke:
+      tool: "nika:jq"
+      args:
+        input:
+          primary: ${{ with.primary }}
+          secondary: ${{ with.secondary }}
+        expression: '{primary: .primary.value, secondary: .secondary.value, delta: (.secondary.value - .primary.value)}'
+outputs:
+  reconciliation: ${{ tasks.reconcile.output }}

@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 23/100 · legal operations · fallback-merge
+# Actor: policy owner for legal operations
+# Trigger: fallback-merge request enters the legal operations queue
+# Authority: tools only: nika:json_diff; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: revision patch is non-empty and points at the changed value for uc-023-legal-fallback-merge
+# Business outcome: explain exactly what changed between two business revisions for legal operations
+
+nika: uc-023-legal-fallback-merge
+
+model: mock/echo
+
+const:
+  before: {"id":"uc-023-legal-fallback-merge","value":23,"state":"draft"}
+  after: {"id":"uc-023-legal-fallback-merge","value":24,"state":"approved"}
+permits:
+  tools: ["nika:json_diff"]
+tasks:
+  diff:
+    invoke:
+      tool: "nika:json_diff"
+      args:
+        before: ${{ const.before }}
+        after: ${{ const.after }}
+outputs:
+  patch: ${{ tasks.diff.output }}

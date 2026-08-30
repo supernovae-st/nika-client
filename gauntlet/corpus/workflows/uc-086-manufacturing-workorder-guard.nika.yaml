@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 86/100 · manufacturing · workorder-guard
+# Actor: production planner for manufacturing
+# Trigger: workorder-guard request enters the manufacturing queue
+# Authority: tools only: nika:date; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: measured duration is positive and uses fixed ISO timestamps for uc-086-manufacturing-workorder-guard
+# Business outcome: calculate an operational service window without ambient time for manufacturing
+
+nika: uc-086-manufacturing-workorder-guard
+
+model: mock/echo
+
+const:
+  case: "uc-086-manufacturing-workorder-guard"
+  start: "2026-08-07T09:00:00Z"
+  end: "2026-08-08T17:00:00Z"
+permits:
+  tools: ["nika:date"]
+tasks:
+  duration:
+    invoke:
+      tool: "nika:date"
+      args:
+        op: diff
+        start: ${{ const.start }}
+        end: ${{ const.end }}
+        unit: hours
+outputs:
+  case: ${{ const.case }}
+  hours: ${{ tasks.duration.output }}

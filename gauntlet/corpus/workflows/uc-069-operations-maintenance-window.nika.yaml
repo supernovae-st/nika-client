@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 69/100 · business operations · maintenance-window
+# Actor: maintenance planner for business operations
+# Trigger: maintenance-window request enters the business operations queue
+# Authority: tools only: nika:jq, nika:log; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: threshold result is true and the admitted branch emits one log for uc-069-operations-maintenance-window
+# Business outcome: open an action only when a deterministic threshold is met for business operations
+
+nika: uc-069-operations-maintenance-window
+
+model: mock/echo
+
+const:
+  case: "uc-069-operations-maintenance-window"
+  observation: {"metric":89,"threshold":69}
+permits:
+  tools: ["nika:jq", "nika:log"]
+tasks:
+  decide:
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ const.observation }}
+        expression: '.metric >= .threshold'
+  admitted:
+    with:
+      decision: ${{ tasks.decide.output }}
+    when: ${{ with.decision == true }}
+    invoke:
+      tool: "nika:log"
+      args:
+        level: info
+        message: "threshold admitted uc-069-operations-maintenance-window"
+outputs:
+  case: ${{ const.case }}
+  admitted: ${{ tasks.decide.output }}

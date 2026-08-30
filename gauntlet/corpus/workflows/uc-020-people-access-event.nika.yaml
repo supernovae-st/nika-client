@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 20/100 · people operations · access-event
+# Actor: identity administrator for people operations
+# Trigger: access-event request enters the people operations queue
+# Authority: tools only: nika:emit; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: one typed machine event carries the case identity and accepted state for uc-020-people-access-event
+# Business outcome: publish a typed completion receipt for subscribers for people operations
+
+nika: uc-020-people-access-event
+
+model: mock/echo
+
+const:
+  receipt: {"case":"uc-020-people-access-event","domain":"people","state":"accepted"}
+permits:
+  tools: ["nika:emit"]
+tasks:
+  publish:
+    invoke:
+      tool: "nika:emit"
+      args:
+        event_type: "gauntlet.people.access-event"
+        payload: ${{ const.receipt }}
+outputs:
+  receipt: ${{ const.receipt }}

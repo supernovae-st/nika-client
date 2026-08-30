@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 9/100 · commerce operations · stockout-window
+# Actor: store operator for commerce operations
+# Trigger: stockout-window request enters the commerce operations queue
+# Authority: tools only: nika:jq, nika:log; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: threshold result is true and the admitted branch emits one log for uc-009-commerce-stockout-window
+# Business outcome: open an action only when a deterministic threshold is met for commerce operations
+
+nika: uc-009-commerce-stockout-window
+
+model: mock/echo
+
+const:
+  case: "uc-009-commerce-stockout-window"
+  observation: {"metric":29,"threshold":9}
+permits:
+  tools: ["nika:jq", "nika:log"]
+tasks:
+  decide:
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ const.observation }}
+        expression: '.metric >= .threshold'
+  admitted:
+    with:
+      decision: ${{ tasks.decide.output }}
+    when: ${{ with.decision == true }}
+    invoke:
+      tool: "nika:log"
+      args:
+        level: info
+        message: "threshold admitted uc-009-commerce-stockout-window"
+outputs:
+  case: ${{ const.case }}
+  admitted: ${{ tasks.decide.output }}

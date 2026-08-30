@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 56/100 · software engineering · issue-guard
+# Actor: triage engineer for software engineering
+# Trigger: issue-guard request enters the software engineering queue
+# Authority: tools only: nika:date; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: measured duration is positive and uses fixed ISO timestamps for uc-056-engineering-issue-guard
+# Business outcome: calculate an operational service window without ambient time for software engineering
+
+nika: uc-056-engineering-issue-guard
+
+model: mock/echo
+
+const:
+  case: "uc-056-engineering-issue-guard"
+  start: "2026-08-17T09:00:00Z"
+  end: "2026-08-18T17:00:00Z"
+permits:
+  tools: ["nika:date"]
+tasks:
+  duration:
+    invoke:
+      tool: "nika:date"
+      args:
+        op: diff
+        start: ${{ const.start }}
+        end: ${{ const.end }}
+        unit: hours
+outputs:
+  case: ${{ const.case }}
+  hours: ${{ tasks.duration.output }}

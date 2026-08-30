@@ -1,0 +1,611 @@
+{
+  "schema_version": 1,
+  "engine": "nika 0.115.0 (274f8e9cf)",
+  "workflows": 100,
+  "domains": 20,
+  "recipes": 10,
+  "distinct_output_hashes": 100,
+  "result": "pass",
+  "rows": [
+    {
+      "id": "uc-001-customer-support-sla-breach-triage",
+      "domain": "customer-support",
+      "recipe": "project-record",
+      "output_sha256": "3d63025a198ccc83e785f0f33be3099e7936e0b09863a861f5b08bf0e04048bc"
+    },
+    {
+      "id": "uc-002-customer-support-duplicate-ticket-diff",
+      "domain": "customer-support",
+      "recipe": "validate-contract",
+      "output_sha256": "ff06d8b8c2f27d8f36e876a06f586165c50bdeb9641b571fcf7b81312214561f"
+    },
+    {
+      "id": "uc-003-customer-support-escalation-readiness",
+      "domain": "customer-support",
+      "recipe": "diff-revisions",
+      "output_sha256": "509ea620f88a4f8d2078ba8c80a623e559c3e115ef0bc2eb40bc755042f2c6d3"
+    },
+    {
+      "id": "uc-004-customer-support-queue-batch-enrichment",
+      "domain": "customer-support",
+      "recipe": "merge-policy",
+      "output_sha256": "68c13608af766151d973d97bc3403076f48a6ccfeb766125c13dc4148f9a08f7"
+    },
+    {
+      "id": "uc-005-customer-support-resolution-receipt",
+      "domain": "customer-support",
+      "recipe": "hash-evidence",
+      "output_sha256": "4ed8de9c1f0fdc6bb7b2b60a4da46121a3f164777f1195612e593ec334fdef82"
+    },
+    {
+      "id": "uc-006-commerce-refund-policy-validation",
+      "domain": "commerce",
+      "recipe": "measure-window",
+      "output_sha256": "214ecaab3b6f26a4cba2300fbd8f1b2ff60651d60c12afdf75a10b2db36630fc"
+    },
+    {
+      "id": "uc-007-commerce-inventory-delta",
+      "domain": "commerce",
+      "recipe": "batch-enrich",
+      "output_sha256": "63187b39c872362ba8f5bab0178f7485ee513715a9b57ce7a1fde590abf57306"
+    },
+    {
+      "id": "uc-008-commerce-catalog-merge",
+      "domain": "commerce",
+      "recipe": "parallel-reconcile",
+      "output_sha256": "e22e8b8ad4497d7b6af23bfdbf21f23771bcc71998ea30c7719722f73642e3dd"
+    },
+    {
+      "id": "uc-009-commerce-stockout-window",
+      "domain": "commerce",
+      "recipe": "threshold-gate",
+      "output_sha256": "2e748dae4940a8b06b271c16026c580700fff576096b9061f69ca6898a604413"
+    },
+    {
+      "id": "uc-010-commerce-price-change-event",
+      "domain": "commerce",
+      "recipe": "emit-receipt",
+      "output_sha256": "7c048e78a0c4bf33e156b40425a26cd174c32e25818ade2b05be0692f9c84e39"
+    },
+    {
+      "id": "uc-011-finance-invoice-schema-guard",
+      "domain": "finance",
+      "recipe": "project-record",
+      "output_sha256": "7cdd4056f8f722bba74f81ea0ea3af5ee0a68320cc734a29b1ee9b8a21d55aa6"
+    },
+    {
+      "id": "uc-012-finance-payment-reconciliation",
+      "domain": "finance",
+      "recipe": "validate-contract",
+      "output_sha256": "fd72354134c8a3cf69268ce65cb39aa5f703f6b1a5c9de2dff1cc7c45c544e56"
+    },
+    {
+      "id": "uc-013-finance-expense-policy-merge",
+      "domain": "finance",
+      "recipe": "diff-revisions",
+      "output_sha256": "e4de16417d76d9d600d080cfbbc339bcbb726c025f0b7a4229f212ace5150a58"
+    },
+    {
+      "id": "uc-014-finance-cashflow-window",
+      "domain": "finance",
+      "recipe": "merge-policy",
+      "output_sha256": "95fe9b129143ee68642f04f833d0e43f0a55d7f9c45a24e392ae9d8a64f766a3"
+    },
+    {
+      "id": "uc-015-finance-close-receipt",
+      "domain": "finance",
+      "recipe": "hash-evidence",
+      "output_sha256": "eafbb7a77383c986f1a0d4cf57bf581b24ab2062ccc467698372e442a60be04b"
+    },
+    {
+      "id": "uc-016-people-candidate-intake",
+      "domain": "people",
+      "recipe": "measure-window",
+      "output_sha256": "339513cce3c80b18daecfea853b751b5e8a8c9e223c0acbd52622780484c54a4"
+    },
+    {
+      "id": "uc-017-people-offer-diff",
+      "domain": "people",
+      "recipe": "batch-enrich",
+      "output_sha256": "ee172820e43bcfc3df48be137580f98031942bd23985f2773171404e4e07a7da"
+    },
+    {
+      "id": "uc-018-people-onboarding-merge",
+      "domain": "people",
+      "recipe": "parallel-reconcile",
+      "output_sha256": "278849cf7ad3baa303054bbe215a9aa2a80162aaebb3b347c9835430eafa942c"
+    },
+    {
+      "id": "uc-019-people-probation-window",
+      "domain": "people",
+      "recipe": "threshold-gate",
+      "output_sha256": "2fd59422942f9be3253a8787d22eb0e7a58b522ca80241b50acc9b572c1b21ff"
+    },
+    {
+      "id": "uc-020-people-access-event",
+      "domain": "people",
+      "recipe": "emit-receipt",
+      "output_sha256": "427d8a4f55d832048c40d6a80537a2a2b591540e5215ebe56f61e6ae6dd310c8"
+    },
+    {
+      "id": "uc-021-legal-clause-schema-guard",
+      "domain": "legal",
+      "recipe": "project-record",
+      "output_sha256": "7c1c18c0d548ae69d6095103aeae9f5167a6938554ad15105a6a1e7a49c0c617"
+    },
+    {
+      "id": "uc-022-legal-redline-diff",
+      "domain": "legal",
+      "recipe": "validate-contract",
+      "output_sha256": "0ac890063d64645efe007e9c4fe367c62f6086bb6ceba12f4670f6144f876cef"
+    },
+    {
+      "id": "uc-023-legal-fallback-merge",
+      "domain": "legal",
+      "recipe": "diff-revisions",
+      "output_sha256": "f895c972ddd4c35884536ab8ef992b8f5855fdba469c64030683058278b0c0e7"
+    },
+    {
+      "id": "uc-024-legal-renewal-window",
+      "domain": "legal",
+      "recipe": "merge-policy",
+      "output_sha256": "9aa11e2aa6a58d757a4591d1ec1626067075579aa3bb7fbfe8f9c905ec2b8654"
+    },
+    {
+      "id": "uc-025-legal-signature-event",
+      "domain": "legal",
+      "recipe": "hash-evidence",
+      "output_sha256": "50ec61b252b69830b110d67f4212663d61b30920900fa8743c702b84390e05c3"
+    },
+    {
+      "id": "uc-026-clinic-admin-referral-guard",
+      "domain": "clinic-admin",
+      "recipe": "measure-window",
+      "output_sha256": "916731c0d0c238a67256dd365e4b411a445f91b9fe6ac861ca5123ce04873d61"
+    },
+    {
+      "id": "uc-027-clinic-admin-appointment-diff",
+      "domain": "clinic-admin",
+      "recipe": "batch-enrich",
+      "output_sha256": "2dfd2061411ecc6e958caa506b4dad4f8ea480bb6dbb0a39062564189ad87a1a"
+    },
+    {
+      "id": "uc-028-clinic-admin-care-instructions-merge",
+      "domain": "clinic-admin",
+      "recipe": "parallel-reconcile",
+      "output_sha256": "e6f753b67cf00543f8a04f8a39ddd891061ceb7b5a0e879ab026c8e20d46690d"
+    },
+    {
+      "id": "uc-029-clinic-admin-followup-window",
+      "domain": "clinic-admin",
+      "recipe": "threshold-gate",
+      "output_sha256": "0849cc8ff98aafc40b00cf36438ade716f4e541851394ccb7981f011dc73db4d"
+    },
+    {
+      "id": "uc-030-clinic-admin-handoff-event",
+      "domain": "clinic-admin",
+      "recipe": "emit-receipt",
+      "output_sha256": "6ef01300a443ce06f921ccfe73d10e04b656d81eea61b2dddb839ea2587a95d6"
+    },
+    {
+      "id": "uc-031-education-enrollment-guard",
+      "domain": "education",
+      "recipe": "project-record",
+      "output_sha256": "697b790287ffd5738a362cfaf5d09e66f3d9bb29a32c87b8a0038d040ca22ab8"
+    },
+    {
+      "id": "uc-032-education-rubric-diff",
+      "domain": "education",
+      "recipe": "validate-contract",
+      "output_sha256": "4d51ad0b6300c67624195d0a948270621fb51a7c5c0b1f956bc23c1209d97277"
+    },
+    {
+      "id": "uc-033-education-learning-plan-merge",
+      "domain": "education",
+      "recipe": "diff-revisions",
+      "output_sha256": "630e7679e47be846912b630cd782486b28765b507053794fd19ed96be48c0082"
+    },
+    {
+      "id": "uc-034-education-assignment-window",
+      "domain": "education",
+      "recipe": "merge-policy",
+      "output_sha256": "17359c2ff9c388aaa114bdac469f33b1d1a32a74ea210897e80e173ce900a553"
+    },
+    {
+      "id": "uc-035-education-completion-event",
+      "domain": "education",
+      "recipe": "hash-evidence",
+      "output_sha256": "7340c87f298dfd8a3a5850bf512f959ab784f2b5bcd3b79f63dfb3bf0ca6fdb4"
+    },
+    {
+      "id": "uc-036-logistics-shipment-guard",
+      "domain": "logistics",
+      "recipe": "measure-window",
+      "output_sha256": "2da694ca846d3bbc67080c86a7b9f4c2793976e79c9c0c1436988bd888da7182"
+    },
+    {
+      "id": "uc-037-logistics-route-diff",
+      "domain": "logistics",
+      "recipe": "batch-enrich",
+      "output_sha256": "c233fc2d917e882278bab17bce09bd2bb14dbf80bf92ea0688dd96d37df81d8f"
+    },
+    {
+      "id": "uc-038-logistics-exception-merge",
+      "domain": "logistics",
+      "recipe": "parallel-reconcile",
+      "output_sha256": "6d67eafc0a604aba7af532847a5ff6736f8545bb12f1f9d6945c2d3e57f459e0"
+    },
+    {
+      "id": "uc-039-logistics-delivery-window",
+      "domain": "logistics",
+      "recipe": "threshold-gate",
+      "output_sha256": "aee689d6a4949a16cefa512535b4712c3c908d99d37fd93562b65d0dca91e163"
+    },
+    {
+      "id": "uc-040-logistics-proof-event",
+      "domain": "logistics",
+      "recipe": "emit-receipt",
+      "output_sha256": "a5dc3edfcba146ba7508880f452790c537aa030a28d06d89f67a9340bd356535"
+    },
+    {
+      "id": "uc-041-real-estate-lead-guard",
+      "domain": "real-estate",
+      "recipe": "project-record",
+      "output_sha256": "05cf7e06f6904f05c88582c3862bc477b2479bdb6683b626fea5addc06be824f"
+    },
+    {
+      "id": "uc-042-real-estate-lease-diff",
+      "domain": "real-estate",
+      "recipe": "validate-contract",
+      "output_sha256": "eb5ea29889d918338c0f5ae4293bdd1cc171e1e82e33d161d3a54c353466bfa0"
+    },
+    {
+      "id": "uc-043-real-estate-listing-merge",
+      "domain": "real-estate",
+      "recipe": "diff-revisions",
+      "output_sha256": "7868150cfa81974c3894f2a3a738a9bd384b4ec086f907bd89cfd35276300a50"
+    },
+    {
+      "id": "uc-044-real-estate-inspection-window",
+      "domain": "real-estate",
+      "recipe": "merge-policy",
+      "output_sha256": "a938ac5c96d2736d07d5155ba0e378449998bcfa3c08ab5c91a0bf5d08054414"
+    },
+    {
+      "id": "uc-045-real-estate-handover-event",
+      "domain": "real-estate",
+      "recipe": "hash-evidence",
+      "output_sha256": "7284a9c19114440d7e394a72a04b1da81f0ebe64b78b54d8ede52fecd3f94bbb"
+    },
+    {
+      "id": "uc-046-travel-booking-guard",
+      "domain": "travel",
+      "recipe": "measure-window",
+      "output_sha256": "3792577f97ea45593428847a4b8d0413bfd5d693203004f615c8ed1fa377a448"
+    },
+    {
+      "id": "uc-047-travel-itinerary-diff",
+      "domain": "travel",
+      "recipe": "batch-enrich",
+      "output_sha256": "7b7b0dc414e37061d92a717dc4df017e36e9596f2ee4871fcafbcbd4f2c7979c"
+    },
+    {
+      "id": "uc-048-travel-disruption-merge",
+      "domain": "travel",
+      "recipe": "parallel-reconcile",
+      "output_sha256": "1d390d24f22dadb58950597264b8b7572ed01dfe1fcbbcd8b7b2f8f16d986eaf"
+    },
+    {
+      "id": "uc-049-travel-checkin-window",
+      "domain": "travel",
+      "recipe": "threshold-gate",
+      "output_sha256": "e85d41425db6bdd70bea89a0fdc6d7ffe1fbd51b721b9c8e6c67205ee533def5"
+    },
+    {
+      "id": "uc-050-travel-voucher-event",
+      "domain": "travel",
+      "recipe": "emit-receipt",
+      "output_sha256": "0da589a78ae1288436eb429857e82eae7250e5d5cd4e4bc4ef8f1d5797fea80e"
+    },
+    {
+      "id": "uc-051-marketing-brief-guard",
+      "domain": "marketing",
+      "recipe": "project-record",
+      "output_sha256": "05509a5df0dc9e3c6bab847209041f511e69ff04ab05962406b07932145e9e0b"
+    },
+    {
+      "id": "uc-052-marketing-campaign-diff",
+      "domain": "marketing",
+      "recipe": "validate-contract",
+      "output_sha256": "5f1ef111e0d2a35269d81be35b8a0399670b639a63fa07f4c231f7b441e0bd44"
+    },
+    {
+      "id": "uc-053-marketing-audience-merge",
+      "domain": "marketing",
+      "recipe": "diff-revisions",
+      "output_sha256": "4bba2e911e05158f69e3c8085cf415958fb96938934936022e1a0df6945f3ae4"
+    },
+    {
+      "id": "uc-054-marketing-launch-window",
+      "domain": "marketing",
+      "recipe": "merge-policy",
+      "output_sha256": "1e1269d91adae55337a93d56bb9babd96cc2320297c35ced3c9073873459fcfa"
+    },
+    {
+      "id": "uc-055-marketing-attribution-event",
+      "domain": "marketing",
+      "recipe": "hash-evidence",
+      "output_sha256": "15620eb0467de6050727072b9280c625a20b6c6417075b09bab868b4dc2477dd"
+    },
+    {
+      "id": "uc-056-engineering-issue-guard",
+      "domain": "engineering",
+      "recipe": "measure-window",
+      "output_sha256": "efa5c00c74180dce1dc52dd662965a24ef6978464c6e2c94917b25e3985a7c10"
+    },
+    {
+      "id": "uc-057-engineering-config-diff",
+      "domain": "engineering",
+      "recipe": "batch-enrich",
+      "output_sha256": "c9653dac52c2d9b289135d97b91dbd625c0a5072ab199758b20c77065ee4e38d"
+    },
+    {
+      "id": "uc-058-engineering-release-merge",
+      "domain": "engineering",
+      "recipe": "parallel-reconcile",
+      "output_sha256": "99ec22bc45a01de4bcdb9ed806b7409777b9cb8a7a33aff1f894eef6a6b7c84d"
+    },
+    {
+      "id": "uc-059-engineering-incident-window",
+      "domain": "engineering",
+      "recipe": "threshold-gate",
+      "output_sha256": "9b6af2a71d27e9ff4e64549c642c3f0a17fb6a3da6f23e5ad1e7134b09ee82cf"
+    },
+    {
+      "id": "uc-060-engineering-deployment-event",
+      "domain": "engineering",
+      "recipe": "emit-receipt",
+      "output_sha256": "a78eb14ff1bbc68c4b01cca35ed3ff6b5cc433b6636127aca339b0c87dd3e0f3"
+    },
+    {
+      "id": "uc-061-security-alert-guard",
+      "domain": "security",
+      "recipe": "project-record",
+      "output_sha256": "5e31e34ffbbf12a25bc6d6b19d51de6cb17273d4c2a5878ae4b5ba9e35e32041"
+    },
+    {
+      "id": "uc-062-security-policy-diff",
+      "domain": "security",
+      "recipe": "validate-contract",
+      "output_sha256": "4d511d716ff0d34222e804c77423245fa31ac3d04a50cc2fdf18534588fa9e40"
+    },
+    {
+      "id": "uc-063-security-exception-merge",
+      "domain": "security",
+      "recipe": "diff-revisions",
+      "output_sha256": "4a6f46565f7329ceb80695de03b4d00411bf6f92035be4e6b8b2642c16f04f9c"
+    },
+    {
+      "id": "uc-064-security-remediation-window",
+      "domain": "security",
+      "recipe": "merge-policy",
+      "output_sha256": "9ef4f5b761e061e423c73af37217077c0c6d99b634009ead241939ec6e5c1890"
+    },
+    {
+      "id": "uc-065-security-audit-event",
+      "domain": "security",
+      "recipe": "hash-evidence",
+      "output_sha256": "02e79cb62c3de4dd9d39465b6ba149568c136032ced05eb9f06e2bbe6a271063"
+    },
+    {
+      "id": "uc-066-operations-request-guard",
+      "domain": "operations",
+      "recipe": "measure-window",
+      "output_sha256": "543b9d5e46bbbc4d1a664cef9c8466cb9c3d3fe05d066b5941eda0f72362d666"
+    },
+    {
+      "id": "uc-067-operations-roster-diff",
+      "domain": "operations",
+      "recipe": "batch-enrich",
+      "output_sha256": "665c8e31171291c3a14032ca23674e7731a25551c67cacab5d0d781e2780d557"
+    },
+    {
+      "id": "uc-068-operations-runbook-merge",
+      "domain": "operations",
+      "recipe": "parallel-reconcile",
+      "output_sha256": "138dab900003826e6d19a25b870f56fc784de16bbcd93d027855aef8385dd5d8"
+    },
+    {
+      "id": "uc-069-operations-maintenance-window",
+      "domain": "operations",
+      "recipe": "threshold-gate",
+      "output_sha256": "2aad69f9b4e9dc9e163852c13d02eb698a0abee8cf81e34023ca514ea9f546d3"
+    },
+    {
+      "id": "uc-070-operations-completion-event",
+      "domain": "operations",
+      "recipe": "emit-receipt",
+      "output_sha256": "fd4c7fa1c12a633e8ccad7b86dcebac9926c02c429faf2fdbbe4e383fa1e3093"
+    },
+    {
+      "id": "uc-071-media-asset-guard",
+      "domain": "media",
+      "recipe": "project-record",
+      "output_sha256": "3d068969ca1cd1a1b15358da985723592110de5fc7e512baa11862526ba6869c"
+    },
+    {
+      "id": "uc-072-media-transcript-diff",
+      "domain": "media",
+      "recipe": "validate-contract",
+      "output_sha256": "a3f11ce26baf4d74e339c9b4012fbe2c8a79401d9bc7a7687b19e49eb6de65dc"
+    },
+    {
+      "id": "uc-073-media-metadata-merge",
+      "domain": "media",
+      "recipe": "diff-revisions",
+      "output_sha256": "0cc507283ee1f007e0082a9bf710061ca589a7c1cc9749de9a59fcddf977da68"
+    },
+    {
+      "id": "uc-074-media-publish-window",
+      "domain": "media",
+      "recipe": "merge-policy",
+      "output_sha256": "5c0c63d0829191858a08fdd03d8c843af084211104ae888fb0556c0b7443500e"
+    },
+    {
+      "id": "uc-075-media-rights-event",
+      "domain": "media",
+      "recipe": "hash-evidence",
+      "output_sha256": "2ab949a6bcef50de41efdea99da8ad3656c3e5f19d84e43ec56872430f6ce72a"
+    },
+    {
+      "id": "uc-076-nonprofit-donor-guard",
+      "domain": "nonprofit",
+      "recipe": "measure-window",
+      "output_sha256": "1f1adebdf176276c6a9db58ddd3bc0391694947ffb848c9daf9fdfb92a554f0d"
+    },
+    {
+      "id": "uc-077-nonprofit-pledge-diff",
+      "domain": "nonprofit",
+      "recipe": "batch-enrich",
+      "output_sha256": "f6e6d7a5b301708c555a87ee857a372491c337478856845856681e3c132b2c01"
+    },
+    {
+      "id": "uc-078-nonprofit-grant-merge",
+      "domain": "nonprofit",
+      "recipe": "parallel-reconcile",
+      "output_sha256": "4d00b33ec4d1da7f5fc3961bea20d778c7c63a661877d7f4ad9e18681064e52c"
+    },
+    {
+      "id": "uc-079-nonprofit-campaign-window",
+      "domain": "nonprofit",
+      "recipe": "threshold-gate",
+      "output_sha256": "a55bef60e9a52f27fa9970ff32591c6558b9a4adaf37884b6c94a7d2ba665d96"
+    },
+    {
+      "id": "uc-080-nonprofit-impact-event",
+      "domain": "nonprofit",
+      "recipe": "emit-receipt",
+      "output_sha256": "a861c1b511dacfdcb050c404f2537518141c6fb368c90ca4d6a398d23406e19b"
+    },
+    {
+      "id": "uc-081-hospitality-reservation-guard",
+      "domain": "hospitality",
+      "recipe": "project-record",
+      "output_sha256": "a7473a03889eceaf1367bba4d0ccbd61ad1aa954c7331077b9aabb4c45c3e7ad"
+    },
+    {
+      "id": "uc-082-hospitality-room-diff",
+      "domain": "hospitality",
+      "recipe": "validate-contract",
+      "output_sha256": "3b822833b1b0e284430e73cad580d29e0cd48005efa9c4012fd3d6c40fcbf781"
+    },
+    {
+      "id": "uc-083-hospitality-service-merge",
+      "domain": "hospitality",
+      "recipe": "diff-revisions",
+      "output_sha256": "166105748feb128e83194bdcc83eb2ee5206d61978f2dbade453993a558f2e28"
+    },
+    {
+      "id": "uc-084-hospitality-checkout-window",
+      "domain": "hospitality",
+      "recipe": "merge-policy",
+      "output_sha256": "42e9bd6b6b2a95312ab01d04c88d81c0988d4c8c9e682af9d0ed7fd155fe4786"
+    },
+    {
+      "id": "uc-085-hospitality-stay-event",
+      "domain": "hospitality",
+      "recipe": "hash-evidence",
+      "output_sha256": "d4c9f2b28921d4660f492da9aab265a0842f4adf9f0ed64a05de949628e0d300"
+    },
+    {
+      "id": "uc-086-manufacturing-workorder-guard",
+      "domain": "manufacturing",
+      "recipe": "measure-window",
+      "output_sha256": "d2c7fe2a9f6e81e2f9097f68622c98b83878f0d1ad4efa5f831711d08ea6f7de"
+    },
+    {
+      "id": "uc-087-manufacturing-bom-diff",
+      "domain": "manufacturing",
+      "recipe": "batch-enrich",
+      "output_sha256": "5e1b06945af9117908b3f74195333daf3fb7a884d0be18d079c598a0ce391135"
+    },
+    {
+      "id": "uc-088-manufacturing-quality-merge",
+      "domain": "manufacturing",
+      "recipe": "parallel-reconcile",
+      "output_sha256": "9dd9efaf571c5862b3924ae98352e6c1bcd08f7e93923b10e634e21e35746445"
+    },
+    {
+      "id": "uc-089-manufacturing-maintenance-window",
+      "domain": "manufacturing",
+      "recipe": "threshold-gate",
+      "output_sha256": "b005186fe5c7a65bb4d75c0c8c9a91f63293129d6a05cf45b8e17e1d39f0798f"
+    },
+    {
+      "id": "uc-090-manufacturing-batch-event",
+      "domain": "manufacturing",
+      "recipe": "emit-receipt",
+      "output_sha256": "f04b29acb33d379b9c9b52ca4f1c92a01bc7ca7eefe88163a98ace980e3105b6"
+    },
+    {
+      "id": "uc-091-research-protocol-guard",
+      "domain": "research",
+      "recipe": "project-record",
+      "output_sha256": "21beb67fa8e7631e5899608c19e96aea4a069de6f6690e35e9a0ab0b734bf53c"
+    },
+    {
+      "id": "uc-092-research-evidence-diff",
+      "domain": "research",
+      "recipe": "validate-contract",
+      "output_sha256": "be0b7d04db21e34455fc1ec246d98c5d6ee9c70d7e41dda43e69e1d543a238ad"
+    },
+    {
+      "id": "uc-093-research-dataset-merge",
+      "domain": "research",
+      "recipe": "diff-revisions",
+      "output_sha256": "9fc217319ea9034cb644dda99901bb7fd24b29e5dc0509d1139882be5b3d8020"
+    },
+    {
+      "id": "uc-094-research-review-window",
+      "domain": "research",
+      "recipe": "merge-policy",
+      "output_sha256": "a851d501e7f2fee328e28d46acb0fe22da7b5aea62b96060ab78d652a687bc2b"
+    },
+    {
+      "id": "uc-095-research-provenance-event",
+      "domain": "research",
+      "recipe": "hash-evidence",
+      "output_sha256": "a99bbcfa1a1fb74daed07430648837e2440f66012c478ff7aa46d2e586ac613c"
+    },
+    {
+      "id": "uc-096-creator-sponsorship-guard",
+      "domain": "creator",
+      "recipe": "measure-window",
+      "output_sha256": "48e655023f3143a755fd3b1314798c1c06008dfab3755e886d93e987e67b4575"
+    },
+    {
+      "id": "uc-097-creator-draft-diff",
+      "domain": "creator",
+      "recipe": "batch-enrich",
+      "output_sha256": "e287b6a95c1ba1c48f3596ed443eaa5da3ef6956c850da3898c03fa490bee56f"
+    },
+    {
+      "id": "uc-098-creator-content-merge",
+      "domain": "creator",
+      "recipe": "parallel-reconcile",
+      "output_sha256": "93c77e58ab697410304eec6ad97900d95033780e33b428cac03c6e43e9db1ae1"
+    },
+    {
+      "id": "uc-099-creator-publish-window",
+      "domain": "creator",
+      "recipe": "threshold-gate",
+      "output_sha256": "7ec457659fe18ab4fdb253eea25798df3b801cf4418fd43565d47dc12ed2c291"
+    },
+    {
+      "id": "uc-100-creator-royalty-event",
+      "domain": "creator",
+      "recipe": "emit-receipt",
+      "output_sha256": "4bb2770d83713bdcb44f46591092127877e7fa929c21357d70151d89c435aaf6"
+    }
+  ]
+}

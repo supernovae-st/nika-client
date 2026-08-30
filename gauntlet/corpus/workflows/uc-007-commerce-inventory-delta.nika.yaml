@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 7/100 · commerce operations · inventory-delta
+# Actor: inventory planner for commerce operations
+# Trigger: inventory-delta request enters the commerce operations queue
+# Authority: tools only: nika:jq; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: all three batch items return in input order with checked=true for uc-007-commerce-inventory-delta
+# Business outcome: enrich a bounded batch while preserving source order for commerce operations
+
+nika: uc-007-commerce-inventory-delta
+
+model: mock/echo
+
+const:
+  items: [{"sequence":1,"case":"inventory-delta"},{"sequence":2,"case":"inventory-delta"},{"sequence":3,"case":"inventory-delta"}]
+permits:
+  tools: ["nika:jq"]
+tasks:
+  enrich:
+    for_each:
+      items: ${{ const.items }}
+      max_parallel: 2
+      fail_fast: true
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ item }}
+        expression: '. + {checked: true}'
+outputs:
+  rows: ${{ tasks.enrich.output }}

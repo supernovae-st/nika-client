@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 22/100 · legal operations · redline-diff
+# Actor: legal counsel for legal operations
+# Trigger: redline-diff request enters the legal operations queue
+# Authority: tools only: nika:validate; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: validation report is valid with zero errors for uc-022-legal-redline-diff
+# Business outcome: refuse malformed business input before downstream work for legal operations
+
+nika: uc-022-legal-redline-diff
+
+model: mock/echo
+
+const:
+  record: {"key":"uc-022-legal-redline-diff","amount":122,"status":"ready"}
+permits:
+  tools: ["nika:validate"]
+tasks:
+  validate:
+    invoke:
+      tool: "nika:validate"
+      args:
+        data: ${{ const.record }}
+        schema:
+          type: object
+          additionalProperties: false
+          required: [key, amount, status]
+          properties:
+            key: { type: string }
+            amount: { type: integer, minimum: 1 }
+            status: { type: string, enum: [ready] }
+outputs:
+  report: ${{ tasks.validate.output }}
+  record: ${{ const.record }}

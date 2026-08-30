@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 80/100 · nonprofit operations · impact-event
+# Actor: impact officer for nonprofit operations
+# Trigger: impact-event request enters the nonprofit operations queue
+# Authority: tools only: nika:emit; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: one typed machine event carries the case identity and accepted state for uc-080-nonprofit-impact-event
+# Business outcome: publish a typed completion receipt for subscribers for nonprofit operations
+
+nika: uc-080-nonprofit-impact-event
+
+model: mock/echo
+
+const:
+  receipt: {"case":"uc-080-nonprofit-impact-event","domain":"nonprofit","state":"accepted"}
+permits:
+  tools: ["nika:emit"]
+tasks:
+  publish:
+    invoke:
+      tool: "nika:emit"
+      args:
+        event_type: "gauntlet.nonprofit.impact-event"
+        payload: ${{ const.receipt }}
+outputs:
+  receipt: ${{ const.receipt }}

@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 81/100 · hospitality · reservation-guard
+# Actor: reservation agent for hospitality
+# Trigger: reservation-guard request enters the hospitality queue
+# Authority: tools only: nika:jq; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: projection carries the domain, actor, and accepted state for uc-081-hospitality-reservation-guard
+# Business outcome: produce a normalized decision card for hospitality
+
+nika: uc-081-hospitality-reservation-guard
+
+model: mock/echo
+
+const:
+  record: {"case":"reservation-guard","domain":"hospitality","actor":"reservation agent for hospitality","metric":101,"threshold":81,"state":"accepted"}
+permits:
+  tools: ["nika:jq"]
+tasks:
+  project:
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ const.record }}
+        expression: '{case, domain, actor, state}'
+outputs:
+  card: ${{ tasks.project.output }}

@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 93/100 · research operations · dataset-merge
+# Actor: data steward for research operations
+# Trigger: dataset-merge request enters the research operations queue
+# Authority: tools only: nika:json_diff; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: revision patch is non-empty and points at the changed value for uc-093-research-dataset-merge
+# Business outcome: explain exactly what changed between two business revisions for research operations
+
+nika: uc-093-research-dataset-merge
+
+model: mock/echo
+
+const:
+  before: {"id":"uc-093-research-dataset-merge","value":93,"state":"draft"}
+  after: {"id":"uc-093-research-dataset-merge","value":94,"state":"approved"}
+permits:
+  tools: ["nika:json_diff"]
+tasks:
+  diff:
+    invoke:
+      tool: "nika:json_diff"
+      args:
+        before: ${{ const.before }}
+        after: ${{ const.after }}
+outputs:
+  patch: ${{ tasks.diff.output }}

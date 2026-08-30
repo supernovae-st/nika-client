@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 10/100 · commerce operations · price-change-event
+# Actor: pricing controller for commerce operations
+# Trigger: price-change-event request enters the commerce operations queue
+# Authority: tools only: nika:emit; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: one typed machine event carries the case identity and accepted state for uc-010-commerce-price-change-event
+# Business outcome: publish a typed completion receipt for subscribers for commerce operations
+
+nika: uc-010-commerce-price-change-event
+
+model: mock/echo
+
+const:
+  receipt: {"case":"uc-010-commerce-price-change-event","domain":"commerce","state":"accepted"}
+permits:
+  tools: ["nika:emit"]
+tasks:
+  publish:
+    invoke:
+      tool: "nika:emit"
+      args:
+        event_type: "gauntlet.commerce.price-change-event"
+        payload: ${{ const.receipt }}
+outputs:
+  receipt: ${{ const.receipt }}

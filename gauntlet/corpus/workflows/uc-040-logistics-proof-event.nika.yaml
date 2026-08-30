@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 40/100 · logistics · proof-event
+# Actor: proof clerk for logistics
+# Trigger: proof-event request enters the logistics queue
+# Authority: tools only: nika:emit; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: one typed machine event carries the case identity and accepted state for uc-040-logistics-proof-event
+# Business outcome: publish a typed completion receipt for subscribers for logistics
+
+nika: uc-040-logistics-proof-event
+
+model: mock/echo
+
+const:
+  receipt: {"case":"uc-040-logistics-proof-event","domain":"logistics","state":"accepted"}
+permits:
+  tools: ["nika:emit"]
+tasks:
+  publish:
+    invoke:
+      tool: "nika:emit"
+      args:
+        event_type: "gauntlet.logistics.proof-event"
+        payload: ${{ const.receipt }}
+outputs:
+  receipt: ${{ const.receipt }}

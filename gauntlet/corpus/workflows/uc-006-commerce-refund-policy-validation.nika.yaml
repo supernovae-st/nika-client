@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 6/100 · commerce operations · refund-policy-validation
+# Actor: refund specialist for commerce operations
+# Trigger: refund-policy-validation request enters the commerce operations queue
+# Authority: tools only: nika:date; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: measured duration is positive and uses fixed ISO timestamps for uc-006-commerce-refund-policy-validation
+# Business outcome: calculate an operational service window without ambient time for commerce operations
+
+nika: uc-006-commerce-refund-policy-validation
+
+model: mock/echo
+
+const:
+  case: "uc-006-commerce-refund-policy-validation"
+  start: "2026-08-07T09:00:00Z"
+  end: "2026-08-08T17:00:00Z"
+permits:
+  tools: ["nika:date"]
+tasks:
+  duration:
+    invoke:
+      tool: "nika:date"
+      args:
+        op: diff
+        start: ${{ const.start }}
+        end: ${{ const.end }}
+        unit: hours
+outputs:
+  case: ${{ const.case }}
+  hours: ${{ tasks.duration.output }}

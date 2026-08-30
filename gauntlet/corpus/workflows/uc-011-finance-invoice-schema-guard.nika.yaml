@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 11/100 · finance operations · invoice-schema-guard
+# Actor: accounts payable clerk for finance operations
+# Trigger: invoice-schema-guard request enters the finance operations queue
+# Authority: tools only: nika:jq; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: projection carries the domain, actor, and accepted state for uc-011-finance-invoice-schema-guard
+# Business outcome: produce a normalized decision card for finance operations
+
+nika: uc-011-finance-invoice-schema-guard
+
+model: mock/echo
+
+const:
+  record: {"case":"invoice-schema-guard","domain":"finance","actor":"accounts payable clerk for finance operations","metric":31,"threshold":11,"state":"accepted"}
+permits:
+  tools: ["nika:jq"]
+tasks:
+  project:
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ const.record }}
+        expression: '{case, domain, actor, state}'
+outputs:
+  card: ${{ tasks.project.output }}

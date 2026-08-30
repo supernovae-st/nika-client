@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 27/100 · clinic administration · appointment-diff
+# Actor: appointment coordinator for clinic administration
+# Trigger: appointment-diff request enters the clinic administration queue
+# Authority: tools only: nika:jq; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: all three batch items return in input order with checked=true for uc-027-clinic-admin-appointment-diff
+# Business outcome: enrich a bounded batch while preserving source order for clinic administration
+
+nika: uc-027-clinic-admin-appointment-diff
+
+model: mock/echo
+
+const:
+  items: [{"sequence":1,"case":"appointment-diff"},{"sequence":2,"case":"appointment-diff"},{"sequence":3,"case":"appointment-diff"}]
+permits:
+  tools: ["nika:jq"]
+tasks:
+  enrich:
+    for_each:
+      items: ${{ const.items }}
+      max_parallel: 2
+      fail_fast: true
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ item }}
+        expression: '. + {checked: true}'
+outputs:
+  rows: ${{ tasks.enrich.output }}

@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 1/100 · customer support · sla-breach-triage
+# Actor: support lead for customer support
+# Trigger: sla-breach-triage request enters the customer support queue
+# Authority: tools only: nika:jq; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: projection carries the domain, actor, and accepted state for uc-001-customer-support-sla-breach-triage
+# Business outcome: produce a normalized decision card for customer support
+
+nika: uc-001-customer-support-sla-breach-triage
+
+model: mock/echo
+
+const:
+  record: {"case":"sla-breach-triage","domain":"customer-support","actor":"support lead for customer support","metric":21,"threshold":1,"state":"accepted"}
+permits:
+  tools: ["nika:jq"]
+tasks:
+  project:
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ const.record }}
+        expression: '{case, domain, actor, state}'
+outputs:
+  card: ${{ tasks.project.output }}

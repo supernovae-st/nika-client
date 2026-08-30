@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 35/100 · education operations · completion-event
+# Actor: credential officer for education operations
+# Trigger: completion-event request enters the education operations queue
+# Authority: tools only: nika:hash, nika:log; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: evidence digest is stable and is logged without source disclosure for uc-035-education-completion-event
+# Business outcome: mint a stable evidence identifier for later reconciliation for education operations
+
+nika: uc-035-education-completion-event
+
+model: mock/echo
+
+const:
+  evidence: {"id":"uc-035-education-completion-event","outcome":"mint a stable evidence identifier for later reconciliation for education operations","accepted":true}
+permits:
+  tools: ["nika:hash", "nika:log"]
+tasks:
+  digest:
+    invoke:
+      tool: "nika:hash"
+      args:
+        content: ${{ const.evidence }}
+        algo: sha256
+        encoding: hex
+  announce:
+    with:
+      digest: ${{ tasks.digest.output }}
+    invoke:
+      tool: "nika:log"
+      args:
+        level: info
+        message: "evidence sealed for uc-035-education-completion-event"
+        data: { digest: "${{ with.digest }}" }
+outputs:
+  digest: ${{ tasks.digest.output }}

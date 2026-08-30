@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 50/100 · travel operations · voucher-event
+# Actor: voucher controller for travel operations
+# Trigger: voucher-event request enters the travel operations queue
+# Authority: tools only: nika:emit; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: one typed machine event carries the case identity and accepted state for uc-050-travel-voucher-event
+# Business outcome: publish a typed completion receipt for subscribers for travel operations
+
+nika: uc-050-travel-voucher-event
+
+model: mock/echo
+
+const:
+  receipt: {"case":"uc-050-travel-voucher-event","domain":"travel","state":"accepted"}
+permits:
+  tools: ["nika:emit"]
+tasks:
+  publish:
+    invoke:
+      tool: "nika:emit"
+      args:
+        event_type: "gauntlet.travel.voucher-event"
+        payload: ${{ const.receipt }}
+outputs:
+  receipt: ${{ const.receipt }}

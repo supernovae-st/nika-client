@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 63/100 · security operations · exception-merge
+# Actor: risk owner for security operations
+# Trigger: exception-merge request enters the security operations queue
+# Authority: tools only: nika:json_diff; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: revision patch is non-empty and points at the changed value for uc-063-security-exception-merge
+# Business outcome: explain exactly what changed between two business revisions for security operations
+
+nika: uc-063-security-exception-merge
+
+model: mock/echo
+
+const:
+  before: {"id":"uc-063-security-exception-merge","value":63,"state":"draft"}
+  after: {"id":"uc-063-security-exception-merge","value":64,"state":"approved"}
+permits:
+  tools: ["nika:json_diff"]
+tasks:
+  diff:
+    invoke:
+      tool: "nika:json_diff"
+      args:
+        before: ${{ const.before }}
+        after: ${{ const.after }}
+outputs:
+  patch: ${{ tasks.diff.output }}

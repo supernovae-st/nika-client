@@ -1,84 +1,68 @@
-import type { NikaJob } from './types.js';
+import type { NikaTransportKind } from './types.js';
 
-/** Base error for all SDK errors. Catch this to handle any nika-client error. */
 export class NikaError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'NikaError';
   }
 }
 
-/** HTTP error from nika serve (non-2xx response). */
-export class NikaAPIError extends NikaError {
-  public readonly status: number;
-  public readonly body: string;
-  public readonly requestId?: string;
-
-  constructor(message: string, status: number, body: string, requestId?: string) {
-    super(message);
-    this.name = 'NikaAPIError';
-    this.status = status;
-    this.body = body;
-    this.requestId = requestId;
-  }
-}
-
-/** Network or connection error (DNS, TCP reset, refused). */
-export class NikaConnectionError extends NikaError {
-  public override readonly cause?: Error;
-
-  constructor(message: string, cause?: Error) {
-    super(message);
-    this.name = 'NikaConnectionError';
-    this.cause = cause;
-  }
-}
-
-/** Request or poll timeout exceeded. */
-export class NikaTimeoutError extends NikaError {
+export class NikaConfigurationError extends NikaError {
   constructor(message: string) {
     super(message);
-    this.name = 'NikaTimeoutError';
+    this.name = 'NikaConfigurationError';
   }
 }
 
-/** Job terminated with status 'failed' or 'interrupted'. */
-export class NikaJobError extends NikaError {
-  public readonly job: NikaJob;
-  public readonly exitCode: number | undefined;
+export class NikaTransportError extends NikaError {
+  readonly transport: NikaTransportKind;
 
-  constructor(job: NikaJob) {
-    const diagnosis = job.error
-      ? `${job.error.code} · ${job.error.message}`
-      : job.status;
-    super(`Job ${job.id} ${diagnosis}`);
-    this.name = 'NikaJobError';
-    this.job = job;
-    this.exitCode = undefined;
+  constructor(transport: NikaTransportKind, message: string, options?: ErrorOptions) {
+    super(message, options);
+    this.name = 'NikaTransportError';
+    this.transport = transport;
   }
 }
 
-/**
- * Kept for the exported hierarchy. Live HTTP has no cancel route and no
- * `cancelled` status — poll never throws this.
- */
-export class NikaJobCancelledError extends NikaJobError {
-  constructor(job: NikaJob) {
-    super(job);
-    this.name = 'NikaJobCancelledError';
+/** A typed engine/adapter capability gap, not a workflow failure. */
+export class NikaCompatibilityError extends NikaError {
+  readonly capability: string;
+  readonly transport: NikaTransportKind;
+
+  constructor(
+    capability: string,
+    transport: NikaTransportKind,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'NikaCompatibilityError';
+    this.capability = capability;
+    this.transport = transport;
   }
 }
 
-/** A helper that would hit a route the live server keeps 404. */
-export class NikaUnavailableError extends NikaError {
-  public readonly surface: string;
+export class NikaProtocolError extends NikaTransportError {
+  constructor(transport: NikaTransportKind, message: string, options?: ErrorOptions) {
+    super(transport, message, options);
+    this.name = 'NikaProtocolError';
+  }
+}
 
-  constructor(surface: string) {
-    super(
-      `${surface} is not on the live nika serve HTTP surface. `
-      + 'Cancel and artifacts stay 404 until those authorities exist.',
-    );
-    this.name = 'NikaUnavailableError';
-    this.surface = surface;
+export class NikaEventBufferOverflowError extends NikaError {
+  readonly runId: string;
+  readonly limit: number;
+
+  constructor(runId: string, limit: number) {
+    super(`Event subscriber for run ${runId} exceeded its ${limit}-event buffer`);
+    this.name = 'NikaEventBufferOverflowError';
+    this.runId = runId;
+    this.limit = limit;
+  }
+}
+
+export class NikaRunOwnershipError extends NikaError {
+  constructor() {
+    super('The NikaRun was not created by this Nika client');
+    this.name = 'NikaRunOwnershipError';
   }
 }

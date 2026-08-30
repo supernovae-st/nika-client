@@ -627,6 +627,17 @@ describe('HTTP transport', () => {
       verdict: 'unavailable',
       reason: 'trace_journal_unavailable',
     });
+    expectTypeOf(verdict.verdict).toEqualTypeOf<
+      'verified' | 'invalid' | 'unavailable' | (string & {}) | undefined
+    >();
+    expectTypeOf(verdict.reason).toEqualTypeOf<
+      | 'trace_invalid'
+      | 'receipt_mismatch'
+      | 'run_not_terminal'
+      | 'trace_journal_unavailable'
+      | (string & {})
+      | undefined
+    >();
   });
 
   it('refuses absent options, cancels through the live route, and keeps trace refusal typed', async () => {

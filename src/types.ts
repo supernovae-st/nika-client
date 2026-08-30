@@ -110,6 +110,16 @@ export interface NikaCancelResult {
 
 export interface NikaTraceVerifyResult {
   verified: boolean;
+  /** Engine-owned trace verdict. Open to additive future vocabulary. */
+  verdict?: 'verified' | 'invalid' | 'unavailable' | (string & {});
+  /** Engine-owned explanation for a negative or unavailable verdict. */
+  reason?:
+    | 'trace_invalid'
+    | 'receipt_mismatch'
+    | 'run_not_terminal'
+    | 'trace_journal_unavailable'
+    | (string & {});
+  trace_id?: string;
   exitCode?: number;
   output?: string;
   [key: string]: unknown;

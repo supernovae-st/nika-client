@@ -266,6 +266,7 @@ await scenario('remote-durable-cancellation', async () => {
   mkdirSync(remote);
   writeFileSync(path.join(remote, 'nika.yaml'), 'nika: hostile-remote\n');
   writeFileSync(path.join(remote, 'slow.nika.yaml'), readFileSync(cancellable, 'utf8'));
+  writeFileSync(path.join(remote, 'broken.nika.yaml'), readFileSync(malformed, 'utf8'));
   const token = 'hostile-remote-token-0123456789abcdef0123456789';
   const tokenFile = path.join(remote, 'serve.token');
   writeFileSync(tokenFile, `${token}\n`);
@@ -288,6 +289,9 @@ await scenario('remote-durable-cancellation', async () => {
       bin: nikaBin,
       cwd: remote,
     });
+    const parseFatal = await client.check('broken.nika.yaml');
+    assert.equal(parseFatal.clean, false);
+    assert.notEqual(parseFatal.exitCode, 0);
     const run = await client.run('slow.nika.yaml', { idempotencyKey: 'hostile-cancel-1' });
     const observed = (async () => {
       const events = [];
@@ -315,6 +319,7 @@ await scenario('remote-durable-cancellation', async () => {
       events,
       durable_receipt: true,
       trace_verdict: trace.verdict,
+      parse_fatal_clean: parseFatal.clean,
     };
   } finally {
     server.kill('SIGINT');

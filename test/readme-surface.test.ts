@@ -18,6 +18,8 @@ describe('packed public documentation', () => {
     }
     expect(readme).toContain('Node.js 22 or newer');
     expect(readme).toContain('NIKA_BIN');
+    expect(readme).toContain('maxCostUsd: 0.01');
+    expect(readme).toContain('pauseUntil:');
   });
 
   it('does not regress to removed APIs or claim a webhook verifier', () => {

@@ -715,6 +715,7 @@ export class HttpTransport implements Transport {
     const report: Record<string, unknown> = { ...outer, exitCode: captured.exitCode };
     delete report.execution_snapshot;
     if (captured.exitCode !== 0 || outer.clean !== true) {
+      report.clean = false;
       return { report: report as NikaCheckResult };
     }
     compatibleEngineIdentity(outer, this.kind, identity);

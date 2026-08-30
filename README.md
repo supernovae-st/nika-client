@@ -94,6 +94,9 @@ engine to verify the receipt and its signed binding. The remote endpoint
 currently returns `{ verified: false, verdict: "unavailable", reason:
 "trace_journal_unavailable" }` because the server has no path-free journal
 authority; the typed verdict is preserved instead of being hidden as a 404.
+`/health.supportedCapabilities` names authorities that can currently complete
+their operation. It therefore does not advertise remote trace verification
+while this diagnostic route can only return the typed unavailable verdict.
 
 ## Cancel a run
 
@@ -183,7 +186,7 @@ cannot honestly own durable schedule state.
 const applied = await nika.schedule('hello.nika.yaml', {
   id: 'weekday-hello',
   when: { kind: 'cadence', expression: 'TZ=Europe/Paris 0 9 * * 1-5' },
-  maxCostUsd: 0,
+  maxCostUsd: 0.01,
   missed: 'catch-up-once',
   overlap: 'skip',
   afterSkip: 'next_slot',
@@ -195,13 +198,14 @@ console.log(applied.changed, status.next, status.lastDecision);
 await nika.schedule('hello.nika.yaml', {
   id: 'weekday-hello',
   when: { kind: 'cadence', expression: 'TZ=Europe/Paris 0 9 * * 1-5' },
-  maxCostUsd: 0,
+  maxCostUsd: 0.01,
   missed: 'catch-up-once',
   overlap: 'skip',
   afterSkip: 'next_slot',
   revision: status.revision,
   active: false,
   pauseReason: 'maintenance',
+  pauseUntil: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
 });
 ```
 

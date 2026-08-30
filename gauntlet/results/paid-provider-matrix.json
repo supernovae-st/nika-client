@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-08-30",
+  "engine": "nika 0.115.0 (5c5bd1ab5)",
+  "workflow": "dx/workflows/sota-radar-beat.nika.yaml",
+  "policy": {
+    "access": "api",
+    "per_run_max_cost_usd": 2,
+    "secrets_recorded": false,
+    "provider_outputs_recorded": false,
+    "proof_rule": "A provider is green only after a real successful dispatch and explicit offline trace verification. Check-time or environment refusals remain refusals."
+  },
+  "successful_runs": [
+    {
+      "provider": "gemini",
+      "model": "gemini/gemini-2.5-flash",
+      "tasks_completed": 4,
+      "tasks_total": 4,
+      "inference_duration_ms": 16048,
+      "tokens": 3371,
+      "cost": {
+        "status": "unpriced",
+        "usd": null,
+        "reason": "missing_catalog_price"
+      },
+      "trace": {
+        "path": ".nika/traces/2026-08-30T19-53-09Z-303d.ndjson",
+        "events": 20,
+        "head": "692ff06059a66d0e839e2e11d5868f76e82721a4d15cb6c98ae8fb7a398ea121",
+        "chain_intact": true,
+        "sealed": true,
+        "signing_key_fingerprint": "bdec0f1d24ff5eba",
+        "verification": "nika trace verify --plain --key ~/.nika/keys/run-signing.pub <trace>",
+        "anchored": false,
+        "replayed": false
+      }
+    },
+    {
+      "provider": "xai",
+      "model": "xai/grok-3",
+      "tasks_completed": 4,
+      "tasks_total": 4,
+      "inference_duration_ms": 12207,
+      "tokens": 987,
+      "cost": {
+        "status": "measured",
+        "usd": 0.056799,
+        "reason": null
+      },
+      "trace": {
+        "path": ".nika/traces/2026-08-30T20-56-44Z-d79a.ndjson",
+        "events": 20,
+        "head": "1856cd09446e0e11009b2e308a4450f425daf8739c3ed862b624864c89659de3",
+        "chain_intact": true,
+        "sealed": true,
+        "signing_key_fingerprint": "bdec0f1d24ff5eba",
+        "verification": "nika trace verify --plain --key ~/.nika/keys/run-signing.pub <trace>",
+        "anchored": false,
+        "replayed": false
+      }
+    },
+    {
+      "provider": "xai",
+      "model": "xai/mini",
+      "tasks_completed": 4,
+      "tasks_total": 4,
+      "inference_duration_ms": 10745,
+      "tokens": 817,
+      "cost": {
+        "status": "unpriced",
+        "usd": null,
+        "reason": "missing_catalog_price"
+      },
+      "trace": {
+        "path": ".nika/traces/2026-08-30T20-58-18Z-0b90.ndjson",
+        "events": 20,
+        "head": "7bc6ec9ec8070899b0e8bcdeaab87e5aaddccd269a55c429bce7f381fd4024c0",
+        "chain_intact": true,
+        "sealed": true,
+        "signing_key_fingerprint": "bdec0f1d24ff5eba",
+        "verification": "nika trace verify --plain --key ~/.nika/keys/run-signing.pub <trace>",
+        "anchored": false,
+        "replayed": false
+      }
+    }
+  ],
+  "refusals": [
+    {
+      "provider": "anthropic",
+      "stage": "provider_dispatch",
+      "reason": "low_credits",
+      "sdk_green": false,
+      "spend_usd": 0
+    },
+    {
+      "provider": "openai",
+      "stage": "provider_dispatch",
+      "reason": "invalid_credentials",
+      "sdk_green": false,
+      "spend_usd": 0
+    },
+    {
+      "provider": "groq",
+      "stage": "environment",
+      "reason": "missing_key",
+      "sdk_green": false,
+      "spend_usd": 0
+    },
+    {
+      "provider": "gemini",
+      "model": "gemini/gemini-2.0-flash",
+      "stage": "model_resolution",
+      "reason": "model_absent",
+      "sdk_green": false,
+      "spend_usd": 0
+    },
+    {
+      "provider": "perplexity",
+      "model": "perplexity/sonar-pro",
+      "stage": "model_resolution",
+      "reason": "catalog_only_provider_not_runnable_in_this_binary",
+      "sdk_green": false,
+      "spend_usd": 0
+    }
+  ],
+  "findings": [
+    {
+      "id": "provider-pricing-coverage",
+      "status": "open",
+      "severity": "medium",
+      "observation": "The finite run cap cannot statically bound models missing from the local pricing catalog.",
+      "oracle": "Every metered provider model either has a pinned price ceiling or is refused before dispatch when a finite-cost proof is required."
+    },
+    {
+      "id": "implicit-trace-key-discovery",
+      "status": "open",
+      "severity": "medium",
+      "observation": "Implicit trace verification reported SEAL UNATTRIBUTABLE while an explicit --key using the same default public-key path verified SEALED.",
+      "oracle": "Default discovery and explicit --key produce the same highest proof tier for the same trace and public key."
+    }
+  ]
+}

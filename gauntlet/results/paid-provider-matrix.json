@@ -133,10 +133,12 @@
     },
     {
       "id": "implicit-trace-key-discovery",
-      "status": "open",
+      "status": "closed",
       "severity": "medium",
       "observation": "Implicit trace verification reported SEAL UNATTRIBUTABLE while an explicit --key using the same default public-key path verified SEALED.",
-      "oracle": "Default discovery and explicit --key produce the same highest proof tier for the same trace and public key."
+      "oracle": "Default discovery and explicit --key produce the same highest proof tier for the same trace and public key.",
+      "fixed_by": "nika engine dba25b03",
+      "regression_proof": "The custody parser preserves complete two-line minisign boxes, deduplicates current and retired keys, ignores malformed ledger noise, and the real xai/grok-3 trace reaches SEALED without --key."
     }
   ]
 }

@@ -44,7 +44,7 @@ export interface HttpTransportOptions {
 
 interface CapturedSnapshot {
   report: NikaCheckResult;
-  bytes: string;
+  bytes?: string;
 }
 
 interface ObservationState {
@@ -60,6 +60,8 @@ interface DurableJob {
   status: string;
   execution_id?: string;
   trace_id?: string;
+  outputs?: Record<string, unknown>;
+  receipt?: NikaReceipt;
   error?: { code: string; message: string };
 }
 
@@ -75,6 +77,7 @@ const JOB_STATUSES = new Set([
   'paused',
   'succeeded',
   'failed',
+  'cancelled',
 ]);
 const MAX_OBSERVATION_RETRIES = 5;
 const RETRY_BASE_MILLISECONDS = 100;
@@ -96,6 +99,7 @@ export class HttpTransport implements Transport {
       );
     }
     const captured = await this.captureSnapshot(workflow, options.signal);
+    if (captured.bytes === undefined) return captured.report;
     const acknowledged = await this.json('/v1/check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -132,6 +136,9 @@ export class HttpTransport implements Transport {
       throw new NikaTransportError(this.kind, 'Idempotency-Key must be 1-255 bytes');
     }
     const captured = await this.captureSnapshot(workflow);
+    if (captured.bytes === undefined) {
+      throw this.gap('executionSnapshot', 'Local workflow check was not clean; run was not admitted');
+    }
     const admitted = await this.json('/v1/jobs', {
       method: 'POST',
       headers: {
@@ -188,10 +195,32 @@ export class HttpTransport implements Transport {
   }
 
   async traceVerify(
-    _receipt: NikaReceipt,
-    _options: NikaTraceVerifyOptions,
+    receipt: NikaReceipt,
+    options: NikaTraceVerifyOptions,
   ): Promise<NikaTraceVerifyResult> {
-    throw this.gap('traceVerify', 'nika serve does not expose trace verification');
+    await this.ensureReady();
+    const jobId = receipt.job_id;
+    if (typeof jobId !== 'string' || jobId.length === 0) {
+      throw this.gap('traceVerify', 'The engine receipt does not carry a remote job_id');
+    }
+    const object = await this.json(
+      `/v1/jobs/${encodeURIComponent(jobId)}/trace/verify`,
+      { method: 'GET', signal: options.signal },
+    );
+    if (
+      typeof object.verdict !== 'string'
+      || typeof object.reason !== 'string'
+      || (object.trace_id !== undefined && typeof object.trace_id !== 'string')
+    ) {
+      throw new NikaProtocolError(this.kind, 'Trace verification verdict was malformed');
+    }
+    const traceMatches = object.trace_id === undefined
+      || receipt.trace_id === undefined
+      || object.trace_id === receipt.trace_id;
+    return {
+      ...object,
+      verified: object.verdict === 'verified' && traceMatches,
+    } as NikaTraceVerifyResult;
   }
 
   private httpRun(id: string): TransportRun {
@@ -209,8 +238,8 @@ export class HttpTransport implements Transport {
       terminalObserved = true;
       const event = 'sequence' in source ? source : undefined;
       const durable = event ? undefined : source as DurableJob;
-      const receipt = eventReceipt(event);
-      const outputs = eventOutputs(event);
+      const receipt = event ? eventReceipt(event) : durable?.receipt;
+      const outputs = event ? eventOutputs(event) : durable?.outputs;
       const error = event ? eventError(event) : durable?.error;
       resolveDone({
         id,
@@ -245,7 +274,21 @@ export class HttpTransport implements Transport {
       events,
       done,
       cancel: async (): Promise<NikaCancelResult> => {
-        throw this.gap('cancel', 'nika serve intentionally has no cancel route');
+        const object = await this.json(`/v1/jobs/${encodeURIComponent(id)}/cancel`, {
+          method: 'POST',
+        });
+        const durable = durableJob(object, id, this.kind);
+        if (!isTerminal(durable.status)) {
+          throw new NikaProtocolError(this.kind, 'Cancellation did not return a terminal job');
+        }
+        settle(durable);
+        const accepted = durable.status === 'cancelled';
+        return {
+          runId: id,
+          accepted,
+          status: accepted ? 'cancelled' : 'already_settled',
+          transport: this.kind,
+        };
       },
       cleanup: async () => {
         if (!terminalObserved) controller.abort();
@@ -669,6 +712,11 @@ export class HttpTransport implements Transport {
         `Local engine did not emit the required snapshot report (exit ${captured.exitCode})`,
       );
     }
+    const report: Record<string, unknown> = { ...outer, exitCode: captured.exitCode };
+    delete report.execution_snapshot;
+    if (captured.exitCode !== 0 || outer.clean !== true) {
+      return { report: report as NikaCheckResult };
+    }
     compatibleEngineIdentity(outer, this.kind, identity);
     if (
       outer.engineVersion !== identity.engineVersion
@@ -682,18 +730,10 @@ export class HttpTransport implements Transport {
     if (captured.stderr.trim()) {
       throw this.gap('executionSnapshot', 'Local snapshot capture wrote unexpected diagnostics');
     }
-    if (captured.exitCode !== 0 || outer.clean !== true) {
-      throw this.gap(
-        'executionSnapshot',
-        `Local snapshot capture was not clean (exit ${captured.exitCode})`,
-      );
-    }
     const bytes = outer.execution_snapshot;
     if (typeof bytes !== 'string' || bytes.length === 0) {
       throw this.gap('executionSnapshot', 'Local engine omitted execution_snapshot bytes');
     }
-    const report: Record<string, unknown> = { ...outer, exitCode: captured.exitCode };
-    delete report.execution_snapshot;
     return { report: report as NikaCheckResult, bytes };
   }
 
@@ -924,7 +964,10 @@ function pathForOperation(operation: NikaOperation): string {
 }
 
 function isTerminal(status: unknown): status is string {
-  return status === 'succeeded' || status === 'failed' || status === 'interrupted';
+  return status === 'succeeded'
+    || status === 'failed'
+    || status === 'interrupted'
+    || status === 'cancelled';
 }
 
 function isRetryableStatus(status: number): boolean {
@@ -982,7 +1025,9 @@ function durableJob(
   expectedId: string,
   transport: 'http',
 ): DurableJob {
-  const allowed = new Set(['id', 'status', 'execution_id', 'trace_id', 'error']);
+  const allowed = new Set([
+    'id', 'status', 'execution_id', 'trace_id', 'outputs', 'receipt', 'error',
+  ]);
   if (Object.keys(value).some((key) => !allowed.has(key))) {
     throw new NikaProtocolError(transport, 'Durable job response contained unknown fields');
   }
@@ -1007,11 +1052,21 @@ function durableJob(
     }
     error = { code: object.code, message: object.message };
   }
+  const outputs = value.outputs === undefined ? undefined : machineObject(value.outputs);
+  const receipt = value.receipt === undefined ? undefined : machineObject(value.receipt);
+  if (value.outputs !== undefined && !outputs) {
+    throw new NikaProtocolError(transport, 'Durable job response outputs were malformed');
+  }
+  if (value.receipt !== undefined && !receipt) {
+    throw new NikaProtocolError(transport, 'Durable job response receipt was malformed');
+  }
   return {
     id: value.id,
     status: value.status,
     ...(typeof value.execution_id === 'string' ? { execution_id: value.execution_id } : {}),
     ...(typeof value.trace_id === 'string' ? { trace_id: value.trace_id } : {}),
+    ...(outputs ? { outputs } : {}),
+    ...(receipt ? { receipt: Object.freeze(receipt) } : {}),
     ...(error ? { error } : {}),
   };
 }

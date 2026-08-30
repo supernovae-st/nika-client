@@ -41,13 +41,13 @@ export function eventStatus(event: NikaEvent | undefined): NikaRunStatus | undef
 
 export function eventReceipt(event: NikaEvent | undefined): NikaReceipt | undefined {
   const direct = machineObject(event?.receipt);
-  if (direct) return direct as NikaReceipt;
+  if (direct) return Object.freeze(direct) as NikaReceipt;
   const fields = Array.isArray(event?.fields) ? event.fields : [];
   for (const field of fields) {
     const row = machineObject(field);
     if (row?.key === 'receipt') {
       const receipt = machineObject(row.value);
-      if (receipt) return receipt as NikaReceipt;
+      if (receipt) return Object.freeze(receipt) as NikaReceipt;
     }
   }
   return undefined;

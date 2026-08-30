@@ -25,6 +25,7 @@ import {
   eventOutputs,
   eventReceipt,
   eventStatus,
+  machineObject,
   parseMachineObject,
   receiptTraceLocator,
 } from './machine.js';
@@ -118,11 +119,34 @@ export class NativeProcessTransport implements Transport {
         'The engine receipt does not carry a native trace locator',
       );
     }
-    const captured = await this.capture(['trace', 'verify', locator], options.signal);
+    const captured = await this.capture(['trace', 'verify', locator, '--plain'], options.signal);
+    if (captured.exitCode !== 0) {
+      return {
+        verified: false,
+        exitCode: captured.exitCode,
+        output: captured.stdout + captured.stderr,
+      };
+    }
+    const evidence = await this.capture(
+      ['trace', 'evidence', locator, '--json', '--plain'],
+      options.signal,
+    );
+    let manifest: Record<string, unknown>;
+    try {
+      manifest = parseMachineObject(evidence.stdout.trim(), this.kind);
+    } catch (cause) {
+      throw new NikaCompatibilityError(
+        'traceVerify',
+        this.kind,
+        `This engine did not emit the required evidence manifest (exit ${evidence.exitCode})`,
+      );
+    }
+    const mismatch = receiptMismatch(receipt, manifest);
     return {
-      verified: captured.exitCode === 0,
-      exitCode: captured.exitCode,
-      output: captured.stdout + captured.stderr,
+      verified: mismatch === undefined,
+      exitCode: mismatch === undefined ? 0 : 2,
+      output: captured.stdout + captured.stderr
+        + (mismatch === undefined ? '' : `\nRECEIPT MISMATCH: ${mismatch}\n`),
     };
   }
 
@@ -327,4 +351,30 @@ function boundedAppend(current: string, chunk: string, limit: number): string {
   const combined = current + chunk;
   if (Buffer.byteLength(combined) <= limit) return combined;
   return Buffer.from(combined).subarray(-limit).toString('utf8');
+}
+
+function receiptMismatch(
+  receipt: NikaReceipt,
+  manifest: Record<string, unknown>,
+): string | undefined {
+  const trace = machineObject(manifest.trace);
+  const seal = machineObject(manifest.seal);
+  const covers = machineObject(seal?.covers);
+  const binding = machineObject(covers?.sdk_receipt);
+  if (
+    trace?.chain !== 'intact'
+    || seal?.present !== true
+    || seal.verifies !== true
+    || seal.covers_chain !== true
+    || !binding
+  ) return 'the evidence manifest has no verified signed SDK receipt binding';
+
+  const claims = ['receipt_format', 'execution_id', 'trace_id', 'snapshot_digest'] as const;
+  for (const claim of claims) {
+    if (receipt[claim] !== binding[claim]) return `${claim} is not bound to this trace`;
+  }
+  if (receipt.chain_head !== trace.head) return 'chain_head is not this journal head';
+  if (receipt.chain_len !== trace.events) return 'chain_len is not this journal length';
+  if (receipt.sealed !== true) return 'sealed is not true for this verified seal';
+  return undefined;
 }

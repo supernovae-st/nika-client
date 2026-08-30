@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import {
   appendFileSync,
   chmodSync,
   copyFileSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { createServer } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -29,7 +31,7 @@ async function scenario(name, body) {
   try {
     const evidence = await body();
     rows.push({ name, result: 'green', duration_ms: Math.round(performance.now() - started), evidence });
-    process.stdout.write(`hostile ${rows.length}/13 · ${name} · green\n`);
+    process.stdout.write(`hostile ${rows.length}/14 · ${name} · green\n`);
   } catch (cause) {
     rows.push({
       name,
@@ -37,7 +39,7 @@ async function scenario(name, body) {
       duration_ms: Math.round(performance.now() - started),
       error: cause instanceof Error ? `${cause.name}: ${cause.message}` : String(cause),
     });
-    process.stdout.write(`hostile ${rows.length}/13 · ${name} · red\n`);
+    process.stdout.write(`hostile ${rows.length}/14 · ${name} · red\n`);
   }
 }
 
@@ -59,6 +61,31 @@ function receiptPath(receipt) {
   const locator = receipt.trace_path;
   assert.equal(typeof locator, 'string');
   return path.isAbsolute(locator) ? locator : path.join(scratch, locator);
+}
+
+async function freeLoopbackPort() {
+  const server = createServer();
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolve);
+  });
+  const address = server.address();
+  assert(address && typeof address === 'object');
+  await new Promise((resolve) => server.close(resolve));
+  return address.port;
+}
+
+async function waitForHealth(url) {
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    try {
+      const response = await fetch(`${url}/health`);
+      if (response.ok) return;
+    } catch {
+      // The listener is still starting.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+  throw new Error(`server did not become healthy at ${url}`);
 }
 
 const deterministic = writeWorkflow('deterministic.nika.yaml', `
@@ -234,6 +261,71 @@ await scenario('real-cancellation-race', async () => {
   return { cancel_status: cancelled.status, run_status: result.status, exit_code: result.exitCode };
 });
 
+await scenario('remote-durable-cancellation', async () => {
+  const remote = path.join(scratch, 'remote-cancel');
+  mkdirSync(remote);
+  writeFileSync(path.join(remote, 'nika.yaml'), 'nika: hostile-remote\n');
+  writeFileSync(path.join(remote, 'slow.nika.yaml'), readFileSync(cancellable, 'utf8'));
+  const token = 'hostile-remote-token-0123456789abcdef0123456789';
+  const tokenFile = path.join(remote, 'serve.token');
+  writeFileSync(tokenFile, `${token}\n`);
+  chmodSync(tokenFile, 0o600);
+  const port = await freeLoopbackPort();
+  const url = `http://127.0.0.1:${port}`;
+  const server = spawn(nikaBin, [
+    'serve', '--bind', `127.0.0.1:${port}`, '--workflows', remote,
+    '--token-file', tokenFile, '--state-root', path.join(remote, 'state'), '--plain',
+  ], { cwd: remote, stdio: ['ignore', 'pipe', 'pipe'] });
+  let diagnostics = '';
+  server.stderr.setEncoding('utf8');
+  server.stderr.on('data', (chunk) => { diagnostics += chunk; });
+  try {
+    await waitForHealth(url);
+    const client = new Nika({
+      url,
+      token,
+      allowInsecureHttp: true,
+      bin: nikaBin,
+      cwd: remote,
+    });
+    const run = await client.run('slow.nika.yaml', { idempotencyKey: 'hostile-cancel-1' });
+    const observed = (async () => {
+      const events = [];
+      for await (const event of client.events(run)) events.push(event.kind);
+      return events;
+    })();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    const cancellation = await client.cancel(run);
+    const [result, events] = await bounded(
+      Promise.all([run.done, observed]),
+      5_000,
+      'remote cancellation',
+    );
+    assert.equal(cancellation.accepted, true);
+    assert.equal(result.status, 'cancelled');
+    assert(result.receipt);
+    assert(events.includes('execution.cancelled'));
+    const trace = await client.traceVerify(result.receipt);
+    assert.equal(trace.verified, false);
+    assert.equal(trace.verdict, 'unavailable');
+    assert.equal(trace.reason, 'trace_journal_unavailable');
+    return {
+      cancel_status: cancellation.status,
+      run_status: result.status,
+      events,
+      durable_receipt: true,
+      trace_verdict: trace.verdict,
+    };
+  } finally {
+    server.kill('SIGINT');
+    await bounded(new Promise((resolve) => server.once('close', resolve)), 5_000, 'server shutdown')
+      .catch(() => server.kill('SIGTERM'));
+    if (server.exitCode && server.exitCode !== 130) {
+      throw new Error(`server exited ${server.exitCode}: ${diagnostics.slice(-500)}`);
+    }
+  }
+});
+
 await scenario('trace-corruption-detection', async () => {
   const client = new Nika({ bin: nikaBin, cwd: scratch });
   const run = await client.run(deterministic, { maxCostUsd: 0 });
@@ -241,13 +333,26 @@ await scenario('trace-corruption-detection', async () => {
   assert(result.receipt);
   const intact = await client.traceVerify(result.receipt);
   assert.equal(intact.verified, true);
+  const forged = await client.traceVerify({
+    ...result.receipt,
+    trace_id: 'forged-trace-id',
+    snapshot_digest: '0'.repeat(64),
+    chain_head: '0'.repeat(64),
+    chain_len: 999_999,
+    sealed: false,
+  });
+  assert.equal(forged.verified, false);
   const source = receiptPath(result.receipt);
   const corrupted = path.join(scratch, 'corrupted-trace.ndjson');
   copyFileSync(source, corrupted);
   appendFileSync(corrupted, '{"tampered":true}\n');
   const broken = await client.traceVerify({ ...result.receipt, trace_path: corrupted });
   assert.equal(broken.verified, false);
-  return { intact: intact.verified, corrupted: broken.verified };
+  return {
+    intact: intact.verified,
+    forged_receipt: forged.verified,
+    corrupted_trace: broken.verified,
+  };
 });
 
 await scenario('secret-canary-redaction', async () => {
@@ -302,7 +407,7 @@ const report = {
     total: rows.length,
     green: rows.filter((row) => row.result === 'green').length,
     red: rows.filter((row) => row.result === 'red').length,
-    real_engine_runs: 69,
+    real_engine_runs: 70,
   },
   result: rows.every((row) => row.result === 'green') ? 'green' : 'red',
 };

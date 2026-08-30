@@ -49,6 +49,7 @@ export type NikaRunStatus =
   | 'succeeded'
   | 'failed'
   | 'interrupted'
+  | 'cancelled'
   | (string & {});
 
 /** A machine check report. Unknown engine fields deliberately ride through. */

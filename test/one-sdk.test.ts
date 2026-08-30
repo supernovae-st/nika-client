@@ -276,9 +276,21 @@ describe.skipIf(!posix)('native-process transport', () => {
 
   it('delegates trace verification using an engine-issued receipt', async () => {
     const client = native();
-    await expect(client.traceVerify({ trace_path: 'fixture-trace.ndjson' }))
+    const receipt = Object.freeze({
+      receipt_format: 1,
+      execution_id: 'exe-fixture',
+      trace_id: 'trace-fixture',
+      snapshot_digest: 'snapshot-fixture',
+      trace_path: 'fixture-trace.ndjson',
+      chain_head: 'fixture-head',
+      chain_len: 7,
+      sealed: true,
+    });
+    await expect(client.traceVerify(receipt))
       .resolves.toMatchObject({ verified: true, exitCode: 0 });
-    await expect(client.traceVerify({ trace_path: 'broken.ndjson' }))
+    await expect(client.traceVerify({ ...receipt, trace_path: 'broken.ndjson' }))
+      .resolves.toMatchObject({ verified: false, exitCode: 2 });
+    await expect(client.traceVerify({ ...receipt, chain_head: 'forged' }))
       .resolves.toMatchObject({ verified: false, exitCode: 2 });
     await expect(client.traceVerify({ opaque: true }))
       .rejects.toBeInstanceOf(NikaCompatibilityError);
@@ -586,13 +598,45 @@ describe('HTTP transport', () => {
     }
   });
 
-  it('refuses options and capabilities absent from live nika serve', async () => {
+  it('returns a parse-fatal remote check report without misclassifying identity', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(healthResponse());
+    const report = await remote(fetch as typeof globalThis.fetch).check('parse-fatal.nika.yaml');
+    expect(report).toMatchObject({
+      clean: false,
+      parse_fatal: true,
+      exitCode: 2,
+      findings: [{ code: 'NIKA-PARSE-001' }],
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('projects the server trace authority typed unavailable verdict', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
+      .mockResolvedValueOnce(jsonResponse({
+        verdict: 'unavailable',
+        reason: 'trace_journal_unavailable',
+        trace_id: 'trace-remote',
+      }));
+    const verdict = await remote(fetch as typeof globalThis.fetch).traceVerify({
+      job_id: '00000000-0000-4000-8000-000000000001',
+      trace_id: 'trace-remote',
+    });
+    expect(verdict).toMatchObject({
+      verified: false,
+      verdict: 'unavailable',
+      reason: 'trace_journal_unavailable',
+    });
+  });
+
+  it('refuses absent options, cancels through the live route, and keeps trace refusal typed', async () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(jsonResponse({ id: 'remote-gaps', status: 'queued' }, 202))
       .mockResolvedValueOnce(sseResponse([
         { sequence: 1, kind: 'settled', status: 'succeeded' },
-      ]));
+      ]))
+      .mockResolvedValueOnce(jsonResponse({ id: 'remote-gaps', status: 'succeeded' }));
     const client = remote(fetch as typeof globalThis.fetch);
     await expect(client.check('flow.nika.yaml', { model: 'mock/echo' }))
       .rejects.toMatchObject({ capability: 'checkOptions', transport: 'http' });
@@ -607,8 +651,9 @@ describe('HTTP transport', () => {
     expect(fetch).not.toHaveBeenCalled();
     const run = await client.run('flow.nika.yaml');
     await run.done;
-    await expect(client.cancel(run)).rejects.toMatchObject({
-      capability: 'cancel',
+    await expect(client.cancel(run)).resolves.toMatchObject({
+      accepted: false,
+      status: 'already_settled',
       transport: 'http',
     });
     await expect(client.traceVerify({ trace_path: 'x' })).rejects.toMatchObject({

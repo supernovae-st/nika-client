@@ -25,6 +25,15 @@ if (command === 'wait-for-signal') {
 
 if (command === 'check') {
   const sdkSnapshot = argv.includes('--sdk-snapshot');
+  if (sdkSnapshot && workflow.includes('parse-fatal')) {
+    console.log(JSON.stringify({
+      report_version: 1,
+      clean: false,
+      parse_fatal: true,
+      findings: [{ code: 'NIKA-PARSE-001', message: 'fixture parse failure' }],
+    }));
+    process.exit(2);
+  }
   const report = {
     report_version: 1,
     clean: !workflow.includes('dirty'),
@@ -94,6 +103,26 @@ if (command === 'trace' && argv[1] === 'verify') {
   const target = argv[2] ?? '';
   console.log(target.includes('broken') ? 'BROKEN' : `OK ${target}`);
   process.exit(target.includes('broken') ? 2 : 0);
+}
+
+if (command === 'trace' && argv[1] === 'evidence') {
+  console.log(JSON.stringify({
+    trace: { chain: 'intact', events: 7, head: 'fixture-head' },
+    seal: {
+      present: true,
+      verifies: true,
+      covers_chain: true,
+      covers: {
+        sdk_receipt: {
+          receipt_format: 1,
+          execution_id: 'exe-fixture',
+          trace_id: 'trace-fixture',
+          snapshot_digest: 'snapshot-fixture',
+        },
+      },
+    },
+  }));
+  return;
 }
 
 console.error(`fake-nika: unsupported argv ${JSON.stringify(argv)}`);

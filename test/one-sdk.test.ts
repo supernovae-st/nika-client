@@ -62,7 +62,9 @@ function sseResponse(frames: NikaEvent[]): Response {
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       for (const event of frames) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+        controller.enqueue(encoder.encode(
+          `id: ${event.sequence}\ndata: ${JSON.stringify(event)}\n\n`,
+        ));
       }
       controller.close();
     },
@@ -293,6 +295,7 @@ describe('HTTP transport', () => {
       .mockResolvedValueOnce(sseResponse([
         { sequence: 1, kind: 'queued', status: 'queued' },
       ]))
+      .mockResolvedValueOnce(jsonResponse({ id: 'remote-reconnect', status: 'running' }))
       .mockResolvedValueOnce(sseResponse([
         {
           sequence: 2,
@@ -308,7 +311,10 @@ describe('HTTP transport', () => {
       status: 'failed',
       error: { code: 'NIKA-TEST-002', message: 'no' },
     });
-    const reconnectHeaders = new Headers(fetch.mock.calls[3]?.[1]?.headers);
+    expect(String(fetch.mock.calls[3]?.[0])).toBe(
+      'https://nika.example/v1/jobs/remote-reconnect',
+    );
+    const reconnectHeaders = new Headers(fetch.mock.calls[4]?.[1]?.headers);
     expect(reconnectHeaders.get('Last-Event-ID')).toBe('1');
   });
 

@@ -22,6 +22,7 @@ import {
   type NikaEngineIdentity,
 } from './engine-identity.js';
 import { eventError, eventOutputs, eventReceipt, machineObject } from './machine.js';
+import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
 import type { Transport, TransportRun } from './transport.js';
 
 export interface HttpTransportOptions {
@@ -32,12 +33,47 @@ export interface HttpTransportOptions {
   machineBufferBytes: number;
   engine: ResolvedNikaEngine;
   cwd?: string;
+  retryDelay?: (milliseconds: number, signal: AbortSignal) => Promise<void>;
 }
 
 interface CapturedSnapshot {
   report: NikaCheckResult;
   bytes: string;
 }
+
+interface ObservationState {
+  lastSequence: number;
+  lastData?: string;
+  attempt: number;
+  terminalObserved: boolean;
+  serverRetryMilliseconds?: number;
+}
+
+interface DurableJob {
+  id: string;
+  status: string;
+  execution_id?: string;
+  trace_id?: string;
+  error?: { code: string; message: string };
+}
+
+interface RetryObservation {
+  retry: true;
+  retryAfterMilliseconds?: number;
+}
+
+const JOB_STATUSES = new Set([
+  'queued',
+  'running',
+  'interrupted',
+  'paused',
+  'succeeded',
+  'failed',
+]);
+const MAX_OBSERVATION_RETRIES = 5;
+const RETRY_BASE_MILLISECONDS = 100;
+const RETRY_MIN_MILLISECONDS = 25;
+const RETRY_MAX_MILLISECONDS = 5_000;
 
 export class HttpTransport implements Transport {
   readonly kind = 'http' as const;
@@ -113,7 +149,7 @@ export class HttpTransport implements Transport {
 
   private httpRun(id: string): TransportRun {
     const controller = new AbortController();
-    let terminal = false;
+    let terminalObserved = false;
     let resolveDone!: (result: NikaRunResult) => void;
     let rejectDone!: (error: Error) => void;
     const done = new Promise<NikaRunResult>((resolve, reject) => {
@@ -122,63 +158,36 @@ export class HttpTransport implements Transport {
     });
     done.catch(() => {});
 
+    const settle = (source: NikaEvent | DurableJob) => {
+      terminalObserved = true;
+      const event = 'sequence' in source ? source : undefined;
+      const durable = event ? undefined : source as DurableJob;
+      const receipt = eventReceipt(event);
+      const outputs = eventOutputs(event);
+      const error = event ? eventError(event) : durable?.error;
+      resolveDone({
+        id,
+        status: source.status!,
+        transport: this.kind,
+        ...(durable?.execution_id ? { execution_id: durable.execution_id } : {}),
+        ...(durable?.trace_id ? { trace_id: durable.trace_id } : {}),
+        ...(outputs ? { outputs } : {}),
+        ...(receipt ? { receipt } : {}),
+        ...(error ? { error } : {}),
+      });
+    };
+
     const events: AsyncIterable<NikaEvent> = {
       [Symbol.asyncIterator]: async function* (this: HttpTransport) {
         try {
-          let after = 0;
-          while (!terminal) {
-            const headers = new Headers({ Accept: 'text/event-stream' });
-            if (after > 0) headers.set('Last-Event-ID', String(after));
-            const response = await this.fetchResponse(
-              `/v1/jobs/${encodeURIComponent(id)}/events`,
-              { headers, signal: controller.signal },
-              false,
-            );
-            if (!response.body) {
-              throw new NikaProtocolError(this.kind, 'Event response has no body');
-            }
-            let advanced = false;
-            for await (const event of decodeSse(
-              response.body,
-              this.options.machineBufferBytes,
-              this.kind,
-            )) {
-              const sequence = event.sequence;
-              if (!Number.isSafeInteger(sequence) || (sequence as number) < 1) {
-                throw new NikaProtocolError(this.kind, 'SSE event omitted a positive integer sequence');
-              }
-              if ((sequence as number) <= after) continue;
-              after = sequence as number;
-              advanced = true;
-              yield event;
-              if (isTerminal(event.status)) {
-                terminal = true;
-                const receipt = eventReceipt(event);
-                const outputs = eventOutputs(event);
-                const error = eventError(event);
-                resolveDone({
-                  id,
-                  status: event.status!,
-                  transport: this.kind,
-                  ...(outputs ? { outputs } : {}),
-                  ...(receipt ? { receipt } : {}),
-                  ...(error ? { error } : {}),
-                });
-                return;
-              }
-            }
-            if (!advanced) {
-              throw new NikaProtocolError(
-                this.kind,
-                `Event stream for run ${id} closed without progress or terminal settlement`,
-              );
-            }
+          for await (const event of this.observeJob(id, controller.signal, settle)) {
+            yield event;
           }
         } catch (cause) {
           const error = cause instanceof Error
             ? cause
             : new NikaTransportError(this.kind, String(cause));
-          if (!terminal) rejectDone(error);
+          if (!terminalObserved) rejectDone(error);
           throw error;
         }
       }.bind(this),
@@ -192,8 +201,363 @@ export class HttpTransport implements Transport {
         throw this.gap('cancel', 'nika serve intentionally has no cancel route');
       },
       cleanup: async () => {
-        if (!terminal) controller.abort();
+        if (!terminalObserved) controller.abort();
       },
+    };
+  }
+
+  private async *observeJob(
+    id: string,
+    signal: AbortSignal,
+    settle: (source: NikaEvent | DurableJob) => void,
+  ): AsyncGenerator<NikaEvent> {
+    const state: ObservationState = {
+      lastSequence: 0,
+      attempt: 0,
+      terminalObserved: false,
+    };
+    const jobPath = `/v1/jobs/${encodeURIComponent(id)}`;
+    const eventsPath = `${jobPath}/events`;
+
+    while (!state.terminalObserved) {
+      const headers = new Headers({ Accept: 'text/event-stream' });
+      if (state.lastSequence > 0) headers.set('Last-Event-ID', String(state.lastSequence));
+
+      let response: Response;
+      try {
+        response = await this.observationRequest(eventsPath, { headers, signal });
+      } catch {
+        await this.retryObservation(state, signal, {
+          retry: true,
+        });
+        continue;
+      }
+
+      if (response.status === 404) {
+        await discardResponse(response);
+        const durable = await this.inspectDurableJob(jobPath, id, signal);
+        if (isRetryObservation(durable)) {
+          await this.retryObservation(state, signal, durable);
+          continue;
+        }
+        if (isTerminal(durable.status)) {
+          state.terminalObserved = true;
+          settle(durable);
+          return;
+        }
+        await this.retryObservation(state, signal, { retry: true });
+        continue;
+      }
+
+      if (isRetryableStatus(response.status)) {
+        const retryAfterMilliseconds = retryAfter(response.headers.get('Retry-After'));
+        await discardResponse(response);
+        await this.retryObservation(state, signal, {
+          retry: true,
+          ...(retryAfterMilliseconds !== undefined ? { retryAfterMilliseconds } : {}),
+        });
+        continue;
+      }
+
+      this.assertObservationResponse(response, eventsPath, 'text/event-stream');
+      const body = response.body;
+      if (!body) {
+        throw new NikaProtocolError(this.kind, 'SSE event response omitted its body');
+      }
+
+      try {
+        const limits = this.sseLimits();
+        for await (const frame of decodeSse(body, limits)) {
+          if (frame.retry !== undefined) {
+            state.serverRetryMilliseconds = boundedDelay(frame.retry);
+          }
+          if (frame.data === undefined) continue;
+          const event = this.nikaEvent(frame.id, frame.data);
+          const sequence = event.sequence as number;
+          if (sequence === state.lastSequence) {
+            if (frame.data === state.lastData) continue;
+            throw new NikaProtocolError(
+              this.kind,
+              `SSE sequence ${sequence} replayed with different data`,
+            );
+          }
+          if (sequence !== state.lastSequence + 1) {
+            const relation = sequence > state.lastSequence ? 'gap' : 'out-of-order replay';
+            throw new NikaProtocolError(
+              this.kind,
+              `SSE ${relation}: expected sequence ${state.lastSequence + 1}, received ${sequence}`,
+            );
+          }
+          state.lastSequence = sequence;
+          state.lastData = frame.data;
+          state.attempt = 0;
+          if (isTerminal(event.status)) {
+            state.terminalObserved = true;
+            settle(event);
+          }
+          yield event;
+          if (state.terminalObserved) return;
+        }
+      } catch (cause) {
+        if (cause instanceof SseParseError) {
+          throw new NikaProtocolError(this.kind, cause.message, { cause });
+        }
+        if (cause instanceof NikaProtocolError) throw cause;
+        // A body reset is recoverable, but durable state is authoritative
+        // before any resume attempt.
+      }
+
+      const durable = await this.inspectDurableJob(jobPath, id, signal);
+      if (isRetryObservation(durable)) {
+        await this.retryObservation(state, signal, durable);
+        continue;
+      }
+      if (isTerminal(durable.status)) {
+        state.terminalObserved = true;
+        settle(durable);
+        return;
+      }
+      await this.retryObservation(state, signal, { retry: true });
+    }
+  }
+
+  private nikaEvent(id: string | undefined, data: string): NikaEvent {
+    if (!id || !/^[1-9]\d*$/.test(id)) {
+      throw new NikaProtocolError(
+        this.kind,
+        'SSE event id must be a canonical positive decimal sequence',
+      );
+    }
+    const sequence = Number(id);
+    if (!Number.isSafeInteger(sequence)) {
+      throw new NikaProtocolError(this.kind, 'SSE event id exceeded the safe integer range');
+    }
+    let value: unknown;
+    try {
+      value = JSON.parse(data);
+    } catch (cause) {
+      throw new NikaProtocolError(this.kind, 'SSE data was not valid JSON', {
+        cause: cause instanceof Error ? cause : undefined,
+      });
+    }
+    const event = machineObject(value);
+    if (!event) throw new NikaProtocolError(this.kind, 'SSE data was not an object');
+    if (event.sequence !== sequence) {
+      throw new NikaProtocolError(
+        this.kind,
+        `SSE id ${id} did not equal JSON data.sequence`,
+      );
+    }
+    if (event.kind !== undefined && event.kind !== null && typeof event.kind !== 'string') {
+      throw new NikaProtocolError(this.kind, 'SSE data.kind was not a string or null');
+    }
+    if (
+      event.status !== undefined
+      && event.status !== null
+      && (typeof event.status !== 'string' || !JOB_STATUSES.has(event.status))
+    ) {
+      throw new NikaProtocolError(this.kind, 'SSE data.status was not a known job status or null');
+    }
+    for (const field of ['code', 'message'] as const) {
+      if (event[field] !== undefined && typeof event[field] !== 'string') {
+        throw new NikaProtocolError(this.kind, `SSE data.${field} was not a string`);
+      }
+    }
+    return event as NikaEvent;
+  }
+
+  private async inspectDurableJob(
+    path: string,
+    expectedId: string,
+    signal: AbortSignal,
+  ): Promise<DurableJob | RetryObservation> {
+    let response: Response;
+    try {
+      response = await this.observationRequest(path, { headers: { Accept: 'application/json' }, signal });
+    } catch {
+      return { retry: true };
+    }
+    if (response.status === 404) {
+      await discardResponse(response);
+      throw new NikaTransportError(this.kind, `HTTP 404 for ${path}; job was durably absent`);
+    }
+    if (isRetryableStatus(response.status)) {
+      const retryAfterMilliseconds = retryAfter(response.headers.get('Retry-After'));
+      await discardResponse(response);
+      return {
+        retry: true,
+        ...(retryAfterMilliseconds !== undefined ? { retryAfterMilliseconds } : {}),
+      };
+    }
+    this.assertObservationResponse(response, path, 'application/json');
+    try {
+      const object = await this.readObservationObject(response, path);
+      return durableJob(object, expectedId, this.kind);
+    } catch (cause) {
+      if (cause instanceof NikaTransportError && !(cause instanceof NikaProtocolError)) {
+        return { retry: true };
+      }
+      throw cause;
+    }
+  }
+
+  private assertObservationResponse(
+    response: Response,
+    path: string,
+    contentType: string,
+  ): void {
+    if (response.status === 204) {
+      void discardResponse(response);
+      throw new NikaProtocolError(this.kind, `HTTP 204 permanently stopped observation for ${path}`);
+    }
+    if (response.status === 401 || response.status === 403) {
+      void discardResponse(response);
+      throw new NikaTransportError(this.kind, `HTTP ${response.status} authorization failure for ${path}`);
+    }
+    if (response.status !== 200) {
+      void discardResponse(response);
+      throw new NikaTransportError(this.kind, `HTTP ${response.status} permanently failed ${path}`);
+    }
+    const actual = response.headers.get('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase();
+    if (actual !== contentType) {
+      void discardResponse(response);
+      throw new NikaProtocolError(
+        this.kind,
+        `HTTP ${path} returned an invalid content-type`,
+      );
+    }
+  }
+
+  private async readObservationObject(
+    response: Response,
+    path: string,
+  ): Promise<Record<string, unknown>> {
+    if (!response.body) {
+      throw new NikaProtocolError(this.kind, `HTTP ${path} omitted its JSON body`);
+    }
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let bytes = 0;
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      void reader.cancel().catch(() => {});
+    }, this.options.requestTimeout);
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        bytes += value.byteLength;
+        if (bytes > this.options.machineBufferBytes) {
+          throw new NikaProtocolError(
+            this.kind,
+            `HTTP ${path} JSON exceeded ${this.options.machineBufferBytes} bytes`,
+          );
+        }
+        chunks.push(value);
+      }
+    } catch (cause) {
+      if (cause instanceof NikaProtocolError) throw cause;
+      throw new NikaTransportError(this.kind, `HTTP ${path} response body reset`);
+    } finally {
+      clearTimeout(timer);
+      await reader.cancel().catch(() => {});
+      reader.releaseLock();
+    }
+    if (timedOut) {
+      throw new NikaTransportError(
+        this.kind,
+        `HTTP observation timed out after ${this.options.requestTimeout}ms`,
+      );
+    }
+    const body = new Uint8Array(bytes);
+    let offset = 0;
+    for (const chunk of chunks) {
+      body.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    let text: string;
+    try {
+      text = new TextDecoder('utf-8', { fatal: true }).decode(body);
+    } catch (cause) {
+      throw new NikaProtocolError(this.kind, `HTTP ${path} JSON was not valid UTF-8`, {
+        cause: cause instanceof Error ? cause : undefined,
+      });
+    }
+    let value: unknown;
+    try {
+      value = JSON.parse(text);
+    } catch (cause) {
+      throw new NikaProtocolError(this.kind, `HTTP ${path} did not return valid JSON`, {
+        cause: cause instanceof Error ? cause : undefined,
+      });
+    }
+    const object = machineObject(value);
+    if (!object) throw new NikaProtocolError(this.kind, `HTTP ${path} did not return an object`);
+    return object;
+  }
+
+  private async observationRequest(
+    path: string,
+    init: RequestInit,
+    withTimeout = true,
+  ): Promise<Response> {
+    const controller = withTimeout ? new AbortController() : undefined;
+    const timer = controller
+      ? setTimeout(() => controller.abort(), this.options.requestTimeout)
+      : undefined;
+    const callerSignal = init.signal;
+    const abort = () => controller?.abort(callerSignal?.reason);
+    callerSignal?.addEventListener('abort', abort, { once: true });
+    const headers = new Headers(init.headers);
+    headers.set('Authorization', `Bearer ${this.options.token}`);
+    try {
+      return await this.options.fetch(`${this.options.url}${path}`, {
+        ...init,
+        headers,
+        signal: controller?.signal ?? callerSignal,
+      });
+    } catch {
+      if (controller?.signal.aborted && !callerSignal?.aborted) {
+        throw new NikaTransportError(
+          this.kind,
+          `HTTP observation timed out after ${this.options.requestTimeout}ms`,
+        );
+      }
+      throw new NikaTransportError(this.kind, 'HTTP observation transport failed');
+    } finally {
+      if (timer) clearTimeout(timer);
+      callerSignal?.removeEventListener('abort', abort);
+    }
+  }
+
+  private async retryObservation(
+    state: ObservationState,
+    signal: AbortSignal,
+    retry: RetryObservation,
+  ): Promise<void> {
+    if (state.attempt >= MAX_OBSERVATION_RETRIES) {
+      throw new NikaTransportError(
+        this.kind,
+        `HTTP observation exhausted ${MAX_OBSERVATION_RETRIES} retries`,
+      );
+    }
+    state.attempt += 1;
+    const exponential = Math.min(
+      RETRY_BASE_MILLISECONDS * (2 ** (state.attempt - 1)),
+      RETRY_MAX_MILLISECONDS,
+    );
+    const milliseconds = retry.retryAfterMilliseconds
+      ?? state.serverRetryMilliseconds
+      ?? exponential;
+    await (this.options.retryDelay ?? abortableDelay)(boundedDelay(milliseconds), signal);
+  }
+
+  private sseLimits(): SseLimits {
+    return {
+      maxLineBytes: this.options.machineBufferBytes,
+      maxFrameBytes: this.options.machineBufferBytes,
+      maxBufferBytes: this.options.machineBufferBytes,
     };
   }
 
@@ -317,11 +681,10 @@ export class HttpTransport implements Transport {
         signal: controller?.signal ?? callerSignal,
       });
       if (!response.ok) {
-        const body = await response.text().catch(() => '');
-        const safeBody = redact(body, this.options.token);
+        await discardResponse(response);
         throw new NikaTransportError(
           this.kind,
-          `HTTP ${response.status} for ${path}${safeBody ? `: ${safeBody}` : ''}`,
+          `HTTP ${response.status} for ${path}: [REDACTED]`,
         );
       }
       return response;
@@ -344,57 +707,95 @@ export class HttpTransport implements Transport {
   }
 }
 
-function redact(value: string, secret: string): string {
-  if (!value) return value;
-  return value.split(secret).join('[REDACTED]');
-}
-
 function isTerminal(status: unknown): status is string {
   return status === 'succeeded' || status === 'failed' || status === 'interrupted';
 }
 
-async function* decodeSse(
-  stream: ReadableStream<Uint8Array>,
-  limit: number,
-  transport: 'http',
-): AsyncGenerator<NikaEvent> {
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
-      buffer = buffer.replace(/\r\n/g, '\n');
-      let boundary: number;
-      while ((boundary = buffer.indexOf('\n\n')) >= 0) {
-        const frame = buffer.slice(0, boundary);
-        buffer = buffer.slice(boundary + 2);
-        const data = frame
-          .split('\n')
-          .filter((line) => line.startsWith('data:'))
-          .map((line) => line.slice(5).replace(/^ /, ''))
-          .join('\n');
-        if (!data) continue;
-        let value: unknown;
-        try {
-          value = JSON.parse(data);
-        } catch (cause) {
-          throw new NikaProtocolError(transport, 'SSE data was not valid JSON', {
-            cause: cause instanceof Error ? cause : undefined,
-          });
-        }
-        const event = machineObject(value);
-        if (!event) throw new NikaProtocolError(transport, 'SSE data was not an object');
-        yield event as NikaEvent;
-      }
-      if (Buffer.byteLength(buffer) > limit) {
-        throw new NikaProtocolError(transport, `SSE frame exceeded ${limit} bytes`);
-      }
-      if (done) break;
-    }
-  } finally {
-    await reader.cancel().catch(() => {});
-    reader.releaseLock();
+function isRetryableStatus(status: number): boolean {
+  return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+function retryAfter(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) {
+    const seconds = Number(trimmed);
+    return Number.isSafeInteger(seconds) ? boundedDelay(seconds * 1_000) : undefined;
   }
+  const date = Date.parse(trimmed);
+  if (!Number.isFinite(date)) return undefined;
+  return boundedDelay(Math.max(0, date - Date.now()));
+}
+
+function boundedDelay(milliseconds: number): number {
+  return Math.max(
+    RETRY_MIN_MILLISECONDS,
+    Math.min(Math.floor(milliseconds), RETRY_MAX_MILLISECONDS),
+  );
+}
+
+function abortableDelay(milliseconds: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.reject(signal.reason ?? new Error('Observation aborted'));
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(done, milliseconds);
+    function done() {
+      signal.removeEventListener('abort', abort);
+      resolve();
+    }
+    function abort() {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', abort);
+      reject(signal.reason ?? new Error('Observation aborted'));
+    }
+    signal.addEventListener('abort', abort, { once: true });
+  });
+}
+
+async function discardResponse(response: Response): Promise<void> {
+  await response.body?.cancel().catch(() => {});
+}
+
+function isRetryObservation(
+  value: DurableJob | RetryObservation,
+): value is RetryObservation {
+  return 'retry' in value;
+}
+
+function durableJob(
+  value: Record<string, unknown>,
+  expectedId: string,
+  transport: 'http',
+): DurableJob {
+  const allowed = new Set(['id', 'status', 'execution_id', 'trace_id', 'error']);
+  if (Object.keys(value).some((key) => !allowed.has(key))) {
+    throw new NikaProtocolError(transport, 'Durable job response contained unknown fields');
+  }
+  if (value.id !== expectedId || typeof value.status !== 'string' || !JOB_STATUSES.has(value.status)) {
+    throw new NikaProtocolError(transport, 'Durable job response had an invalid id or status');
+  }
+  for (const field of ['execution_id', 'trace_id'] as const) {
+    if (value[field] !== undefined && typeof value[field] !== 'string') {
+      throw new NikaProtocolError(transport, `Durable job response ${field} was not a string`);
+    }
+  }
+  let error: DurableJob['error'];
+  if (value.error !== undefined) {
+    const object = machineObject(value.error);
+    if (
+      !object
+      || Object.keys(object).some((key) => key !== 'code' && key !== 'message')
+      || typeof object.code !== 'string'
+      || typeof object.message !== 'string'
+    ) {
+      throw new NikaProtocolError(transport, 'Durable job response error was malformed');
+    }
+    error = { code: object.code, message: object.message };
+  }
+  return {
+    id: value.id,
+    status: value.status,
+    ...(typeof value.execution_id === 'string' ? { execution_id: value.execution_id } : {}),
+    ...(typeof value.trace_id === 'string' ? { trace_id: value.trace_id } : {}),
+    ...(error ? { error } : {}),
+  };
 }

@@ -1,0 +1,16 @@
+nika: mini-saas-research-monitor
+model: mock/echo
+const:
+  previous: {"papers":12,"adopts":2,"state":"review"}
+  current: {"papers":17,"adopts":3,"state":"approved"}
+permits:
+  tools: ["nika:json_diff"]
+tasks:
+  compare:
+    invoke:
+      tool: "nika:json_diff"
+      args:
+        before: ${{ const.previous }}
+        after: ${{ const.current }}
+outputs:
+  delta: ${{ tasks.compare.output }}

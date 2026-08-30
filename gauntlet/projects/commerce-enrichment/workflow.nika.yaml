@@ -1,0 +1,19 @@
+nika: mini-saas-commerce-enrichment
+model: mock/echo
+const:
+  items: [{"sku":"A-1","stock":4},{"sku":"B-2","stock":0},{"sku":"C-3","stock":9}]
+permits:
+  tools: ["nika:jq"]
+tasks:
+  enrich:
+    for_each:
+      items: ${{ const.items }}
+      max_parallel: 2
+      fail_fast: true
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ item }}
+        expression: '. + {available: (.stock > 0), checked: true}'
+outputs:
+  inventory: ${{ tasks.enrich.output }}

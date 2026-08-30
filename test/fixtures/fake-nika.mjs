@@ -12,7 +12,7 @@ if (command === '--sdk-identity') {
     checkReportVersion: 1,
     eventFormatVersion: 1,
     traceFormatVersion: 1,
-    supportedCapabilities: ['check', 'run', 'trace-verify'],
+    supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'trace'],
   }));
   return;
 }
@@ -24,12 +24,26 @@ if (command === 'wait-for-signal') {
 }
 
 if (command === 'check') {
-  console.log(JSON.stringify({
+  const sdkSnapshot = argv.includes('--sdk-snapshot');
+  const report = {
     report_version: 1,
     clean: !workflow.includes('dirty'),
     argv,
     engine_owned: { future: true },
-  }));
+  };
+  if (sdkSnapshot) {
+    Object.assign(report, {
+      engineVersion: '0.114.0',
+      machineProtocolVersion: workflow.includes('tampered') ? 99 : 1,
+      snapshotFormatVersion: 1,
+      checkReportVersion: 1,
+      eventFormatVersion: 1,
+      traceFormatVersion: 1,
+      supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'trace'],
+      execution_snapshot: '{"format_version":1,"root":"fixture.nika.yaml","digest":"fixture-digest","units":[{"path":"fixture.nika.yaml","kind":0,"digest":"unit-digest","bytes_hex":"00"}]}',
+    });
+  }
+  console.log(JSON.stringify(report));
   process.exit(workflow.includes('dirty') ? 2 : 0);
 }
 

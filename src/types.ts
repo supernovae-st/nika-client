@@ -30,8 +30,10 @@ export interface NikaRemoteConfig extends NikaSharedConfig {
   requestTimeout?: number;
   /** Fetch implementation used by the HTTP transport. */
   fetch?: typeof globalThis.fetch;
-  cwd?: never;
-  bin?: never;
+  /** Working directory used while capturing the immutable snapshot locally. */
+  cwd?: string;
+  /** Local engine used to capture the immutable snapshot before HTTP admission. */
+  bin?: string;
 }
 
 /** Public configuration for the one Nika client surface. */

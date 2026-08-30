@@ -15,6 +15,12 @@ import type {
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
 } from '../types.js';
+import { verifyNikaEngine, type ResolvedNikaEngine } from './binary/index.js';
+import { captureEngine } from './engine-capture.js';
+import {
+  compatibleEngineIdentity,
+  type NikaEngineIdentity,
+} from './engine-identity.js';
 import { eventError, eventOutputs, eventReceipt, machineObject } from './machine.js';
 import type { Transport, TransportRun } from './transport.js';
 
@@ -24,15 +30,47 @@ export interface HttpTransportOptions {
   fetch: typeof globalThis.fetch;
   requestTimeout: number;
   machineBufferBytes: number;
+  engine: ResolvedNikaEngine;
+  cwd?: string;
+}
+
+interface CapturedSnapshot {
+  report: NikaCheckResult;
+  bytes: string;
 }
 
 export class HttpTransport implements Transport {
   readonly kind = 'http' as const;
+  private ready?: Promise<NikaEngineIdentity>;
 
   constructor(private readonly options: HttpTransportOptions) {}
 
-  async check(_workflow: string, _options: NikaCheckOptions): Promise<NikaCheckResult> {
-    throw this.gap('check', 'nika serve does not expose a check route');
+  async check(workflow: string, options: NikaCheckOptions): Promise<NikaCheckResult> {
+    if (options.model !== undefined || options.nativeStrict === true) {
+      throw this.gap(
+        'checkOptions',
+        'Remote snapshot capture does not support model or nativeStrict overrides',
+      );
+    }
+    const captured = await this.captureSnapshot(workflow, options.signal);
+    const acknowledged = await this.json('/v1/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: captured.bytes,
+      signal: options.signal,
+    });
+    if (
+      acknowledged.status !== 'accepted'
+      || typeof acknowledged.snapshot_digest !== 'string'
+      || acknowledged.snapshot_digest.length === 0
+      || typeof acknowledged.root !== 'string'
+      || acknowledged.root.length === 0
+      || !Number.isSafeInteger(acknowledged.units)
+      || (acknowledged.units as number) < 1
+    ) {
+      throw new NikaProtocolError(this.kind, 'Check admission did not acknowledge the snapshot');
+    }
+    return captured.report;
   }
 
   async startRun(workflow: string, options: NikaRunOptions): Promise<TransportRun> {
@@ -43,20 +81,21 @@ export class HttpTransport implements Transport {
     ) {
       throw this.gap(
         'runOptions',
-        'nika serve admission accepts { workflow } only; vars, model, and maxCostUsd are native options',
+        'nika serve snapshot admission has no request envelope for vars, model, or maxCostUsd',
       );
     }
     const idempotencyKey = options.idempotencyKey ?? randomUUID();
     if (Buffer.byteLength(idempotencyKey) < 1 || Buffer.byteLength(idempotencyKey) > 255) {
       throw new NikaTransportError(this.kind, 'Idempotency-Key must be 1-255 bytes');
     }
+    const captured = await this.captureSnapshot(workflow);
     const admitted = await this.json('/v1/jobs', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Idempotency-Key': idempotencyKey,
       },
-      body: JSON.stringify({ workflow }),
+      body: captured.bytes,
     });
     const id = typeof admitted.id === 'string' ? admitted.id : undefined;
     if (!id) {
@@ -162,8 +201,87 @@ export class HttpTransport implements Transport {
     return new NikaCompatibilityError(capability, this.kind, message);
   }
 
-  private async json(path: string, init: RequestInit): Promise<Record<string, unknown>> {
-    const response = await this.fetchResponse(path, init, true);
+  private ensureReady(): Promise<NikaEngineIdentity> {
+    this.ready ??= this.verifyIdentities();
+    return this.ready;
+  }
+
+  private async verifyIdentities(): Promise<NikaEngineIdentity> {
+    // Verify local package integrity first: a modified capture engine must not
+    // reach even the remote liveness probe.
+    const local = await verifyNikaEngine(this.options.engine);
+    const health = await this.json('/health', { method: 'GET' }, false);
+    if (health.status !== 'ok' || health.service !== 'nika-serve') {
+      throw new NikaCompatibilityError(
+        'engineIdentity',
+        this.kind,
+        'GET /health did not identify a live nika-serve engine',
+      );
+    }
+    compatibleEngineIdentity(health, this.kind, local);
+    return local;
+  }
+
+  private async captureSnapshot(
+    workflow: string,
+    signal?: AbortSignal,
+  ): Promise<CapturedSnapshot> {
+    const identity = await this.ensureReady();
+    const captured = await captureEngine(
+      this.options.engine.bin,
+      ['check', workflow, '--json', '--sdk-snapshot'],
+      {
+        cwd: this.options.cwd,
+        signal,
+        bufferBytes: this.options.machineBufferBytes,
+        transport: this.kind,
+        label: 'SDK snapshot capture',
+      },
+    );
+    let outer: Record<string, unknown>;
+    try {
+      outer = JSON.parse(captured.stdout.trim()) as unknown as Record<string, unknown>;
+    } catch (cause) {
+      throw new NikaCompatibilityError(
+        'executionSnapshot',
+        this.kind,
+        `Local engine did not emit the required snapshot report (exit ${captured.exitCode})`,
+      );
+    }
+    compatibleEngineIdentity(outer, this.kind, identity);
+    if (
+      outer.engineVersion !== identity.engineVersion
+      || outer.report_version !== identity.checkReportVersion
+    ) {
+      throw this.gap(
+        'executionSnapshot',
+        'Local snapshot report identity changed after the engine probe',
+      );
+    }
+    if (captured.stderr.trim()) {
+      throw this.gap('executionSnapshot', 'Local snapshot capture wrote unexpected diagnostics');
+    }
+    if (captured.exitCode !== 0 || outer.clean !== true) {
+      throw this.gap(
+        'executionSnapshot',
+        `Local snapshot capture was not clean (exit ${captured.exitCode})`,
+      );
+    }
+    const bytes = outer.execution_snapshot;
+    if (typeof bytes !== 'string' || bytes.length === 0) {
+      throw this.gap('executionSnapshot', 'Local engine omitted execution_snapshot bytes');
+    }
+    const report: Record<string, unknown> = { ...outer, exitCode: captured.exitCode };
+    delete report.execution_snapshot;
+    return { report: report as NikaCheckResult, bytes };
+  }
+
+  private async json(
+    path: string,
+    init: RequestInit,
+    authenticated = true,
+  ): Promise<Record<string, unknown>> {
+    const response = await this.fetchResponse(path, init, true, authenticated);
     let value: unknown;
     try {
       value = await response.json();
@@ -181,6 +299,7 @@ export class HttpTransport implements Transport {
     path: string,
     init: RequestInit,
     withTimeout: boolean,
+    authenticated = true,
   ): Promise<Response> {
     const controller = withTimeout ? new AbortController() : undefined;
     const timer = controller
@@ -190,7 +309,7 @@ export class HttpTransport implements Transport {
     const abort = () => controller?.abort(callerSignal?.reason);
     callerSignal?.addEventListener('abort', abort, { once: true });
     const headers = new Headers(init.headers);
-    headers.set('Authorization', `Bearer ${this.options.token}`);
+    if (authenticated) headers.set('Authorization', `Bearer ${this.options.token}`);
     try {
       const response = await this.options.fetch(`${this.options.url}${path}`, {
         ...init,
@@ -199,9 +318,10 @@ export class HttpTransport implements Transport {
       });
       if (!response.ok) {
         const body = await response.text().catch(() => '');
+        const safeBody = redact(body, this.options.token);
         throw new NikaTransportError(
           this.kind,
-          `HTTP ${response.status} for ${path}${body ? `: ${body}` : ''}`,
+          `HTTP ${response.status} for ${path}${safeBody ? `: ${safeBody}` : ''}`,
         );
       }
       return response;
@@ -222,6 +342,11 @@ export class HttpTransport implements Transport {
       callerSignal?.removeEventListener('abort', abort);
     }
   }
+}
+
+function redact(value: string, secret: string): string {
+  if (!value) return value;
+  return value.split(secret).join('[REDACTED]');
 }
 
 function isTerminal(status: unknown): status is string {

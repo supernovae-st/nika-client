@@ -48,9 +48,6 @@ export class Nika {
       if (typeof config.token !== 'string' || config.token.length === 0) {
         throw new NikaConfigurationError('A non-empty token is required with a Nika URL');
       }
-      if (config.cwd !== undefined || config.bin !== undefined) {
-        throw new NikaConfigurationError('cwd and bin are native-process options, not HTTP options');
-      }
       const url = checkedUrl(config.url, config.allowInsecureHttp === true);
       this.transport = new HttpTransport({
         url,
@@ -61,6 +58,8 @@ export class Nika {
           'requestTimeout',
         ),
         machineBufferBytes,
+        engine: resolveNikaEngine(config.bin),
+        cwd: config.cwd,
       });
     } else {
       const remoteOnly = config as NikaConfig & {

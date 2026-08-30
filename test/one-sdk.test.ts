@@ -29,6 +29,22 @@ const INCOMPATIBLE_FIXTURE = path.join(
   'incompatible-nika.mjs',
 );
 const posix = process.platform !== 'win32';
+const SNAPSHOT_BYTES = '{"format_version":1,"root":"fixture.nika.yaml","digest":"fixture-digest","units":[{"path":"fixture.nika.yaml","kind":0,"digest":"unit-digest","bytes_hex":"00"}]}';
+
+function healthResponse(overrides: Record<string, unknown> = {}): Response {
+  return jsonResponse({
+    status: 'ok',
+    service: 'nika-serve',
+    engineVersion: '0.114.0',
+    machineProtocolVersion: 1,
+    snapshotFormatVersion: 1,
+    checkReportVersion: 1,
+    eventFormatVersion: 1,
+    traceFormatVersion: 1,
+    supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'trace'],
+    ...overrides,
+  });
+}
 
 function native(overrides: Omit<NikaLocalConfig, 'bin'> = {}): Nika {
   return new Nika({ bin: FIXTURE, ...overrides });
@@ -83,11 +99,13 @@ describe('one Nika surface', () => {
       url: 'http://127.0.0.1:8787/',
       token: 'secret',
       allowInsecureHttp: true,
+      bin: FIXTURE,
     }).transportKind).toBe('http');
   });
 
   it('exposes only identity and done on a run handle', async () => {
     const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(jsonResponse({ id: 'run-shape', status: 'queued' }, 202))
       .mockResolvedValueOnce(sseResponse([
         { sequence: 1, kind: 'settled', status: 'succeeded' },
@@ -95,6 +113,7 @@ describe('one Nika surface', () => {
     const client = new Nika({
       url: 'https://nika.example',
       token: 'secret',
+      bin: FIXTURE,
       fetch: fetch as typeof globalThis.fetch,
     });
     const run = await client.run('flow.nika.yaml');
@@ -231,12 +250,14 @@ describe('HTTP transport', () => {
     return new Nika({
       url: 'https://nika.example/',
       token: 'server-token',
+      bin: FIXTURE,
       fetch,
     });
   }
 
-  it('admits only { workflow }, drains SSE eagerly, and retains events', async () => {
+  it('posts the exact opaque snapshot bytes with no legacy workflow envelope', async () => {
     const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(jsonResponse({ id: 'remote-1', status: 'queued' }, 202))
       .mockResolvedValueOnce(sseResponse([
         { sequence: 1, kind: 'queued', status: 'queued' },
@@ -252,16 +273,22 @@ describe('HTTP transport', () => {
     });
     expect(await collect(client.events(run))).toHaveLength(3);
 
-    const [url, init] = fetch.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetch.mock.calls[1] as [string, RequestInit];
     expect(url).toBe('https://nika.example/v1/jobs');
-    expect(JSON.parse(init.body as string)).toEqual({ workflow: 'nested/flow.nika.yaml' });
+    expect(init.body).toBe(SNAPSHOT_BYTES);
+    expect(init.body).not.toContain('nested/flow.nika.yaml');
+    expect(init.body).not.toContain('workflow');
     const headers = new Headers(init.headers);
+    const healthHeaders = new Headers(fetch.mock.calls[0]?.[1]?.headers);
+    expect(healthHeaders.has('Authorization')).toBe(false);
     expect(headers.get('Authorization')).toBe('Bearer server-token');
+    expect(headers.get('Content-Type')).toBe('application/json');
     expect(headers.get('Idempotency-Key')).toBe('stable-key');
   });
 
   it('reconnects a cleanly closed event stream with Last-Event-ID', async () => {
     const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(jsonResponse({ id: 'remote-reconnect', status: 'queued' }, 202))
       .mockResolvedValueOnce(sseResponse([
         { sequence: 1, kind: 'queued', status: 'queued' },
@@ -281,23 +308,97 @@ describe('HTTP transport', () => {
       status: 'failed',
       error: { code: 'NIKA-TEST-002', message: 'no' },
     });
-    const reconnectHeaders = new Headers(fetch.mock.calls[2]?.[1]?.headers);
+    const reconnectHeaders = new Headers(fetch.mock.calls[3]?.[1]?.headers);
     expect(reconnectHeaders.get('Last-Event-ID')).toBe('1');
+  });
+
+  it('returns the complete local check report only after remote acknowledgement', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
+      .mockResolvedValueOnce(jsonResponse({
+        status: 'accepted',
+        snapshot_digest: 'fixture-digest',
+        root: 'fixture.nika.yaml',
+        units: 1,
+      }));
+    const client = remote(fetch as typeof globalThis.fetch);
+    const report = await client.check('/local/only/flow.nika.yaml');
+    expect(report).toMatchObject({
+      clean: true,
+      report_version: 1,
+      engine_owned: { future: true },
+      exitCode: 0,
+    });
+    expect(report).not.toHaveProperty('execution_snapshot');
+    expect(report.argv).toEqual([
+      'check',
+      '/local/only/flow.nika.yaml',
+      '--json',
+      '--sdk-snapshot',
+    ]);
+    const [url, init] = fetch.mock.calls[1] as [string, RequestInit];
+    expect(url).toBe('https://nika.example/v1/check');
+    expect(init.body).toBe(SNAPSHOT_BYTES);
+    expect(init.body).not.toContain('/local/only/flow.nika.yaml');
+  });
+
+  it('caches compatible identities and refuses incompatible remote protocol', async () => {
+    const compatibleFetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
+      .mockResolvedValueOnce(jsonResponse({
+        status: 'accepted',
+        snapshot_digest: 'fixture-digest',
+        root: 'fixture.nika.yaml',
+        units: 1,
+      }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'cached', status: 'queued' }, 202))
+      .mockResolvedValueOnce(sseResponse([
+        { sequence: 1, kind: 'settled', status: 'succeeded' },
+      ]));
+    const compatible = remote(compatibleFetch as typeof globalThis.fetch);
+    await compatible.check('one.nika.yaml');
+    const run = await compatible.run('two.nika.yaml');
+    await run.done;
+    expect(compatibleFetch.mock.calls.filter(([url]) => String(url).endsWith('/health')))
+      .toHaveLength(1);
+
+    const incompatibleFetch = vi.fn().mockResolvedValueOnce(healthResponse({
+      machineProtocolVersion: 99,
+    }));
+    await expect(remote(incompatibleFetch as typeof globalThis.fetch).run('never.nika.yaml'))
+      .rejects.toMatchObject({ capability: 'engineIdentity', transport: 'http' });
+    expect(incompatibleFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses dirty or tampered local capture before network admission', async () => {
+    for (const workflow of ['dirty.nika.yaml', 'tampered.nika.yaml']) {
+      const fetch = vi.fn().mockResolvedValueOnce(healthResponse());
+      await expect(remote(fetch as typeof globalThis.fetch).run(workflow))
+        .rejects.toBeInstanceOf(NikaCompatibilityError);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(String(fetch.mock.calls[0]?.[0])).toBe('https://nika.example/health');
+    }
   });
 
   it('refuses options and capabilities absent from live nika serve', async () => {
     const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(jsonResponse({ id: 'remote-gaps', status: 'queued' }, 202))
       .mockResolvedValueOnce(sseResponse([
         { sequence: 1, kind: 'settled', status: 'succeeded' },
       ]));
     const client = remote(fetch as typeof globalThis.fetch);
-    await expect(client.check('flow.nika.yaml')).rejects.toMatchObject({
-      capability: 'check',
-      transport: 'http',
-    });
-    await expect(client.run('flow.nika.yaml', { vars: { x: 1 } }))
-      .rejects.toMatchObject({ capability: 'runOptions' });
+    await expect(client.check('flow.nika.yaml', { model: 'mock/echo' }))
+      .rejects.toMatchObject({ capability: 'checkOptions', transport: 'http' });
+    for (const options of [
+      { vars: { x: 1 } },
+      { model: 'mock/echo' },
+      { maxCostUsd: 1 },
+    ]) {
+      await expect(client.run('flow.nika.yaml', options))
+        .rejects.toMatchObject({ capability: 'runOptions', transport: 'http' });
+    }
+    expect(fetch).not.toHaveBeenCalled();
     const run = await client.run('flow.nika.yaml');
     await run.done;
     await expect(client.cancel(run)).rejects.toMatchObject({
@@ -308,5 +409,21 @@ describe('HTTP transport', () => {
       capability: 'traceVerify',
       transport: 'http',
     });
+  });
+
+  it('redacts the bearer token from HTTP failures', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(new Response(
+      'reflected server-token',
+      { status: 500 },
+    ));
+    const client = remote(fetch as typeof globalThis.fetch);
+    let failure: unknown;
+    try {
+      await client.run('flow.nika.yaml');
+    } catch (cause) {
+      failure = cause;
+    }
+    expect(String(failure)).toContain('[REDACTED]');
+    expect(String(failure)).not.toContain('server-token');
   });
 });

@@ -1,24 +1,18 @@
-import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { NikaCompatibilityError } from '../../errors.js';
+import { captureEngine } from '../engine-capture.js';
+import {
+  compatibleEngineIdentity,
+  type NikaEngineIdentity,
+} from '../engine-identity.js';
 import type { ResolvedNikaEngine } from './resolve.js';
 
-const MACHINE_PROTOCOL_VERSION = 1;
 const IDENTITY_BUFFER_BYTES = 16 * 1024;
 
-export interface NikaEngineIdentity {
-  engineVersion: string;
-  machineProtocolVersion: number;
-  snapshotFormatVersion?: number;
-  checkReportVersion?: number;
-  eventFormatVersion?: number;
-  traceFormatVersion?: number;
-  supportedCapabilities?: string[];
-  [key: string]: unknown;
-}
+export type { NikaEngineIdentity } from '../engine-identity.js';
 
 interface PayloadIntegrity {
   algorithm: string;
@@ -37,11 +31,6 @@ export async function verifyNikaEngine(
     : undefined;
   const identity = await probeIdentity(engine.bin);
 
-  if (identity.machineProtocolVersion !== MACHINE_PROTOCOL_VERSION) {
-    throw incompatible(
-      `Engine machine protocol ${String(identity.machineProtocolVersion)} is incompatible with SDK protocol ${MACHINE_PROTOCOL_VERSION}`,
-    );
-  }
   if (expectedVersion !== undefined && identity.engineVersion !== expectedVersion) {
     throw incompatible(
       `Packaged engine version ${identity.engineVersion} does not match payload version ${expectedVersion}`,
@@ -89,7 +78,16 @@ async function verifyManagedPayload(engine: ResolvedNikaEngine): Promise<string>
 }
 
 async function probeIdentity(bin: string): Promise<NikaEngineIdentity> {
-  const captured = await capture(bin, ['--sdk-identity']);
+  const captured = await captureEngine(bin, ['--sdk-identity'], {
+    bufferBytes: IDENTITY_BUFFER_BYTES,
+    transport: 'native-process',
+    label: 'Engine identity probe',
+  }).catch((cause: unknown) => {
+    throw incompatible(
+      'Engine identity probe failed',
+      cause,
+    );
+  });
   if (captured.exitCode !== 0) {
     throw incompatible(`Engine identity probe exited with code ${captured.exitCode}`);
   }
@@ -99,53 +97,15 @@ async function probeIdentity(bin: string): Promise<NikaEngineIdentity> {
   } catch (cause) {
     throw incompatible('Engine identity probe did not emit one JSON object', cause);
   }
-  if (!isRecord(value)) throw incompatible('Engine identity probe did not emit an object');
-  if (typeof value.engineVersion !== 'string' || value.engineVersion.length === 0) {
-    throw incompatible('Engine identity is missing engineVersion');
+  if (captured.stderr.trim()) {
+    throw incompatible('Engine identity probe wrote unexpected diagnostics');
   }
-  if (!Number.isSafeInteger(value.machineProtocolVersion)) {
-    throw incompatible('Engine identity is missing machineProtocolVersion');
+  try {
+    return compatibleEngineIdentity(value, 'native-process');
+  } catch (cause) {
+    if (cause instanceof NikaCompatibilityError) throw cause;
+    throw incompatible('Engine identity probe was incompatible', cause);
   }
-  return value as NikaEngineIdentity;
-}
-
-function capture(
-  bin: string,
-  args: string[],
-): Promise<{ exitCode: number; stdout: string }> {
-  return new Promise((resolve, reject) => {
-    const child = spawn(bin, args, {
-      shell: false,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    let stdout = '';
-    let stderr = '';
-    let overflow = false;
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-    child.stdout.on('data', (chunk: string) => {
-      stdout += chunk;
-      overflow ||= Buffer.byteLength(stdout) > IDENTITY_BUFFER_BYTES;
-      if (overflow) child.kill('SIGTERM');
-    });
-    child.stderr.on('data', (chunk: string) => {
-      stderr += chunk;
-      overflow ||= Buffer.byteLength(stderr) > IDENTITY_BUFFER_BYTES;
-      if (overflow) child.kill('SIGTERM');
-    });
-    child.once('error', (cause) => reject(incompatible(`Cannot spawn ${bin}`, cause)));
-    child.once('close', (code) => {
-      if (overflow) {
-        reject(incompatible(`Engine identity probe exceeded ${IDENTITY_BUFFER_BYTES} bytes`));
-        return;
-      }
-      if (stderr.trim()) {
-        reject(incompatible('Engine identity probe wrote unexpected diagnostics'));
-        return;
-      }
-      resolve({ exitCode: code ?? 3, stdout });
-    });
-  });
 }
 
 async function readJson(file: string, label: string): Promise<Record<string, unknown>> {

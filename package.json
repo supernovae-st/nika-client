@@ -1,7 +1,7 @@
 {
   "name": "@supernovae-st/nika-client",
   "version": "0.114.0",
-  "description": "TypeScript client for Nika — a live local driver plus the nika serve HTTP client",
+  "description": "One TypeScript SDK for local and remote Nika execution",
   "repository": {
     "type": "git",
     "url": "https://github.com/supernovae-st/nika-client.git"
@@ -30,16 +30,6 @@
       "require": {
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
-      }
-    },
-    "./local": {
-      "import": {
-        "types": "./dist/local/index.d.ts",
-        "default": "./dist/local/index.js"
-      },
-      "require": {
-        "types": "./dist/local/index.d.cts",
-        "default": "./dist/local/index.cjs"
       }
     }
   },

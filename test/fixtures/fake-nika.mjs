@@ -49,7 +49,7 @@ if (command === 'check') {
       eventFormatVersion: 1,
       traceFormatVersion: 1,
       supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'trace'],
-      execution_snapshot: '{"format_version":1,"root":"fixture.nika.yaml","digest":"fixture-digest","units":[{"path":"fixture.nika.yaml","kind":0,"digest":"unit-digest","bytes_hex":"00"}]}',
+      execution_snapshot: '{"format_version":1,"root":"fixture.nika.yaml","digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","units":[{"path":"fixture.nika.yaml","kind":0,"digest":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","bytes_hex":"00"}]}',
     });
   }
   console.log(JSON.stringify(report));

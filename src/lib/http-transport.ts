@@ -48,6 +48,13 @@ export interface HttpTransportOptions {
 interface CapturedSnapshot {
   report: NikaCheckResult;
   bytes?: string;
+  identity?: SnapshotIdentity;
+}
+
+interface SnapshotIdentity {
+  digest: string;
+  root: string;
+  units: number;
 }
 
 interface ObservationState {
@@ -103,6 +110,10 @@ export class HttpTransport implements Transport {
     }
     const captured = await this.captureSnapshot(workflow, options.signal);
     if (captured.bytes === undefined) return captured.report;
+    const snapshot = captured.identity;
+    if (!snapshot) {
+      throw this.gap('executionSnapshot', 'Local engine omitted execution snapshot identity');
+    }
     const acknowledged = await this.json('/v1/check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -110,13 +121,13 @@ export class HttpTransport implements Transport {
       signal: options.signal,
     });
     if (
-      acknowledged.status !== 'accepted'
-      || typeof acknowledged.snapshot_digest !== 'string'
-      || acknowledged.snapshot_digest.length === 0
-      || typeof acknowledged.root !== 'string'
-      || acknowledged.root.length === 0
-      || !Number.isSafeInteger(acknowledged.units)
-      || (acknowledged.units as number) < 1
+      Object.keys(acknowledged).some((key) => ![
+        'status', 'snapshot_digest', 'root', 'units',
+      ].includes(key))
+      || acknowledged.status !== 'accepted'
+      || acknowledged.snapshot_digest !== snapshot.digest
+      || acknowledged.root !== snapshot.root
+      || acknowledged.units !== snapshot.units
     ) {
       throw new NikaProtocolError(this.kind, 'Check admission did not acknowledge the snapshot');
     }
@@ -142,6 +153,9 @@ export class HttpTransport implements Transport {
     if (captured.bytes === undefined) {
       throw this.gap('executionSnapshot', 'Local workflow check was not clean; run was not admitted');
     }
+    if (!captured.identity) {
+      throw this.gap('executionSnapshot', 'Local engine omitted execution snapshot identity');
+    }
     const admitted = await this.json('/v1/jobs', {
       method: 'POST',
       headers: {
@@ -154,7 +168,12 @@ export class HttpTransport implements Transport {
     if (!id) {
       throw new NikaProtocolError(this.kind, 'Job admission response omitted its id');
     }
-    return this.httpRun(id, 0, durableJob(admitted, id, this.kind));
+    return this.httpRun(
+      id,
+      0,
+      durableJob(admitted, id, this.kind),
+      captured.identity.digest,
+    );
   }
 
   async attachRun(id: string, options: NikaAttachRunOptions): Promise<TransportRun> {
@@ -273,6 +292,7 @@ export class HttpTransport implements Transport {
     id: string,
     initialSequence = 0,
     attachedState?: DurableJob,
+    expectedSnapshotDigest?: string,
   ): TransportRun {
     const controller = new AbortController();
     let terminalObserved = false;
@@ -288,8 +308,8 @@ export class HttpTransport implements Transport {
       const event = 'sequence' in source ? source : undefined;
       const durable = event ? undefined : source as DurableJob;
       const receipt = event ? eventReceipt(event) : durable?.receipt;
-      const executionId = durable?.execution_id;
-      const traceId = durable?.trace_id;
+      const executionId = durable?.execution_id ?? attachedState?.execution_id;
+      const traceId = durable?.trace_id ?? attachedState?.trace_id;
       if (receipt) {
         assertReceiptIdentity(
           receipt,
@@ -297,6 +317,7 @@ export class HttpTransport implements Transport {
           this.kind,
           executionId,
           traceId,
+          expectedSnapshotDigest,
         );
       }
       terminalObserved = true;
@@ -442,7 +463,7 @@ export class HttpTransport implements Transport {
             state.serverRetryMilliseconds = boundedDelay(frame.retry);
           }
           if (frame.data === undefined) continue;
-          const event = this.nikaEvent(frame.id, frame.data);
+          const event = this.nikaEvent(id, frame.id, frame.data);
           const sequence = event.sequence as number;
           if (sequence === state.lastSequence) {
             if (frame.data === state.lastData) continue;
@@ -491,7 +512,7 @@ export class HttpTransport implements Transport {
     }
   }
 
-  private nikaEvent(id: string | undefined, data: string): NikaEvent {
+  private nikaEvent(jobId: string, id: string | undefined, data: string): NikaEvent {
     if (!id || !/^[1-9]\d*$/.test(id)) {
       throw new NikaProtocolError(
         this.kind,
@@ -524,13 +545,14 @@ export class HttpTransport implements Transport {
         `SSE id ${id} did not equal JSON data.sequence`,
       );
     }
-    if (event.kind !== undefined && event.kind !== null && typeof event.kind !== 'string') {
+    if (!Object.hasOwn(event, 'kind') || (event.kind !== null && typeof event.kind !== 'string')) {
       throw new NikaProtocolError(this.kind, 'SSE data.kind was not a string or null');
     }
     if (
-      event.status !== undefined
-      && event.status !== null
+      !Object.hasOwn(event, 'status')
+      || (event.status !== null
       && (typeof event.status !== 'string' || !JOB_STATUSES.has(event.status))
+      )
     ) {
       throw new NikaProtocolError(this.kind, 'SSE data.status was not a known job status or null');
     }
@@ -538,6 +560,16 @@ export class HttpTransport implements Transport {
       if (event[field] !== undefined && typeof event[field] !== 'string') {
         throw new NikaProtocolError(this.kind, `SSE data.${field} was not a string`);
       }
+    }
+    if (event.outputs !== undefined && !machineObject(event.outputs)) {
+      throw new NikaProtocolError(this.kind, 'SSE data.outputs was not an object');
+    }
+    if (event.receipt !== undefined) {
+      const receipt = machineObject(event.receipt);
+      if (!receipt) {
+        throw new NikaProtocolError(this.kind, 'SSE data.receipt was not an object');
+      }
+      assertReceiptIdentity(receipt, jobId, this.kind);
     }
     return event as NikaEvent;
   }
@@ -829,7 +861,11 @@ export class HttpTransport implements Transport {
     if (typeof bytes !== 'string' || bytes.length === 0) {
       throw this.gap('executionSnapshot', 'Local engine omitted execution_snapshot bytes');
     }
-    return { report: report as NikaCheckResult, bytes };
+    return {
+      report: report as NikaCheckResult,
+      bytes,
+      identity: snapshotIdentity(bytes, this.kind),
+    };
   }
 
   private async json(
@@ -1216,9 +1252,10 @@ function assertReceiptIdentity(
   transport: 'http',
   expectedExecutionId?: string,
   expectedTraceId?: string,
+  expectedSnapshotDigest?: string,
 ): void {
   const allowed = new Set([
-    'job_id', 'execution_id', 'trace_id', 'snapshot_digest', 'chain_head',
+    'job_id', 'execution_id', 'trace_id', 'snapshot_digest', 'origin', 'chain_head',
   ]);
   if (Object.keys(receipt).some((key) => !allowed.has(key))) {
     throw new NikaProtocolError(transport, 'Receipt contained unknown fields');
@@ -1244,10 +1281,74 @@ function assertReceiptIdentity(
   ) {
     throw new NikaProtocolError(transport, 'Receipt chain head was malformed');
   }
+  if (receipt.origin !== undefined) validateReceiptOrigin(receipt.origin, transport);
   if (expectedExecutionId !== undefined && receipt.execution_id !== expectedExecutionId) {
     throw new NikaProtocolError(transport, 'Receipt execution identity did not match its job');
   }
   if (expectedTraceId !== undefined && receipt.trace_id !== expectedTraceId) {
     throw new NikaProtocolError(transport, 'Receipt trace identity did not match its job');
+  }
+  if (
+    expectedSnapshotDigest !== undefined
+    && receipt.snapshot_digest !== expectedSnapshotDigest
+  ) {
+    throw new NikaProtocolError(transport, 'Receipt snapshot digest did not match its admission');
+  }
+}
+
+function snapshotIdentity(bytes: string, transport: 'http'): SnapshotIdentity {
+  let value: unknown;
+  try {
+    value = JSON.parse(bytes);
+  } catch (cause) {
+    throw new NikaCompatibilityError(
+      'executionSnapshot',
+      transport,
+      'Local engine emitted malformed execution_snapshot bytes',
+    );
+  }
+  const snapshot = machineObject(value);
+  if (
+    !snapshot
+    || typeof snapshot.digest !== 'string'
+    || !/^[0-9a-f]{64}$/.test(snapshot.digest)
+    || typeof snapshot.root !== 'string'
+    || snapshot.root.length === 0
+    || !Array.isArray(snapshot.units)
+    || snapshot.units.length < 1
+  ) {
+    throw new NikaCompatibilityError(
+      'executionSnapshot',
+      transport,
+      'Local engine emitted an invalid execution_snapshot identity',
+    );
+  }
+  return { digest: snapshot.digest, root: snapshot.root, units: snapshot.units.length };
+}
+
+function validateReceiptOrigin(value: unknown, transport: 'http'): void {
+  const origin = machineObject(value);
+  if (!origin || typeof origin.kind !== 'string') {
+    throw new NikaProtocolError(transport, 'Receipt origin was malformed');
+  }
+  if (origin.kind === 'manual') {
+    if (Object.keys(origin).some((key) => key !== 'kind')) {
+      throw new NikaProtocolError(transport, 'Manual receipt origin contained unknown fields');
+    }
+    return;
+  }
+  const required = [
+    'kind', 'schedule_origin', 'schedule_id', 'schedule_revision', 'slot_id',
+    'decision', 'scheduled_for', 'fired_at', 'arm_generation',
+  ];
+  if (
+    origin.kind !== 'schedule'
+    || Object.keys(origin).some((key) => !required.includes(key))
+    || required.some((key) => !Object.hasOwn(origin, key))
+    || !['project', 'api'].includes(String(origin.schedule_origin))
+    || !['scheduled', 'catch_up'].includes(String(origin.decision))
+    || required.slice(2).some((key) => typeof origin[key] !== 'string' || origin[key].length === 0)
+  ) {
+    throw new NikaProtocolError(transport, 'Scheduled receipt origin was malformed');
   }
 }

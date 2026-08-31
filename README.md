@@ -33,8 +33,8 @@ not parse YAML or reconstruct proof in TypeScript.
   idempotency, and schedule CAS
 - [Testing and release evidence](docs/testing.md) — layered gauntlets and the
   Socratic risk matrix
-- [Migrating to 0.116](docs/migrating-to-0.116.md) — additive discovery and
-  durable status methods
+- [Migrating to 0.116](docs/migrating-to-0.116.md) — intentional breaking
+  migration to the smaller durable client surface
 
 ## Install
 
@@ -326,9 +326,10 @@ NikaError
 └── NikaRunOwnershipError
 ```
 
-Unknown engine event kinds and error fields ride through. The SDK does not
-collapse future vocabulary into `unknown error`, nor does it turn an unpriced
-model into `$0`.
+Native engine event vocabulary stays open. HTTP events instead enforce the
+closed, redacted `JobEvent` projection advertised by the pinned OpenAPI contract;
+unknown HTTP fields are rejected at the trust boundary. The SDK never turns an
+unpriced model into `$0`.
 
 ## Security boundaries
 

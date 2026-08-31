@@ -23,6 +23,7 @@ const RECEIPT = Object.freeze({
   execution_id: 'execution-1',
   trace_id: 'trace-1',
   snapshot_digest: 'a'.repeat(64),
+  origin: { kind: 'manual' },
 });
 
 function client(
@@ -387,15 +388,53 @@ describe('cancellation and terminal identity', () => {
     await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);
   });
 
-  it('rejects receipt identities that disagree with terminal SSE fields', async () => {
+  it('binds a terminal SSE receipt to identities retained from attach', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
+      .mockResolvedValueOnce(jsonResponse({
+        id: 'job-1',
+        status: 'running',
+        execution_id: 'execution-1',
+        trace_id: 'trace-1',
+      }))
+      .mockResolvedValueOnce(sseResponse([{
+        sequence: 1,
+        kind: 'settled',
+        status: 'succeeded',
+        receipt: {
+          ...RECEIPT,
+          execution_id: 'execution-other',
+          trace_id: 'trace-other',
+        },
+      }]));
+    const nika = client(fetch as typeof globalThis.fetch);
+    const run = await nika.attachRun('job-1');
+    await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);
+  });
+
+  it('binds a new run receipt to the exact locally captured snapshot', async () => {
     const fetch = admissionThen(sseResponse([{
       sequence: 1,
       kind: 'settled',
       status: 'succeeded',
-      execution_id: 'execution-other',
-      trace_id: 'trace-1',
-      receipt: RECEIPT,
+      receipt: { ...RECEIPT, snapshot_digest: 'b'.repeat(64) },
     }]));
+    const nika = client(fetch as typeof globalThis.fetch);
+    const run = await nika.run('flow.nika.yaml');
+    await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);
+  });
+
+  it.each([
+    ['missing kind', { sequence: 1, status: 'running' }],
+    ['missing status', { sequence: 1, kind: 'running' }],
+    ['non-object outputs', {
+      sequence: 1, kind: 'settled', status: 'succeeded', outputs: 'private',
+    }],
+    ['non-object receipt', {
+      sequence: 1, kind: 'settled', status: 'succeeded', receipt: 'private',
+    }],
+  ])('rejects %s in the closed SSE projection', async (_name, event) => {
+    const fetch = admissionThen(sseResponse([event]));
     const nika = client(fetch as typeof globalThis.fetch);
     const run = await nika.run('flow.nika.yaml');
     await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);

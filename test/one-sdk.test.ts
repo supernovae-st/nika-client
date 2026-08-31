@@ -32,7 +32,8 @@ const INCOMPATIBLE_FIXTURE = path.join(
 );
 const posix = process.platform !== 'win32';
 const SERVER_TOKEN = 's'.repeat(32);
-const SNAPSHOT_BYTES = '{"format_version":1,"root":"fixture.nika.yaml","digest":"fixture-digest","units":[{"path":"fixture.nika.yaml","kind":0,"digest":"unit-digest","bytes_hex":"00"}]}';
+const SNAPSHOT_DIGEST = 'a'.repeat(64);
+const SNAPSHOT_BYTES = `{"format_version":1,"root":"fixture.nika.yaml","digest":"${SNAPSHOT_DIGEST}","units":[{"path":"fixture.nika.yaml","kind":0,"digest":"${'b'.repeat(64)}","bytes_hex":"00"}]}`;
 
 function healthResponse(overrides: Record<string, unknown> = {}): Response {
   return jsonResponse({
@@ -714,7 +715,7 @@ describe('HTTP transport', () => {
       .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(jsonResponse({
         status: 'accepted',
-        snapshot_digest: 'fixture-digest',
+        snapshot_digest: SNAPSHOT_DIGEST,
         root: 'fixture.nika.yaml',
         units: 1,
       }));
@@ -739,12 +740,25 @@ describe('HTTP transport', () => {
     expect(init.body).not.toContain('/local/only/flow.nika.yaml');
   });
 
+  it('refuses a check acknowledgement for a different snapshot', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
+      .mockResolvedValueOnce(jsonResponse({
+        status: 'accepted',
+        snapshot_digest: 'c'.repeat(64),
+        root: 'other.nika.yaml',
+        units: 1,
+      }));
+    await expect(remote(fetch as typeof globalThis.fetch).check('flow.nika.yaml'))
+      .rejects.toMatchObject({ name: 'NikaProtocolError', transport: 'http' });
+  });
+
   it('caches compatible identities and refuses incompatible remote protocol', async () => {
     const compatibleFetch = vi.fn()
       .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(jsonResponse({
         status: 'accepted',
-        snapshot_digest: 'fixture-digest',
+        snapshot_digest: SNAPSHOT_DIGEST,
         root: 'fixture.nika.yaml',
         units: 1,
       }))

@@ -276,8 +276,8 @@ function packageForCurrentHost(): string | undefined {
   return ({
     'darwin-arm64': '@supernovae-st/nika-darwin-arm64',
     'darwin-x64': '@supernovae-st/nika-darwin-x64',
-    'linux-arm64': '@supernovae-st/nika-linux-arm64-gnu',
-    'linux-x64': '@supernovae-st/nika-linux-x64-gnu',
+    'linux-arm64': '@supernovae-st/nika-linux-arm64',
+    'linux-x64': '@supernovae-st/nika-linux-x64',
   } as Record<string, string>)[`${process.platform}-${process.arch}`];
 }
 
@@ -285,7 +285,7 @@ function allPackages(): string[] {
   return [
     '@supernovae-st/nika-darwin-arm64',
     '@supernovae-st/nika-darwin-x64',
-    '@supernovae-st/nika-linux-arm64-gnu',
-    '@supernovae-st/nika-linux-x64-gnu',
+    '@supernovae-st/nika-linux-arm64',
+    '@supernovae-st/nika-linux-x64',
   ];
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@supernovae-st/nika-linux-arm64-gnu",
+  "name": "@supernovae-st/nika-linux-arm64",
   "version": "0.116.0",
   "description": "Nika native engine payload for Linux arm64 GNU",
   "license": "AGPL-3.0-or-later",

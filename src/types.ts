@@ -9,7 +9,7 @@ interface NikaSharedConfig {
 export interface NikaLocalConfig extends NikaSharedConfig {
   /** Working directory used by the native process transport. */
   cwd?: string;
-  /** Binary resolution: this value, then NIKA_BIN, then `nika`. */
+  /** Binary resolution: this value, then NIKA_BIN, then the host payload package. */
   bin?: string;
   url?: never;
   token?: never;

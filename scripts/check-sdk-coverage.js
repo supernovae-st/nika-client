@@ -63,8 +63,29 @@ if (!existsSync(SPEC)) {
 const live = livePaths().map(normalize);
 const sdk = extractSdkEndpoints();
 const sdkNorm = sdk.map(normalize);
+const contract = JSON.parse(readFileSync(SPEC, 'utf-8'));
 
 let failed = false;
+
+console.log('Machine schema bindings:');
+for (const [label, actual, expected] of [
+  ['health JSON', contract.paths?.['/health']?.get?.responses?.['200']?.content?.['application/json']?.schema?.$ref, '#/components/schemas/Health'],
+  ['workflow list JSON', contract.paths?.['/v1/workflows']?.get?.responses?.['200']?.content?.['application/json']?.schema?.$ref, '#/components/schemas/WorkflowList'],
+  ['workflow metadata JSON', contract.paths?.['/v1/workflows/{name}']?.get?.responses?.['200']?.content?.['application/json']?.schema?.$ref, '#/components/schemas/WorkflowMetadata'],
+  ['SSE event extension', contract.paths?.['/v1/jobs/{id}/events']?.get?.responses?.['200']?.content?.['text/event-stream']?.['x-nika-event-schema']?.$ref, '#/components/schemas/JobEvent'],
+]) {
+  if (actual !== expected) {
+    console.log(`  MISSING  ${label}: expected ${expected}`);
+    failed = true;
+  } else {
+    console.log(`  ok       ${label}`);
+  }
+}
+const eventSchema = contract.components?.schemas?.JobEvent;
+if (eventSchema?.additionalProperties !== false) {
+  console.log('  MISSING  JobEvent must close additionalProperties');
+  failed = true;
+}
 
 console.log('Live OpenAPI paths:');
 for (const path of live) {

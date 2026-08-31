@@ -361,6 +361,29 @@ describe('HTTP transport', () => {
     expect(fetch).toHaveBeenCalledTimes(3);
   });
 
+  it('rejects uncontained or ambiguous workflow catalog responses', async () => {
+    for (const body of [
+      { workflows: ['../secret.nika.yaml'] },
+      { workflows: ['flow.nika.yaml', 'flow.nika.yaml'] },
+      { workflows: ['flow.yaml'] },
+      { workflows: ['flow.nika.yaml'], source: 'secret' },
+    ]) {
+      const fetch = vi.fn()
+        .mockResolvedValueOnce(healthResponse())
+        .mockResolvedValueOnce(jsonResponse(body));
+      await expect(remote(fetch as typeof globalThis.fetch).listWorkflows())
+        .rejects.toMatchObject({ name: 'NikaProtocolError' });
+    }
+  });
+
+  it('rejects workflow metadata that changes the requested contained identity', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
+      .mockResolvedValueOnce(jsonResponse({ workflow: '../secret.nika.yaml' }));
+    await expect(remote(fetch as typeof globalThis.fetch).workflow('safe.nika.yaml'))
+      .rejects.toMatchObject({ name: 'NikaProtocolError' });
+  });
+
   it('reads the durable status route through an owned run', async () => {
     const fetch = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
@@ -438,6 +461,45 @@ describe('HTTP transport', () => {
         message: expect.stringContaining('HTTP 404'),
       });
     expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('settles immediately when attachRun finds an already-terminal durable job', async () => {
+    const receipt = {
+      job_id: 'durable-job',
+      execution_id: 'execution-1',
+      trace_id: 'trace-1',
+      snapshot_digest: 'a'.repeat(64),
+    };
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
+      .mockResolvedValueOnce(jsonResponse({
+        id: 'durable-job',
+        status: 'succeeded',
+        execution_id: 'execution-1',
+        trace_id: 'trace-1',
+        receipt,
+      }))
+      .mockResolvedValueOnce(sseResponse([{
+        sequence: 2,
+        kind: 'settled',
+        status: 'succeeded',
+        receipt,
+      }]));
+    const client = remote(fetch as typeof globalThis.fetch);
+    const run = await client.attachRun('durable-job', { lastEventId: 1 });
+
+    await expect(run.done).resolves.toMatchObject({
+      id: 'durable-job',
+      status: 'succeeded',
+      receipt,
+    });
+    await expect(collect(client.events(run))).resolves.toEqual([{
+      sequence: 2,
+      kind: 'settled',
+      status: 'succeeded',
+      receipt,
+    }]);
+    expect(fetch).toHaveBeenCalledTimes(3);
   });
 
   const scheduleOptions: NikaScheduleOptions = {

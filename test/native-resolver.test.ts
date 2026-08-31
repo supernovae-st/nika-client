@@ -25,7 +25,7 @@ describe('native binary resolver', () => {
       arch: 'x64',
       glibc: true,
       resolvePackageJson,
-    })).toBe('/payload/@supernovae-st/nika-linux-x64-gnu/bin/nika');
+    })).toBe('/payload/@supernovae-st/nika-linux-x64/bin/nika');
   });
 
   it('rejects empty explicit values instead of falling through', () => {

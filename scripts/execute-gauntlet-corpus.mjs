@@ -8,7 +8,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const corpusRoot = join(root, "gauntlet", "corpus");
 const resultsRoot = join(root, "gauntlet", "results");
 const inventory = JSON.parse(readFileSync(join(corpusRoot, "use-cases.json"), "utf8"));
-const nikaBin = process.env.NIKA_GAUNTLET_BIN || "nika";
+const nikaBin = process.env.NIKA_BIN || process.env.NIKA_GAUNTLET_BIN || "nika";
 const version = spawnSync(nikaBin, ["--version"], { encoding: "utf8" });
 
 if (version.status !== 0) throw new Error(`cannot identify ${nikaBin}: ${version.stderr}`);

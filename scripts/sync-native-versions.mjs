@@ -7,8 +7,8 @@ const lockPath = path.join(root, 'package-lock.json');
 const nativePackages = [
   ['@supernovae-st/nika-darwin-arm64', 'packages/native/darwin-arm64/package.json'],
   ['@supernovae-st/nika-darwin-x64', 'packages/native/darwin-x64/package.json'],
-  ['@supernovae-st/nika-linux-arm64-gnu', 'packages/native/linux-arm64-gnu/package.json'],
-  ['@supernovae-st/nika-linux-x64-gnu', 'packages/native/linux-x64-gnu/package.json'],
+  ['@supernovae-st/nika-linux-arm64', 'packages/native/linux-arm64-gnu/package.json'],
+  ['@supernovae-st/nika-linux-x64', 'packages/native/linux-x64-gnu/package.json'],
 ];
 
 const rootPackage = await readJson(rootPackagePath);

@@ -118,6 +118,36 @@ describe('independent event observers', () => {
     await expect(run.done).resolves.toMatchObject({ status: 'succeeded' });
     expect(fetch.mock.calls.some(([url]) => String(url).endsWith('/cancel'))).toBe(false);
   });
+
+  it.each([
+    [2, undefined, 'global replay capacity'],
+    [6, 2, 'smaller observer capacity'],
+  ] as const)('refuses late observation after exceeding %s', async (eventBufferSize, bufferSize) => {
+    const replay = Array.from({ length: 5 }, (_, index) => ({
+      sequence: index + 1,
+      kind: index === 4 ? 'settled' : 'running',
+      status: index === 4 ? 'succeeded' : 'running',
+    } satisfies NikaEvent));
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const path = new URL(String(input)).pathname;
+      if (path === '/health') return healthResponse();
+      if (path === '/v1/jobs/durable-job') {
+        return jsonResponse({ id: 'durable-job', status: 'running' });
+      }
+      if (path === '/v1/jobs/durable-job/events') return sseResponse(replay);
+      throw new Error(`unexpected ${path}`);
+    });
+    const nika = client(fetch as typeof globalThis.fetch, { eventBufferSize });
+    const run = await nika.attachRun('durable-job');
+    await run.done;
+
+    expect(() => nika.events(run, bufferSize === undefined ? {} : { bufferSize }))
+      .toThrowError(expect.objectContaining({
+      name: 'NikaEventBufferOverflowError',
+      runId: 'durable-job',
+      limit: 2,
+      }));
+  });
 });
 
 describe('SSE replay, reconnect, and terminal authority', () => {
@@ -225,6 +255,43 @@ describe('SSE replay, reconnect, and terminal authority', () => {
 });
 
 describe('cancellation and terminal identity', () => {
+  it('settles a terminal 200 admission immediately while replaying persisted SSE', async () => {
+    const terminal = {
+      sequence: 1,
+      kind: 'settled',
+      status: 'succeeded',
+      receipt: RECEIPT,
+      outputs: { replayed: true },
+    } as const;
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const path = new URL(String(input)).pathname;
+      if (path === '/health') return healthResponse();
+      if (path === '/v1/jobs') {
+        return jsonResponse({
+          id: 'job-1',
+          status: 'succeeded',
+          execution_id: 'execution-1',
+          trace_id: 'trace-1',
+          outputs: { replayed: true },
+          receipt: RECEIPT,
+        });
+      }
+      if (path === '/v1/jobs/job-1/events') return sseResponse([terminal]);
+      throw new Error(`unexpected ${path}`);
+    });
+    const nika = client(fetch as typeof globalThis.fetch);
+    const run = await nika.run('flow.nika.yaml', { idempotencyKey: 'same-request' });
+
+    await expect(run.done).resolves.toMatchObject({
+      id: 'job-1',
+      status: 'succeeded',
+      outputs: { replayed: true },
+      receipt: RECEIPT,
+    });
+    await expect(collect(nika.events(run))).resolves.toEqual([terminal]);
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
   it.each([
     ['succeeded', false, 'already_settled'],
     ['cancelled', true, 'cancelled'],
@@ -258,13 +325,6 @@ describe('cancellation and terminal identity', () => {
         status: cancelStatus,
         transport: 'http',
       });
-      stream.enqueue(sseFrame({
-        sequence: 1,
-        kind: status === 'cancelled' ? 'execution.cancelled' : 'execution.completed',
-        status,
-        receipt: RECEIPT,
-      }));
-      stream.close();
       await expect(run.done).resolves.toMatchObject({
         id: 'job-1',
         status,
@@ -273,12 +333,83 @@ describe('cancellation and terminal identity', () => {
     },
   );
 
+  it('settles run.done when cancellation wins even if the SSE body stays open', async () => {
+    const stream = controlledByteStream();
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const path = new URL(String(input)).pathname;
+      if (path === '/health') return healthResponse();
+      if (path === '/v1/jobs') {
+        return jsonResponse({ id: 'job-1', status: 'queued' }, 202);
+      }
+      if (path === '/v1/jobs/job-1/events') return stream.response;
+      if (path === '/v1/jobs/job-1/cancel') {
+        return jsonResponse({
+          id: 'job-1',
+          status: 'cancelled',
+          execution_id: 'execution-1',
+          trace_id: 'trace-1',
+          receipt: RECEIPT,
+        });
+      }
+      throw new Error(`unexpected ${path}`);
+    });
+    const nika = client(fetch as typeof globalThis.fetch);
+    const run = await nika.run('flow.nika.yaml');
+
+    await nika.cancel(run);
+    await expect(Promise.race([
+      run.done,
+      new Promise<'pending'>((resolve) => setTimeout(() => resolve('pending'), 100)),
+    ])).resolves.toMatchObject({ id: 'job-1', status: 'cancelled' });
+  });
+
   it('rejects a terminal SSE receipt bound to another run', async () => {
     const fetch = admissionThen(sseResponse([{
       sequence: 1,
       kind: 'settled',
       status: 'succeeded',
       receipt: { ...RECEIPT, job_id: 'job-other' },
+    }]));
+    const nika = client(fetch as typeof globalThis.fetch);
+    const run = await nika.run('flow.nika.yaml');
+    await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);
+  });
+
+  it('rejects an incomplete terminal SSE receipt', async () => {
+    const fetch = admissionThen(sseResponse([{
+      sequence: 1,
+      kind: 'settled',
+      status: 'succeeded',
+      receipt: { job_id: 'job-1' },
+    }]));
+    const nika = client(fetch as typeof globalThis.fetch);
+    const run = await nika.run('flow.nika.yaml');
+    await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);
+  });
+
+  it('rejects receipt identities that disagree with terminal SSE fields', async () => {
+    const fetch = admissionThen(sseResponse([{
+      sequence: 1,
+      kind: 'settled',
+      status: 'succeeded',
+      execution_id: 'execution-other',
+      trace_id: 'trace-1',
+      receipt: RECEIPT,
+    }]));
+    const nika = client(fetch as typeof globalThis.fetch);
+    const run = await nika.run('flow.nika.yaml');
+    await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);
+  });
+
+  it('rejects terminal SSE fields outside the public redacted projection', async () => {
+    const fetch = admissionThen(sseResponse([{
+      sequence: 1,
+      kind: 'settled',
+      status: 'failed',
+      code: 'NIKA-TEST-PRIVATE',
+      message: 'redacted summary',
+      path: '/Users/private/workflow.nika.yaml',
+      token: 'CANARY_SECRET',
     }]));
     const nika = client(fetch as typeof globalThis.fetch);
     const run = await nika.run('flow.nika.yaml');

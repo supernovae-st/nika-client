@@ -1,5 +1,5 @@
 {
-  "name": "@supernovae-st/nika-linux-x64-gnu",
+  "name": "@supernovae-st/nika-linux-x64",
   "version": "0.114.0",
   "os": ["linux"],
   "cpu": ["x64"],

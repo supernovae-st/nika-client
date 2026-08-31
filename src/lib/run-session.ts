@@ -20,6 +20,7 @@ export class RunSession {
   private rejectDone!: (error: Error) => void;
   private terminal = false;
   private cancelPromise?: Promise<NikaCancelResult>;
+  private historyOverflowed = false;
 
   constructor(
     private readonly source: TransportRun,
@@ -33,6 +34,7 @@ export class RunSession {
     // become a process-level unhandled rejection.
     this.done.catch(() => {});
     this.run = Object.freeze({ id: source.id, done: this.done });
+    void this.observeSettlement();
     void this.pump();
   }
 
@@ -42,6 +44,9 @@ export class RunSession {
       throw new RangeError(
         `events bufferSize must be an integer from 1 to ${this.eventBufferSize}`,
       );
+    }
+    if (this.historyOverflowed || this.history.length > requested) {
+      throw new NikaEventBufferOverflowError(this.source.id, requested);
     }
     const subscription = new EventSubscription(
       this.source.id,
@@ -56,7 +61,7 @@ export class RunSession {
   }
 
   cancel(): Promise<NikaCancelResult> {
-    this.cancelPromise ??= this.source.cancel();
+    this.cancelPromise ??= this.cancelAndSettle();
     return this.cancelPromise;
   }
 
@@ -64,11 +69,36 @@ export class RunSession {
     return this.source.status();
   }
 
+  private async cancelAndSettle(): Promise<NikaCancelResult> {
+    const cancellation = await this.source.cancel();
+    const result = await this.source.done;
+    if (!this.terminal) {
+      this.terminal = true;
+      this.resolveDone(result);
+      for (const subscriber of [...this.subscribers]) subscriber.close();
+      this.subscribers.clear();
+      await this.source.cleanup().catch(() => {});
+    }
+    return cancellation;
+  }
+
+  private async observeSettlement(): Promise<void> {
+    try {
+      this.resolveDone(await this.source.done);
+    } catch (cause) {
+      const error = cause instanceof Error ? cause : new Error(String(cause));
+      this.rejectDone(error);
+    }
+  }
+
   private async pump(): Promise<void> {
     try {
       for await (const event of this.source.events) {
         this.history.push(event);
-        if (this.history.length > this.eventBufferSize) this.history.shift();
+        if (this.history.length > this.eventBufferSize) {
+          this.history.shift();
+          this.historyOverflowed = true;
+        }
         for (const subscriber of [...this.subscribers]) subscriber.push(event);
       }
       this.resolveDone(await this.source.done);

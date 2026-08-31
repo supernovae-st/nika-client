@@ -159,9 +159,15 @@ export class SseParser {
 export async function* decodeSse(
   stream: ReadableStream<Uint8Array>,
   limits: SseLimits,
+  signal?: AbortSignal,
 ): AsyncGenerator<SseFrame> {
   const reader = stream.getReader();
   const parser = new SseParser(limits);
+  const abort = () => {
+    void reader.cancel().catch(() => {});
+  };
+  if (signal?.aborted) abort();
+  else signal?.addEventListener('abort', abort, { once: true });
   try {
     while (true) {
       const { done, value } = await reader.read();
@@ -170,6 +176,7 @@ export async function* decodeSse(
     }
     for (const frame of parser.finish()) yield frame;
   } finally {
+    signal?.removeEventListener('abort', abort);
     await reader.cancel().catch(() => {});
     reader.releaseLock();
   }

@@ -26,7 +26,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["Health"];
+                    };
                 };
             };
         };
@@ -411,7 +413,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "text/event-stream": string;
+                    };
                 };
                 /** @description Error envelope */
                 400: {
@@ -774,7 +778,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["WorkflowList"];
+                    };
                 };
                 /** @description Error envelope */
                 401: {
@@ -819,7 +825,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["WorkflowMetadata"];
+                    };
                 };
                 /** @description Error envelope */
                 401: {
@@ -872,6 +880,25 @@ export interface components {
                 path: string;
             }[];
         };
+        Health: {
+            api_version: string;
+            buildSha: string;
+            build_sha: string;
+            checkReportVersion: number;
+            engineVersion: string;
+            engine_version: string;
+            eventFormatVersion: number;
+            machineProtocolVersion: number;
+            /** @constant */
+            service: "nika-serve";
+            snapshotFormatVersion: number;
+            specSha: string;
+            spec_sha: string;
+            /** @constant */
+            status: "ok";
+            supportedCapabilities: string[];
+            traceFormatVersion: number;
+        };
         Job: {
             error?: {
                 code: string;
@@ -887,6 +914,17 @@ export interface components {
             receipt?: components["schemas"]["JobReceipt"];
             status: components["schemas"]["JobStatus"];
             trace_id?: string;
+        };
+        JobEvent: {
+            code?: string;
+            kind: string | null;
+            message?: string;
+            outputs?: {
+                [key: string]: unknown;
+            };
+            receipt?: components["schemas"]["JobReceipt"];
+            sequence: number;
+            status: components["schemas"]["JobStatus"] | null;
         };
         /** @description Terminal binding to the exact immutable admitted execution */
         JobReceipt: {
@@ -956,6 +994,12 @@ export interface components {
             trace_id?: string;
             /** @enum {string} */
             verdict: "unavailable";
+        };
+        WorkflowList: {
+            workflows: string[];
+        };
+        WorkflowMetadata: {
+            workflow: string;
         };
     };
     responses: never;

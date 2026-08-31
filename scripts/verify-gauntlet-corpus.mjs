@@ -21,7 +21,7 @@ if (new Set(inventory.map((entry) => entry.domain)).size !== 20) {
   throw new Error("expected 20 distinct domains");
 }
 
-const nikaBin = process.env.NIKA_GAUNTLET_BIN || "nika";
+const nikaBin = process.env.NIKA_BIN || process.env.NIKA_GAUNTLET_BIN || "nika";
 const failures = [];
 for (const [index, file] of workflowFiles.entries()) {
   const path = join(workflowsRoot, file);

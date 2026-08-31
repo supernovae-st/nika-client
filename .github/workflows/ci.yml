@@ -91,17 +91,12 @@ jobs:
           tar xzf "$asset"
           chmod +x nika
           test "$(./nika --version | awk '{print $2}')" = "$version"
-          if ! command -v bwrap >/dev/null; then
-            sudo apt-get update
-            sudo apt-get install --yes bubblewrap
-          fi
           ./nika key init --plain
 
       - name: Replay deterministic and hostile evidence
         env:
           NIKA_BIN: ${{ runner.temp }}/nika-release-asset/nika
           NIKA_GAUNTLET_RESULTS_DIR: ${{ runner.temp }}/nika-release-replay
-          NIKA_SANDBOX: off
         run: |
           npm run gauntlet:run
           npm run gauntlet:hostile

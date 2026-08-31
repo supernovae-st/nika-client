@@ -113,11 +113,12 @@ tasks:
 const cancellable = writeWorkflow('cancellable.nika.yaml', `
 nika: hostile-cancellable
 permits:
-  exec: ["sleep"]
+  tools: ["nika:wait"]
 tasks:
   wait:
-    exec:
-      command: ["sleep", "10"]
+    invoke:
+      tool: "nika:wait"
+      args: { duration: "10s" }
 `);
 
 const burstTasks = Array.from({ length: 12 }, (_, index) => `

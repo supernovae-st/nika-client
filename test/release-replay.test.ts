@@ -15,6 +15,19 @@ afterEach(() => {
 });
 
 describe('public release evidence replay', () => {
+  it('keeps cancellation replay portable without a sandbox waiver', () => {
+    const hostileRunner = readFileSync(
+      path.join(ROOT, 'scripts', 'run-hostile-gauntlet.mjs'),
+      'utf8',
+    );
+    const workflow = readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
+
+    expect(hostileRunner).toContain('tools: ["nika:wait"]');
+    expect(hostileRunner).toContain('args: { duration: "10s" }');
+    expect(hostileRunner).not.toContain('command: ["sleep"');
+    expect(workflow).not.toContain('NIKA_SANDBOX');
+  });
+
   it('compares every deterministic field while excluding only hostile timing metadata', () => {
     const replay = createReplay();
     const hostile = readJson(replay, 'hostile.json');

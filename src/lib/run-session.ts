@@ -72,7 +72,10 @@ export class RunSession {
   private async cancelAndSettle(): Promise<NikaCancelResult> {
     const cancellation = await this.source.cancel();
     const result = await this.source.done;
-    if (!this.terminal) {
+    // An active observer owns the terminal event boundary. Let the transport
+    // pump deliver that persisted frame before it closes the subscription.
+    // With no observer, cancellation can still clean up immediately.
+    if (!this.terminal && this.subscribers.size === 0) {
       this.terminal = true;
       this.resolveDone(result);
       for (const subscriber of [...this.subscribers]) subscriber.close();

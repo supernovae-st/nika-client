@@ -268,6 +268,80 @@ describe('SSE replay, reconnect, and terminal authority', () => {
 });
 
 describe('cancellation and terminal identity', () => {
+  it('delivers one terminal cancellation event before closing active observers', async () => {
+    const stream = controlledByteStream();
+    const terminal = {
+      sequence: 2,
+      kind: 'execution.cancelled',
+      status: 'cancelled',
+      receipt: RECEIPT,
+    } as const;
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const path = new URL(String(input)).pathname;
+      if (path === '/health') return healthResponse();
+      if (path === '/v1/jobs') {
+        return jsonResponse({ id: 'job-1', status: 'queued' }, 202);
+      }
+      if (path === '/v1/jobs/job-1/events') return stream.response;
+      if (path === '/v1/jobs/job-1/cancel') {
+        return jsonResponse({
+          id: 'job-1',
+          status: 'cancelled',
+          execution_id: 'execution-1',
+          trace_id: 'trace-1',
+          receipt: RECEIPT,
+        });
+      }
+      throw new Error(`unexpected ${path}`);
+    });
+    const nika = client(fetch as typeof globalThis.fetch);
+    const run = await nika.run('flow.nika.yaml');
+    const observer = nika.events(run)[Symbol.asyncIterator]();
+    stream.enqueue(sseFrame({
+      sequence: 1,
+      kind: 'execution.started',
+      status: 'running',
+    }));
+    await expect(observer.next()).resolves.toMatchObject({
+      done: false,
+      value: { sequence: 1, status: 'running' },
+    });
+    const terminalObservation = observer.next();
+
+    const cancellation = nika.cancel(run);
+    expect(nika.cancel(run)).toBe(cancellation);
+    await expect(cancellation).resolves.toMatchObject({
+      accepted: true,
+      status: 'cancelled',
+    });
+    await expect(run.done).resolves.toMatchObject({
+      id: 'job-1',
+      status: 'cancelled',
+      receipt: RECEIPT,
+    });
+
+    try {
+      stream.enqueue(sseFrame(terminal));
+      stream.close();
+    } catch {
+      // The regression closes the stream before the persisted terminal event
+      // can reach the already-waiting observer. The assertion below owns the
+      // failure so the user-visible contract stays explicit.
+    }
+    await expect(terminalObservation).resolves.toEqual({
+      done: false,
+      value: terminal,
+    });
+    await expect(observer.next()).resolves.toEqual({ done: true, value: undefined });
+
+    const replay = await collect(nika.events(run));
+    expect(replay).toEqual([
+      { sequence: 1, kind: 'execution.started', status: 'running' },
+      terminal,
+    ]);
+    expect(replay.filter((event) => event.status === 'cancelled')).toHaveLength(1);
+  });
+
   it('settles a terminal 200 admission immediately while replaying persisted SSE', async () => {
     const terminal = {
       sequence: 1,

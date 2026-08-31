@@ -34,8 +34,9 @@ v0.116.0 release assets before npm publication.
 - The OpenAPI coverage gate now scans the live HTTP Adapter instead of deleted
   pre-One-SDK modules, fails hard, and rejects routes outside the pin.
 - The pinned OpenAPI contract and generated declaration are reviewable source;
-  CI compares both with the matching tagged engine instead of merely checking
-  that a generated file exists.
+  the release gate starts the downloaded tagged engine binary, compares its
+  live contract byte-for-byte after JSON normalization, regenerates the types,
+  and refuses any diff.
 - The SDK now deliberately covers the live resident workflow and durable
   status routes that the old coverage scanner could not see.
 
@@ -51,10 +52,16 @@ v0.116.0 release assets before npm publication.
 
 ### Changed
 
-- **Failed jobs may carry `{ error: { code, message } }`.** Additive.
-  `NikaJobError` includes the NIKA code in its message when present.
-  SSE frames may forward the same redacted pair. Cancel, artifacts
-  and `/v1/run` stay unclaimed.
+- **Breaking:** the two 0.115 root/local clients are consolidated into one
+  transport-selecting `Nika` facade. The `./local` export, `LocalNika`,
+  `jobs`/`workflows` namespaces, `fromEnv`, `health`, webhook helpers, and
+  preview-only artifact helpers are removed; Node 22 is now required. The
+  migration guide contains the complete method mapping.
+
+- Failed terminal job responses may carry redacted
+  `{ error: { code, message } }`; SSE carries the same pair as top-level
+  `code` and `message`. The One SDK returns either as `NikaRunResult.error`;
+  the removed 0.115 `NikaJobError` class is not retained.
 - **Type-drift CI mints `--token-file`.** `nika serve --bind` no
   longer starts without it. The job waits on `GET /health` and
   generates from the OpenAPI pin.

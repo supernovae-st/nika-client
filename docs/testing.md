@@ -9,13 +9,20 @@ npm ci
 npm test
 npm run build
 npm run check:coverage
-npm run gauntlet:check
-npm run gauntlet:run
-npm run gauntlet:projects
-npm run gauntlet:hostile
+NIKA_BIN=/path/to/nika npm run gauntlet:check
+NIKA_BIN=/path/to/nika npm run gauntlet:run
+NIKA_BIN=/path/to/nika npm run gauntlet:projects
+NIKA_BIN=/path/to/nika npm run gauntlet:depth
+NIKA_BIN=/path/to/nika npm run gauntlet:hostile
+NIKA_BIN=/path/to/nika npm run gauntlet:recovery
 npm audit
 npm pack --dry-run
 ```
+
+All engine-backed gauntlets use `NIKA_BIN` as the canonical explicit binary.
+`NIKA_GAUNTLET_BIN` remains a compatibility fallback for the corpus-only
+scripts. Evidence is invalid when the recorded engine identity does not match
+the intended release candidate.
 
 ## Test layers
 
@@ -74,3 +81,10 @@ Every release wave must ask and demonstrate an answer to these questions:
 Record exact commands, versions, commit SHAs, platform, run counts, cost, and
 the path to machine-readable results. A green unit suite alone is never release
 evidence. A failed or skipped lane stays named; it is not rounded into a pass.
+
+The release ceremony is deliberately two-step. `release.yml` validates the
+tagged engine assets, starts the released Linux binary, proves the live
+OpenAPI/types pin, and stages four payloads plus the SDK through npm OIDC. A
+maintainer then inspects and approves the staged packages with 2FA.
+`release-finalize.yml` refuses to create the SDK tag and GitHub Release until
+all five exact versions are publicly observable on npm.

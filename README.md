@@ -22,7 +22,7 @@ not parse YAML or reconstruct proof in TypeScript.
 
 - Node.js 22 or newer
 - a compatible `nika` engine, resolved from `config.bin`, then `NIKA_BIN`,
-  then the optional platform package or `PATH`
+  then the exact optional platform package; implicit `PATH` lookup is refused
 - a `.nika.yaml` workflow
 
 ## Documentation
@@ -136,7 +136,7 @@ in for `cancel(run)`.
 Remote admission is bytes-first: the local compatible engine captures an
 immutable execution snapshot, then the SDK sends those exact bytes to the
 authenticated server. A remote client therefore still needs a local `nika`
-binary through `bin`, `NIKA_BIN`, an optional platform package, or `PATH`.
+binary through `bin`, `NIKA_BIN`, or the exact optional platform package.
 
 The current persistent server requires a project file. A minimal `nika.yaml`
 is enough:

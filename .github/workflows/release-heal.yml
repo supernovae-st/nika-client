@@ -2,9 +2,10 @@ name: release-heal
 
 # The SDK rides every wave without a hand on the dispatch button
 # (dispatched by hand for 0.100/0.101/0.102): when the engine's latest
-# release moves past npm's published version, this triggers the repo's
-# own Release workflow with that version. SECURITY: no github.event
-# data in the shell; the tag is validated before use.
+# release moves past npm's published version, this triggers the repo's own
+# Release workflow only after the matching SDK train is already merged.
+# SECURITY: no github.event data is interpolated into shell source; the tag
+# and checked-in package version are validated before dispatch.
 
 on:
   schedule:
@@ -13,12 +14,15 @@ on:
 
 permissions:
   actions: write
+  contents: read
 
 jobs:
   heal:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: npm follows the engine release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -29,5 +33,10 @@ jobs:
           ver="${tag#v}"
           npm_v="$(curl -fsSL https://registry.npmjs.org/@supernovae-st%2Fnika-client | python3 -c 'import json,sys;print(json.load(sys.stdin)["dist-tags"]["latest"])')"
           if [ "$npm_v" = "$ver" ]; then echo "npm already $ver — nothing to heal"; exit 0; fi
+          repo_v="$(node -p "require('./package.json').version")"
+          if [ "$repo_v" != "$ver" ]; then
+            echo "::warning::engine is $ver but the prepared SDK train is $repo_v; waiting for its version PR"
+            exit 0
+          fi
           gh workflow run Release --repo "$GITHUB_REPOSITORY" -f version="$ver"
           echo "dispatched Release $ver (npm was $npm_v)"

@@ -19,10 +19,13 @@ concurrency:
 
 jobs:
   prepare:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
+    outputs:
+      prepared_sha: ${{ steps.release-metadata.outputs.prepared_sha }}
     env:
       VERSION: ${{ github.event.inputs.version }}
       DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
@@ -31,6 +34,9 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -39,7 +45,9 @@ jobs:
           package-manager-cache: false
 
       - name: Pin trusted-publishing npm CLI
-        run: npm install --global npm@11.5.1
+        run: |
+          npm install --global npm@11.19.1
+          npm stage --help
 
       - name: Validate checked-in release train
         env:
@@ -108,6 +116,40 @@ jobs:
             grep -E "[[:space:]]${asset}$" SHA256SUMS | sha256sum --check --strict
           done
 
+      - name: Prove the pinned contract and generated types against the released binary
+        run: |
+          set -euo pipefail
+          mkdir -p openapi-probe/{workflows,state}
+          tar -xzf "engine-assets/nika-linux-x64-$VERSION.tar.gz" -C openapi-probe nika
+          token="nika-release-openapi-probe-token-0116"
+          printf '%s\n' "$token" > openapi-probe/token
+          chmod 600 openapi-probe/token
+          ./openapi-probe/nika serve \
+            --bind 127.0.0.1:18787 \
+            --workflows openapi-probe/workflows \
+            --token-file openapi-probe/token \
+            --state-root openapi-probe/state \
+            --plain >openapi-probe/server.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
+          for _ in {1..50}; do
+            if curl -fsS http://127.0.0.1:18787/health >/dev/null; then break; fi
+            sleep 0.1
+          done
+          curl -fsS \
+            -H "Authorization: Bearer $token" \
+            http://127.0.0.1:18787/v1/openapi.json \
+            > openapi-probe/live.json
+          jq -S . openapi.json > openapi-probe/pinned.sorted.json
+          jq -S . openapi-probe/live.json > openapi-probe/live.sorted.json
+          if ! cmp -s openapi-probe/pinned.sorted.json openapi-probe/live.sorted.json; then
+            echo "::error::openapi.json differs from the released v$VERSION binary"
+            exit 1
+          fi
+          NIKA_TOKEN="$token" npm run generate:types -- http://127.0.0.1:18787
+          rm -f .openapi-cache.json
+          git diff --exit-code -- openapi.json src/generated/openapi.d.ts
+
       - name: Build native payload packages
         run: |
           set -euo pipefail
@@ -150,6 +192,18 @@ jobs:
             > pack-reports/nika-client.json
           node scripts/verify-client-pack.mjs pack-reports/nika-client.json
 
+      - name: Seal release metadata
+        id: release-metadata
+        run: |
+          set -euo pipefail
+          prepared_sha="$(git rev-parse HEAD)"
+          jq -n \
+            --arg version "$VERSION" \
+            --arg prepared_sha "$prepared_sha" \
+            '{schema_version: 1, version: $version, prepared_sha: $prepared_sha}' \
+            > release-metadata.json
+          echo "prepared_sha=$prepared_sha" >> "$GITHUB_OUTPUT"
+
       - name: Refuse an already-started public train
         if: env.DRY_RUN != 'true'
         run: |
@@ -157,8 +211,8 @@ jobs:
           packages=(
             @supernovae-st/nika-darwin-arm64
             @supernovae-st/nika-darwin-x64
-            @supernovae-st/nika-linux-arm64-gnu
-            @supernovae-st/nika-linux-x64-gnu
+            @supernovae-st/nika-linux-arm64
+            @supernovae-st/nika-linux-x64
             @supernovae-st/nika-client
           )
           for package_name in "${packages[@]}"; do
@@ -174,19 +228,22 @@ jobs:
           path: |
             release-tarballs/*.tgz
             pack-reports/*.json
+            release-metadata.json
           if-no-files-found: error
           retention-days: 7
 
       - name: Dry-run summary
         if: env.DRY_RUN == 'true'
         run: |
-          echo "### Nika client release candidate" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Version: $VERSION" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Result: built, tested, checksummed, packed, and inspected" >> "$GITHUB_STEP_SUMMARY"
-          echo "- npm staging: skipped by dry run" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### Nika client release candidate"
+            echo "- Version: $VERSION"
+            echo "- Result: built, tested, checksummed, packed, and inspected"
+            echo "- npm staging: skipped by dry run"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   stage:
-    if: github.event.inputs.dry_run != 'true'
+    if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -197,6 +254,11 @@ jobs:
     env:
       VERSION: ${{ github.event.inputs.version }}
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.prepared_sha }}
+          fetch-depth: 0
+
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: nika-client-release-${{ env.VERSION }}
@@ -209,16 +271,23 @@ jobs:
           package-manager-cache: false
 
       - name: Pin trusted-publishing npm CLI
-        run: npm install --global npm@11.5.1
+        run: |
+          npm install --global npm@11.19.1
+          npm stage --help
 
       - name: Stage payloads, then SDK through OIDC
         run: |
           set -euo pipefail
+          prepared_sha="$(jq -r .prepared_sha release-candidate/release-metadata.json)"
+          if [ "$(git rev-parse HEAD)" != "$prepared_sha" ]; then
+            echo "::error::artifact commit and checked-out publishing commit differ"
+            exit 1
+          fi
           payloads=(
             "release-candidate/release-tarballs/supernovae-st-nika-darwin-arm64-$VERSION.tgz"
             "release-candidate/release-tarballs/supernovae-st-nika-darwin-x64-$VERSION.tgz"
-            "release-candidate/release-tarballs/supernovae-st-nika-linux-arm64-gnu-$VERSION.tgz"
-            "release-candidate/release-tarballs/supernovae-st-nika-linux-x64-gnu-$VERSION.tgz"
+            "release-candidate/release-tarballs/supernovae-st-nika-linux-arm64-$VERSION.tgz"
+            "release-candidate/release-tarballs/supernovae-st-nika-linux-x64-$VERSION.tgz"
           )
           for tarball in "${payloads[@]}"; do
             npm stage publish "$tarball" --access public
@@ -229,8 +298,11 @@ jobs:
 
       - name: Approval summary
         run: |
-          echo "### Nika client release staged" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Version: $VERSION" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Order: four native payloads, then root SDK" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Authentication: npm trusted publishing (OIDC), no write token" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Next gate: inspect and approve all five staged packages with human 2FA" >> "$GITHUB_STEP_SUMMARY"
+          {
+            echo "### Nika client release staged"
+            echo "- Version: $VERSION"
+            echo "- Order: four native payloads, then root SDK"
+            echo "- Authentication: npm trusted publishing (OIDC), no write token"
+            echo "- Prepared commit: $(jq -r .prepared_sha release-candidate/release-metadata.json)"
+            echo "- Next gate: inspect and approve all five staged packages with human 2FA"
+          } >> "$GITHUB_STEP_SUMMARY"

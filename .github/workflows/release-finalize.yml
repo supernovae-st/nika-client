@@ -1,0 +1,102 @@
+name: release-finalize
+
+# Staged npm packages require a maintainer's 2FA approval. This second,
+# explicit ceremony creates the repository tag and GitHub Release only after
+# all five packages are publicly observable at the exact prepared version.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Approved SDK release version (e.g. 0.116.0)'
+        required: true
+      prepared_sha:
+        description: 'Exact 40-hex commit printed by the staging job'
+        required: true
+
+concurrency:
+  group: nika-client-release-finalize-${{ github.event.inputs.version }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: sdk-release
+    env:
+      VERSION: ${{ github.event.inputs.version }}
+      PREPARED_SHA: ${{ github.event.inputs.prepared_sha }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Refuse an unprepared or unpublished train
+        run: |
+          set -euo pipefail
+          if ! [[ "$VERSION" =~ ^0\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::invalid version: $VERSION"
+            exit 1
+          fi
+          if ! [[ "$PREPARED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::invalid prepared commit: $PREPARED_SHA"
+            exit 1
+          fi
+          git cat-file -e "$PREPARED_SHA^{commit}"
+          if ! git merge-base --is-ancestor "$PREPARED_SHA" origin/main; then
+            echo "::error::prepared commit is not on main"
+            exit 1
+          fi
+          repo_version="$(git show "$PREPARED_SHA:package.json" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).version))')"
+          if [ "$repo_version" != "$VERSION" ]; then
+            echo "::error::main prepares $repo_version, not $VERSION"
+            exit 1
+          fi
+          packages=(
+            @supernovae-st/nika-darwin-arm64
+            @supernovae-st/nika-darwin-x64
+            @supernovae-st/nika-linux-arm64
+            @supernovae-st/nika-linux-x64
+            @supernovae-st/nika-client
+          )
+          for package_name in "${packages[@]}"; do
+            published="$(npm view "$package_name@$VERSION" version)"
+            if [ "$published" != "$VERSION" ]; then
+              echo "::error::$package_name@$VERSION is not public after staged approval"
+              exit 1
+            fi
+          done
+          published_head="$(npm view "@supernovae-st/nika-client@$VERSION" gitHead)"
+          if [ "$published_head" != "$PREPARED_SHA" ]; then
+            echo "::error::npm provenance commit $published_head differs from prepared $PREPARED_SHA"
+            exit 1
+          fi
+
+      - name: Create the immutable SDK tag and GitHub Release
+        run: |
+          set -euo pipefail
+          tag="v$VERSION"
+          if git rev-parse --verify --quiet "refs/tags/$tag" >/dev/null; then
+            tagged="$(git rev-list -n 1 "$tag")"
+            if [ "$tagged" != "$PREPARED_SHA" ]; then
+              echo "::error::$tag already points to $tagged, not prepared $PREPARED_SHA"
+              exit 1
+            fi
+          else
+            git tag "$tag" "$PREPARED_SHA"
+            git push origin "$tag"
+          fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "$tag already has a GitHub Release"
+            exit 0
+          fi
+          gh release create "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --title "Nika One SDK $VERSION" \
+            --generate-notes

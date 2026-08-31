@@ -1,0 +1,5 @@
+{
+  "name": "nika-depth-multi-tenant-webhook-router",
+  "private": true,
+  "type": "module"
+}

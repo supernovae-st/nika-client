@@ -1,0 +1,66 @@
+nika: depth-evidence-provenance-pipeline
+model: mock/echo
+run:
+  entropy: none
+  clock: virtual
+const:
+  prior: { policy: p-17, controls: 2, state: review }
+  current: { policy: p-17, controls: 4, state: approved }
+  evidence:
+    - { id: source-a, claim: controls-present, value: 4 }
+    - { id: source-b, claim: approver-count, value: 2 }
+    - { id: source-c, claim: exceptions-open, value: 0 }
+permits:
+  tools: ["nika:hash", "nika:jq", "nika:json_diff", "nika:validate"]
+tasks:
+  validate_evidence:
+    invoke:
+      tool: "nika:validate"
+      args:
+        data: ${{ const.evidence }}
+        schema:
+          type: array
+          minItems: 3
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, claim, value]
+            properties:
+              id: { type: string }
+              claim: { type: string }
+              value: { type: integer }
+  source_digests:
+    after: { validate_evidence: success }
+    for_each:
+      items: ${{ const.evidence }}
+      max_parallel: 3
+      fail_fast: true
+    invoke:
+      tool: "nika:hash"
+      args: { content: "${{ item }}", algo: sha256, encoding: hex }
+  policy_delta:
+    invoke:
+      tool: "nika:json_diff"
+      args: { before: "${{ const.prior }}", after: "${{ const.current }}" }
+  evidence_snapshot:
+    with:
+      digests: ${{ tasks.source_digests.output }}
+      delta: ${{ tasks.policy_delta.output }}
+    invoke:
+      tool: "nika:jq"
+      args:
+        input:
+          policy: ${{ const.current.policy }}
+          evidence: "${{ const.evidence }}"
+          digests: "${{ with.digests }}"
+          delta: "${{ with.delta }}"
+        expression: '{ policy, evidence: [.evidence as $e | range(0; ($e | length)) as $i | ($e[$i] + {digest: .digests[$i]})], delta, complete: ((.evidence | length) == (.digests | length)) }'
+  provenance_root:
+    with:
+      snapshot: ${{ tasks.evidence_snapshot.output }}
+    invoke:
+      tool: "nika:hash"
+      args: { content: "${{ with.snapshot }}", algo: sha256, encoding: hex }
+outputs:
+  evidence_snapshot: ${{ tasks.evidence_snapshot.output }}
+  provenance_root: ${{ tasks.provenance_root.output }}

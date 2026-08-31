@@ -1,0 +1,70 @@
+nika: depth-deployment-gate
+model: mock/echo
+run:
+  entropy: none
+  clock: virtual
+inputs:
+  approved:
+    type: bool
+    default: true
+const:
+  candidate: { service: payments, version: 2.4.0, tests: 184, vulnerabilities: 0 }
+  baseline: { service: payments, version: 2.3.9, tests: 176, vulnerabilities: 0 }
+  regions: [eu-west-1, us-east-1, ap-southeast-2]
+permits:
+  tools: ["nika:assert", "nika:hash", "nika:jq", "nika:json_diff", "nika:validate"]
+tasks:
+  validate_candidate:
+    invoke:
+      tool: "nika:validate"
+      args:
+        data: ${{ const.candidate }}
+        schema:
+          type: object
+          additionalProperties: false
+          required: [service, version, tests, vulnerabilities]
+          properties:
+            service: { type: string }
+            version: { type: string }
+            tests: { type: integer, minimum: 1 }
+            vulnerabilities: { type: integer, minimum: 0 }
+  region_checks:
+    after: { validate_candidate: success }
+    for_each:
+      items: ${{ const.regions }}
+      max_parallel: 3
+      fail_fast: true
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: { region: "${{ item }}", candidate: "${{ const.candidate }}" }
+        expression: '{ region, ready: (.candidate.vulnerabilities == 0 and .candidate.tests >= 180), version: .candidate.version }'
+  release_delta:
+    invoke:
+      tool: "nika:json_diff"
+      args: { before: "${{ const.baseline }}", after: "${{ const.candidate }}" }
+  gate_board:
+    with:
+      regions: ${{ tasks.region_checks.output }}
+      delta: ${{ tasks.release_delta.output }}
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: { regions: "${{ with.regions }}", delta: "${{ with.delta }}", approved: "${{ inputs.approved }}" }
+        expression: '{ regions, delta, all_regions_ready: ([.regions[].ready] | all), approved, green: (([.regions[].ready] | all) and .approved) }'
+  enforce_gate:
+    with:
+      board: ${{ tasks.gate_board.output }}
+    invoke:
+      tool: "nika:assert"
+      args: { condition: "${{ with.board.green }}", message: "deployment gate refused the candidate" }
+  deployment_receipt:
+    with:
+      board: ${{ tasks.gate_board.output }}
+    after: { enforce_gate: success }
+    invoke:
+      tool: "nika:hash"
+      args: { content: "${{ with.board }}", algo: sha256, encoding: hex }
+outputs:
+  board: ${{ tasks.gate_board.output }}
+  receipt_digest: ${{ tasks.deployment_receipt.output }}

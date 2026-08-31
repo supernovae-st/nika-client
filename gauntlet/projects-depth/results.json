@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "engine": "nika 0.115.0 (08fb9e289)",
+  "package": "supernovae-st-nika-client-0.114.0.tgz",
+  "install_mode": "npm pack + isolated npm install --omit=optional + explicit NIKA_BIN",
+  "projects": [
+    {
+      "project": "deployment-gate",
+      "status": "succeeded",
+      "green_path": "succeeded",
+      "refusal_path": {
+        "status": "failed",
+        "exit_code": 1,
+        "board_green": false
+      },
+      "typed_error": {
+        "name": "NikaCompatibilityError",
+        "capability": "idempotencyKey"
+      },
+      "concurrent_gate_runs": 2,
+      "observed_event_kinds": [
+        "permit_checked",
+        "run_settled",
+        "task_completed",
+        "task_scheduled",
+        "task_started",
+        "workflow_completed",
+        "workflow_started"
+      ],
+      "receipt_verified": true,
+      "deterministic_cost_cap_usd": 0,
+      "installed_from_pack": true
+    },
+    {
+      "project": "evidence-provenance-pipeline",
+      "status": "succeeded",
+      "concurrent_runs": 2,
+      "deterministic_provenance_root": "87866c760cd3fffe2c8e4db981384ac7bc858dcb3189544c6b0c043db2cfcde3",
+      "receipts_verified": 2,
+      "forged_receipt_rejected": true,
+      "observed_event_kinds": [
+        "permit_checked",
+        "run_settled",
+        "task_completed",
+        "task_scheduled",
+        "task_started",
+        "workflow_completed",
+        "workflow_started"
+      ],
+      "deterministic_cost_cap_usd": 0,
+      "installed_from_pack": true
+    },
+    {
+      "project": "incident-response-controller",
+      "status": "succeeded",
+      "cancelled_run_status": "cancelled",
+      "cancellation_idempotent": true,
+      "cancellation_status": "cancelled",
+      "sse_event_kinds": [
+        "execution.cancelled",
+        "execution.started"
+      ],
+      "remote_receipt_verdict": {
+        "verdict": "unavailable",
+        "reason": "trace_journal_unavailable"
+      },
+      "deterministic_cost_cap_usd": 0,
+      "installed_from_pack": true
+    },
+    {
+      "project": "multi-tenant-webhook-router",
+      "status": "succeeded",
+      "transport": "http",
+      "trigger": "real-loopback-webhook-http",
+      "duplicate_deliveries": 2,
+      "idempotent_job_identity": true,
+      "routed_tenants": 3,
+      "sse_event_kinds": [
+        "execution.settled",
+        "execution.started"
+      ],
+      "deterministic_cost_cap_usd": 0,
+      "installed_from_pack": true
+    },
+    {
+      "project": "scheduled-research-monitor",
+      "status": "succeeded",
+      "schedule_cas_updated": true,
+      "stale_writer_error": {
+        "name": "NikaOperationError",
+        "code": "schedule_conflict",
+        "current_revision": "sha256:45dbd8366b654950031e6eed5bf1b926676ee8c95e6dcdd23f86041d3138d592"
+      },
+      "revision_survived_restart": true,
+      "reconnect_event_sequences": [
+        1,
+        2
+      ],
+      "deterministic_cost_cap_usd": 0,
+      "installed_from_pack": true
+    }
+  ],
+  "summary": {
+    "total": 5,
+    "succeeded": 5,
+    "result": "green"
+  }
+}

@@ -1,0 +1,66 @@
+nika: depth-scheduled-research-monitor
+model: mock/echo
+run:
+  entropy: none
+  clock: virtual
+const:
+  previous:
+    - { source: arxiv, papers: 12, adopted: 2 }
+    - { source: crossref, papers: 9, adopted: 1 }
+    - { source: openalex, papers: 15, adopted: 4 }
+  current:
+    - { source: arxiv, papers: 14, adopted: 3 }
+    - { source: crossref, papers: 11, adopted: 1 }
+    - { source: openalex, papers: 18, adopted: 5 }
+permits:
+  tools: ["nika:hash", "nika:jq", "nika:json_diff", "nika:validate"]
+tasks:
+  validate_current:
+    invoke:
+      tool: "nika:validate"
+      args:
+        data: ${{ const.current }}
+        schema:
+          type: array
+          minItems: 3
+          items:
+            type: object
+            additionalProperties: false
+            required: [source, papers, adopted]
+            properties:
+              source: { type: string }
+              papers: { type: integer, minimum: 0 }
+              adopted: { type: integer, minimum: 0 }
+  score_sources:
+    after: { validate_current: success }
+    for_each:
+      items: ${{ const.current }}
+      max_parallel: 2
+      fail_fast: true
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ item }}
+        expression: '. + { adoption_rate: (if .papers == 0 then 0 else (.adopted / .papers) end), monitored: true }'
+  changes:
+    invoke:
+      tool: "nika:json_diff"
+      args: { before: "${{ const.previous }}", after: "${{ const.current }}" }
+  snapshot:
+    with:
+      scores: ${{ tasks.score_sources.output }}
+      changes: ${{ tasks.changes.output }}
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: { scores: "${{ with.scores }}", changes: "${{ with.changes }}" }
+        expression: '{ scores, changes, total_papers: ([.scores[].papers] | add), total_adopted: ([.scores[].adopted] | add), source_count: (.scores | length) }'
+  receipt_digest:
+    with:
+      snapshot: ${{ tasks.snapshot.output }}
+    invoke:
+      tool: "nika:hash"
+      args: { content: "${{ with.snapshot }}", algo: sha256, encoding: hex }
+outputs:
+  snapshot: ${{ tasks.snapshot.output }}
+  digest: ${{ tasks.receipt_digest.output }}

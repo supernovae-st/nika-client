@@ -87,7 +87,7 @@ jobs:
           token: ${{ secrets.NIKA_REPO_TOKEN || github.token }}
 
       - name: Enforce SDK coverage against tagged engine source
-        run: npm run check:coverage -- ./nika-source
+        run: npm run check:coverage
 
       - name: Download and verify engine release assets
         env:

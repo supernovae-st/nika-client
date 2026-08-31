@@ -106,21 +106,31 @@ jobs:
   # and fails if generated types differ from committed ones.
   type-drift:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
 
-      # Resolve the latest tag → the versioned asset. The old URL pinned
-      # `nika-x86_64-unknown-linux-gnu.tar.gz` under /latest/download/, which
-      # 404s — releases publish `nika-linux-x64-<version>.tar.gz`.
+      # Resolve package.json → the exact versioned asset. This avoids both the
+      # old unversioned filename and a racy unauthenticated /latest API read.
       - name: Install nika
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          tag=$(curl -sf https://api.github.com/repos/supernovae-st/nika/releases/latest | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).tag_name")
-          ver=${tag#v}
-          curl -fsSL "https://github.com/supernovae-st/nika/releases/download/${tag}/nika-linux-x64-${ver}.tar.gz" | tar xz
-          chmod +x nika && sudo mv nika /usr/local/bin/
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          asset_root="$RUNNER_TEMP/nika-type-drift"
+          mkdir -p "$asset_root"
+          gh release download "v$version" \
+            --repo supernovae-st/nika \
+            --dir "$asset_root" \
+            --pattern "nika-linux-x64-$version.tar.gz"
+          tar xzf "$asset_root/nika-linux-x64-$version.tar.gz" -C "$asset_root"
+          chmod +x "$asset_root/nika"
+          sudo mv "$asset_root/nika" /usr/local/bin/
 
       - run: npm ci
       # The type-drift check needs the target-facing HTTP `nika serve` surface

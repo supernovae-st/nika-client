@@ -419,6 +419,9 @@ writeFileSync(resultsPath, `${JSON.stringify(report, null, 2)}\n`);
 rmSync(scratch, { recursive: true, force: true });
 
 if (report.result !== 'green') {
+  for (const row of rows.filter((entry) => entry.result === 'red')) {
+    process.stderr.write(`${row.name} · ${row.error}\n`);
+  }
   process.stderr.write(`${report.summary.red}/${report.summary.total} hostile scenarios red · ${resultsPath}\n`);
   process.exitCode = 1;
 } else {

@@ -8,9 +8,11 @@ interface PackageLock {
   packages: Record<string, {
     version?: string;
     optional?: boolean;
+    license?: string;
     os?: string[];
     cpu?: string[];
     libc?: string[];
+    engines?: Record<string, string>;
   }>;
 }
 
@@ -27,6 +29,13 @@ describe('native package lock coverage', () => {
       expect(entry).toMatchObject({ version, optional: true });
       expect(entry.os).toHaveLength(1);
       expect(entry.cpu).toHaveLength(1);
+
+      const expectedKeys = entry.libc
+        ? ['version', 'cpu', 'libc', 'license', 'optional', 'os', 'engines']
+        : ['version', 'cpu', 'license', 'optional', 'os', 'engines'];
+      expect(Object.keys(entry), `${name} must retain npm 11.19.1 lock order`).toEqual(
+        expectedKeys,
+      );
     }
   });
 });

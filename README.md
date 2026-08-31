@@ -11,8 +11,9 @@
 
 <p align="center"><strong>One TypeScript surface for local Nika processes and authenticated Nika servers.</strong></p>
 
-`Nika` exposes the same lifecycle vocabulary on both transports: `check`,
-`run`, `events`, `cancel`, `schedule`, `scheduleStatus`, and `traceVerify`.
+`Nika` exposes one lifecycle vocabulary: `check`, `run`, `attachRun`, `status`, `events`,
+`cancel`, `traceVerify`, `listWorkflows`, `workflow`, `schedule`, and
+`scheduleStatus`.
 The engine remains authoritative for parsing, admission, execution, receipts,
 traces, permits, scheduling, and cost. The SDK transports those facts; it does
 not parse YAML or reconstruct proof in TypeScript.
@@ -23,6 +24,17 @@ not parse YAML or reconstruct proof in TypeScript.
 - a compatible `nika` engine, resolved from `config.bin`, then `NIKA_BIN`,
   then the optional platform package or `PATH`
 - a `.nika.yaml` workflow
+
+## Documentation
+
+- [Architecture](docs/architecture.md) — Modules, Interface, Seam, Adapters,
+  lifecycle, and authority boundaries
+- [HTTP contract](docs/http-api.md) — every live route, recovery, security,
+  idempotency, and schedule CAS
+- [Testing and release evidence](docs/testing.md) — layered gauntlets and the
+  Socratic risk matrix
+- [Migrating to 0.116](docs/migrating-to-0.116.md) — additive discovery and
+  durable status methods
 
 ## Install
 
@@ -98,6 +110,13 @@ authority; the typed verdict is preserved instead of being hidden as a 404.
 their operation. It therefore does not advertise remote trace verification
 while this diagnostic route can only return the typed unavailable verdict.
 
+Run-signing keys remain engine-owned. `nika key init`, `nika key trust`, and
+`nika key rotate` manage their lifecycle. Nika prefers the OS keychain and uses
+0600 files under `~/.nika/keys/` only as the local fallback; CI can inject an
+explicit pair through `NIKA_RUN_KEY_FILE` and `NIKA_RUN_PUB_FILE`. Applications
+should persist receipts and public trust material, never copy a private run key
+into SDK configuration, source control, workflow inputs, or an HTTP request.
+
 ## Cancel a run
 
 ```ts
@@ -166,9 +185,27 @@ for await (const event of nika.events(run)) {
 console.log(await run.done);
 ```
 
+If the Node process restarts after admission, recover the durable job without
+submitting the workflow again:
+
+```ts
+const recovered = await nika.attachRun(saved.jobId, {
+  lastEventId: saved.lastEventSequence,
+});
+for await (const event of nika.events(recovered)) {
+  await saveApplicationCheckpoint(recovered.id, event.sequence);
+}
+console.log(await recovered.done);
+```
+
+Persist the job id and last committed sequence in application state. The
+idempotency namespace spans the server's entire `state-root` and currently has
+no TTL; use globally unique business keys and do not recycle them between
+workflows.
+
 Plain HTTP is refused unless `allowInsecureHttp: true` is explicit. Use HTTPS
 for a non-loopback deployment. A URL may not contain credentials, a query, or a
-fragment, and a non-empty token is mandatory.
+fragment, and a 32–512 byte visible-ASCII token is mandatory.
 
 Remote snapshots currently do not have request envelopes for per-call `vars`,
 `model`, or `maxCostUsd`; declare those facts in the workflow. Likewise,
@@ -205,7 +242,7 @@ await nika.schedule('hello.nika.yaml', {
   revision: status.revision,
   active: false,
   pauseReason: 'maintenance',
-  pauseUntil: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+  pauseUntil: '2026-09-01',
 });
 ```
 
@@ -220,7 +257,7 @@ declarations the current engine cannot plan are refused before durable mutation.
 Timed hash jitter is currently unsupported and returns a typed refusal.
 Cron expressions carry their zone as `TZ=<IANA zone> ...`; `tolerance` uses
 `m/k`; `afterSkip` requires `overlap: "skip"`; and `active: false` requires a
-`pauseUntil` instant.
+`pauseUntil` ISO calendar date (`YYYY-MM-DD`).
 
 ## Transport matrix
 
@@ -228,10 +265,13 @@ Cron expressions carry their zone as `TZ=<IANA zone> ...`; `tolerance` uses
 |---|---|---|
 | `check` | yes; `model` and `nativeStrict` allowed | yes; those two overrides refused |
 | `run` | yes; `vars`, `model`, `maxCostUsd` allowed | yes; `idempotencyKey` allowed |
+| `attachRun` | typed refusal | reattach to a durable job with an optional SSE cursor |
+| `status` | typed refusal; await `run.done` | durable status projection |
 | `events` | raw engine lifecycle frames | sequenced SSE frames with bounded replay |
 | `cancel` | signal-backed, idempotent | durable server cancellation |
 | `traceVerify` | engine verification + signed receipt binding | typed unavailable verdict until remote journal authority exists |
 | `schedule` / `scheduleStatus` | typed refusal | resident schedule authority |
+| `listWorkflows` / `workflow` | typed refusal | contained path-free workflow catalog |
 
 Event vocabulary is deliberately open. Native execution exposes detailed task
 lifecycle frames; HTTP exposes durable sequenced execution frames. Consumers
@@ -261,11 +301,15 @@ Remote-only options:
 |---|---|
 | `check(workflow, options?)` | engine check report, including `clean` and `exitCode` |
 | `run(workflow, options?)` | admitted `NikaRun` |
+| `attachRun(id, options?)` | reattached durable HTTP `NikaRun` |
+| `status(run)` | current durable HTTP status |
 | `events(run, options?)` | bounded `AsyncIterable<NikaEvent>` |
 | `cancel(run)` | `NikaCancelResult` |
 | `traceVerify(receipt, options?)` | `NikaTraceVerifyResult` |
 | `schedule(workflow, options)` | durable apply acknowledgement |
 | `scheduleStatus(id)` | fresh engine schedule projection |
+| `listWorkflows()` | contained resident workflow names |
+| `workflow(name)` | path-free resident workflow metadata |
 
 ## Errors
 

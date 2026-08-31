@@ -196,6 +196,8 @@ jobs:
           echo "prepared_sha=$prepared_sha" >> "$GITHUB_OUTPUT"
 
       - name: Pack and inspect all packages
+        env:
+          PREPARED_SHA: ${{ steps.release-metadata.outputs.prepared_sha }}
         run: |
           set -euo pipefail
           mkdir -p release-tarballs pack-reports
@@ -203,12 +205,12 @@ jobs:
             report="pack-reports/$(basename "$package_dir").json"
             npm pack "$package_dir" --json --pack-destination release-tarballs > "$report"
             node scripts/verify-native-pack.mjs \
-              "$report" release-tarballs "$prepared_sha" "$VERSION"
+              "$report" release-tarballs "$PREPARED_SHA" "$VERSION"
           done
           npm pack --ignore-scripts --json --pack-destination release-tarballs \
             > pack-reports/nika-client.json
           node scripts/verify-client-pack.mjs \
-            pack-reports/nika-client.json release-tarballs "$prepared_sha" "$VERSION"
+            pack-reports/nika-client.json release-tarballs "$PREPARED_SHA" "$VERSION"
 
       - name: Refuse an already-started public train
         if: env.DRY_RUN != 'true'

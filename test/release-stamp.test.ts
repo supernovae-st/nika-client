@@ -77,6 +77,17 @@ describe('release commit stamping', () => {
       expect(readManifest(fixture, relativePath).nikaRelease).toBeUndefined();
     }
   });
+
+  it('carries the prepared commit across the GitHub Actions step boundary', () => {
+    const workflow = readFileSync(path.join(ROOT, '.github/workflows/release.yml'), 'utf8');
+    const packStep = workflow.split('      - name: Pack and inspect all packages\n')[1]
+      ?.split('      - name: Refuse an already-started public train\n')[0];
+    expect(packStep).toContain(
+      'PREPARED_SHA: ${{ steps.release-metadata.outputs.prepared_sha }}',
+    );
+    expect(packStep).toContain('"$PREPARED_SHA"');
+    expect(packStep).not.toContain('"$prepared_sha"');
+  });
 });
 
 function createFixture(version: string): string {

@@ -17,12 +17,12 @@ All workflows use the public envelope and task-map form, the canonical `invoke` 
 ## Verification
 
 - `NIKA_BIN=/path/to/compatible/nika node scripts/run-depth-projects.mjs` — 5/5 succeeded from isolated packed installs.
-- `npm test` — 9 files and 119 tests passed.
+- `npm test` — the full repository suite passed.
 - `node --check` — all five consumer entry points and the runner passed.
 - `git diff --check` — passed.
 
-The final release-candidate replay used the clean engine `nika 0.116.0
-(b38267751)` with `supernovae-st-nika-client-0.116.0.tgz`; all five projects
+The final release-candidate replay used the clean engine `nika 0.116.2 (c4cdbeafb)`
+with `supernovae-st-nika-client-0.116.2.tgz`; all five projects
 remained green. The generated JSON records installed-from-pack proof, stable
 scenario facts, typed error names/codes, receipt verdicts, event observations,
 concurrency, cancellation, CAS, and restart evidence.

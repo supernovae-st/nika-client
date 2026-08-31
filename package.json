@@ -50,6 +50,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:coverage": "node scripts/check-sdk-coverage.js",
+    "check:release-evidence": "node scripts/verify-release-evidence.mjs",
     "gauntlet:generate": "node scripts/generate-gauntlet-corpus.mjs",
     "gauntlet:check": "node scripts/verify-gauntlet-corpus.mjs",
     "gauntlet:run": "node scripts/execute-gauntlet-corpus.mjs",

@@ -9,6 +9,7 @@ npm ci
 npm test
 npm run build
 npm run check:coverage
+npm run check:release-evidence
 NIKA_BIN=/path/to/nika npm run gauntlet:check
 NIKA_BIN=/path/to/nika npm run gauntlet:run
 NIKA_BIN=/path/to/nika npm run gauntlet:projects
@@ -22,7 +23,10 @@ npm pack --dry-run
 All engine-backed gauntlets use `NIKA_BIN` as the canonical explicit binary.
 `NIKA_GAUNTLET_BIN` remains a compatibility fallback for the corpus-only
 scripts. Evidence is invalid when the recorded engine identity does not match
-the intended release candidate.
+the intended release candidate. `npm run check:release-evidence` binds every
+current committed gauntlet result and packed tarball identity to the root
+package version. Historical ledgers are limited to an explicit allowlist and
+must remain labelled as non-gating evidence.
 
 ## Test layers
 

@@ -202,11 +202,13 @@ jobs:
           for package_dir in packages/native/*; do
             report="pack-reports/$(basename "$package_dir").json"
             npm pack "$package_dir" --json --pack-destination release-tarballs > "$report"
-            node scripts/verify-native-pack.mjs "$report"
+            node scripts/verify-native-pack.mjs \
+              "$report" release-tarballs "$prepared_sha" "$VERSION"
           done
           npm pack --ignore-scripts --json --pack-destination release-tarballs \
             > pack-reports/nika-client.json
-          node scripts/verify-client-pack.mjs pack-reports/nika-client.json
+          node scripts/verify-client-pack.mjs \
+            pack-reports/nika-client.json release-tarballs "$prepared_sha" "$VERSION"
 
       - name: Refuse an already-started public train
         if: env.DRY_RUN != 'true'

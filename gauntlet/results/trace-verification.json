@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "verified_traces": 300,
+  "chain_intact": 300,
+  "sealed": 300,
+  "signing_key_fingerprint": "bdec0f1d24ff5eba",
+  "public_key_source": "~/.nika/keys/run-signing.pub",
+  "anchored": 0,
+  "replayed": 0,
+  "verifier_exit_code": 0,
+  "engine": "nika 0.115.0 (274f8e9cf)",
+  "evidence_scope": "historical three-pass trace evidence; not a 0.116 release gate",
+  "note": "Three complete 100-workflow passes. Every journal chain and run_sealed signature verified. No transparency-log sidecar or pairwise replay was claimed."
+}

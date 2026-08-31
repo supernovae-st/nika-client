@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 47/100 · travel operations · itinerary-diff
+# Actor: travel designer for travel operations
+# Trigger: itinerary-diff request enters the travel operations queue
+# Authority: tools only: nika:jq; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: all three batch items return in input order with checked=true for uc-047-travel-itinerary-diff
+# Business outcome: enrich a bounded batch while preserving source order for travel operations
+
+nika: uc-047-travel-itinerary-diff
+
+model: mock/echo
+
+const:
+  items: [{"sequence":1,"case":"itinerary-diff"},{"sequence":2,"case":"itinerary-diff"},{"sequence":3,"case":"itinerary-diff"}]
+permits:
+  tools: ["nika:jq"]
+tasks:
+  enrich:
+    for_each:
+      items: ${{ const.items }}
+      max_parallel: 2
+      fail_fast: true
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ item }}
+        expression: '. + {checked: true}'
+outputs:
+  rows: ${{ tasks.enrich.output }}

@@ -1,0 +1,22 @@
+nika: mini-saas-operator-console
+model: mock/echo
+const:
+  record: {"service":"nika-one-sdk","health":"green","runs":5}
+permits:
+  tools: ["nika:validate"]
+tasks:
+  validate:
+    invoke:
+      tool: "nika:validate"
+      args:
+        data: ${{ const.record }}
+        schema:
+          type: object
+          additionalProperties: false
+          required: [service, health, runs]
+          properties:
+            service: { type: string }
+            health: { type: string, enum: [green] }
+            runs: { type: integer, minimum: 1 }
+outputs:
+  health: ${{ tasks.validate.output }}

@@ -3,8 +3,8 @@
  * SDK Coverage Checker
  *
  * The live contract is the pinned OpenAPI at repo-root openapi.json
- * (W09.B). SDK helpers must call every live path and must not call
- * absent ones (cancel, artifacts, /v1/run).
+ * (W09.B). SDK helpers must call every live runtime path and must not call
+ * absent ones. The OpenAPI document itself is a generation surface.
  *
  * Exit 0 = covered. Exit 1 = drift.
  */
@@ -15,11 +15,7 @@ import { resolve, join } from 'node:path';
 const SDK_ROOT = resolve(import.meta.dirname, '..');
 const SPEC = join(SDK_ROOT, 'openapi.json');
 const SDK_FILES = [
-  join(SDK_ROOT, 'src/resources/jobs.ts'),
-  join(SDK_ROOT, 'src/resources/workflows.ts'),
-  join(SDK_ROOT, 'src/index.ts'),
-  join(SDK_ROOT, 'src/lib/api-client.ts'),
-  join(SDK_ROOT, 'src/lib/streaming.ts'),
+  join(SDK_ROOT, 'src/lib/http-transport.ts'),
 ];
 
 const ABSENT = [
@@ -28,8 +24,9 @@ const ABSENT = [
   '/v1/cancel',
   '/v1/events',
   '/v1/reload',
-  '/v1/jobs/:param/cancel',
   '/v1/jobs/:param/artifacts',
+  '/v1/schedules/:param/trigger',
+  '/v1/schedules/:param/backfill',
 ];
 
 function livePaths() {
@@ -42,13 +39,12 @@ function extractSdkEndpoints() {
   for (const file of SDK_FILES) {
     if (!existsSync(file)) continue;
     const src = readFileSync(file, 'utf-8');
-    const apiCallRegex = /(?:this\.api|client)\.\w+(?:<[^>]+>)?\(\s*[`'"]([^`'"]*)[`'"]/g;
+    const apiCallRegex = /([`'"])((?:\/health|\/v1\/).*?)\1/gs;
     let match;
     while ((match = apiCallRegex.exec(src)) !== null) {
-      const cleaned = match[1].replace(/\$\{[^}]+\}/g, ':param');
+      const cleaned = match[2].replace(/\$\{[^}]+\}/g, ':param');
       if (cleaned.startsWith('/')) endpoints.push(cleaned.split('?')[0]);
     }
-    if (src.includes('fetchHealth')) endpoints.push('/health');
   }
   return [...new Set(endpoints)];
 }
@@ -67,24 +63,36 @@ if (!existsSync(SPEC)) {
 const live = livePaths().map(normalize);
 const sdk = extractSdkEndpoints();
 const sdkNorm = sdk.map(normalize);
+const contract = JSON.parse(readFileSync(SPEC, 'utf-8'));
 
 let failed = false;
 
+console.log('Machine schema bindings:');
+for (const [label, actual, expected] of [
+  ['health JSON', contract.paths?.['/health']?.get?.responses?.['200']?.content?.['application/json']?.schema?.$ref, '#/components/schemas/Health'],
+  ['workflow list JSON', contract.paths?.['/v1/workflows']?.get?.responses?.['200']?.content?.['application/json']?.schema?.$ref, '#/components/schemas/WorkflowList'],
+  ['workflow metadata JSON', contract.paths?.['/v1/workflows/{name}']?.get?.responses?.['200']?.content?.['application/json']?.schema?.$ref, '#/components/schemas/WorkflowMetadata'],
+  ['SSE event extension', contract.paths?.['/v1/jobs/{id}/events']?.get?.responses?.['200']?.content?.['text/event-stream']?.['x-nika-event-schema']?.$ref, '#/components/schemas/JobEvent'],
+  ['receipt origin schema', contract.components?.schemas?.JobReceipt?.properties?.origin?.$ref, '#/components/schemas/JobOrigin'],
+]) {
+  if (actual !== expected) {
+    console.log(`  MISSING  ${label}: expected ${expected}`);
+    failed = true;
+  } else {
+    console.log(`  ok       ${label}`);
+  }
+}
+const eventSchema = contract.components?.schemas?.JobEvent;
+if (eventSchema?.additionalProperties !== false) {
+  console.log('  MISSING  JobEvent must close additionalProperties');
+  failed = true;
+}
+
 console.log('Live OpenAPI paths:');
 for (const path of live) {
-  const covered = sdkNorm.some(
-    (s) => s === path || s.startsWith(`${path}/`) || path.startsWith(`${s}/`),
-  );
-  // /v1/jobs/{id}/status is extra to /v1/jobs/{id}
   const hit = sdkNorm.includes(path)
-    || (path === '/v1/jobs/:param' && sdkNorm.includes('/v1/jobs/:param'))
-    || (path === '/v1/jobs/:param/status' && sdkNorm.includes('/v1/jobs/:param/status'))
-    || (path === '/v1/jobs/:param/events' && sdkNorm.includes('/v1/jobs/:param/events'))
-    || (path === '/v1/workflows/:param' && sdkNorm.includes('/v1/workflows/:param'))
-    || (path === '/v1/openapi.json' && sdkNorm.includes('/v1/openapi.json'))
-    || (path === '/v1/jobs' && sdkNorm.includes('/v1/jobs'))
-    || (path === '/v1/workflows' && sdkNorm.includes('/v1/workflows'))
-    || (path === '/health' && sdkNorm.includes('/health'));
+    || (path === '/v1/workflows/:param'
+      && sdkNorm.some((candidate) => candidate.startsWith('/v1/workflows/:param')));
   if (!hit) {
     // openapi.json is fetched by generate-types, not the runtime client
     if (path === '/v1/openapi.json') {
@@ -95,6 +103,16 @@ for (const path of live) {
     failed = true;
   } else {
     console.log(`  ok       ${path}`);
+  }
+}
+
+console.log('\nSDK endpoints must belong to the live contract:');
+for (const path of sdkNorm) {
+  if (!live.includes(path)) {
+    console.log(`  UNKNOWN  ${path}`);
+    failed = true;
+  } else {
+    console.log(`  live     ${path}`);
   }
 }
 

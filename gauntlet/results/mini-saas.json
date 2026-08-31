@@ -1,0 +1,71 @@
+{
+  "schema_version": 1,
+  "engine": "nika 0.116.0 (b38267751)",
+  "package": "supernovae-st-nika-client-0.116.0.tgz",
+  "install_mode": "npm pack + npm install --omit=optional + explicit NIKA_BIN",
+  "projects": [
+    {
+      "name": "commerce-enrichment",
+      "project": "commerce-enrichment",
+      "status": "succeeded",
+      "mode": "bounded-fan-out",
+      "events": 9,
+      "output_keys": [
+        "inventory"
+      ],
+      "installed_from_pack": true
+    },
+    {
+      "name": "document-evidence",
+      "project": "document-evidence",
+      "status": "succeeded",
+      "proof": "sealed-trace-verified",
+      "output_keys": [
+        "digest"
+      ],
+      "installed_from_pack": true
+    },
+    {
+      "name": "operator-console",
+      "project": "operator-console",
+      "status": "succeeded",
+      "transport": "native-process",
+      "observed_event_kinds": [
+        "permit_checked",
+        "run_settled",
+        "task_completed",
+        "task_scheduled",
+        "task_started",
+        "workflow_completed",
+        "workflow_started"
+      ],
+      "output_keys": [
+        "health"
+      ],
+      "installed_from_pack": true
+    },
+    {
+      "name": "research-monitor",
+      "project": "research-monitor",
+      "status": "succeeded",
+      "repeated_runs": 2,
+      "deterministic_status": true,
+      "output_keys": [
+        "delta"
+      ],
+      "installed_from_pack": true
+    },
+    {
+      "name": "support-webhook",
+      "project": "support-webhook",
+      "status": "succeeded",
+      "trigger": "real-loopback-http",
+      "ticket": "ticket-42",
+      "output_keys": [
+        "decision"
+      ],
+      "installed_from_pack": true
+    }
+  ],
+  "result": "green"
+}

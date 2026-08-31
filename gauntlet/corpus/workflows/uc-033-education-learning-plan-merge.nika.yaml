@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 33/100 · education operations · learning-plan-merge
+# Actor: learning coordinator for education operations
+# Trigger: learning-plan-merge request enters the education operations queue
+# Authority: tools only: nika:json_diff; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: revision patch is non-empty and points at the changed value for uc-033-education-learning-plan-merge
+# Business outcome: explain exactly what changed between two business revisions for education operations
+
+nika: uc-033-education-learning-plan-merge
+
+model: mock/echo
+
+const:
+  before: {"id":"uc-033-education-learning-plan-merge","value":33,"state":"draft"}
+  after: {"id":"uc-033-education-learning-plan-merge","value":34,"state":"approved"}
+permits:
+  tools: ["nika:json_diff"]
+tasks:
+  diff:
+    invoke:
+      tool: "nika:json_diff"
+      args:
+        before: ${{ const.before }}
+        after: ${{ const.after }}
+outputs:
+  patch: ${{ tasks.diff.output }}

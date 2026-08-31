@@ -1,0 +1,6 @@
+{
+  "name": "@supernovae-st/nika-darwin-x64",
+  "version": "0.114.0",
+  "os": ["darwin"],
+  "cpu": ["x64"]
+}

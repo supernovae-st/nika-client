@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 61/100 · security operations · alert-guard
+# Actor: soc analyst for security operations
+# Trigger: alert-guard request enters the security operations queue
+# Authority: tools only: nika:jq; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: projection carries the domain, actor, and accepted state for uc-061-security-alert-guard
+# Business outcome: produce a normalized decision card for security operations
+
+nika: uc-061-security-alert-guard
+
+model: mock/echo
+
+const:
+  record: {"case":"alert-guard","domain":"security","actor":"soc analyst for security operations","metric":81,"threshold":61,"state":"accepted"}
+permits:
+  tools: ["nika:jq"]
+tasks:
+  project:
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ const.record }}
+        expression: '{case, domain, actor, state}'
+outputs:
+  card: ${{ tasks.project.output }}

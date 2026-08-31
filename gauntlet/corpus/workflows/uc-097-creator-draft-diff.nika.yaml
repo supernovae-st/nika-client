@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 97/100 · creator business · draft-diff
+# Actor: content editor for creator business
+# Trigger: draft-diff request enters the creator business queue
+# Authority: tools only: nika:jq; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: all three batch items return in input order with checked=true for uc-097-creator-draft-diff
+# Business outcome: enrich a bounded batch while preserving source order for creator business
+
+nika: uc-097-creator-draft-diff
+
+model: mock/echo
+
+const:
+  items: [{"sequence":1,"case":"draft-diff"},{"sequence":2,"case":"draft-diff"},{"sequence":3,"case":"draft-diff"}]
+permits:
+  tools: ["nika:jq"]
+tasks:
+  enrich:
+    for_each:
+      items: ${{ const.items }}
+      max_parallel: 2
+      fail_fast: true
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ item }}
+        expression: '. + {checked: true}'
+outputs:
+  rows: ${{ tasks.enrich.output }}

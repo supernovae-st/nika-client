@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 51/100 · marketing · brief-guard
+# Actor: campaign strategist for marketing
+# Trigger: brief-guard request enters the marketing queue
+# Authority: tools only: nika:jq; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: projection carries the domain, actor, and accepted state for uc-051-marketing-brief-guard
+# Business outcome: produce a normalized decision card for marketing
+
+nika: uc-051-marketing-brief-guard
+
+model: mock/echo
+
+const:
+  record: {"case":"brief-guard","domain":"marketing","actor":"campaign strategist for marketing","metric":71,"threshold":51,"state":"accepted"}
+permits:
+  tools: ["nika:jq"]
+tasks:
+  project:
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ const.record }}
+        expression: '{case, domain, actor, state}'
+outputs:
+  card: ${{ tasks.project.output }}

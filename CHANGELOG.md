@@ -7,12 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.116.0] - 2026-08-31
+
+The One SDK contract becomes the default package surface for native process
+and authenticated HTTP execution. This candidate requires matching engine
+v0.116.0 release assets before npm publication.
+
+### Added
+
+- One `Nika` facade for check, run, durable status, event observation,
+  cancellation, trace verification, resident workflow discovery, and schedule
+  compare-and-swap.
+- HTTP-only `attachRun(id, { lastEventId })` recovery for durable jobs across
+  Node process restarts.
+- Immutable local snapshot capture before remote admission, engine identity
+  compatibility checks, bounded independent event observers, and typed
+  lifecycle settlement.
+- Resident schedule apply/status, path-free workflow catalog methods, and
+  remote trace verification's honest unavailable verdict.
+- A generated 100-workflow corpus, deterministic trace gauntlet, packed Node
+  project gauntlets, hostile transport suite, and public Persona evidence.
+- Architecture, HTTP contract, testing, Socratic risk, and migration guides.
+- Release tarballs embed one immutable prepared commit and version across the
+  SDK and all four native packages; finalization verifies every published
+  manifest before creating the SDK tag.
+
+### Fixed
+
+- The OpenAPI coverage gate now scans the live HTTP Adapter instead of deleted
+  pre-One-SDK modules, fails hard, and rejects routes outside the pin.
+- The pinned OpenAPI contract and generated declaration are reviewable source;
+  the release gate starts the downloaded tagged engine binary, compares its
+  live contract byte-for-byte after JSON normalization, regenerates the types,
+  and refuses any diff.
+- The SDK now deliberately covers the live resident workflow and durable
+  status routes that the old coverage scanner could not see.
+
+### Security
+
+- Bearer tokens require 32–512 visible ASCII bytes; JSON content types, body
+  bounds, body deadlines, admission statuses, and receipt identities are
+  validated before trust crosses the HTTP boundary.
+- Workflow metadata names reject absolute paths, backslashes, empty segments,
+  `.` and `..` before network I/O.
+- Development dependency advisories are reduced to zero without a forced
+  major upgrade.
+
 ### Changed
 
-- **Failed jobs may carry `{ error: { code, message } }`.** Additive.
-  `NikaJobError` includes the NIKA code in its message when present.
-  SSE frames may forward the same redacted pair. Cancel, artifacts
-  and `/v1/run` stay unclaimed.
+- **Breaking:** the two 0.115 root/local clients are consolidated into one
+  transport-selecting `Nika` facade. The `./local` export, `LocalNika`,
+  `jobs`/`workflows` namespaces, `fromEnv`, `health`, webhook helpers, and
+  preview-only artifact helpers are removed; Node 22 is now required. The
+  migration guide contains the complete method mapping.
+
+- Failed terminal job responses may carry redacted
+  `{ error: { code, message } }`; SSE carries the same pair as top-level
+  `code` and `message`. The One SDK returns either as `NikaRunResult.error`;
+  the removed 0.115 `NikaJobError` class is not retained.
 - **Type-drift CI mints `--token-file`.** `nika serve --bind` no
   longer starts without it. The job waits on `GET /health` and
   generates from the OpenAPI pin.

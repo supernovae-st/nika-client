@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 43/100 · real estate operations · listing-merge
+# Actor: listing agent for real estate operations
+# Trigger: listing-merge request enters the real estate operations queue
+# Authority: tools only: nika:json_diff; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: revision patch is non-empty and points at the changed value for uc-043-real-estate-listing-merge
+# Business outcome: explain exactly what changed between two business revisions for real estate operations
+
+nika: uc-043-real-estate-listing-merge
+
+model: mock/echo
+
+const:
+  before: {"id":"uc-043-real-estate-listing-merge","value":43,"state":"draft"}
+  after: {"id":"uc-043-real-estate-listing-merge","value":44,"state":"approved"}
+permits:
+  tools: ["nika:json_diff"]
+tasks:
+  diff:
+    invoke:
+      tool: "nika:json_diff"
+      args:
+        before: ${{ const.before }}
+        after: ${{ const.after }}
+outputs:
+  patch: ${{ tasks.diff.output }}

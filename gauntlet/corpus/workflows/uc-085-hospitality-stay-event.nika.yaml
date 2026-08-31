@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 85/100 · hospitality · stay-event
+# Actor: experience manager for hospitality
+# Trigger: stay-event request enters the hospitality queue
+# Authority: tools only: nika:hash, nika:log; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: evidence digest is stable and is logged without source disclosure for uc-085-hospitality-stay-event
+# Business outcome: mint a stable evidence identifier for later reconciliation for hospitality
+
+nika: uc-085-hospitality-stay-event
+
+model: mock/echo
+
+const:
+  evidence: {"id":"uc-085-hospitality-stay-event","outcome":"mint a stable evidence identifier for later reconciliation for hospitality","accepted":true}
+permits:
+  tools: ["nika:hash", "nika:log"]
+tasks:
+  digest:
+    invoke:
+      tool: "nika:hash"
+      args:
+        content: ${{ const.evidence }}
+        algo: sha256
+        encoding: hex
+  announce:
+    with:
+      digest: ${{ tasks.digest.output }}
+    invoke:
+      tool: "nika:log"
+      args:
+        level: info
+        message: "evidence sealed for uc-085-hospitality-stay-event"
+        data: { digest: "${{ with.digest }}" }
+outputs:
+  digest: ${{ tasks.digest.output }}

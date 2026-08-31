@@ -1,140 +1,278 @@
-import type { NikaConfig, NikaHealth } from './types.js';
-import { NikaAPIError } from './errors.js';
-import { ApiClient } from './lib/api-client.js';
-import { Jobs } from './resources/jobs.js';
-import { Workflows } from './resources/workflows.js';
-import { verifyWebhookSignature } from './webhook.js';
+import {
+  NikaConfigurationError,
+  NikaRunOwnershipError,
+} from './errors.js';
+import { HttpTransport } from './lib/http-transport.js';
+import { NativeProcessTransport } from './lib/native-process-transport.js';
+import { NikaEngineUnavailable, resolveNikaEngine } from './lib/binary/index.js';
+import { RunSession } from './lib/run-session.js';
+import type { Transport } from './lib/transport.js';
+import type {
+  NikaCancelResult,
+  NikaAttachRunOptions,
+  NikaCheckOptions,
+  NikaCheckResult,
+  NikaConfig,
+  NikaEvent,
+  NikaEventsOptions,
+  NikaReceipt,
+  NikaRun,
+  NikaRunOptions,
+  NikaRunStatus,
+  NikaScheduleApplyResult,
+  NikaScheduleOptions,
+  NikaScheduleStatus,
+  NikaTraceVerifyOptions,
+  NikaTraceVerifyResult,
+  NikaTransportKind,
+  NikaWorkflowMetadata,
+} from './types.js';
 
+const DEFAULT_EVENT_BUFFER_SIZE = 256;
+const DEFAULT_MACHINE_BUFFER_BYTES = 64 * 1024;
+const DEFAULT_REQUEST_TIMEOUT = 30_000;
+
+/** One client surface for a local engine process or a live nika serve URL. */
 export class Nika {
-  /** Job operations: submit, status, run, stream. Cancel/artifacts throw. */
-  readonly jobs: Jobs;
-  /** Workflow operations: list, metadata. Reload/source throw. */
-  readonly workflows: Workflows;
+  readonly transportKind: NikaTransportKind;
 
-  private readonly api: ApiClient;
+  private readonly transport: Transport;
+  private readonly sessions = new WeakMap<NikaRun, RunSession>();
+  private readonly eventBufferSize: number;
 
-  /**
-   * Create a Nika client from environment variables.
-   * Reads `NIKA_URL` and `NIKA_TOKEN`. Throws if either is missing.
-   *
-   * @param overrides — optional config fields to override env values
-   */
-  static fromEnv(overrides?: Partial<NikaConfig>): Nika {
-    const url = overrides?.url ?? process.env.NIKA_URL;
-    const token = overrides?.token ?? process.env.NIKA_TOKEN;
-    if (!url) {
-      throw new TypeError(
-        'NIKA_URL environment variable is not set. '
-        + 'Set it or pass url explicitly: new Nika({ url: "http://127.0.0.1:8787", token: "..." })',
-      );
-    }
-    if (!token) {
-      throw new TypeError(
-        'NIKA_TOKEN environment variable is not set. '
-        + 'Set it or pass token explicitly: new Nika({ url: "...", token: "your-token" })',
-      );
-    }
-    return new Nika({ ...overrides, url, token } as NikaConfig);
-  }
-
-  constructor(config: NikaConfig) {
-    if (!config.url) {
-      throw new TypeError(
-        'NikaConfig.url is required — pass a compatible workflow service URL.\n'
-        + '  Example: new Nika({ url: "http://127.0.0.1:8787", token: "..." })\n'
-        + '  Or use:  Nika.fromEnv() to read NIKA_URL and NIKA_TOKEN from environment',
-      );
-    }
-    if (!config.url.startsWith('http://') && !config.url.startsWith('https://')) {
-      throw new TypeError(
-        `NikaConfig.url must start with http:// or https://, got: "${config.url}"`,
-      );
-    }
-    if (!config.token) {
-      throw new TypeError(
-        'NikaConfig.token is required — set NIKA_TOKEN env var or pass token in config.\n'
-        + '  Or use:  Nika.fromEnv() to read both from environment',
-      );
-    }
-
-    this.api = new ApiClient(
-      config.url.replace(/\/$/, ''),
-      config.token,
-      config.timeout ?? 30_000,
-      config.retries ?? 2,
-      config.fetch ?? globalThis.fetch.bind(globalThis),
-      config.concurrency ?? 24,
-      config.logger,
+  constructor(config: NikaConfig = {}) {
+    this.eventBufferSize = positiveInteger(
+      config.eventBufferSize ?? DEFAULT_EVENT_BUFFER_SIZE,
+      'eventBufferSize',
+    );
+    const machineBufferBytes = positiveInteger(
+      config.machineBufferBytes ?? DEFAULT_MACHINE_BUFFER_BYTES,
+      'machineBufferBytes',
     );
 
-    this.jobs = new Jobs(this.api, {
-      pollInterval: config.pollInterval ?? 2_000,
-      pollTimeout: config.pollTimeout ?? 300_000,
-      pollBackoff: config.pollBackoff ?? 1.5,
-    });
-
-    this.workflows = new Workflows(this.api);
-  }
-
-  /** Health check (no auth required, uses timeout). */
-  async health(): Promise<NikaHealth> {
-    const res = await this.api.fetchHealth();
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new NikaAPIError(
-        `Health check failed: ${res.status} ${body}`.trim(),
-        res.status,
-        body,
-      );
+    if (config.url !== undefined) {
+      if (typeof config.token !== 'string' || config.token.length === 0) {
+        throw new NikaConfigurationError('A non-empty token is required with a Nika URL');
+      }
+      const url = checkedUrl(config.url, config.allowInsecureHttp === true);
+      this.transport = new HttpTransport({
+        url,
+        token: checkedToken(config.token),
+        fetch: config.fetch ?? globalThis.fetch.bind(globalThis),
+        requestTimeout: positiveInteger(
+          config.requestTimeout ?? DEFAULT_REQUEST_TIMEOUT,
+          'requestTimeout',
+        ),
+        machineBufferBytes,
+        engine: resolveNikaEngine(config.bin),
+        cwd: config.cwd,
+      });
+    } else {
+      const remoteOnly = config as NikaConfig & {
+        token?: unknown;
+        allowInsecureHttp?: unknown;
+        requestTimeout?: unknown;
+        fetch?: unknown;
+      };
+      if (
+        remoteOnly.token !== undefined
+        || remoteOnly.allowInsecureHttp !== undefined
+        || remoteOnly.requestTimeout !== undefined
+        || remoteOnly.fetch !== undefined
+      ) {
+        throw new NikaConfigurationError('token, allowInsecureHttp, requestTimeout, and fetch require url');
+      }
+      const engine = resolveNikaEngine(config.bin);
+      this.transport = new NativeProcessTransport({
+        engine,
+        cwd: config.cwd,
+        machineBufferBytes,
+      });
     }
-    return res.json() as Promise<NikaHealth>;
+    this.transportKind = this.transport.kind;
   }
 
-  /**
-   * Verify a webhook signature from a compatible workflow service.
-   *
-   * @param payload — raw request body string
-   * @param signature — value of X-Nika-Signature header
-   * @param secret — shared webhook secret (NIKA_WEBHOOK_SECRET)
-   * @param tolerance — max age in seconds (default: 300)
-   */
-  static verifyWebhook = verifyWebhookSignature;
+  check(workflow: string, options: NikaCheckOptions = {}): Promise<NikaCheckResult> {
+    return this.transport.check(workflowName(workflow), options);
+  }
+
+  async run(workflow: string, options: NikaRunOptions = {}): Promise<NikaRun> {
+    const source = await this.transport.startRun(workflowName(workflow), options);
+    const session = new RunSession(source, this.eventBufferSize);
+    this.sessions.set(session.run, session);
+    return session.run;
+  }
+
+  /** Reattach this client process to an already-admitted durable HTTP job. */
+  async attachRun(id: string, options: NikaAttachRunOptions = {}): Promise<NikaRun> {
+    const lastEventId = options.lastEventId ?? 0;
+    if (!Number.isSafeInteger(lastEventId) || lastEventId < 0) {
+      throw new RangeError('lastEventId must be a non-negative safe integer');
+    }
+    const source = await this.transport.attachRun(jobId(id), { lastEventId });
+    const session = new RunSession(source, this.eventBufferSize);
+    this.sessions.set(session.run, session);
+    return session.run;
+  }
+
+  /** List contained workflow names from a resident HTTP authority. */
+  listWorkflows(): Promise<readonly string[]> {
+    return this.transport.listWorkflows();
+  }
+
+  /** Read path-free metadata for one contained workflow. */
+  workflow(name: string): Promise<NikaWorkflowMetadata> {
+    return this.transport.workflow(workflowName(name));
+  }
+
+  events(run: NikaRun, options: NikaEventsOptions = {}): AsyncIterable<NikaEvent> {
+    return this.session(run).events(options);
+  }
+
+  cancel(run: NikaRun): Promise<NikaCancelResult> {
+    return this.session(run).cancel();
+  }
+
+  /** Read the current durable status without waiting for terminal settlement. */
+  status(run: NikaRun): Promise<NikaRunStatus> {
+    return this.session(run).status();
+  }
+
+  schedule(
+    workflow: string,
+    options: NikaScheduleOptions,
+  ): Promise<NikaScheduleApplyResult> {
+    scheduleId(options?.id);
+    return this.transport.schedule(workflowName(workflow), options);
+  }
+
+  scheduleStatus(id: string): Promise<NikaScheduleStatus> {
+    return this.transport.scheduleStatus(scheduleId(id));
+  }
+
+  traceVerify(
+    receipt: NikaReceipt,
+    options: NikaTraceVerifyOptions = {},
+  ): Promise<NikaTraceVerifyResult> {
+    if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt)) {
+      throw new TypeError('traceVerify() accepts an engine-issued NikaReceipt object only');
+    }
+    return this.transport.traceVerify(receipt, options);
+  }
+
+  private session(run: NikaRun): RunSession {
+    const session = this.sessions.get(run);
+    if (!session) throw new NikaRunOwnershipError();
+    return session;
+  }
 }
 
-// ── Re-exports ──────────────────────────────────────────────
+function checkedUrl(value: string, allowInsecureHttp: boolean): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new NikaConfigurationError(`Invalid Nika URL: ${value}`);
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') {
+    throw new NikaConfigurationError('Nika URL must use https: or http:');
+  }
+  if (url.protocol === 'http:' && !allowInsecureHttp) {
+    throw new NikaConfigurationError(
+      'Plain HTTP requires allowInsecureHttp: true; prefer HTTPS for remote engines',
+    );
+  }
+  if (url.username || url.password || url.search || url.hash) {
+    throw new NikaConfigurationError('Nika URL cannot contain credentials, a query, or a fragment');
+  }
+  return url.toString().replace(/\/$/, '');
+}
 
-export { Jobs } from './resources/jobs.js';
-export { Workflows } from './resources/workflows.js';
-export { verifyWebhookSignature } from './webhook.js';
+function checkedToken(value: string): string {
+  const bytes = Buffer.byteLength(value);
+  if (bytes < 32 || bytes > 512 || !/^[\x21-\x7e]+$/.test(value)) {
+    throw new NikaConfigurationError(
+      'Nika bearer token must be 32-512 visible ASCII bytes without whitespace',
+    );
+  }
+  return value;
+}
+
+function positiveInteger(value: number, name: string): number {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new NikaConfigurationError(`${name} must be a positive integer`);
+  }
+  return value;
+}
+
+function workflowName(value: string): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new TypeError('workflow must be a non-empty string');
+  }
+  return value;
+}
+
+function scheduleId(value: string): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new TypeError('schedule id must be a non-empty string');
+  }
+  return value;
+}
+
+function jobId(value: string): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new TypeError('job id must be a non-empty string');
+  }
+  return value;
+}
 
 export {
+  NikaCompatibilityError,
+  NikaConfigurationError,
   NikaError,
-  NikaAPIError,
-  NikaConnectionError,
-  NikaTimeoutError,
-  NikaJobError,
-  NikaJobCancelledError,
-  NikaUnavailableError,
+  NikaEventBufferOverflowError,
+  NikaOperationError,
+  NikaProtocolError,
+  NikaRunOwnershipError,
+  NikaTransportError,
 } from './errors.js';
 
+export { NikaEngineUnavailable };
+
 export type {
+  NikaCancelResult,
+  NikaAttachRunOptions,
+  NikaCheckOptions,
+  NikaCheckResult,
   NikaConfig,
-  NikaLogger,
-  NikaJob,
-  JobErrorBody,
-  NikaArtifact,
+  NikaLocalConfig,
+  NikaRemoteConfig,
   NikaEvent,
-  NikaEventType,
-  NikaHealth,
-  JobStatus,
-  JobStatusOnly,
-  CreateJobRequest,
-  RunResponse,
-  RunOptions,
-  CancelResponse,
-  ArtifactsResponse,
-  WorkflowMetadata,
-  ListWorkflowsResponse,
-  StreamOptions,
-  PollOptions,
+  NikaEventsOptions,
+  NikaMachineError,
+  NikaReceipt,
+  NikaOperation,
+  NikaOperationFinding,
+  NikaRun,
+  NikaRunOptions,
+  NikaRunResult,
+  NikaRunStatus,
+  NikaScheduleAfterSkip,
+  NikaScheduleApplyResult,
+  NikaScheduleClaim,
+  NikaScheduleDefinition,
+  NikaScheduleDue,
+  NikaScheduleFinding,
+  NikaScheduleLastDecision,
+  NikaScheduleMissed,
+  NikaScheduleOptions,
+  NikaScheduleOverlap,
+  NikaSchedulePause,
+  NikaScheduleSlot,
+  NikaScheduleStatus,
+  NikaScheduleWhen,
+  NikaTraceVerifyOptions,
+  NikaTraceVerifyResult,
+  NikaTransportKind,
+  NikaWorkflowMetadata,
 } from './types.js';

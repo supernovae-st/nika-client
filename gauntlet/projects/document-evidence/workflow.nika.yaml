@@ -1,0 +1,16 @@
+nika: mini-saas-document-evidence
+model: mock/echo
+const:
+  document: {"id":"contract-2026-08","version":3,"approved":true}
+permits:
+  tools: ["nika:hash"]
+tasks:
+  digest:
+    invoke:
+      tool: "nika:hash"
+      args:
+        content: ${{ const.document }}
+        algo: sha256
+        encoding: hex
+outputs:
+  digest: ${{ tasks.digest.output }}

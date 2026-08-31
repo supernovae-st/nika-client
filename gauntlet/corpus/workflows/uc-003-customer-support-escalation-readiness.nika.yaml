@@ -1,0 +1,27 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 3/100 · customer support · escalation-readiness
+# Actor: escalation manager for customer support
+# Trigger: escalation-readiness request enters the customer support queue
+# Authority: tools only: nika:json_diff; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: revision patch is non-empty and points at the changed value for uc-003-customer-support-escalation-readiness
+# Business outcome: explain exactly what changed between two business revisions for customer support
+
+nika: uc-003-customer-support-escalation-readiness
+
+model: mock/echo
+
+const:
+  before: {"id":"uc-003-customer-support-escalation-readiness","value":3,"state":"draft"}
+  after: {"id":"uc-003-customer-support-escalation-readiness","value":4,"state":"approved"}
+permits:
+  tools: ["nika:json_diff"]
+tasks:
+  diff:
+    invoke:
+      tool: "nika:json_diff"
+      args:
+        before: ${{ const.before }}
+        after: ${{ const.after }}
+outputs:
+  patch: ${{ tasks.diff.output }}

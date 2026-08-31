@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 64/100 · security operations · remediation-window
+# Actor: remediation lead for security operations
+# Trigger: remediation-window request enters the security operations queue
+# Authority: tools only: nika:json_merge_patch, nika:jq; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: merged policy is approved and keeps the original identifier for uc-064-security-remediation-window
+# Business outcome: apply an approved override without losing the base record for security operations
+
+nika: uc-064-security-remediation-window
+
+model: mock/echo
+
+const:
+  base: {"id":"uc-064-security-remediation-window","owner":"remediation lead for security operations","state":"draft","value":64}
+  patch: {"state":"approved","value":74}
+permits:
+  tools: ["nika:json_merge_patch", "nika:jq"]
+tasks:
+  merge:
+    invoke:
+      tool: "nika:json_merge_patch"
+      args:
+        target: ${{ const.base }}
+        patch: ${{ const.patch }}
+  project:
+    with:
+      merged: ${{ tasks.merge.output }}
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ with.merged }}
+        expression: '{id, owner, state, value, ready: (.state == "approved")}'
+outputs:
+  merged: ${{ tasks.project.output }}

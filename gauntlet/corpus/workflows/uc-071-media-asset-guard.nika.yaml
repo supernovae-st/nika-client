@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 71/100 · media production · asset-guard
+# Actor: asset producer for media production
+# Trigger: asset-guard request enters the media production queue
+# Authority: tools only: nika:jq; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: projection carries the domain, actor, and accepted state for uc-071-media-asset-guard
+# Business outcome: produce a normalized decision card for media production
+
+nika: uc-071-media-asset-guard
+
+model: mock/echo
+
+const:
+  record: {"case":"asset-guard","domain":"media","actor":"asset producer for media production","metric":91,"threshold":71,"state":"accepted"}
+permits:
+  tools: ["nika:jq"]
+tasks:
+  project:
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ const.record }}
+        expression: '{case, domain, actor, state}'
+outputs:
+  card: ${{ tasks.project.output }}

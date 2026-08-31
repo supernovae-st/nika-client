@@ -1,0 +1,66 @@
+nika: depth-incident-response-controller
+model: mock/echo
+run:
+  entropy: ambient
+  clock: system
+const:
+  incident: { id: inc-2042, service: checkout, severity: sev1 }
+  signals:
+    - { name: error_rate, value: 18, threshold: 5 }
+    - { name: latency_ms, value: 940, threshold: 400 }
+    - { name: queue_depth, value: 73, threshold: 50 }
+permits:
+  tools: ["nika:hash", "nika:jq", "nika:validate", "nika:wait"]
+tasks:
+  validate_incident:
+    invoke:
+      tool: "nika:validate"
+      args:
+        data: ${{ const.incident }}
+        schema:
+          type: object
+          additionalProperties: false
+          required: [id, service, severity]
+          properties:
+            id: { type: string }
+            service: { type: string }
+            severity: { type: string, enum: [sev1, sev2, sev3] }
+  assess_signals:
+    after: { validate_incident: success }
+    for_each:
+      items: ${{ const.signals }}
+      max_parallel: 3
+      fail_fast: true
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ item }}
+        expression: '. + { breached: (.value > .threshold), ratio: (.value / .threshold) }'
+  controller_plan:
+    with:
+      signals: ${{ tasks.assess_signals.output }}
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: { incident: "${{ const.incident }}", signals: "${{ with.signals }}" }
+        expression: '{ incident, signals, breached: ([.signals[] | select(.breached)] | length), action: "hold-and-reassess" }'
+  plan_digest:
+    with:
+      plan: ${{ tasks.controller_plan.output }}
+    invoke:
+      tool: "nika:hash"
+      args: { content: "${{ with.plan }}", algo: sha256, encoding: hex }
+  stabilization_window:
+    after: { plan_digest: success }
+    invoke:
+      tool: "nika:wait"
+      args: { duration: "10s" }
+  completion:
+    after: { stabilization_window: success }
+    invoke:
+      tool: "nika:jq"
+      args: { input: "${{ const.incident }}", expression: '. + { state: "reassessed" }' }
+outputs:
+  plan: ${{ tasks.controller_plan.output }}
+  plan_digest: ${{ tasks.plan_digest.output }}
+  completion: ${{ tasks.completion.output }}

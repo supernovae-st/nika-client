@@ -1,0 +1,34 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 62/100 · security operations · policy-diff
+# Actor: security architect for security operations
+# Trigger: policy-diff request enters the security operations queue
+# Authority: tools only: nika:validate; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: validation report is valid with zero errors for uc-062-security-policy-diff
+# Business outcome: refuse malformed business input before downstream work for security operations
+
+nika: uc-062-security-policy-diff
+
+model: mock/echo
+
+const:
+  record: {"key":"uc-062-security-policy-diff","amount":162,"status":"ready"}
+permits:
+  tools: ["nika:validate"]
+tasks:
+  validate:
+    invoke:
+      tool: "nika:validate"
+      args:
+        data: ${{ const.record }}
+        schema:
+          type: object
+          additionalProperties: false
+          required: [key, amount, status]
+          properties:
+            key: { type: string }
+            amount: { type: integer, minimum: 1 }
+            status: { type: string, enum: [ready] }
+outputs:
+  report: ${{ tasks.validate.output }}
+  record: ${{ const.record }}

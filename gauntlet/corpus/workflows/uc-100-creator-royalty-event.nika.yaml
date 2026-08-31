@@ -1,0 +1,26 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 100/100 · creator business · royalty-event
+# Actor: royalty analyst for creator business
+# Trigger: royalty-event request enters the creator business queue
+# Authority: tools only: nika:emit; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: one typed machine event carries the case identity and accepted state for uc-100-creator-royalty-event
+# Business outcome: publish a typed completion receipt for subscribers for creator business
+
+nika: uc-100-creator-royalty-event
+
+model: mock/echo
+
+const:
+  receipt: {"case":"uc-100-creator-royalty-event","domain":"creator","state":"accepted"}
+permits:
+  tools: ["nika:emit"]
+tasks:
+  publish:
+    invoke:
+      tool: "nika:emit"
+      args:
+        event_type: "gauntlet.creator.royalty-event"
+        payload: ${{ const.receipt }}
+outputs:
+  receipt: ${{ const.receipt }}

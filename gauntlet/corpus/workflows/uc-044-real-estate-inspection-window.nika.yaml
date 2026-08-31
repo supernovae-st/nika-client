@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 44/100 · real estate operations · inspection-window
+# Actor: inspection coordinator for real estate operations
+# Trigger: inspection-window request enters the real estate operations queue
+# Authority: tools only: nika:json_merge_patch, nika:jq; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: merged policy is approved and keeps the original identifier for uc-044-real-estate-inspection-window
+# Business outcome: apply an approved override without losing the base record for real estate operations
+
+nika: uc-044-real-estate-inspection-window
+
+model: mock/echo
+
+const:
+  base: {"id":"uc-044-real-estate-inspection-window","owner":"inspection coordinator for real estate operations","state":"draft","value":44}
+  patch: {"state":"approved","value":54}
+permits:
+  tools: ["nika:json_merge_patch", "nika:jq"]
+tasks:
+  merge:
+    invoke:
+      tool: "nika:json_merge_patch"
+      args:
+        target: ${{ const.base }}
+        patch: ${{ const.patch }}
+  project:
+    with:
+      merged: ${{ tasks.merge.output }}
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ with.merged }}
+        expression: '{id, owner, state, value, ready: (.state == "approved")}'
+outputs:
+  merged: ${{ tasks.project.output }}

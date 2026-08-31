@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-31T02:53:46.375Z",
+  "engine": "nika 0.116.0 (b38267751)",
+  "scenarios": [
+    {
+      "name": "unsafe-http-refusal",
+      "result": "green",
+      "duration_ms": 0,
+      "evidence": {
+        "refusal": "NikaConfigurationError",
+        "network_requests": 0
+      }
+    },
+    {
+      "name": "missing-engine-refusal",
+      "result": "green",
+      "duration_ms": 2,
+      "evidence": {
+        "error": "NikaCompatibilityError",
+        "bounded": true
+      }
+    },
+    {
+      "name": "oversize-machine-line",
+      "result": "green",
+      "duration_ms": 61,
+      "evidence": {
+        "error": "NikaProtocolError",
+        "limit_bytes": 1024
+      }
+    },
+    {
+      "name": "malformed-machine-frame",
+      "result": "green",
+      "duration_ms": 61,
+      "evidence": {
+        "error": "NikaProtocolError"
+      }
+    },
+    {
+      "name": "child-crash-settlement",
+      "result": "green",
+      "duration_ms": 59,
+      "evidence": {
+        "status": "failed",
+        "exit_code": 23
+      }
+    },
+    {
+      "name": "malformed-workflow-domain-report",
+      "result": "green",
+      "duration_ms": 8,
+      "evidence": {
+        "clean": false,
+        "exit_code": 2
+      }
+    },
+    {
+      "name": "explicit-bin-empty-path",
+      "result": "green",
+      "duration_ms": 63,
+      "evidence": {
+        "check": "clean",
+        "status": "succeeded"
+      }
+    },
+    {
+      "name": "parallel-run-load",
+      "result": "green",
+      "duration_ms": 189,
+      "evidence": {
+        "runs": 24,
+        "succeeded": 24,
+        "unique_run_ids": 24
+      }
+    },
+    {
+      "name": "real-cancellation-race",
+      "result": "green",
+      "duration_ms": 157,
+      "evidence": {
+        "cancel_status": "cancellation_requested",
+        "run_status": "interrupted",
+        "exit_code": 130
+      }
+    },
+    {
+      "name": "remote-durable-cancellation",
+      "result": "green",
+      "duration_ms": 248,
+      "evidence": {
+        "cancel_status": "cancelled",
+        "run_status": "cancelled",
+        "events": [
+          "execution.started",
+          "execution.cancelled"
+        ],
+        "durable_receipt": true,
+        "trace_verdict": "unavailable",
+        "parse_fatal_clean": false
+      }
+    },
+    {
+      "name": "trace-corruption-detection",
+      "result": "green",
+      "duration_ms": 84,
+      "evidence": {
+        "intact": true,
+        "forged_receipt": false,
+        "corrupted_trace": false
+      }
+    },
+    {
+      "name": "secret-canary-redaction",
+      "result": "green",
+      "duration_ms": 59,
+      "evidence": {
+        "result_redacted": true,
+        "trace_redacted": true
+      }
+    },
+    {
+      "name": "slow-subscriber-overflow-isolation",
+      "result": "green",
+      "duration_ms": 60,
+      "evidence": {
+        "run_status": "succeeded",
+        "subscriber_error": "NikaEventBufferOverflowError",
+        "subscriber_limit": 2
+      }
+    },
+    {
+      "name": "sequential-soak",
+      "result": "green",
+      "duration_ms": 2205,
+      "evidence": {
+        "runs": 40,
+        "succeeded": 40
+      }
+    }
+  ],
+  "summary": {
+    "total": 14,
+    "green": 14,
+    "red": 0,
+    "real_engine_runs": 70
+  },
+  "result": "green"
+}

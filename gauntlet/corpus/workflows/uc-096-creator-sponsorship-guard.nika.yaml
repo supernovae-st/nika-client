@@ -1,0 +1,31 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 96/100 · creator business · sponsorship-guard
+# Actor: partnership manager for creator business
+# Trigger: sponsorship-guard request enters the creator business queue
+# Authority: tools only: nika:date; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: measured duration is positive and uses fixed ISO timestamps for uc-096-creator-sponsorship-guard
+# Business outcome: calculate an operational service window without ambient time for creator business
+
+nika: uc-096-creator-sponsorship-guard
+
+model: mock/echo
+
+const:
+  case: "uc-096-creator-sponsorship-guard"
+  start: "2026-08-17T09:00:00Z"
+  end: "2026-08-18T17:00:00Z"
+permits:
+  tools: ["nika:date"]
+tasks:
+  duration:
+    invoke:
+      tool: "nika:date"
+      args:
+        op: diff
+        start: ${{ const.start }}
+        end: ${{ const.end }}
+        unit: hours
+outputs:
+  case: ${{ const.case }}
+  hours: ${{ tasks.duration.output }}

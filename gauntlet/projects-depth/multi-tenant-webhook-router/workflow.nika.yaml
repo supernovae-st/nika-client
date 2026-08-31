@@ -1,0 +1,77 @@
+# Multi-tenant webhook admission: validate once, route concurrently, then seal a manifest.
+nika: depth-multi-tenant-webhook-router
+model: mock/echo
+run:
+  entropy: none
+  clock: virtual
+const:
+  envelope:
+    delivery_id: delivery-2026-08-31-001
+    received_at: "2026-08-31T08:00:00Z"
+    events:
+      - { tenant: atlas, kind: invoice.overdue, subject: inv-17, attempt: 1 }
+      - { tenant: boreal, kind: user.created, subject: usr-42, attempt: 1 }
+      - { tenant: cirrus, kind: deploy.failed, subject: dep-09, attempt: 2 }
+permits:
+  tools: ["nika:hash", "nika:jq", "nika:validate"]
+tasks:
+  validate_envelope:
+    invoke:
+      tool: "nika:validate"
+      args:
+        data: ${{ const.envelope }}
+        schema:
+          type: object
+          additionalProperties: false
+          required: [delivery_id, received_at, events]
+          properties:
+            delivery_id: { type: string, minLength: 1 }
+            received_at: { type: string, minLength: 1 }
+            events:
+              type: array
+              minItems: 3
+              items:
+                type: object
+                additionalProperties: false
+                required: [tenant, kind, subject, attempt]
+                properties:
+                  tenant: { type: string, enum: [atlas, boreal, cirrus] }
+                  kind: { type: string, minLength: 1 }
+                  subject: { type: string, minLength: 1 }
+                  attempt: { type: integer, minimum: 1 }
+  route_events:
+    after: { validate_envelope: success }
+    for_each:
+      items: ${{ const.envelope.events }}
+      max_parallel: 3
+      fail_fast: true
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ item }}
+        expression: |
+          . + { route: (if .tenant == "atlas" then "finance"
+                       elif .tenant == "boreal" then "identity"
+                       else "operations" end),
+                accepted: true,
+                partition: (.tenant + ":" + .kind) }
+  manifest:
+    with:
+      routes: ${{ tasks.route_events.output }}
+    invoke:
+      tool: "nika:jq"
+      args:
+        input:
+          delivery_id: ${{ const.envelope.delivery_id }}
+          received_at: ${{ const.envelope.received_at }}
+          routes: "${{ with.routes }}"
+        expression: '{ delivery_id, received_at, routes, accepted: ([.routes[].accepted] | all), tenant_count: ([.routes[].tenant] | unique | length) }'
+  seal:
+    with:
+      manifest: ${{ tasks.manifest.output }}
+    invoke:
+      tool: "nika:hash"
+      args: { content: "${{ with.manifest }}", algo: sha256, encoding: hex }
+outputs:
+  manifest: ${{ tasks.manifest.output }}
+  digest: ${{ tasks.seal.output }}

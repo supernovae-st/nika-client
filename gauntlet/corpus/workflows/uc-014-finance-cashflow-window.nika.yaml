@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 14/100 · finance operations · cashflow-window
+# Actor: cash manager for finance operations
+# Trigger: cashflow-window request enters the finance operations queue
+# Authority: tools only: nika:json_merge_patch, nika:jq; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: merged policy is approved and keeps the original identifier for uc-014-finance-cashflow-window
+# Business outcome: apply an approved override without losing the base record for finance operations
+
+nika: uc-014-finance-cashflow-window
+
+model: mock/echo
+
+const:
+  base: {"id":"uc-014-finance-cashflow-window","owner":"cash manager for finance operations","state":"draft","value":14}
+  patch: {"state":"approved","value":24}
+permits:
+  tools: ["nika:json_merge_patch", "nika:jq"]
+tasks:
+  merge:
+    invoke:
+      tool: "nika:json_merge_patch"
+      args:
+        target: ${{ const.base }}
+        patch: ${{ const.patch }}
+  project:
+    with:
+      merged: ${{ tasks.merge.output }}
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ with.merged }}
+        expression: '{id, owner, state, value, ready: (.state == "approved")}'
+outputs:
+  merged: ${{ tasks.project.output }}

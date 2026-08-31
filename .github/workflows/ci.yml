@@ -1,4 +1,5 @@
 name: CI
+# SECURITY: no github.event text is interpolated directly into shell source.
 on:
   push:
     branches: [main]
@@ -8,15 +9,33 @@ jobs:
   # ── Tests + Build ──────────────────────────────────────
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 20
+          node-version: ${{ matrix.node }}
 
       - run: npm ci
       - run: npm test
       - run: npm run build
+
+  node-current-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 26
+      - run: npm ci
+      - run: npm run build
+      - name: Smoke packed module faces
+        run: |
+          node -e "import('./dist/index.js').then(module => { if (!module.Nika) process.exit(1) })"
+          node -e "const module = require('./dist/index.cjs'); if (!module.Nika) process.exit(1)"
 
   # ── SDK Coverage Check ────────────────────────────────
   # Verifies that the SDK covers all nika-serve routes,
@@ -27,43 +46,11 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 20
-
-      # Checkout nika repo for server source analysis
-      # clock: released · the SDK serves RELEASED users, so coverage judges
-      # against the latest release tag, never a floating engine main (the
-      # clock-sweep caught the HEAD checkout 2026-07-20 · a sister engine
-      # merge could flip this gate at constant SDK content).
-      - id: engine-tag
-        run: |
-          set -euo pipefail
-          tag=$(curl -fsSL -o /dev/null -w '%{url_effective}'             https://github.com/supernovae-st/nika/releases/latest | sed 's|.*/tag/||')
-          case "$tag" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "bad tag: $tag" >&2; exit 1 ;; esac
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: supernovae-st/nika
-          ref: ${{ steps.engine-tag.outputs.tag }}
-          path: nika
-          # NIKA_REPO_TOKEN is withheld on dependabot/fork PR runs, so the
-          # expression resolves empty and checkout errors "Input required and
-          # not supplied: token". Fall back to the always-present github.token
-          # (sufficient to clone the public nika repo). Advisory gate stays advisory.
-          token: ${{ secrets.NIKA_REPO_TOKEN || github.token }}
+          node-version: 24
 
       - run: npm ci
-      # `nika serve` is target-facing — it re-admits to the engine during the
-      # v0.9x arc (see CHANGELOG). Until the serve source lands, the coverage
-      # check has nothing to analyze and errors "nika-serve not found"; that is
-      # not a regression, so the gate is advisory here (it hard-fails legit SDK
-      # PRs otherwise). Flip back to a hard gate when serve ships.
-      - name: Check SDK coverage against nika-serve
-        run: |
-          if npm run check:coverage -- ./nika; then
-            echo "SDK coverage: OK"
-          else
-            echo "::warning::SDK coverage advisory — nika serve is not yet shipped (target-facing SDK, see CHANGELOG). Re-enable the hard gate when the serve surface lands."
-          fi
+      - name: Check SDK coverage against the pinned contract
+        run: npm run check:coverage
 
   # ── Type Drift Check ──────────────────────────────────
   # Starts a live nika serve, generates types from OpenAPI,
@@ -74,7 +61,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 20
+          node-version: 24
 
       # Resolve the latest tag → the versioned asset. The old URL pinned
       # `nika-x86_64-unknown-linux-gnu.tar.gz` under /latest/download/, which
@@ -97,6 +84,12 @@ jobs:
           NIKA_URL: http://127.0.0.1:3000
           NIKA_TOKEN: ci-test-token-32-chars-minimum!!
         run: |
+          sdk_version=$(node -p "require('./package.json').version")
+          engine_version=$(nika --version | awk '{print $2}')
+          if [ "$sdk_version" != "$engine_version" ]; then
+            echo "::warning::type-drift deferred — SDK $sdk_version targets the next engine train; latest release is $engine_version"
+            exit 0
+          fi
           serve_help=$(nika serve --help 2>&1 || true)
           if [[ "$serve_help" != *"--bind"* || "$serve_help" != *"--workflows"* ]]; then
             echo "::warning::type-drift advisory — nika serve currently exposes the resident scheduler, not the target-facing HTTP surface. Re-activates when --bind and --workflows ship."
@@ -135,13 +128,14 @@ jobs:
             echo "::error::nika serve --bind never answered GET /health"
             exit 1
           fi
-          curl -sf -H "Authorization: Bearer $NIKA_TOKEN" http://127.0.0.1:3000/v1/openapi.json >/dev/null
-          npm run generate:types
-          if [ ! -f src/generated/openapi.d.ts ]; then
-            echo "::error::type-drift is blind — the generator produced no src/generated/openapi.d.ts. A drift check whose subject is absent proves nothing."
-            exit 1
-          fi
-          echo "Types generated from the OpenAPI pin; live serve answered /health and /v1/openapi.json"
+          curl -sf -H "Authorization: Bearer $NIKA_TOKEN" \
+            http://127.0.0.1:3000/v1/openapi.json > /tmp/nika-live-openapi.json
+          jq -S . openapi.json > /tmp/nika-pinned-openapi.sorted.json
+          jq -S . /tmp/nika-live-openapi.json > /tmp/nika-live-openapi.sorted.json
+          diff -u /tmp/nika-pinned-openapi.sorted.json /tmp/nika-live-openapi.sorted.json
+          npm run generate:types -- http://127.0.0.1:3000
+          git diff --exit-code -- src/generated/openapi.d.ts
+          echo "Pinned OpenAPI and generated types match the live tagged engine"
 
   # ── Version Sync Check ────────────────────────────────
   # Warns if nika-client version doesn't match latest nika release.

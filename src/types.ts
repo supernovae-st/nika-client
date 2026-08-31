@@ -1,150 +1,301 @@
-// Live wire types for nika serve HTTP + SSE (W06/W07).
-// Pin: ./openapi.json · generated: src/generated/openapi.d.ts
-
-export interface NikaLogger {
-  debug: (message: string, ...args: unknown[]) => void;
-  info: (message: string, ...args: unknown[]) => void;
-  warn: (message: string, ...args: unknown[]) => void;
-  error: (message: string, ...args: unknown[]) => void;
+interface NikaSharedConfig {
+  /** Bound for each event subscriber. Default: 256 events. */
+  eventBufferSize?: number;
+  /** Bound for buffered diagnostics and one machine frame. Default: 64 KiB. */
+  machineBufferBytes?: number;
 }
 
-export interface NikaConfig {
-  /** URL of a nika serve listener (e.g. http://127.0.0.1:8787) */
+/** The default configuration drives a native `nika` process. */
+export interface NikaLocalConfig extends NikaSharedConfig {
+  /** Working directory used by the native process transport. */
+  cwd?: string;
+  /** Binary resolution: this value, then NIKA_BIN, then the host payload package. */
+  bin?: string;
+  url?: never;
+  token?: never;
+  allowInsecureHttp?: never;
+  requestTimeout?: never;
+  fetch?: never;
+}
+
+/** Supplying a URL selects the authenticated HTTP transport. */
+export interface NikaRemoteConfig extends NikaSharedConfig {
+  /** A `nika serve --bind` base URL. */
   url: string;
-  /** Bearer token matching the server --token-file */
+  /** Bearer token matching the server's `--token-file`. */
   token: string;
-  /** Global HTTP request timeout in ms. Default: 30_000 */
-  timeout?: number;
-  /** Retries on 429/5xx. Default: 2 */
-  retries?: number;
-  /** Initial polling interval in ms. Default: 2_000 */
-  pollInterval?: number;
-  /** Max polling timeout in ms. Default: 300_000 (5 min) */
-  pollTimeout?: number;
-  /** Backoff multiplier for polling. Default: 1.5 */
-  pollBackoff?: number;
-  /** Max concurrent HTTP requests. Default: 24 */
-  concurrency?: number;
-  /** Custom fetch function. Default: globalThis.fetch */
+  /** Plain HTTP is refused unless this is explicitly true. */
+  allowInsecureHttp?: boolean;
+  /** Bound for HTTP admission. Default: 30 seconds. */
+  requestTimeout?: number;
+  /** Fetch implementation used by the HTTP transport. */
   fetch?: typeof globalThis.fetch;
-  /** Logger for request/response tracing. Default: silent */
-  logger?: NikaLogger;
+  /** Working directory used while capturing the immutable snapshot locally. */
+  cwd?: string;
+  /** Local engine used to capture the immutable snapshot before HTTP admission. */
+  bin?: string;
 }
 
-/** POST /v1/jobs body. The live server deny_unknown_fields this object. */
-export interface CreateJobRequest {
-  workflow: string;
-}
+/** Public configuration for the one Nika client surface. */
+export type NikaConfig = NikaLocalConfig | NikaRemoteConfig;
 
-/** Live JobStatus enum from OpenAPI. */
-export type JobStatus =
+export type NikaTransportKind = 'native-process' | 'http';
+
+/** Machine vocabulary is additive. Known words aid completion without closing the set. */
+export type NikaRunStatus =
   | 'queued'
   | 'running'
-  | 'interrupted'
   | 'paused'
   | 'succeeded'
-  | 'failed';
+  | 'failed'
+  | 'interrupted'
+  | 'cancelled'
+  | (string & {});
 
-/** Redacted diagnosis on a failed job (NIKA code + message, no paths). */
-export interface JobErrorBody {
-  code: string;
-  message: string;
+/** A machine check report. Unknown engine fields deliberately ride through. */
+export interface NikaCheckResult {
+  report_version?: number;
+  clean?: boolean;
+  exitCode?: number;
+  [key: string]: unknown;
 }
 
-/** POST /v1/jobs and GET /v1/jobs/{id} body. */
-export interface NikaJob {
-  id: string;
-  status: JobStatus;
-  /** Present after the worker readmits the POST-time snapshot. */
-  execution_id?: string;
-  /** Present after the worker readmits the POST-time snapshot. */
-  trace_id?: string;
-  /** Present on `failed` when the engine named a redacted diagnosis. */
-  error?: JobErrorBody;
-}
-
-/** GET /v1/jobs/{id}/status body. */
-export interface JobStatusOnly {
-  status: JobStatus;
-}
-
-export interface RunOptions {
-  /** Caller-supplied Idempotency-Key (1–255 bytes). Default: a random UUID. */
-  idempotencyKey?: string;
-  signal?: AbortSignal;
-}
-
-/** GET /health — public process identity, no Bearer. */
-export interface NikaHealth {
-  status: 'ok';
-  service: string;
-  engine_version?: string;
-  build_sha?: string;
-  spec_sha?: string;
-  api_version?: string;
-}
-
-/** GET /v1/workflows — contained relative names. */
-export interface ListWorkflowsResponse {
-  workflows: string[];
-}
-
-/** GET /v1/workflows/{name} */
-export interface WorkflowMetadata {
-  workflow: string;
+/** One engine-owned run event. Event kinds and future fields stay open. */
+export interface NikaEvent {
+  kind?: string;
+  status?: NikaRunStatus;
+  sequence?: number;
+  receipt?: NikaReceipt;
+  outputs?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 /**
- * SSE data payload from GET /v1/jobs/{id}/events.
- * Allowlisted to {sequence, kind, status} — never a rich task log.
+ * Engine-issued proof material. The SDK transports it but never constructs,
+ * reads a workflow to enrich it, or verifies its claims itself.
  */
-export interface NikaEvent {
-  sequence: number;
-  kind?: string;
-  status?: JobStatus | string;
-}
+export type NikaReceipt = Readonly<Record<string, unknown>>;
 
-export type NikaEventType = string;
-
-export interface StreamOptions {
-  signal?: AbortSignal;
-  /** Max ms without any event before treating connection as dead. Default: 60_000 */
-  idleTimeout?: number;
-  /** Max reconnection attempts on stream drop. Default: 3 */
-  maxReconnects?: number;
-  /** Initial reconnect delay in ms (multiplied by attempt). Default: 1000 */
-  reconnectDelay?: number;
-}
-
-export interface PollOptions {
-  interval: number;
-  timeout: number;
-  backoff: number;
-  signal?: AbortSignal;
-}
-
-/** @deprecated Preview-dialect leftover. Cancel is not on the live HTTP surface. */
-export interface CancelResponse {
-  id: string;
-  status: string;
+export interface NikaMachineError {
+  code?: string;
   message?: string;
+  [key: string]: unknown;
 }
 
-/** @deprecated Preview-dialect leftover. Artifacts are not on the live HTTP surface. */
-export interface NikaArtifact {
-  name: string;
-  size: number;
-  format: string;
-  content_type: string;
-  checksum?: string;
-}
-
-/** @deprecated Preview-dialect leftover. */
-export interface ArtifactsResponse {
+/** The only terminal value for a run. */
+export interface NikaRunResult {
   id: string;
-  count: number;
-  artifacts: NikaArtifact[];
+  status: NikaRunStatus;
+  transport: NikaTransportKind;
+  exitCode?: number;
+  outputs?: Record<string, unknown>;
+  receipt?: NikaReceipt;
+  error?: NikaMachineError;
+  [key: string]: unknown;
 }
 
-/** @deprecated Use NikaJob. Kept as an alias so existing imports compile. */
-export type RunResponse = NikaJob;
+/** A run identity plus its one terminal settlement. */
+export interface NikaRun {
+  readonly id: string;
+  readonly done: Promise<NikaRunResult>;
+}
+
+export interface NikaCancelResult {
+  runId: string;
+  accepted: boolean;
+  status: string;
+  transport: NikaTransportKind;
+  [key: string]: unknown;
+}
+
+/** Server-owned metadata for one contained resident workflow. */
+export interface NikaWorkflowMetadata {
+  workflow: string;
+  [key: string]: unknown;
+}
+
+export interface NikaTraceVerifyResult {
+  verified: boolean;
+  /** Engine-owned trace verdict. Open to additive future vocabulary. */
+  verdict?: 'verified' | 'invalid' | 'unavailable' | (string & {});
+  /** Engine-owned explanation for a negative or unavailable verdict. */
+  reason?:
+    | 'trace_invalid'
+    | 'receipt_mismatch'
+    | 'run_not_terminal'
+    | 'trace_journal_unavailable'
+    | (string & {});
+  trace_id?: string;
+  exitCode?: number;
+  output?: string;
+  [key: string]: unknown;
+}
+
+export interface NikaCheckOptions {
+  model?: string;
+  nativeStrict?: boolean;
+  /** Stops only this check request/process. */
+  signal?: AbortSignal;
+}
+
+export interface NikaRunOptions {
+  vars?: Record<string, string | number | boolean>;
+  model?: string;
+  maxCostUsd?: number;
+  /** Retained for HTTP admission deduplication. */
+  idempotencyKey?: string;
+}
+
+/** Resume observation of an already-admitted durable HTTP job. */
+export interface NikaAttachRunOptions {
+  /** Last SSE sequence durably consumed by the caller. Default: 0. */
+  lastEventId?: number;
+}
+
+export interface NikaEventsOptions {
+  /** Stops this subscriber view. It never cancels the run. */
+  signal?: AbortSignal;
+  /** Per-view queue bound, capped by the client eventBufferSize. */
+  bufferSize?: number;
+}
+
+export interface NikaTraceVerifyOptions {
+  /** Stops only the verification request/process. */
+  signal?: AbortSignal;
+}
+
+/** The two operations that can fail before returning an engine projection. */
+export type NikaOperation = 'schedule' | 'scheduleStatus';
+
+/** One engine-owned schedule finding. The vocabulary remains additive. */
+export interface NikaScheduleFinding {
+  code: string;
+  detail: string;
+  [key: string]: unknown;
+}
+
+/** Findings carried by the one operation-error taxonomy. */
+export type NikaOperationFinding = NikaScheduleFinding;
+
+export type NikaScheduleWhen =
+  | { kind: 'once'; at: string }
+  | { kind: 'cadence'; expression: string };
+
+/** Exact declarative input accepted by PUT /v1/schedules/{id}. */
+export interface NikaScheduleOptions {
+  /** Stable path identity for the resident schedule. */
+  id: string;
+  when: NikaScheduleWhen;
+  maxCostUsd: number;
+  missed: 'catch-up' | 'catch-up-once' | 'skip';
+  maxLatenessSeconds?: number;
+  overlap?: 'skip' | 'queue' | 'replace';
+  afterSkip?: 'next_slot' | 'on_completion';
+  jitter?: 'hash';
+  tolerance?: string;
+  active?: boolean;
+  pauseReason?: string;
+  /** ISO calendar date (`YYYY-MM-DD`) required when active is false. */
+  pauseUntil?: string;
+  /** Exact prior revision for an update. Omit for create-if-absent. */
+  revision?: string;
+}
+
+export type NikaScheduleMissed =
+  | 'catch-up'
+  | 'catch-up-once'
+  | 'skip'
+  | (string & {});
+export type NikaScheduleOverlap = 'skip' | 'queue' | 'replace' | (string & {});
+export type NikaScheduleAfterSkip =
+  | 'next_slot'
+  | 'on_completion'
+  | (string & {});
+
+/** The engine-normalized schedule definition; the SDK never normalizes it. */
+export interface NikaScheduleDefinition {
+  id: string;
+  workflow: string;
+  when: NikaScheduleWhen | { kind: string; [key: string]: unknown };
+  maxCostUsd: number;
+  missed: NikaScheduleMissed;
+  maxLatenessSeconds: number | null;
+  overlap: NikaScheduleOverlap;
+  afterSkip: NikaScheduleAfterSkip;
+  jitter: 'hash' | (string & {}) | null;
+  tolerance: string | null;
+  active: boolean;
+  pauseReason: string | null;
+  pauseUntil: string | null;
+  [key: string]: unknown;
+}
+
+export interface NikaScheduleSlot {
+  slotId: string;
+  scheduledFor: string;
+  requestedCivil: string | null;
+  shift: 'exact' | 'advanced_first_valid' | 'folded_first' | (string & {});
+  [key: string]: unknown;
+}
+
+export type NikaScheduleDue =
+  | { kind: 'scheduled'; slot: NikaScheduleSlot }
+  | { kind: 'catch_up'; slot: NikaScheduleSlot; missedSlots: number }
+  | { kind: 'skipped_missed'; slot: NikaScheduleSlot; missedSlots: number }
+  | {
+      kind: 'skipped_too_late';
+      slot: NikaScheduleSlot;
+      latenessSeconds: number;
+      maximumSeconds: number;
+    }
+  | { kind: 'paused'; reason: string | null; pauseUntil: string | null }
+  | { kind: 'once_consumed'; slotId: string; scheduledFor: string }
+  | { kind: 'not_due' }
+  | { kind: string & {}; [key: string]: unknown };
+
+export interface NikaSchedulePause {
+  reason: string | null;
+  until: string | null;
+}
+
+export interface NikaScheduleClaim {
+  runId: string;
+  executionId: string;
+  traceId: string;
+  generation: string;
+  [key: string]: unknown;
+}
+
+export interface NikaScheduleLastDecision {
+  action: 'claimed' | 'skipped' | (string & {});
+  decision: 'scheduled' | 'catch_up' | (string & {});
+  revision: string;
+  slotId: string;
+  scheduledFor: string;
+  decidedAt: string;
+  reason: string | null;
+  claim: NikaScheduleClaim | null;
+  [key: string]: unknown;
+}
+
+/** Fresh engine planning facts. The SDK transports them without interpretation. */
+export interface NikaScheduleStatus {
+  definition: NikaScheduleDefinition;
+  origin: 'api' | (string & {});
+  revision: string;
+  active: boolean;
+  pause: NikaSchedulePause | null;
+  due?: NikaScheduleDue;
+  finding?: NikaScheduleFinding;
+  next: NikaScheduleSlot[];
+  earliestWakeHint: string | null;
+  lastDecision: NikaScheduleLastDecision | null;
+  [key: string]: unknown;
+}
+
+/** Durable apply acknowledgement. It does not wait for a scheduled fire. */
+export interface NikaScheduleApplyResult {
+  applied: true;
+  changed: boolean;
+  status: NikaScheduleStatus;
+}

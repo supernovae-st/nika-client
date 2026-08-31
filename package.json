@@ -1,7 +1,7 @@
 {
   "name": "@supernovae-st/nika-client",
-  "version": "0.114.0",
-  "description": "TypeScript client for Nika — a live local driver plus the nika serve HTTP client",
+  "version": "0.116.0",
+  "description": "One TypeScript SDK for local and remote Nika execution",
   "repository": {
     "type": "git",
     "url": "https://github.com/supernovae-st/nika-client.git"
@@ -31,23 +31,18 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
-    },
-    "./local": {
-      "import": {
-        "types": "./dist/local/index.d.ts",
-        "default": "./dist/local/index.js"
-      },
-      "require": {
-        "types": "./dist/local/index.d.cts",
-        "default": "./dist/local/index.cjs"
-      }
     }
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "nika": "./dist/bin/nika.js"
+  },
   "files": [
     "dist",
+    "docs",
+    "openapi.json",
     "LICENSE"
   ],
   "scripts": {
@@ -55,18 +50,33 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:coverage": "node scripts/check-sdk-coverage.js",
+    "gauntlet:generate": "node scripts/generate-gauntlet-corpus.mjs",
+    "gauntlet:check": "node scripts/verify-gauntlet-corpus.mjs",
+    "gauntlet:run": "node scripts/execute-gauntlet-corpus.mjs",
+    "gauntlet:projects": "node scripts/run-mini-saas-gauntlet.mjs",
+    "gauntlet:depth": "node scripts/run-depth-projects.mjs",
+    "gauntlet:recovery": "node scripts/run-recovery-e2e.mjs",
+    "gauntlet:hostile": "node scripts/run-hostile-gauntlet.mjs",
     "generate:types": "node scripts/generate-types.js",
+    "sync:native-versions": "node scripts/sync-native-versions.mjs",
+    "prepack": "npm run build",
     "prepublishOnly": "npm run build"
   },
+  "optionalDependencies": {
+    "@supernovae-st/nika-darwin-arm64": "0.116.0",
+    "@supernovae-st/nika-darwin-x64": "0.116.0",
+    "@supernovae-st/nika-linux-arm64": "0.116.0",
+    "@supernovae-st/nika-linux-x64": "0.116.0"
+  },
   "devDependencies": {
-    "@types/node": "^26.1.1",
+    "@types/node": "^26.4.0",
     "openapi-typescript": "^7.13.0",
     "tsup": "^8.0",
     "typescript": "^5.5",
-    "vitest": "^4.1"
+    "vitest": "^4.1.11"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=22"
   },
   "license": "Apache-2.0",
   "mcpName": "io.github.supernovae-st/nika"

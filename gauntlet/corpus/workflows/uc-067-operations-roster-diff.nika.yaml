@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: Apache-2.0
+# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json
+# Corpus case 67/100 · business operations · roster-diff
+# Actor: workforce planner for business operations
+# Trigger: roster-diff request enters the business operations queue
+# Authority: tools only: nika:jq; no filesystem, network, subprocess, secret, or ambient clock authority
+# Failure oracle: all three batch items return in input order with checked=true for uc-067-operations-roster-diff
+# Business outcome: enrich a bounded batch while preserving source order for business operations
+
+nika: uc-067-operations-roster-diff
+
+model: mock/echo
+
+const:
+  items: [{"sequence":1,"case":"roster-diff"},{"sequence":2,"case":"roster-diff"},{"sequence":3,"case":"roster-diff"}]
+permits:
+  tools: ["nika:jq"]
+tasks:
+  enrich:
+    for_each:
+      items: ${{ const.items }}
+      max_parallel: 2
+      fail_fast: true
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ item }}
+        expression: '. + {checked: true}'
+outputs:
+  rows: ${{ tasks.enrich.output }}

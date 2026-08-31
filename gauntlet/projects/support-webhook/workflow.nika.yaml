@@ -1,0 +1,15 @@
+nika: mini-saas-support-webhook
+model: mock/echo
+const:
+  ticket: {"id":"ticket-42","priority":"urgent","queue":"enterprise"}
+permits:
+  tools: ["nika:jq"]
+tasks:
+  triage:
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ const.ticket }}
+        expression: '. + {route: "human-escalation", accepted: true}'
+outputs:
+  decision: ${{ tasks.triage.output }}

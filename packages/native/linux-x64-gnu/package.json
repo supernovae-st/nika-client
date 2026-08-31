@@ -1,0 +1,28 @@
+{
+  "name": "@supernovae-st/nika-linux-x64",
+  "version": "0.116.0",
+  "description": "Nika native engine payload for Linux x64 GNU",
+  "license": "AGPL-3.0-or-later",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "files": [
+    "bin/nika",
+    "LICENSE",
+    "SOURCE.json",
+    "INTEGRITY.json"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "preferUnplugged": true,
+  "publishConfig": {
+    "access": "public"
+  }
+}

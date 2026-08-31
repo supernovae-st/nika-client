@@ -26,6 +26,18 @@ const RECEIPT = Object.freeze({
   origin: { kind: 'manual' },
 });
 
+const SCHEDULE_ORIGIN = Object.freeze({
+  kind: 'schedule',
+  schedule_origin: 'api',
+  schedule_id: 'daily',
+  schedule_revision: `sha256:${'c'.repeat(64)}`,
+  slot_id: 'd'.repeat(64),
+  decision: 'scheduled',
+  scheduled_for: '2026-08-31T04:00:00Z',
+  fired_at: '2026-08-31T04:00:01.123Z',
+  arm_generation: 'e'.repeat(64),
+});
+
 function client(
   fetch: typeof globalThis.fetch,
   options: { eventBufferSize?: number; requestTimeout?: number } = {},
@@ -411,6 +423,29 @@ describe('cancellation and terminal identity', () => {
     const nika = client(fetch as typeof globalThis.fetch);
     const run = await nika.run('flow.nika.yaml');
     await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);
+  });
+
+  it('accepts canonical schedule provenance and rejects calendar normalization', async () => {
+    const accepted = admissionThen(sseResponse([{
+      sequence: 1,
+      kind: 'settled',
+      status: 'succeeded',
+      receipt: { ...RECEIPT, origin: SCHEDULE_ORIGIN },
+    }]));
+    const acceptedRun = await client(accepted as typeof globalThis.fetch).run('flow.nika.yaml');
+    await expect(acceptedRun.done).resolves.toMatchObject({ status: 'succeeded' });
+
+    const refused = admissionThen(sseResponse([{
+      sequence: 1,
+      kind: 'settled',
+      status: 'succeeded',
+      receipt: {
+        ...RECEIPT,
+        origin: { ...SCHEDULE_ORIGIN, scheduled_for: '2026-02-30T00:00:00Z' },
+      },
+    }]));
+    const refusedRun = await client(refused as typeof globalThis.fetch).run('flow.nika.yaml');
+    await expect(refusedRun.done).rejects.toBeInstanceOf(NikaProtocolError);
   });
 
   it('binds a terminal SSE receipt to identities retained from attach', async () => {

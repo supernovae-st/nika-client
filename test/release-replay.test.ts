@@ -30,6 +30,10 @@ describe('public release evidence replay', () => {
     expect(hostileRunner).toContain('isDurableCancellationTerminal(events.at(-1))');
     expect(hostileRunner).not.toContain("events.includes('execution.cancelled')");
     expect(hostileRunner).not.toContain('command: ["sleep"');
+    expect(hostileRunner).not.toContain('return { runs: 40, succeeded: 40 }');
+    expect(hostileRunner).not.toContain('real_engine_runs: 70');
+    expect(hostileRunner).toContain('return { runs: succeeded, succeeded }');
+    expect(hostileRunner).toContain('real_engine_runs: realEngineRuns');
     expect(workflow).not.toContain('NIKA_SANDBOX');
   });
 

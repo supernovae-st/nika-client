@@ -24,6 +24,7 @@ const resultsPath = path.join(resultsRoot, 'hostile.json');
 const scratch = mkdtempSync(path.join(tmpdir(), 'nika-hostile-'));
 const nikaBin = process.env.NIKA_BIN;
 const rows = [];
+let realEngineRuns = 0;
 
 if (!nikaBin) throw new Error('NIKA_BIN must name the engine binary under test');
 
@@ -239,6 +240,7 @@ await scenario('explicit-bin-empty-path', async () => {
     const result = await run.done;
     assert.equal(report.clean, true);
     assert.equal(result.status, 'succeeded');
+    realEngineRuns += 1;
     return { check: 'clean', status: result.status };
   } finally {
     process.env.PATH = previous;
@@ -251,6 +253,7 @@ await scenario('parallel-run-load', async () => {
   const results = await bounded(Promise.all(runs.map((run) => run.done)), 20_000, 'parallel runs');
   assert.equal(results.filter((result) => result.status === 'succeeded').length, 24);
   assert.equal(new Set(results.map((result) => result.id)).size, 24);
+  realEngineRuns += results.filter((result) => result.status === 'succeeded').length;
   return { runs: 24, succeeded: 24, unique_run_ids: 24 };
 });
 
@@ -275,6 +278,7 @@ await scenario('real-cancellation-race', async () => {
     result,
   }));
   assert.equal(result.status, 'interrupted');
+  realEngineRuns += 1;
   return { cancel_status: cancelled.status, run_status: result.status, exit_code: result.exitCode };
 });
 
@@ -320,6 +324,7 @@ await scenario('remote-durable-cancellation', async () => {
       result,
     }));
     assert.equal(result.status, 'cancelled');
+    realEngineRuns += 1;
     assert(result.receipt);
     const recovered = await client.attachRun(run.id);
     const events = [];
@@ -362,6 +367,7 @@ await scenario('trace-corruption-detection', async () => {
   const client = new Nika({ bin: nikaBin, cwd: scratch });
   const run = await client.run(deterministic, { maxCostUsd: 0 });
   const result = await run.done;
+  realEngineRuns += 1;
   assert(result.receipt);
   const intact = await client.traceVerify(result.receipt);
   assert.equal(intact.verified, true);
@@ -395,6 +401,7 @@ await scenario('secret-canary-redaction', async () => {
     const run = await client.run(canary, { maxCostUsd: 0 });
     const result = await run.done;
     assert.equal(result.status, 'succeeded');
+    realEngineRuns += 1;
     assert(!JSON.stringify(result).includes(canaryValue));
     assert(result.receipt);
     const tracePath = receiptPath(result.receipt);
@@ -412,6 +419,7 @@ await scenario('slow-subscriber-overflow-isolation', async () => {
   const iterator = client.events(run, { bufferSize: 2 })[Symbol.asyncIterator]();
   const result = await run.done;
   assert.equal(result.status, 'succeeded');
+  realEngineRuns += 1;
   const error = await iterator.next().then(
     () => undefined,
     (cause) => cause,
@@ -422,12 +430,15 @@ await scenario('slow-subscriber-overflow-isolation', async () => {
 
 await scenario('sequential-soak', async () => {
   const client = new Nika({ bin: nikaBin, cwd: scratch });
+  let succeeded = 0;
   for (let index = 0; index < 40; index += 1) {
     const run = await client.run(deterministic, { maxCostUsd: 0 });
     const result = await run.done;
     assert.equal(result.status, 'succeeded');
+    succeeded += 1;
+    realEngineRuns += 1;
   }
-  return { runs: 40, succeeded: 40 };
+  return { runs: succeeded, succeeded };
 });
 
 const report = {
@@ -439,7 +450,7 @@ const report = {
     total: rows.length,
     green: rows.filter((row) => row.result === 'green').length,
     red: rows.filter((row) => row.result === 'red').length,
-    real_engine_runs: 70,
+    real_engine_runs: realEngineRuns,
   },
   result: rows.every((row) => row.result === 'green') ? 'green' : 'red',
 };

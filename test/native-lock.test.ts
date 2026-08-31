@@ -4,16 +4,36 @@ import { describe, expect, it } from 'vitest';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 
+interface PackageEntry {
+  name?: string;
+  version?: string;
+  optional?: boolean;
+  license?: string;
+  os?: string[];
+  cpu?: string[];
+  libc?: string[];
+  engines?: Record<string, string>;
+  bin?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
+}
+
 interface PackageLock {
-  packages: Record<string, {
-    version?: string;
-    optional?: boolean;
-    license?: string;
-    os?: string[];
-    cpu?: string[];
-    libc?: string[];
-    engines?: Record<string, string>;
-  }>;
+  name: string;
+  version: string;
+  lockfileVersion: number;
+  requires: boolean;
+  packages: Record<string, PackageEntry>;
+}
+
+interface RootManifest {
+  name: string;
+  version: string;
+  license: string;
+  bin: Record<string, string>;
+  engines: Record<string, string>;
+  devDependencies: Record<string, string>;
+  optionalDependencies: Record<string, string>;
 }
 
 interface NativeManifest {
@@ -40,11 +60,9 @@ const NATIVE_TARGETS = [
 
 describe('native package lock coverage', () => {
   it('locks every optional native payload for cross-platform npm ci', () => {
-    const manifest = readJson('package.json') as {
-      version: string;
-      optionalDependencies: Record<string, string>;
-    };
+    const manifest = readJson('package.json') as RootManifest;
     const lock = readJson('package-lock.json') as PackageLock;
+    assertRootLock(lock, manifest);
 
     expect(Object.keys(manifest.optionalDependencies).sort()).toEqual(
       NATIVE_TARGETS.map((target) => target.name).sort(),
@@ -99,10 +117,47 @@ describe('native package lock coverage', () => {
       '0.116.2',
     )).toThrow();
   });
+
+  it('refuses stale root identities in the lockfile', () => {
+    const manifest = readJson('package.json') as RootManifest;
+    const lock = readJson('package-lock.json') as PackageLock;
+
+    expect(() => assertRootLock(
+      {
+        ...lock,
+        version: '0.115.0',
+        packages: { ...lock.packages, '': { ...lock.packages[''], version: '0.115.0' } },
+      },
+      manifest,
+    )).toThrow();
+  });
 });
 
+function assertRootLock(lock: PackageLock, manifest: RootManifest): void {
+  expect(lock).toMatchObject({
+    name: manifest.name,
+    version: manifest.version,
+    lockfileVersion: 3,
+    requires: true,
+  });
+  expect(lock.packages['']).toEqual({
+    name: manifest.name,
+    version: manifest.version,
+    license: manifest.license,
+    bin: Object.fromEntries(
+      Object.entries(manifest.bin).map(([name, executable]) => [
+        name,
+        executable.replace(/^\.\//, ''),
+      ]),
+    ),
+    devDependencies: manifest.devDependencies,
+    engines: manifest.engines,
+    optionalDependencies: manifest.optionalDependencies,
+  });
+}
+
 function assertLockEntry(
-  entry: PackageLock['packages'][string],
+  entry: PackageEntry,
   target: typeof NATIVE_TARGETS[number],
   rootVersion: string,
 ): void {

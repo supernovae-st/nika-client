@@ -34,7 +34,11 @@ the exact root package version, verifies its GitHub attestation and published
 14-scenario hostile suite. The runner mints an ephemeral run-signing key. Its
 cancellation fixtures use the engine's in-process `nika:wait` primitive, so the
 replay needs no shell command, platform sandbox, or sandbox waiver. Cancellation
-and sealed-trace claims are exercised against the public binary. The parsed
+and sealed-trace claims are exercised against the public binary. The attached
+cancellation replay records both event kind and status: Nika 0.116.2 ratifies
+the `cancel_job` writer (`execution.cancelled`) and the racing worker settlement
+writer (`execution.settled`), but either is accepted only with `status=cancelled`.
+The parsed
 deterministic result must match exactly; the hostile comparison excludes only
 `generated_at` and per-scenario duration. This proves that the attested public
 release currently reproduces the committed behavioral claims. It does not

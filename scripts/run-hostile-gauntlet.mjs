@@ -14,6 +14,7 @@ import { tmpdir } from 'node:os';
 import { createServer } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isDurableCancellationTerminal } from './verify-release-replay.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const resultsRoot = process.env.NIKA_GAUNTLET_RESULTS_DIR
@@ -322,9 +323,19 @@ await scenario('remote-durable-cancellation', async () => {
     assert(result.receipt);
     const recovered = await client.attachRun(run.id);
     const events = [];
-    for await (const event of client.events(recovered)) events.push(event.kind);
+    for await (const event of client.events(recovered)) {
+      events.push({ kind: event.kind, status: event.status });
+    }
     await bounded(recovered.done, 5_000, 'cancel replay settlement');
-    assert(events.includes('execution.cancelled'), `cancel replay kinds: ${JSON.stringify(events)}`);
+    // Nika v0.116.2 has two explicitly ratified race winners:
+    // crates/nika-serve/src/server/route.rs::cancel_job persists
+    // execution.cancelled, while server/mod.rs::settle_disposition persists
+    // execution.settled. Both are valid only with terminal status cancelled.
+    assert.equal(
+      isDurableCancellationTerminal(events.at(-1)),
+      true,
+      `cancel replay events: ${JSON.stringify(events)}`,
+    );
     const trace = await client.traceVerify(result.receipt);
     assert.equal(trace.verified, false);
     assert.equal(trace.verdict, 'unavailable');

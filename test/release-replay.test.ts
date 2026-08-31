@@ -2,7 +2,10 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { verifyReleaseReplay } from '../scripts/verify-release-replay.mjs';
+import {
+  isDurableCancellationTerminal,
+  verifyReleaseReplay,
+} from '../scripts/verify-release-replay.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const committedResults = path.join(ROOT, 'gauntlet', 'results');
@@ -24,8 +27,26 @@ describe('public release evidence replay', () => {
 
     expect(hostileRunner).toContain('tools: ["nika:wait"]');
     expect(hostileRunner).toContain('args: { duration: "10s" }');
+    expect(hostileRunner).toContain('isDurableCancellationTerminal(events.at(-1))');
+    expect(hostileRunner).not.toContain("events.includes('execution.cancelled')");
     expect(hostileRunner).not.toContain('command: ["sleep"');
     expect(workflow).not.toContain('NIKA_SANDBOX');
+  });
+
+  it.each([
+    ['execution.cancelled', 'cancelled'],
+    ['execution.settled', 'cancelled'],
+  ])('accepts the ratified %s cancellation winner with cancelled status', (kind, status) => {
+    expect(isDurableCancellationTerminal({ kind, status })).toBe(true);
+  });
+
+  it.each([
+    ['execution.started', 'cancelled'],
+    ['execution.cancelled', 'failed'],
+    ['execution.settled', 'succeeded'],
+    ['execution.refused', 'cancelled'],
+  ])('rejects cancellation replay terminal %s/%s', (kind, status) => {
+    expect(isDurableCancellationTerminal({ kind, status })).toBe(false);
   });
 
   it('compares every deterministic field while excluding only hostile timing metadata', () => {
@@ -41,6 +62,32 @@ describe('public release evidence replay', () => {
       hostileScenarios: 14,
       realEngineRuns: 70,
     });
+  });
+
+  it('normalizes only the two ratified durable cancellation race winners', () => {
+    const replay = createReplay();
+    const hostile = readJson(replay, 'hostile.json');
+    const cancellation = hostile.scenarios.find(
+      (scenario: any) => scenario.name === 'remote-durable-cancellation',
+    );
+    cancellation.evidence.events.at(-1).kind = 'execution.settled';
+    writeJson(replay, 'hostile.json', hostile);
+
+    expect(verifyReleaseReplay(ROOT, replay)).toMatchObject({ hostileScenarios: 14 });
+  });
+
+  it('refuses a cancellation terminal writer with a non-cancelled status', () => {
+    const replay = createReplay();
+    const hostile = readJson(replay, 'hostile.json');
+    const cancellation = hostile.scenarios.find(
+      (scenario: any) => scenario.name === 'remote-durable-cancellation',
+    );
+    cancellation.evidence.events.at(-1).status = 'failed';
+    writeJson(replay, 'hostile.json', hostile);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'remote cancellation replay lacks an exact cancelled terminal frame',
+    );
   });
 
   it('refuses a rewritten engine identity', () => {

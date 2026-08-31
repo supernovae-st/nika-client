@@ -360,7 +360,7 @@ The repository also carries 100 distinct use-case workflows and provider proof
 under `gauntlet/`.
 
 <!-- engine hero pinned to the release tag it demonstrates · re-pin on lockstep bumps -->
-![nika check audits the workflow, then runs and seals its trace](https://raw.githubusercontent.com/supernovae-st/nika/v0.115.0/media/nika-hero.gif)
+![nika check audits the workflow, then runs and seals its trace](https://raw.githubusercontent.com/supernovae-st/nika/v0.116.2/media/nika-hero.gif)
 
 ## Keeping it fresh
 

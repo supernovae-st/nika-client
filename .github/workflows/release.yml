@@ -24,6 +24,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+      attestations: read
     outputs:
       prepared_sha: ${{ steps.release-metadata.outputs.prepared_sha }}
     env:
@@ -94,7 +95,12 @@ jobs:
           ref: "v${{ env.VERSION }}"
           token: ${{ secrets.NIKA_REPO_TOKEN || github.token }}
 
-      - name: Enforce SDK coverage against tagged engine source
+      - name: Test the tagged engine OpenAPI source
+        run: |
+          cargo test --manifest-path nika-source/Cargo.toml \
+            -p nika-serve --lib server::openapi::tests
+
+      - name: Enforce SDK coverage against the pinned contract
         run: npm run check:coverage
 
       - name: Download and verify engine release assets
@@ -113,6 +119,7 @@ jobs:
             --pattern SHA256SUMS
           cd engine-assets
           for asset in nika-*"$VERSION".tar.gz; do
+            gh attestation verify "$asset" --repo supernovae-st/nika
             grep -E "[[:space:]]${asset}$" SHA256SUMS | sha256sum --check --strict
           done
 
@@ -263,11 +270,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-tarballs pack-reports
+          engine_commit=$(git -C nika-source rev-parse HEAD)
           for package_dir in packages/native/*; do
             report="pack-reports/$(basename "$package_dir").json"
             npm pack "$package_dir" --json --pack-destination release-tarballs > "$report"
             node scripts/verify-native-pack.mjs \
-              "$report" release-tarballs "$PREPARED_SHA" "$VERSION"
+              "$report" release-tarballs "$PREPARED_SHA" "$VERSION" \
+              "$engine_commit" engine-assets/SHA256SUMS
           done
           npm pack --ignore-scripts --json --pack-destination release-tarballs \
             > pack-reports/nika-client.json
@@ -312,9 +321,66 @@ jobs:
             echo "- npm staging: skipped by dry run"
           } >> "$GITHUB_STEP_SUMMARY"
 
+  verify-native-runtime:
+    name: packed runtime (${{ matrix.target }})
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ github.event.inputs.version }}
+      PREPARED_SHA: ${{ needs.prepare.outputs.prepared_sha }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-24.04
+            tarball: supernovae-st-nika-linux-x64
+            package: '@supernovae-st/nika-linux-x64'
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+            tarball: supernovae-st-nika-linux-arm64
+            package: '@supernovae-st/nika-linux-arm64'
+          - target: darwin-x64
+            runner: macos-15-intel
+            tarball: supernovae-st-nika-darwin-x64
+            package: '@supernovae-st/nika-darwin-x64'
+          - target: darwin-arm64
+            runner: macos-15
+            tarball: supernovae-st-nika-darwin-arm64
+            package: '@supernovae-st/nika-darwin-arm64'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.prepare.outputs.prepared_sha }}
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: nika-client-release-${{ env.VERSION }}
+          path: release-candidate
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Execute the freshly packed SDK and native payload
+        env:
+          NATIVE_PACKAGE: ${{ matrix.package }}
+          NATIVE_TARBALL: ${{ matrix.tarball }}
+        run: |
+          npm install --global npm@11.19.1
+          node scripts/verify-packed-install.mjs \
+            "release-candidate/release-tarballs/supernovae-st-nika-client-$VERSION.tgz" \
+            "release-candidate/release-tarballs/$NATIVE_TARBALL-$VERSION.tgz" \
+            "$VERSION" "$PREPARED_SHA" "$NATIVE_PACKAGE"
+
   stage:
     if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
-    needs: prepare
+    needs: [prepare, verify-native-runtime]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: npm-staging

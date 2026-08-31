@@ -1,6 +1,13 @@
-import { createHash } from 'node:crypto';
 import { chmod, copyFile, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import {
+  assertExecutableIdentity,
+  assertExecutableTarget,
+  assertNativeManifest,
+  isCommit,
+  isSha256,
+  sha256File,
+} from './native-release-contract.mjs';
 
 const args = parseArgs(process.argv.slice(2));
 for (const required of ['package', 'binary', 'license', 'asset', 'asset-sha256', 'source-commit']) {
@@ -10,14 +17,23 @@ for (const required of ['package', 'binary', 'license', 'asset', 'asset-sha256',
 const packageDir = path.resolve(args.package);
 const manifest = JSON.parse(await readFile(path.join(packageDir, 'package.json'), 'utf8'));
 const rootManifest = JSON.parse(await readFile(path.resolve('package.json'), 'utf8'));
-if (manifest.version !== rootManifest.version) {
-  throw new Error(`${manifest.name} version ${manifest.version} != root ${rootManifest.version}`);
+const target = assertNativeManifest(manifest, rootManifest.version);
+if (args.asset !== target.asset) {
+  throw new Error(`${manifest.name} must be built from ${target.asset}, got ${args.asset}`);
 }
+if (!isSha256(args['asset-sha256'])) {
+  throw new Error('--asset-sha256 must be exactly 64 lowercase hexadecimal characters');
+}
+if (!isCommit(args['source-commit'])) {
+  throw new Error('--source-commit must be exactly 40 lowercase hexadecimal characters');
+}
+await assertExecutableTarget(path.resolve(args.binary), target);
+await assertExecutableIdentity(path.resolve(args.binary), rootManifest.version, args['source-commit']);
 
 const metadata = {
-  os: one(manifest.os, 'os'),
-  cpu: one(manifest.cpu, 'cpu'),
-  libc: manifest.libc ? one(manifest.libc, 'libc') : null,
+  os: target.os,
+  cpu: target.cpu,
+  libc: target.libc,
 };
 const binDir = path.join(packageDir, 'bin');
 const outputBin = path.join(binDir, 'nika');
@@ -38,7 +54,7 @@ const integrity = {
   algorithm: 'sha256',
   ...metadata,
   archive: { file: args.asset, sha256: args['asset-sha256'] },
-  executable: { file: 'bin/nika', sha256: await sha256(outputBin) },
+  executable: { file: 'bin/nika', sha256: await sha256File(outputBin) },
 };
 await writeJson(path.join(packageDir, 'SOURCE.json'), source);
 await writeJson(path.join(packageDir, 'INTEGRITY.json'), integrity);
@@ -54,17 +70,6 @@ function parseArgs(values) {
     result[flag.slice(2)] = values[index + 1];
   }
   return result;
-}
-
-function one(value, field) {
-  if (!Array.isArray(value) || value.length !== 1 || typeof value[0] !== 'string') {
-    throw new Error(`${manifest.name} must declare one ${field} value`);
-  }
-  return value[0];
-}
-
-async function sha256(file) {
-  return createHash('sha256').update(await readFile(file)).digest('hex');
 }
 
 async function writeJson(file, value) {

@@ -5,7 +5,7 @@ import { NikaEngineUnavailable } from './error.js';
 import { packageForHost } from './packages.js';
 
 const requireFromBundle = createRequire(
-  typeof __filename === 'string' ? __filename : import.meta.url,
+  typeof import.meta.url === 'string' ? import.meta.url : __filename,
 );
 
 export interface BinaryResolverHost {

@@ -9,7 +9,9 @@ export default defineConfig([
     target: 'es2022',
     splitting: false,
     esbuildOptions(options) {
-      // CJS takes the __filename branch; import.meta.url is used only by ESM.
+      // ESM takes import.meta.url first; CJS falls back to its absolute __filename.
+      // The order matters because Node 26 exposes a non-absolute `[eval]`
+      // __filename during dynamic imports launched from `node -e`.
       options.logOverride = { 'empty-import-meta': 'silent' };
     },
   },

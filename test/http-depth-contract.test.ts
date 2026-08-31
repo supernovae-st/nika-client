@@ -161,7 +161,9 @@ describe('HTTP response framing, status, and deadlines', () => {
   it('keeps the request deadline active while the admission body is read', async () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse())
-      .mockResolvedValueOnce(delayedJsonResponse({ id: 'job-1', status: 'queued' }, 40));
+      .mockImplementationOnce(() => Promise.resolve(
+        delayedJsonResponse({ id: 'job-1', status: 'queued' }, 40),
+      ));
     await expect(transport(fetch as typeof globalThis.fetch, {
       requestTimeout: 5,
     }).startRun('flow.nika.yaml', {})).rejects.toMatchObject({

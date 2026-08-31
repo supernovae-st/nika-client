@@ -8,17 +8,20 @@ import {
 } from '../errors.js';
 import type {
   NikaCancelResult,
+  NikaAttachRunOptions,
   NikaCheckOptions,
   NikaCheckResult,
   NikaEvent,
   NikaReceipt,
   NikaRunOptions,
   NikaRunResult,
+  NikaRunStatus,
   NikaScheduleApplyResult,
   NikaScheduleOptions,
   NikaScheduleStatus,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
+  NikaWorkflowMetadata,
 } from '../types.js';
 import {
   eventError,
@@ -85,6 +88,30 @@ export class NativeProcessTransport implements Transport {
       shell: false,
     });
     return this.processRun(randomUUID(), child);
+  }
+
+  async attachRun(_id: string, _options: NikaAttachRunOptions): Promise<TransportRun> {
+    throw new NikaCompatibilityError(
+      'attachRun',
+      this.kind,
+      'Only a resident nika serve authority owns durable jobs across client processes',
+    );
+  }
+
+  async listWorkflows(): Promise<readonly string[]> {
+    throw new NikaCompatibilityError(
+      'workflowCatalog',
+      this.kind,
+      'The contained workflow catalog belongs to a resident nika serve authority',
+    );
+  }
+
+  async workflow(_name: string): Promise<NikaWorkflowMetadata> {
+    throw new NikaCompatibilityError(
+      'workflowCatalog',
+      this.kind,
+      'The contained workflow catalog belongs to a resident nika serve authority',
+    );
   }
 
   async schedule(
@@ -253,6 +280,13 @@ export class NativeProcessTransport implements Transport {
       id,
       events,
       done,
+      status: async (): Promise<NikaRunStatus> => {
+        throw new NikaCompatibilityError(
+          'runStatus',
+          this.kind,
+          'A direct native process has no independent durable status authority; await run.done',
+        );
+      },
       cancel: () => {
         cancelPromise ??= Promise.resolve(
           settled

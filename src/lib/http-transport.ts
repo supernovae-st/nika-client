@@ -7,12 +7,14 @@ import {
 } from '../errors.js';
 import type {
   NikaCancelResult,
+  NikaAttachRunOptions,
   NikaCheckOptions,
   NikaCheckResult,
   NikaEvent,
   NikaReceipt,
   NikaRunOptions,
   NikaRunResult,
+  NikaRunStatus,
   NikaOperation,
   NikaOperationFinding,
   NikaScheduleApplyResult,
@@ -20,6 +22,7 @@ import type {
   NikaScheduleStatus,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
+  NikaWorkflowMetadata,
 } from '../types.js';
 import { verifyNikaEngine, type ResolvedNikaEngine } from './binary/index.js';
 import { captureEngine } from './engine-capture.js';
@@ -146,12 +149,49 @@ export class HttpTransport implements Transport {
         'Idempotency-Key': idempotencyKey,
       },
       body: captured.bytes,
-    });
+    }, true, [200, 202]);
     const id = typeof admitted.id === 'string' ? admitted.id : undefined;
     if (!id) {
       throw new NikaProtocolError(this.kind, 'Job admission response omitted its id');
     }
     return this.httpRun(id);
+  }
+
+  async attachRun(id: string, options: NikaAttachRunOptions): Promise<TransportRun> {
+    await this.ensureReady();
+    const object = await this.json(`/v1/jobs/${encodeURIComponent(id)}`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    });
+    durableJob(object, id, this.kind);
+    return this.httpRun(id, options.lastEventId ?? 0);
+  }
+
+  async listWorkflows(): Promise<readonly string[]> {
+    await this.ensureReady();
+    const object = await this.json('/v1/workflows', {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    });
+    if (
+      !Array.isArray(object.workflows)
+      || object.workflows.some((name) => typeof name !== 'string' || name.length === 0)
+    ) {
+      throw new NikaProtocolError(this.kind, 'Workflow catalog response was malformed');
+    }
+    return Object.freeze([...object.workflows]) as readonly string[];
+  }
+
+  async workflow(name: string): Promise<NikaWorkflowMetadata> {
+    await this.ensureReady();
+    const object = await this.json(`/v1/workflows/${workflowPath(name)}`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    });
+    if (typeof object.workflow !== 'string' || object.workflow.length === 0) {
+      throw new NikaProtocolError(this.kind, 'Workflow metadata response was malformed');
+    }
+    return object as unknown as NikaWorkflowMetadata;
   }
 
   async schedule(
@@ -223,7 +263,7 @@ export class HttpTransport implements Transport {
     } as NikaTraceVerifyResult;
   }
 
-  private httpRun(id: string): TransportRun {
+  private httpRun(id: string, initialSequence = 0): TransportRun {
     const controller = new AbortController();
     let terminalObserved = false;
     let resolveDone!: (result: NikaRunResult) => void;
@@ -235,10 +275,19 @@ export class HttpTransport implements Transport {
     done.catch(() => {});
 
     const settle = (source: NikaEvent | DurableJob) => {
-      terminalObserved = true;
       const event = 'sequence' in source ? source : undefined;
       const durable = event ? undefined : source as DurableJob;
       const receipt = event ? eventReceipt(event) : durable?.receipt;
+      if (receipt) {
+        assertReceiptIdentity(
+          receipt,
+          id,
+          this.kind,
+          durable?.execution_id,
+          durable?.trace_id,
+        );
+      }
+      terminalObserved = true;
       const outputs = event ? eventOutputs(event) : durable?.outputs;
       const error = event ? eventError(event) : durable?.error;
       resolveDone({
@@ -256,7 +305,12 @@ export class HttpTransport implements Transport {
     const events: AsyncIterable<NikaEvent> = {
       [Symbol.asyncIterator]: async function* (this: HttpTransport) {
         try {
-          for await (const event of this.observeJob(id, controller.signal, settle)) {
+          for await (const event of this.observeJob(
+            id,
+            controller.signal,
+            settle,
+            initialSequence,
+          )) {
             yield event;
           }
         } catch (cause) {
@@ -273,6 +327,16 @@ export class HttpTransport implements Transport {
       id,
       events,
       done,
+      status: async (): Promise<NikaRunStatus> => {
+        const object = await this.json(`/v1/jobs/${encodeURIComponent(id)}/status`, {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+        });
+        if (typeof object.status !== 'string' || !JOB_STATUSES.has(object.status)) {
+          throw new NikaProtocolError(this.kind, 'Job status response was malformed');
+        }
+        return object.status;
+      },
       cancel: async (): Promise<NikaCancelResult> => {
         const object = await this.json(`/v1/jobs/${encodeURIComponent(id)}/cancel`, {
           method: 'POST',
@@ -300,14 +364,15 @@ export class HttpTransport implements Transport {
     id: string,
     signal: AbortSignal,
     settle: (source: NikaEvent | DurableJob) => void,
+    initialSequence = 0,
   ): AsyncGenerator<NikaEvent> {
     const state: ObservationState = {
-      lastSequence: 0,
+      lastSequence: initialSequence,
       attempt: 0,
       terminalObserved: false,
     };
     const jobPath = `/v1/jobs/${encodeURIComponent(id)}`;
-    const eventsPath = `${jobPath}/events`;
+    const eventsPath = `/v1/jobs/${encodeURIComponent(id)}/events`;
 
     while (!state.terminalObserved) {
       const headers = new Headers({ Accept: 'text/event-stream' });
@@ -521,6 +586,7 @@ export class HttpTransport implements Transport {
   private async readObservationObject(
     response: Response,
     path: string,
+    signal?: AbortSignal,
   ): Promise<Record<string, unknown>> {
     if (!response.body) {
       throw new NikaProtocolError(this.kind, `HTTP ${path} omitted its JSON body`);
@@ -528,14 +594,26 @@ export class HttpTransport implements Transport {
     const reader = response.body.getReader();
     const chunks: Uint8Array[] = [];
     let bytes = 0;
-    let timedOut = false;
+    let rejectBoundary!: (error: Error) => void;
+    const boundary = new Promise<never>((_resolve, reject) => {
+      rejectBoundary = reject;
+    });
+    const abort = () => {
+      rejectBoundary(new NikaTransportError(this.kind, `HTTP ${path} response body was aborted`));
+      void reader.cancel().catch(() => {});
+    };
+    signal?.addEventListener('abort', abort, { once: true });
     const timer = setTimeout(() => {
-      timedOut = true;
+      rejectBoundary(new NikaTransportError(
+        this.kind,
+        `HTTP response body timed out after ${this.options.requestTimeout}ms`,
+      ));
       void reader.cancel().catch(() => {});
     }, this.options.requestTimeout);
     try {
+      if (signal?.aborted) abort();
       while (true) {
-        const { done, value } = await reader.read();
+        const { done, value } = await Promise.race([reader.read(), boundary]);
         if (done) break;
         bytes += value.byteLength;
         if (bytes > this.options.machineBufferBytes) {
@@ -551,14 +629,9 @@ export class HttpTransport implements Transport {
       throw new NikaTransportError(this.kind, `HTTP ${path} response body reset`);
     } finally {
       clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
       await reader.cancel().catch(() => {});
       reader.releaseLock();
-    }
-    if (timedOut) {
-      throw new NikaTransportError(
-        this.kind,
-        `HTTP observation timed out after ${this.options.requestTimeout}ms`,
-      );
     }
     const body = new Uint8Array(bytes);
     let offset = 0;
@@ -742,19 +815,32 @@ export class HttpTransport implements Transport {
     path: string,
     init: RequestInit,
     authenticated = true,
+    acceptedStatuses: readonly number[] = [200],
   ): Promise<Record<string, unknown>> {
-    const response = await this.fetchResponse(path, init, true, authenticated);
-    let value: unknown;
-    try {
-      value = await response.json();
-    } catch (cause) {
-      throw new NikaProtocolError(this.kind, `HTTP ${path} did not return JSON`, {
-        cause: cause instanceof Error ? cause : undefined,
-      });
+    const response = await this.fetchResponse(path, init, true, authenticated, false);
+    if (!acceptedStatuses.includes(response.status)) {
+      await discardResponse(response);
+      if (response.ok) {
+        throw new NikaProtocolError(
+          this.kind,
+          `HTTP ${path} returned non-contract status ${response.status}`,
+        );
+      }
+      throw new NikaTransportError(
+        this.kind,
+        `HTTP ${response.status} for ${path}: [REDACTED]`,
+      );
     }
-    const object = machineObject(value);
-    if (!object) throw new NikaProtocolError(this.kind, `HTTP ${path} did not return an object`);
-    return object;
+    const contentType = response.headers
+      .get('Content-Type')
+      ?.split(';', 1)[0]
+      ?.trim()
+      .toLowerCase();
+    if (contentType !== 'application/json') {
+      await discardResponse(response);
+      throw new NikaProtocolError(this.kind, `HTTP ${path} returned an invalid content-type`);
+    }
+    return this.readObservationObject(response, path, init.signal ?? undefined);
   }
 
   private async operationJson(
@@ -874,6 +960,18 @@ export class HttpTransport implements Transport {
       callerSignal?.removeEventListener('abort', abort);
     }
   }
+}
+
+function workflowPath(name: string): string {
+  const segments = name.split('/');
+  if (
+    name.startsWith('/')
+    || name.includes('\\')
+    || segments.some((segment) => segment.length === 0 || segment === '.' || segment === '..')
+  ) {
+    throw new TypeError('workflow name must be a contained slash-separated path');
+  }
+  return segments.map(encodeURIComponent).join('/');
 }
 
 function scheduleBody(
@@ -1061,6 +1159,15 @@ function durableJob(
   if (value.receipt !== undefined && !receipt) {
     throw new NikaProtocolError(transport, 'Durable job response receipt was malformed');
   }
+  if (receipt) {
+    assertReceiptIdentity(
+      receipt,
+      expectedId,
+      transport,
+      typeof value.execution_id === 'string' ? value.execution_id : undefined,
+      typeof value.trace_id === 'string' ? value.trace_id : undefined,
+    );
+  }
   return {
     id: value.id,
     status: value.status,
@@ -1070,4 +1177,22 @@ function durableJob(
     ...(receipt ? { receipt: Object.freeze(receipt) } : {}),
     ...(error ? { error } : {}),
   };
+}
+
+function assertReceiptIdentity(
+  receipt: Readonly<Record<string, unknown>>,
+  expectedJobId: string,
+  transport: 'http',
+  expectedExecutionId?: string,
+  expectedTraceId?: string,
+): void {
+  if (receipt.job_id !== expectedJobId) {
+    throw new NikaProtocolError(transport, 'Receipt job identity did not match its run');
+  }
+  if (expectedExecutionId !== undefined && receipt.execution_id !== expectedExecutionId) {
+    throw new NikaProtocolError(transport, 'Receipt execution identity did not match its job');
+  }
+  if (expectedTraceId !== undefined && receipt.trace_id !== expectedTraceId) {
+    throw new NikaProtocolError(transport, 'Receipt trace identity did not match its job');
+  }
 }

@@ -108,6 +108,12 @@ export interface NikaCancelResult {
   [key: string]: unknown;
 }
 
+/** Server-owned metadata for one contained resident workflow. */
+export interface NikaWorkflowMetadata {
+  workflow: string;
+  [key: string]: unknown;
+}
+
 export interface NikaTraceVerifyResult {
   verified: boolean;
   /** Engine-owned trace verdict. Open to additive future vocabulary. */
@@ -138,6 +144,12 @@ export interface NikaRunOptions {
   maxCostUsd?: number;
   /** Retained for HTTP admission deduplication. */
   idempotencyKey?: string;
+}
+
+/** Resume observation of an already-admitted durable HTTP job. */
+export interface NikaAttachRunOptions {
+  /** Last SSE sequence durably consumed by the caller. Default: 0. */
+  lastEventId?: number;
 }
 
 export interface NikaEventsOptions {
@@ -183,6 +195,7 @@ export interface NikaScheduleOptions {
   tolerance?: string;
   active?: boolean;
   pauseReason?: string;
+  /** ISO calendar date (`YYYY-MM-DD`) required when active is false. */
   pauseUntil?: string;
   /** Exact prior revision for an update. Omit for create-if-absent. */
   revision?: string;

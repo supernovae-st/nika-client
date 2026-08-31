@@ -98,7 +98,7 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
         request++ === 0 ? identity : { applied: true, changed: true, status }
       ), { status: 200, headers: { 'Content-Type': 'application/json' } });
       const nika = new Nika({
-        url: 'https://nika.example', token: 'secret', fetch,
+        url: 'https://nika.example', token: 'ssssssssssssssssssssssssssssssss', fetch,
       });
       const applied = await nika.schedule('flow.nika.yaml', {
         id: 'exit', when: { kind: 'once', at: '2099-09-01T07:00:00Z' },

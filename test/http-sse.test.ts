@@ -12,6 +12,7 @@ const FIXTURE = path.join(
   'fixtures',
   'fake-nika.mjs',
 );
+const SERVER_TOKEN = 's'.repeat(32);
 
 function healthResponse(): Response {
   return jsonResponse({
@@ -67,7 +68,7 @@ function transport(
 ): HttpTransport {
   return new HttpTransport({
     url: 'https://nika.example',
-    token: 'server-token',
+    token: SERVER_TOKEN,
     fetch,
     requestTimeout: 1_000,
     machineBufferBytes: 64 * 1024,
@@ -234,7 +235,7 @@ describe('HTTP observation state machine', () => {
     );
     const client = new Nika({
       url: 'https://nika.example',
-      token: 'server-token',
+      token: SERVER_TOKEN,
       bin: FIXTURE,
       fetch: fetch as typeof globalThis.fetch,
     });

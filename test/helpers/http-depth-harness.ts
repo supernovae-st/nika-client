@@ -108,12 +108,17 @@ export function controlledByteStream(): {
 
 export function delayedJsonResponse(body: unknown, delayMilliseconds: number): Response {
   const bytes = new TextEncoder().encode(JSON.stringify(body));
+  let cancelled = false;
   return new Response(new ReadableStream<Uint8Array>({
     start(controller) {
       setTimeout(() => {
+        if (cancelled) return;
         controller.enqueue(bytes);
         controller.close();
       }, delayMilliseconds);
+    },
+    cancel() {
+      cancelled = true;
     },
   }), {
     status: 200,

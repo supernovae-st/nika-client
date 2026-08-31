@@ -9,6 +9,7 @@ import { RunSession } from './lib/run-session.js';
 import type { Transport } from './lib/transport.js';
 import type {
   NikaCancelResult,
+  NikaAttachRunOptions,
   NikaCheckOptions,
   NikaCheckResult,
   NikaConfig,
@@ -17,12 +18,14 @@ import type {
   NikaReceipt,
   NikaRun,
   NikaRunOptions,
+  NikaRunStatus,
   NikaScheduleApplyResult,
   NikaScheduleOptions,
   NikaScheduleStatus,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
   NikaTransportKind,
+  NikaWorkflowMetadata,
 } from './types.js';
 
 const DEFAULT_EVENT_BUFFER_SIZE = 256;
@@ -54,7 +57,7 @@ export class Nika {
       const url = checkedUrl(config.url, config.allowInsecureHttp === true);
       this.transport = new HttpTransport({
         url,
-        token: config.token,
+        token: checkedToken(config.token),
         fetch: config.fetch ?? globalThis.fetch.bind(globalThis),
         requestTimeout: positiveInteger(
           config.requestTimeout ?? DEFAULT_REQUEST_TIMEOUT,
@@ -100,12 +103,39 @@ export class Nika {
     return session.run;
   }
 
+  /** Reattach this client process to an already-admitted durable HTTP job. */
+  async attachRun(id: string, options: NikaAttachRunOptions = {}): Promise<NikaRun> {
+    const lastEventId = options.lastEventId ?? 0;
+    if (!Number.isSafeInteger(lastEventId) || lastEventId < 0) {
+      throw new RangeError('lastEventId must be a non-negative safe integer');
+    }
+    const source = await this.transport.attachRun(jobId(id), { lastEventId });
+    const session = new RunSession(source, this.eventBufferSize);
+    this.sessions.set(session.run, session);
+    return session.run;
+  }
+
+  /** List contained workflow names from a resident HTTP authority. */
+  listWorkflows(): Promise<readonly string[]> {
+    return this.transport.listWorkflows();
+  }
+
+  /** Read path-free metadata for one contained workflow. */
+  workflow(name: string): Promise<NikaWorkflowMetadata> {
+    return this.transport.workflow(workflowName(name));
+  }
+
   events(run: NikaRun, options: NikaEventsOptions = {}): AsyncIterable<NikaEvent> {
     return this.session(run).events(options);
   }
 
   cancel(run: NikaRun): Promise<NikaCancelResult> {
     return this.session(run).cancel();
+  }
+
+  /** Read the current durable status without waiting for terminal settlement. */
+  status(run: NikaRun): Promise<NikaRunStatus> {
+    return this.session(run).status();
   }
 
   schedule(
@@ -158,6 +188,16 @@ function checkedUrl(value: string, allowInsecureHttp: boolean): string {
   return url.toString().replace(/\/$/, '');
 }
 
+function checkedToken(value: string): string {
+  const bytes = Buffer.byteLength(value);
+  if (bytes < 32 || bytes > 512 || !/^[\x21-\x7e]+$/.test(value)) {
+    throw new NikaConfigurationError(
+      'Nika bearer token must be 32-512 visible ASCII bytes without whitespace',
+    );
+  }
+  return value;
+}
+
 function positiveInteger(value: number, name: string): number {
   if (!Number.isSafeInteger(value) || value < 1) {
     throw new NikaConfigurationError(`${name} must be a positive integer`);
@@ -179,6 +219,13 @@ function scheduleId(value: string): string {
   return value;
 }
 
+function jobId(value: string): string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new TypeError('job id must be a non-empty string');
+  }
+  return value;
+}
+
 export {
   NikaCompatibilityError,
   NikaConfigurationError,
@@ -194,6 +241,7 @@ export { NikaEngineUnavailable };
 
 export type {
   NikaCancelResult,
+  NikaAttachRunOptions,
   NikaCheckOptions,
   NikaCheckResult,
   NikaConfig,
@@ -226,4 +274,5 @@ export type {
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
   NikaTransportKind,
+  NikaWorkflowMetadata,
 } from './types.js';

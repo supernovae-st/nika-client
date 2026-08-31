@@ -5,6 +5,7 @@ import type {
   NikaEventsOptions,
   NikaRun,
   NikaRunResult,
+  NikaRunStatus,
 } from '../types.js';
 import type { TransportRun } from './transport.js';
 
@@ -57,6 +58,10 @@ export class RunSession {
   cancel(): Promise<NikaCancelResult> {
     this.cancelPromise ??= this.source.cancel();
     return this.cancelPromise;
+  }
+
+  status(): Promise<NikaRunStatus> {
+    return this.source.status();
   }
 
   private async pump(): Promise<void> {

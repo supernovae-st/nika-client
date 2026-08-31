@@ -31,6 +31,7 @@ const INCOMPATIBLE_FIXTURE = path.join(
   'incompatible-nika.mjs',
 );
 const posix = process.platform !== 'win32';
+const SERVER_TOKEN = 's'.repeat(32);
 const SNAPSHOT_BYTES = '{"format_version":1,"root":"fixture.nika.yaml","digest":"fixture-digest","units":[{"path":"fixture.nika.yaml","kind":0,"digest":"unit-digest","bytes_hex":"00"}]}';
 
 function healthResponse(overrides: Record<string, unknown> = {}): Response {
@@ -127,7 +128,7 @@ describe('one Nika surface', () => {
   });
 
   it('requires an explicit secure remote configuration', () => {
-    expect(() => new Nika({ url: 'http://127.0.0.1:8787', token: 'secret' }))
+    expect(() => new Nika({ url: 'http://127.0.0.1:8787', token: SERVER_TOKEN }))
       .toThrow(/allowInsecureHttp/);
     expect(() => new Nika({ url: 'https://nika.example', token: '' }))
       .toThrow(NikaConfigurationError);
@@ -135,7 +136,7 @@ describe('one Nika surface', () => {
       .toThrow(/require url/);
     expect(new Nika({
       url: 'http://127.0.0.1:8787/',
-      token: 'secret',
+      token: SERVER_TOKEN,
       allowInsecureHttp: true,
       bin: FIXTURE,
     }).transportKind).toBe('http');
@@ -150,7 +151,7 @@ describe('one Nika surface', () => {
       ]));
     const client = new Nika({
       url: 'https://nika.example',
-      token: 'secret',
+      token: SERVER_TOKEN,
       bin: FIXTURE,
       fetch: fetch as typeof globalThis.fetch,
     });
@@ -163,6 +164,14 @@ describe('one Nika surface', () => {
 describe.skipIf(!posix)('native-process transport', () => {
   it('refuses schedule operations without starting a direct local process', async () => {
     const client = native();
+    await expect(client.listWorkflows()).rejects.toMatchObject({
+      capability: 'workflowCatalog',
+      transport: 'native-process',
+    });
+    await expect(client.workflow('flow.nika.yaml')).rejects.toMatchObject({
+      capability: 'workflowCatalog',
+      transport: 'native-process',
+    });
     await expect(client.schedule('flow.nika.yaml', {
       id: 'daily',
       when: { kind: 'once', at: '2026-09-01T07:00:00Z' },
@@ -310,6 +319,10 @@ describe.skipIf(!posix)('native-process transport', () => {
     };
     expect(() => client.events(foreign)).toThrow(NikaRunOwnershipError);
     expect(() => client.cancel(foreign)).toThrow(NikaRunOwnershipError);
+    await expect(client.attachRun('durable-job')).rejects.toMatchObject({
+      name: 'NikaCompatibilityError',
+      capability: 'attachRun',
+    });
   });
 });
 
@@ -317,11 +330,115 @@ describe('HTTP transport', () => {
   function remote(fetch: typeof globalThis.fetch): Nika {
     return new Nika({
       url: 'https://nika.example/',
-      token: 'server-token',
+      token: SERVER_TOKEN,
       bin: FIXTURE,
       fetch,
     });
   }
+
+  it('covers the resident workflow catalog without exposing source bytes', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
+      .mockResolvedValueOnce(jsonResponse({
+        workflows: ['flows/customer/onboarding.nika.yaml'],
+      }))
+      .mockResolvedValueOnce(jsonResponse({
+        workflow: 'flows/customer/onboarding.nika.yaml',
+      }));
+    const client = remote(fetch as typeof globalThis.fetch);
+
+    await expect(client.listWorkflows()).resolves.toEqual([
+      'flows/customer/onboarding.nika.yaml',
+    ]);
+    await expect(client.workflow('flows/customer/onboarding.nika.yaml')).resolves.toEqual({
+      workflow: 'flows/customer/onboarding.nika.yaml',
+    });
+    expect(String(fetch.mock.calls[1]?.[0])).toBe('https://nika.example/v1/workflows');
+    expect(String(fetch.mock.calls[2]?.[0])).toBe(
+      'https://nika.example/v1/workflows/flows/customer/onboarding.nika.yaml',
+    );
+    await expect(client.workflow('../secret.nika.yaml')).rejects.toThrow(/contained/);
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('reads the durable status route through an owned run', async () => {
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/health')) return healthResponse();
+      if (url.endsWith('/v1/jobs')) {
+        return jsonResponse({ id: 'status-run', status: 'queued' }, 202);
+      }
+      if (url.endsWith('/v1/jobs/status-run/events')) {
+        return sseResponse([{ sequence: 1, kind: 'settled', status: 'succeeded' }]);
+      }
+      if (url.endsWith('/v1/jobs/status-run/status')) {
+        return jsonResponse({ status: 'running' });
+      }
+      throw new Error(`unexpected URL ${url}`);
+    });
+    const client = remote(fetch as typeof globalThis.fetch);
+    const run = await client.run('flow.nika.yaml');
+    await expect(client.status(run)).resolves.toBe('running');
+    await expect(run.done).resolves.toMatchObject({ status: 'succeeded' });
+    expect(() => client.status({ id: run.id, done: run.done }))
+      .toThrow(NikaRunOwnershipError);
+  });
+
+  it('reattaches after a Node process restart and resumes from Last-Event-ID', async () => {
+    const fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith('/health')) return healthResponse();
+      if (url.endsWith('/v1/jobs/durable-job')) {
+        return jsonResponse({ id: 'durable-job', status: 'running' });
+      }
+      if (url.endsWith('/v1/jobs/durable-job/events')) {
+        expect(new Headers(init?.headers).get('Last-Event-ID')).toBe('4');
+        return sseResponse([{
+          sequence: 5,
+          kind: 'settled',
+          status: 'succeeded',
+        }]);
+      }
+      throw new Error(`unexpected URL ${url}`);
+    });
+    const client = remote(fetch as typeof globalThis.fetch);
+
+    const recovered = await client.attachRun('durable-job', { lastEventId: 4 });
+    await expect(recovered.done).resolves.toMatchObject({
+      id: 'durable-job',
+      status: 'succeeded',
+      transport: 'http',
+    });
+    await expect(collect(client.events(recovered))).resolves.toEqual([{
+      sequence: 5,
+      kind: 'settled',
+      status: 'succeeded',
+    }]);
+    await expect(client.attachRun('durable-job', { lastEventId: -1 }))
+      .rejects.toThrow(/non-negative safe integer/);
+  });
+
+  it.each([-1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects invalid attachment cursor %s before network I/O',
+    async (lastEventId) => {
+      const fetch = vi.fn();
+      await expect(remote(fetch as typeof globalThis.fetch).attachRun('job', { lastEventId }))
+        .rejects.toThrow(/non-negative safe integer/);
+      expect(fetch).not.toHaveBeenCalled();
+    },
+  );
+
+  it('refuses an absent durable job before returning an attached handle', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
+      .mockResolvedValueOnce(jsonResponse({ error: { code: 'not_found' } }, 404));
+    await expect(remote(fetch as typeof globalThis.fetch).attachRun('absent'))
+      .rejects.toMatchObject({
+        name: 'NikaTransportError',
+        message: expect.stringContaining('HTTP 404'),
+      });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
 
   const scheduleOptions: NikaScheduleOptions = {
     id: 'daily',
@@ -495,7 +612,7 @@ describe('HTTP transport', () => {
     const headers = new Headers(init.headers);
     const healthHeaders = new Headers(fetch.mock.calls[0]?.[1]?.headers);
     expect(healthHeaders.has('Authorization')).toBe(false);
-    expect(headers.get('Authorization')).toBe('Bearer server-token');
+    expect(headers.get('Authorization')).toBe(`Bearer ${SERVER_TOKEN}`);
     expect(headers.get('Content-Type')).toBe('application/json');
     expect(headers.get('Idempotency-Key')).toBe('stable-key');
   });
@@ -675,7 +792,7 @@ describe('HTTP transport', () => {
 
   it('redacts the bearer token from HTTP failures', async () => {
     const fetch = vi.fn().mockResolvedValueOnce(new Response(
-      'reflected server-token',
+      `reflected ${SERVER_TOKEN}`,
       { status: 500 },
     ));
     const client = remote(fetch as typeof globalThis.fetch);
@@ -686,6 +803,6 @@ describe('HTTP transport', () => {
       failure = cause;
     }
     expect(String(failure)).toContain('[REDACTED]');
-    expect(String(failure)).not.toContain('server-token');
+    expect(String(failure)).not.toContain(SERVER_TOKEN);
   });
 });

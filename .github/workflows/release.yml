@@ -119,30 +119,56 @@ jobs:
       - name: Prove the pinned contract and generated types against the released binary
         run: |
           set -euo pipefail
-          mkdir -p openapi-probe/{workflows,state}
-          tar -xzf "engine-assets/nika-linux-x64-$VERSION.tar.gz" -C openapi-probe nika
+          probe_root=$(mktemp -d "${RUNNER_TEMP:-/tmp}/nika-client-release-openapi.XXXXXX")
+          project_dir="$probe_root/project"
+          workflows_dir="$probe_root/workflows"
+          state_dir="$probe_root/state"
+          token_file="$probe_root/token"
+          server_pid=""
+          cleanup() {
+            if [ -n "$server_pid" ]; then
+              kill "$server_pid" 2>/dev/null || true
+              wait "$server_pid" 2>/dev/null || true
+            fi
+            find "$probe_root" -depth -delete
+          }
+          trap cleanup EXIT
+          mkdir -p "$project_dir" "$workflows_dir" "$state_dir"
+          printf '%s\n' 'nika: release-openapi-probe' > "$project_dir/nika.yaml"
+          tar -xzf "engine-assets/nika-linux-x64-$VERSION.tar.gz" -C "$probe_root" nika
           token="nika-release-openapi-probe-token-0116"
-          printf '%s\n' "$token" > openapi-probe/token
-          chmod 600 openapi-probe/token
-          ./openapi-probe/nika serve \
-            --bind 127.0.0.1:18787 \
-            --workflows openapi-probe/workflows \
-            --token-file openapi-probe/token \
-            --state-root openapi-probe/state \
-            --plain >openapi-probe/server.log 2>&1 &
+          printf '%s\n' "$token" > "$token_file"
+          chmod 600 "$token_file"
+          (
+            cd "$project_dir"
+            exec "$probe_root/nika" serve \
+              --bind 127.0.0.1:18787 \
+              --workflows "$workflows_dir" \
+              --token-file "$token_file" \
+              --state-root "$state_dir" \
+              --plain
+          ) >"$probe_root/server.log" 2>&1 &
           server_pid=$!
-          trap 'kill "$server_pid" 2>/dev/null || true; wait "$server_pid" 2>/dev/null || true' EXIT
+          ok=0
           for _ in {1..50}; do
-            if curl -fsS http://127.0.0.1:18787/health >/dev/null; then break; fi
+            if curl -fsS http://127.0.0.1:18787/health >/dev/null; then
+              ok=1
+              break
+            fi
             sleep 0.1
           done
+          if [ "$ok" != 1 ]; then
+            cat "$probe_root/server.log" >&2
+            echo "::error::released nika serve never answered GET /health"
+            exit 1
+          fi
           curl -fsS \
             -H "Authorization: Bearer $token" \
             http://127.0.0.1:18787/v1/openapi.json \
-            > openapi-probe/live.json
-          jq -S . openapi.json > openapi-probe/pinned.sorted.json
-          jq -S . openapi-probe/live.json > openapi-probe/live.sorted.json
-          if ! cmp -s openapi-probe/pinned.sorted.json openapi-probe/live.sorted.json; then
+            > "$probe_root/live.json"
+          jq -S . openapi.json > "$probe_root/pinned.sorted.json"
+          jq -S . "$probe_root/live.json" > "$probe_root/live.sorted.json"
+          if ! cmp -s "$probe_root/pinned.sorted.json" "$probe_root/live.sorted.json"; then
             echo "::error::openapi.json differs from the released v$VERSION binary"
             exit 1
           fi

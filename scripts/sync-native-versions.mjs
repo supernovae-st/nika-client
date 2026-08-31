@@ -39,13 +39,14 @@ lock.version = version;
 lock.packages[''].version = version;
 lock.packages[''].optionalDependencies = rootPackage.optionalDependencies;
 for (const [name, manifest] of lockEntries) {
+  // Match npm@11.19.1's package-lock serialization so release validation is idempotent.
   lock.packages[`node_modules/${name}`] = {
     version,
-    optional: true,
-    license: manifest.license,
-    os: manifest.os,
     cpu: manifest.cpu,
     ...(manifest.libc ? { libc: manifest.libc } : {}),
+    license: manifest.license,
+    optional: true,
+    os: manifest.os,
     engines: manifest.engines,
   };
 }

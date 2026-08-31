@@ -84,6 +84,7 @@ jobs:
           NIKA_URL: http://127.0.0.1:3000
           NIKA_TOKEN: ci-test-token-32-chars-minimum!!
         run: |
+          set -euo pipefail
           sdk_version=$(node -p "require('./package.json').version")
           engine_version=$(nika --version | awk '{print $2}')
           if [ "$sdk_version" != "$engine_version" ]; then
@@ -98,8 +99,23 @@ jobs:
           # The fixture speaks the shipped nine-key envelope — this exact file
           # passes `nika check` clean (rc=0) on the released binary
           # (`nika: <id>` names the file).
-          mkdir -p /tmp/wf
-          cat > /tmp/wf/test.nika.yaml <<'EOF'
+          probe_root=$(mktemp -d "${RUNNER_TEMP:-/tmp}/nika-client-type-drift.XXXXXX")
+          project_dir="$probe_root/project"
+          workflows_dir="$probe_root/workflows"
+          state_dir="$probe_root/state"
+          token_file="$probe_root/serve.token"
+          server_pid=""
+          cleanup() {
+            if [ -n "$server_pid" ]; then
+              kill "$server_pid" 2>/dev/null || true
+              wait "$server_pid" 2>/dev/null || true
+            fi
+            find "$probe_root" -depth -delete
+          }
+          trap cleanup EXIT
+          mkdir -p "$project_dir" "$workflows_dir" "$state_dir"
+          printf '%s\n' 'nika: ci-type-drift-probe' > "$project_dir/nika.yaml"
+          cat > "$workflows_dir/test.nika.yaml" <<'EOF'
           nika: test
           permits: {}
           tasks:
@@ -111,11 +127,19 @@ jobs:
           outputs:
             greeting: ${{ '${{ tasks.hello.output }}' }}
           EOF
-          mkdir -p /tmp/nika-ci
           umask 077
-          printf '%s' "$NIKA_SERVE_TOKEN" > /tmp/nika-ci/serve.token
-          chmod 600 /tmp/nika-ci/serve.token
-          nika serve --bind 127.0.0.1:3000 --workflows /tmp/wf --token-file /tmp/nika-ci/serve.token &
+          printf '%s' "$NIKA_SERVE_TOKEN" > "$token_file"
+          chmod 600 "$token_file"
+          (
+            cd "$project_dir"
+            exec nika serve \
+              --bind 127.0.0.1:3000 \
+              --workflows "$workflows_dir" \
+              --token-file "$token_file" \
+              --state-root "$state_dir" \
+              --plain
+          ) >"$probe_root/server.log" 2>&1 &
+          server_pid=$!
           ok=0
           for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
             if curl -sf http://127.0.0.1:3000/health >/dev/null; then
@@ -125,14 +149,15 @@ jobs:
             sleep 1
           done
           if [ "$ok" != 1 ]; then
+            cat "$probe_root/server.log" >&2
             echo "::error::nika serve --bind never answered GET /health"
             exit 1
           fi
           curl -sf -H "Authorization: Bearer $NIKA_TOKEN" \
-            http://127.0.0.1:3000/v1/openapi.json > /tmp/nika-live-openapi.json
-          jq -S . openapi.json > /tmp/nika-pinned-openapi.sorted.json
-          jq -S . /tmp/nika-live-openapi.json > /tmp/nika-live-openapi.sorted.json
-          diff -u /tmp/nika-pinned-openapi.sorted.json /tmp/nika-live-openapi.sorted.json
+            http://127.0.0.1:3000/v1/openapi.json > "$probe_root/live-openapi.json"
+          jq -S . openapi.json > "$probe_root/pinned-openapi.sorted.json"
+          jq -S . "$probe_root/live-openapi.json" > "$probe_root/live-openapi.sorted.json"
+          diff -u "$probe_root/pinned-openapi.sorted.json" "$probe_root/live-openapi.sorted.json"
           npm run generate:types -- http://127.0.0.1:3000
           git diff --exit-code -- src/generated/openapi.d.ts
           echo "Pinned OpenAPI and generated types match the live tagged engine"

@@ -1,18 +1,22 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const projectsRoot = path.join(root, 'gauntlet', 'projects');
-const resultsPath = path.join(root, 'gauntlet', 'results', 'mini-saas.json');
+const resultsRoot = process.env.NIKA_GAUNTLET_RESULTS_DIR
+  ? path.resolve(process.env.NIKA_GAUNTLET_RESULTS_DIR)
+  : path.join(root, 'gauntlet', 'results');
+const resultsPath = path.join(resultsRoot, 'mini-saas.json');
 const scratch = mkdtempSync(path.join(tmpdir(), 'nika-mini-saas-'));
 const nikaBin = process.env.NIKA_BIN;
 
 if (!nikaBin) throw new Error('NIKA_BIN must name the engine binary under test');
 
 try {
+  mkdirSync(resultsRoot, { recursive: true });
   execFileSync('npm', ['run', 'build'], { cwd: root, stdio: 'pipe' });
   const packed = JSON.parse(execFileSync(
     'npm',

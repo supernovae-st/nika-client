@@ -9,6 +9,7 @@ npm ci
 npm test
 npm run build
 npm run check:coverage
+npm run check:release-evidence
 NIKA_BIN=/path/to/nika npm run gauntlet:check
 NIKA_BIN=/path/to/nika npm run gauntlet:run
 NIKA_BIN=/path/to/nika npm run gauntlet:projects
@@ -22,7 +23,30 @@ npm pack --dry-run
 All engine-backed gauntlets use `NIKA_BIN` as the canonical explicit binary.
 `NIKA_GAUNTLET_BIN` remains a compatibility fallback for the corpus-only
 scripts. Evidence is invalid when the recorded engine identity does not match
-the intended release candidate.
+the intended release candidate. `npm run check:release-evidence` binds every
+current committed gauntlet result and packed tarball identity to the root
+package version. Historical ledgers are limited to an explicit allowlist and
+must remain labelled as non-gating evidence.
+
+CI adds a behavioral provenance replay. It downloads the Linux x64 asset for
+the exact root package version, verifies its GitHub attestation and published
+`SHA256SUMS` entry, then reruns all 100 deterministic workflows, the full
+14-scenario hostile suite, all five mini-SaaS projects, all five depth projects,
+and the two-process recovery scenario from a freshly packed SDK. The runner
+mints an ephemeral run-signing key. Its
+cancellation fixtures use the engine's in-process `nika:wait` primitive, so the
+replay needs no shell command, platform sandbox, or sandbox waiver. Cancellation
+and sealed-trace claims are exercised against the public binary. The attached
+cancellation replay records both event kind and status: Nika 0.116.2 ratifies
+the `cancel_job` writer (`execution.cancelled`) and the racing worker settlement
+writer (`execution.settled`), but either is accepted only with `status=cancelled`.
+The parsed deterministic and packed-project results must match exactly except
+for the recovery job UUID. The hostile comparison excludes `generated_at` and
+per-scenario duration and canonicalizes only those two ratified cancellation
+writer kinds after checking the exact cancelled status. This proves that the
+attested public release currently reproduces the committed behavioral claims.
+It does not claim cryptographic proof of when the committed JSON file itself
+was originally written.
 
 ## Test layers
 

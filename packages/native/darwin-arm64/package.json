@@ -1,6 +1,6 @@
 {
   "name": "@supernovae-st/nika-darwin-arm64",
-  "version": "0.116.0",
+  "version": "0.116.2",
   "description": "Nika native engine payload for macOS arm64",
   "license": "AGPL-3.0-or-later",
   "os": [

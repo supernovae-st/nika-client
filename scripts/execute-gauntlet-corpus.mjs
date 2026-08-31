@@ -1,12 +1,14 @@
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import path, { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const corpusRoot = join(root, "gauntlet", "corpus");
-const resultsRoot = join(root, "gauntlet", "results");
+const resultsRoot = process.env.NIKA_GAUNTLET_RESULTS_DIR
+  ? path.resolve(process.env.NIKA_GAUNTLET_RESULTS_DIR)
+  : join(root, "gauntlet", "results");
 const inventory = JSON.parse(readFileSync(join(corpusRoot, "use-cases.json"), "utf8"));
 const nikaBin = process.env.NIKA_BIN || process.env.NIKA_GAUNTLET_BIN || "nika";
 const version = spawnSync(nikaBin, ["--version"], { encoding: "utf8" });

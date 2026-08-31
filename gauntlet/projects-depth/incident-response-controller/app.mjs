@@ -34,9 +34,14 @@ try {
   assert(result.receipt);
   const recovered = await nika.attachRun(run.id);
   const events = [];
-  for await (const event of nika.events(recovered)) events.push(event.kind ?? 'unknown');
+  for await (const event of nika.events(recovered)) {
+    events.push({ kind: event.kind ?? 'unknown', status: event.status });
+  }
   await recovered.done;
-  assert(events.includes('execution.cancelled'));
+  const terminal = events.at(-1);
+  assert(terminal);
+  assert(['execution.cancelled', 'execution.settled'].includes(terminal.kind));
+  assert.equal(terminal.status, 'cancelled');
   const remoteProof = await nika.traceVerify(result.receipt);
   assert.equal(remoteProof.verified, false);
   assert.equal(remoteProof.verdict, 'unavailable');
@@ -48,7 +53,8 @@ try {
     cancelled_run_status: result.status,
     cancellation_idempotent: true,
     cancellation_status: cancellation.status,
-    sse_event_kinds: [...new Set(events)].sort(),
+    sse_event_kinds: [...new Set(events.map((event) => event.kind))].sort(),
+    sse_terminal: terminal,
     remote_receipt_verdict: { verdict: remoteProof.verdict, reason: remoteProof.reason },
     deterministic_cost_cap_usd: 0,
   }));

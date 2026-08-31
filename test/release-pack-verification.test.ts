@@ -16,7 +16,10 @@ afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
-function fixture(preparedCommit: string): { report: string; tarballs: string } {
+function fixture(
+  preparedCommit: string,
+  manifestOverrides: Record<string, unknown> = {},
+): { report: string; tarballs: string } {
   const root = mkdtempSync(path.join(tmpdir(), 'nika-pack-proof-'));
   roots.push(root);
   const packageRoot = path.join(root, 'package');
@@ -26,7 +29,19 @@ function fixture(preparedCommit: string): { report: string; tarballs: string } {
   writeFileSync(path.join(packageRoot, 'package.json'), JSON.stringify({
     name: '@supernovae-st/nika-client',
     version,
+    type: 'module',
+    exports: {
+      '.': {
+        import: { types: './dist/index.d.ts', default: './dist/index.js' },
+        require: { types: './dist/index.d.cts', default: './dist/index.cjs' },
+      },
+    },
+    main: './dist/index.cjs',
+    module: './dist/index.js',
+    types: './dist/index.d.ts',
+    bin: { nika: './dist/bin/nika.js' },
     nikaRelease: { preparedCommit, version },
+    ...manifestOverrides,
   }));
   const filename = 'supernovae-st-nika-client-0.116.0.tgz';
   execFileSync('tar', ['-czf', path.join(tarballs, filename), '-C', root, 'package']);
@@ -71,6 +86,19 @@ describe('packed release commit proof', () => {
     ]);
     expect(result.status).not.toBe(0);
     expect(result.stderr.toString()).toContain('packed release metadata');
+  });
+
+  it('refuses a tarball whose installed CLI points away from the shim', () => {
+    const packed = fixture(sha, { bin: { nika: './dist/index.js' } });
+    const result = spawnSync('node', [
+      path.join(repo, 'scripts/verify-client-pack.mjs'),
+      packed.report,
+      packed.tarballs,
+      sha,
+      version,
+    ]);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr.toString()).toContain('manifest entrypoints are not canonical');
   });
 });
 

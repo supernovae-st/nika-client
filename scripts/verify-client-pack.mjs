@@ -40,4 +40,21 @@ if (
 ) {
   throw new Error(`${result.name} packed release metadata does not bind ${preparedCommit}`);
 }
+const expectedExports = {
+  '.': {
+    import: { types: './dist/index.d.ts', default: './dist/index.js' },
+    require: { types: './dist/index.d.cts', default: './dist/index.cjs' },
+  },
+};
+if (
+  manifest.name !== '@supernovae-st/nika-client'
+  || manifest.type !== 'module'
+  || manifest.main !== './dist/index.cjs'
+  || manifest.module !== './dist/index.js'
+  || manifest.types !== './dist/index.d.ts'
+  || manifest.bin?.nika !== './dist/bin/nika.js'
+  || JSON.stringify(manifest.exports) !== JSON.stringify(expectedExports)
+) {
+  throw new Error(`${result.name} packed client manifest entrypoints are not canonical`);
+}
 console.log(`Verified ${result.name}@${result.version}: ${required.join(', ')}`);

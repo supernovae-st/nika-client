@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.116.2] - 2026-08-31
+
+Lockstep recovery release for engine v0.116.2. The HTTP schema is unchanged
+from 0.116.0 apart from its owning engine version; publication still requires
+the exact public engine tag, assets, attestations, and prepared SDK commit.
+
+### Changed
+
+- Pin the checked-in OpenAPI identity and generated declarations to the
+  0.116.2 release train.
+- Align the root client, native payload manifests, optional dependencies, and
+  lockfile through the canonical release synchronization script.
+
 ## [0.116.0] - 2026-08-31
 
 The One SDK contract becomes the default package surface for native process

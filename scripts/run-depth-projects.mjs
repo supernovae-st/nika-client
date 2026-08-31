@@ -1,13 +1,19 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const projectsRoot = path.join(root, 'gauntlet', 'projects-depth');
-const resultsPath = path.join(projectsRoot, 'results.json');
+const resultsRoot = process.env.NIKA_GAUNTLET_RESULTS_DIR
+  ? path.resolve(process.env.NIKA_GAUNTLET_RESULTS_DIR)
+  : projectsRoot;
+const resultsPath = path.join(
+  resultsRoot,
+  process.env.NIKA_GAUNTLET_RESULTS_DIR ? 'depth-projects.json' : 'results.json',
+);
 const scratch = mkdtempSync(path.join(tmpdir(), 'nika-depth-projects-'));
 const nikaBin = process.env.NIKA_BIN;
 assert(nikaBin, 'NIKA_BIN must name the engine binary under test');
@@ -21,6 +27,7 @@ const expected = [
 ];
 
 try {
+  mkdirSync(resultsRoot, { recursive: true });
   execFileSync('npm', ['run', 'build'], { cwd: root, stdio: 'pipe' });
   const packed = JSON.parse(execFileSync('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', scratch], { cwd: root, encoding: 'utf8' }));
   const tarball = path.join(scratch, packed[0].filename);

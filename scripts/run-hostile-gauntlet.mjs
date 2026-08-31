@@ -14,12 +14,17 @@ import { tmpdir } from 'node:os';
 import { createServer } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isDurableCancellationTerminal } from './verify-release-replay.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const resultsPath = path.join(root, 'gauntlet', 'results', 'hostile.json');
+const resultsRoot = process.env.NIKA_GAUNTLET_RESULTS_DIR
+  ? path.resolve(process.env.NIKA_GAUNTLET_RESULTS_DIR)
+  : path.join(root, 'gauntlet', 'results');
+const resultsPath = path.join(resultsRoot, 'hostile.json');
 const scratch = mkdtempSync(path.join(tmpdir(), 'nika-hostile-'));
 const nikaBin = process.env.NIKA_BIN;
 const rows = [];
+let realEngineRuns = 0;
 
 if (!nikaBin) throw new Error('NIKA_BIN must name the engine binary under test');
 
@@ -110,11 +115,12 @@ tasks:
 const cancellable = writeWorkflow('cancellable.nika.yaml', `
 nika: hostile-cancellable
 permits:
-  exec: ["sleep"]
+  tools: ["nika:wait"]
 tasks:
   wait:
-    exec:
-      command: ["sleep", "10"]
+    invoke:
+      tool: "nika:wait"
+      args: { duration: "10s" }
 `);
 
 const burstTasks = Array.from({ length: 12 }, (_, index) => `
@@ -234,6 +240,7 @@ await scenario('explicit-bin-empty-path', async () => {
     const result = await run.done;
     assert.equal(report.clean, true);
     assert.equal(result.status, 'succeeded');
+    realEngineRuns += 1;
     return { check: 'clean', status: result.status };
   } finally {
     process.env.PATH = previous;
@@ -246,18 +253,32 @@ await scenario('parallel-run-load', async () => {
   const results = await bounded(Promise.all(runs.map((run) => run.done)), 20_000, 'parallel runs');
   assert.equal(results.filter((result) => result.status === 'succeeded').length, 24);
   assert.equal(new Set(results.map((result) => result.id)).size, 24);
+  realEngineRuns += results.filter((result) => result.status === 'succeeded').length;
   return { runs: 24, succeeded: 24, unique_run_ids: 24 };
 });
 
 await scenario('real-cancellation-race', async () => {
   const client = new Nika({ bin: nikaBin, cwd: scratch });
   const run = await client.run(cancellable, { maxCostUsd: 0 });
+  let terminalBeforeRequest;
+  let terminalAt;
+  void run.done.then((result) => {
+    terminalBeforeRequest = result;
+    terminalAt = performance.now();
+  });
   await new Promise((resolve) => setTimeout(resolve, 150));
+  const requestedAt = performance.now();
   const first = client.cancel(run);
   assert.equal(client.cancel(run), first);
   const [cancelled, result] = await bounded(Promise.all([first, run.done]), 4_000, 'cancellation');
-  assert.equal(cancelled.accepted, true);
+  assert.equal(cancelled.accepted, true, JSON.stringify({
+    cancelled,
+    terminal_before_request: terminalAt !== undefined && terminalAt <= requestedAt,
+    terminal: terminalBeforeRequest,
+    result,
+  }));
   assert.equal(result.status, 'interrupted');
+  realEngineRuns += 1;
   return { cancel_status: cancelled.status, run_status: result.status, exit_code: result.exitCode };
 });
 
@@ -294,16 +315,32 @@ await scenario('remote-durable-cancellation', async () => {
     assert.notEqual(parseFatal.exitCode, 0);
     const run = await client.run('slow.nika.yaml', { idempotencyKey: 'hostile-cancel-1' });
     await new Promise((resolve) => setTimeout(resolve, 100));
+    const statusBeforeCancellation = await client.status(run);
     const cancellation = await client.cancel(run);
     const result = await bounded(run.done, 5_000, 'remote cancellation');
-    assert.equal(cancellation.accepted, true);
+    assert.equal(cancellation.accepted, true, JSON.stringify({
+      cancellation,
+      status_before_cancellation: statusBeforeCancellation,
+      result,
+    }));
     assert.equal(result.status, 'cancelled');
+    realEngineRuns += 1;
     assert(result.receipt);
     const recovered = await client.attachRun(run.id);
     const events = [];
-    for await (const event of client.events(recovered)) events.push(event.kind);
+    for await (const event of client.events(recovered)) {
+      events.push({ kind: event.kind, status: event.status });
+    }
     await bounded(recovered.done, 5_000, 'cancel replay settlement');
-    assert(events.includes('execution.cancelled'), `cancel replay kinds: ${JSON.stringify(events)}`);
+    // Nika v0.116.2 has two explicitly ratified race winners:
+    // crates/nika-serve/src/server/route.rs::cancel_job persists
+    // execution.cancelled, while server/mod.rs::settle_disposition persists
+    // execution.settled. Both are valid only with terminal status cancelled.
+    assert.equal(
+      isDurableCancellationTerminal(events.at(-1)),
+      true,
+      `cancel replay events: ${JSON.stringify(events)}`,
+    );
     const trace = await client.traceVerify(result.receipt);
     assert.equal(trace.verified, false);
     assert.equal(trace.verdict, 'unavailable');
@@ -330,6 +367,7 @@ await scenario('trace-corruption-detection', async () => {
   const client = new Nika({ bin: nikaBin, cwd: scratch });
   const run = await client.run(deterministic, { maxCostUsd: 0 });
   const result = await run.done;
+  realEngineRuns += 1;
   assert(result.receipt);
   const intact = await client.traceVerify(result.receipt);
   assert.equal(intact.verified, true);
@@ -363,6 +401,7 @@ await scenario('secret-canary-redaction', async () => {
     const run = await client.run(canary, { maxCostUsd: 0 });
     const result = await run.done;
     assert.equal(result.status, 'succeeded');
+    realEngineRuns += 1;
     assert(!JSON.stringify(result).includes(canaryValue));
     assert(result.receipt);
     const tracePath = receiptPath(result.receipt);
@@ -380,6 +419,7 @@ await scenario('slow-subscriber-overflow-isolation', async () => {
   const iterator = client.events(run, { bufferSize: 2 })[Symbol.asyncIterator]();
   const result = await run.done;
   assert.equal(result.status, 'succeeded');
+  realEngineRuns += 1;
   const error = await iterator.next().then(
     () => undefined,
     (cause) => cause,
@@ -390,12 +430,15 @@ await scenario('slow-subscriber-overflow-isolation', async () => {
 
 await scenario('sequential-soak', async () => {
   const client = new Nika({ bin: nikaBin, cwd: scratch });
+  let succeeded = 0;
   for (let index = 0; index < 40; index += 1) {
     const run = await client.run(deterministic, { maxCostUsd: 0 });
     const result = await run.done;
     assert.equal(result.status, 'succeeded');
+    succeeded += 1;
+    realEngineRuns += 1;
   }
-  return { runs: 40, succeeded: 40 };
+  return { runs: succeeded, succeeded };
 });
 
 const report = {
@@ -407,14 +450,18 @@ const report = {
     total: rows.length,
     green: rows.filter((row) => row.result === 'green').length,
     red: rows.filter((row) => row.result === 'red').length,
-    real_engine_runs: 70,
+    real_engine_runs: realEngineRuns,
   },
   result: rows.every((row) => row.result === 'green') ? 'green' : 'red',
 };
+mkdirSync(resultsRoot, { recursive: true });
 writeFileSync(resultsPath, `${JSON.stringify(report, null, 2)}\n`);
 rmSync(scratch, { recursive: true, force: true });
 
 if (report.result !== 'green') {
+  for (const row of rows.filter((entry) => entry.result === 'red')) {
+    process.stderr.write(`${row.name} · ${row.error}\n`);
+  }
   process.stderr.write(`${report.summary.red}/${report.summary.total} hostile scenarios red · ${resultsPath}\n`);
   process.exitCode = 1;
 } else {

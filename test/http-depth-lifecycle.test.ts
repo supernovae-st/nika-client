@@ -388,6 +388,31 @@ describe('cancellation and terminal identity', () => {
     await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);
   });
 
+  it('rejects non-canonical schedule provenance in a terminal receipt', async () => {
+    const fetch = admissionThen(sseResponse([{
+      sequence: 1,
+      kind: 'settled',
+      status: 'succeeded',
+      receipt: {
+        ...RECEIPT,
+        origin: {
+          kind: 'schedule',
+          schedule_origin: 'api',
+          schedule_id: 'daily',
+          schedule_revision: 'x',
+          slot_id: 'x',
+          decision: 'scheduled',
+          scheduled_for: 'x',
+          fired_at: 'x',
+          arm_generation: 'x',
+        },
+      },
+    }]));
+    const nika = client(fetch as typeof globalThis.fetch);
+    const run = await nika.run('flow.nika.yaml');
+    await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);
+  });
+
   it('binds a terminal SSE receipt to identities retained from attach', async () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse())
@@ -407,6 +432,32 @@ describe('cancellation and terminal identity', () => {
           trace_id: 'trace-other',
         },
       }]));
+    const nika = client(fetch as typeof globalThis.fetch);
+    const run = await nika.attachRun('job-1');
+    await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);
+  });
+
+  it('rejects durable identity replacement after attach', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
+      .mockResolvedValueOnce(jsonResponse({
+        id: 'job-1',
+        status: 'running',
+        execution_id: 'execution-1',
+        trace_id: 'trace-1',
+      }))
+      .mockResolvedValueOnce(sseText(''))
+      .mockResolvedValueOnce(jsonResponse({
+        id: 'job-1',
+        status: 'succeeded',
+        execution_id: 'execution-2',
+        trace_id: 'trace-2',
+        receipt: {
+          ...RECEIPT,
+          execution_id: 'execution-2',
+          trace_id: 'trace-2',
+        },
+      }));
     const nika = client(fetch as typeof globalThis.fetch);
     const run = await nika.attachRun('job-1');
     await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);

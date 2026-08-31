@@ -308,8 +308,22 @@ export class HttpTransport implements Transport {
       const event = 'sequence' in source ? source : undefined;
       const durable = event ? undefined : source as DurableJob;
       const receipt = event ? eventReceipt(event) : durable?.receipt;
-      const executionId = durable?.execution_id ?? attachedState?.execution_id;
-      const traceId = durable?.trace_id ?? attachedState?.trace_id;
+      if (
+        durable?.execution_id !== undefined
+        && attachedState?.execution_id !== undefined
+        && durable.execution_id !== attachedState.execution_id
+      ) {
+        throw new NikaProtocolError(this.kind, 'Durable execution identity changed after attach');
+      }
+      if (
+        durable?.trace_id !== undefined
+        && attachedState?.trace_id !== undefined
+        && durable.trace_id !== attachedState.trace_id
+      ) {
+        throw new NikaProtocolError(this.kind, 'Durable trace identity changed after attach');
+      }
+      const executionId = attachedState?.execution_id ?? durable?.execution_id;
+      const traceId = attachedState?.trace_id ?? durable?.trace_id;
       if (receipt) {
         assertReceiptIdentity(
           receipt,
@@ -1348,7 +1362,18 @@ function validateReceiptOrigin(value: unknown, transport: 'http'): void {
     || !['project', 'api'].includes(String(origin.schedule_origin))
     || !['scheduled', 'catch_up'].includes(String(origin.decision))
     || required.slice(2).some((key) => typeof origin[key] !== 'string' || origin[key].length === 0)
+    || Buffer.byteLength(String(origin.schedule_id)) > 255
+    || !/^sha256:[0-9a-f]{64}$/.test(String(origin.schedule_revision))
+    || !/^[0-9a-f]{64}$/.test(String(origin.slot_id))
+    || !/^[0-9a-f]{64}$/.test(String(origin.arm_generation))
+    || !isCanonicalTimestamp(String(origin.scheduled_for))
+    || !isCanonicalTimestamp(String(origin.fired_at))
   ) {
     throw new NikaProtocolError(transport, 'Scheduled receipt origin was malformed');
   }
+}
+
+function isCanonicalTimestamp(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value)
+    && Number.isFinite(Date.parse(value));
 }

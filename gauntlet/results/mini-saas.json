@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "engine": "nika 0.115.0 (08fb9e289)",
-  "package": "supernovae-st-nika-client-0.114.0.tgz",
+  "engine": "nika 0.116.0 (6507647fd)",
+  "package": "supernovae-st-nika-client-0.116.0.tgz",
   "install_mode": "npm pack + npm install --omit=optional + explicit NIKA_BIN",
   "projects": [
     {

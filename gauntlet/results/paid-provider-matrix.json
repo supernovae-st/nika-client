@@ -2,7 +2,8 @@
   "schema_version": 1,
   "recorded_at": "2026-08-30",
   "engine": "nika 0.115.0 (5c5bd1ab5)",
-  "workflow": "dx/workflows/sota-radar-beat.nika.yaml",
+  "evidence_scope": "historical paid-provider dispatch evidence; not a 0.116 release gate",
+  "workflow": "<external-workflow>",
   "policy": {
     "access": "api",
     "per_run_max_cost_usd": 2,

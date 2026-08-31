@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "engine": "nika 0.115.0 (274f8e9cf)",
+  "engine": "nika 0.116.0 (6507647fd)",
   "workflows": 100,
   "domains": 20,
   "recipes": 10,

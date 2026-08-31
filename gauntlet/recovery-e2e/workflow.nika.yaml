@@ -1,0 +1,10 @@
+nika: sdk-recovery-e2e
+model: mock/echo
+permits: {}
+tasks:
+  durable_echo:
+    infer:
+      prompt: "resume this durable run"
+      max_tokens: 16
+outputs:
+  answer: ${{ tasks.durable_echo.output }}

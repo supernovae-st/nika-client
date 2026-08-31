@@ -293,22 +293,17 @@ await scenario('remote-durable-cancellation', async () => {
     assert.equal(parseFatal.clean, false);
     assert.notEqual(parseFatal.exitCode, 0);
     const run = await client.run('slow.nika.yaml', { idempotencyKey: 'hostile-cancel-1' });
-    const observed = (async () => {
-      const events = [];
-      for await (const event of client.events(run)) events.push(event.kind);
-      return events;
-    })();
     await new Promise((resolve) => setTimeout(resolve, 100));
     const cancellation = await client.cancel(run);
-    const [result, events] = await bounded(
-      Promise.all([run.done, observed]),
-      5_000,
-      'remote cancellation',
-    );
+    const result = await bounded(run.done, 5_000, 'remote cancellation');
     assert.equal(cancellation.accepted, true);
     assert.equal(result.status, 'cancelled');
     assert(result.receipt);
-    assert(events.includes('execution.cancelled'));
+    const recovered = await client.attachRun(run.id);
+    const events = [];
+    for await (const event of client.events(recovered)) events.push(event.kind);
+    await bounded(recovered.done, 5_000, 'cancel replay settlement');
+    assert(events.includes('execution.cancelled'), `cancel replay kinds: ${JSON.stringify(events)}`);
     const trace = await client.traceVerify(result.receipt);
     assert.equal(trace.verified, false);
     assert.equal(trace.verdict, 'unavailable');

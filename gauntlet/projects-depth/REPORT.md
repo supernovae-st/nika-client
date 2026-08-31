@@ -17,12 +17,29 @@ All workflows use the public envelope and task-map form, the canonical `invoke` 
 ## Verification
 
 - `NIKA_BIN=/path/to/compatible/nika node scripts/run-depth-projects.mjs` — 5/5 succeeded from isolated packed installs.
-- `npm test` — 5 files and 57 tests passed.
+- `npm test` — 9 files and 118 tests passed.
 - `node --check` — all five consumer entry points and the runner passed.
 - `git diff --check` — passed.
 
-The captured run used `nika 0.115.0 (08fb9e289)`, the matching engine carrier contract consumed by this SDK branch. The generated JSON records installed-from-pack proof, stable scenario facts, typed error names/codes, receipt verdicts, event observations, concurrency, cancellation, CAS, and restart evidence.
+The final release-candidate replay used the clean engine `nika 0.116.0
+(6507647fd)` with `supernovae-st-nika-client-0.116.0.tgz`; all five projects
+remained green. The generated JSON records installed-from-pack proof, stable
+scenario facts, typed error names/codes, receipt verdicts, event observations,
+concurrency, cancellation, CAS, and restart evidence.
+
+An additional packed two-process recovery project runs through
+`npm run gauntlet:recovery`. Process A admits the job, persists sequence 1 and
+exits; process B creates a new client, calls `attachRun`, resumes at sequence 2
+without a duplicate, and observes the same durable job settle successfully.
+Its machine evidence is `gauntlet/results/recovery-e2e.json`.
+
+The historical paid-provider and three-pass trace ledgers remain useful prior
+evidence, but are explicitly labelled as historical 0.115 observations and are
+not release gates for this 0.116 candidate.
 
 ## Finding
 
-The live owning contract and engine validation define `pauseUntil` as an ISO calendar date (`format: date`, for example `2026-09-01`). The current SDK README example constructs a full timestamp with `toISOString()`, which the resident authority refuses with `schedule.pause: pauseUntil must be an ISO date`; this gauntlet follows the owning contract and leaves the documentation correction to its owner.
+The live owning contract and engine validation define `pauseUntil` as an ISO
+calendar date (`format: date`, for example `2026-09-01`). The gauntlet exposed
+that the old README constructed a refused timestamp; the 0.116 documentation
+and exported type comment now teach the owning date contract.

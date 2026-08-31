@@ -228,7 +228,8 @@ function stageOmittingOptional(): string {
 
 function installFixturePayload(scope: string, packageName: string): void {
   const suffix = packageName.replace('@supernovae-st/nika-', '');
-  const source = path.join(FIXTURES, 'native-payloads', suffix);
+  const fixtureSuffix = suffix.startsWith('linux-') ? `${suffix}-gnu` : suffix;
+  const source = path.join(FIXTURES, 'native-payloads', fixtureSuffix);
   const destination = path.join(scope, `nika-${suffix}`);
   mkdirSync(path.join(destination, 'bin'), { recursive: true });
   copyFileSync(path.join(source, 'package.json'), path.join(destination, 'package.json'));

@@ -395,7 +395,6 @@ export class HttpTransport implements Transport {
           throw new NikaProtocolError(this.kind, 'Cancellation did not return a terminal job');
         }
         settle(durable);
-        controller.abort();
         const accepted = durable.status === 'cancelled';
         return {
           runId: id,

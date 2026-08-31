@@ -13,7 +13,7 @@ command -v vhs >/dev/null || { echo "vhs not installed (brew install vhs)" >&2; 
 command -v nika >/dev/null || { echo "nika not on PATH" >&2; exit 1; }
 
 # The staged demo dir the tape enters: this package installed from the
-# local checkout, the workflow, and the eight-line driver script.
+# local checkout, the workflow, and the complete lifecycle driver script.
 rm -rf /tmp/sdk-demo
 mkdir -p /tmp/sdk-demo
 cat > /tmp/sdk-demo/flow.nika.yaml <<'EOF'
@@ -34,14 +34,22 @@ outputs:
   brief: ${{ tasks.brief.output }}
 EOF
 cat > /tmp/sdk-demo/demo.mjs <<'EOF'
-import { LocalNika } from '@supernovae-st/nika-client/local';
+import { Nika } from '@supernovae-st/nika-client';
 
-const nika = new LocalNika();
+const nika = new Nika({ cwd: process.cwd() });
 const report = await nika.check('flow.nika.yaml');
 console.log('clean:', report.clean, '· findings:', report.findings.length);
 
-const run = await nika.runToEnd('flow.nika.yaml', { maxCostUsd: 0.25 });
-console.log('ok:', run.ok, '· events:', run.events.length);
+const run = await nika.run('flow.nika.yaml', { maxCostUsd: 0.25 });
+let eventCount = 0;
+const watching = (async () => {
+  for await (const _event of nika.events(run)) {
+    eventCount += 1;
+  }
+})();
+const result = await run.done;
+await watching;
+console.log('ok:', result.status === 'succeeded', '· events:', eventCount);
 EOF
 (cd /tmp/sdk-demo && npm init -y >/dev/null 2>&1 && npm install "$ROOT" >/dev/null 2>&1)
 nika check /tmp/sdk-demo/flow.nika.yaml >/dev/null || {

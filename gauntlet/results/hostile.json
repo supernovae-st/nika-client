@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-31T02:47:15.947Z",
-  "engine": "nika 0.116.0 (6507647fd)",
+  "generated_at": "2026-08-31T02:53:46.375Z",
+  "engine": "nika 0.116.0 (b38267751)",
   "scenarios": [
     {
       "name": "unsafe-http-refusal",
@@ -24,7 +24,7 @@
     {
       "name": "oversize-machine-line",
       "result": "green",
-      "duration_ms": 64,
+      "duration_ms": 61,
       "evidence": {
         "error": "NikaProtocolError",
         "limit_bytes": 1024
@@ -50,7 +50,7 @@
     {
       "name": "malformed-workflow-domain-report",
       "result": "green",
-      "duration_ms": 7,
+      "duration_ms": 8,
       "evidence": {
         "clean": false,
         "exit_code": 2
@@ -59,7 +59,7 @@
     {
       "name": "explicit-bin-empty-path",
       "result": "green",
-      "duration_ms": 60,
+      "duration_ms": 63,
       "evidence": {
         "check": "clean",
         "status": "succeeded"
@@ -68,7 +68,7 @@
     {
       "name": "parallel-run-load",
       "result": "green",
-      "duration_ms": 181,
+      "duration_ms": 189,
       "evidence": {
         "runs": 24,
         "succeeded": 24,
@@ -78,7 +78,7 @@
     {
       "name": "real-cancellation-race",
       "result": "green",
-      "duration_ms": 156,
+      "duration_ms": 157,
       "evidence": {
         "cancel_status": "cancellation_requested",
         "run_status": "interrupted",
@@ -88,7 +88,7 @@
     {
       "name": "remote-durable-cancellation",
       "result": "green",
-      "duration_ms": 252,
+      "duration_ms": 248,
       "evidence": {
         "cancel_status": "cancelled",
         "run_status": "cancelled",
@@ -104,7 +104,7 @@
     {
       "name": "trace-corruption-detection",
       "result": "green",
-      "duration_ms": 80,
+      "duration_ms": 84,
       "evidence": {
         "intact": true,
         "forged_receipt": false,
@@ -114,7 +114,7 @@
     {
       "name": "secret-canary-redaction",
       "result": "green",
-      "duration_ms": 58,
+      "duration_ms": 59,
       "evidence": {
         "result_redacted": true,
         "trace_redacted": true
@@ -123,7 +123,7 @@
     {
       "name": "slow-subscriber-overflow-isolation",
       "result": "green",
-      "duration_ms": 64,
+      "duration_ms": 60,
       "evidence": {
         "run_status": "succeeded",
         "subscriber_error": "NikaEventBufferOverflowError",
@@ -133,7 +133,7 @@
     {
       "name": "sequential-soak",
       "result": "green",
-      "duration_ms": 2194,
+      "duration_ms": 2205,
       "evidence": {
         "runs": 40,
         "succeeded": 40

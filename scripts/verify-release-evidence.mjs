@@ -18,6 +18,20 @@ const PACKED_EVIDENCE = new Set([
   "gauntlet/results/mini-saas.json",
   "gauntlet/results/recovery-e2e.json",
 ]);
+const MINI_SAAS_PROJECTS = new Set([
+  "commerce-enrichment",
+  "document-evidence",
+  "operator-console",
+  "research-monitor",
+  "support-webhook",
+]);
+const DEPTH_PROJECTS = new Set([
+  "deployment-gate",
+  "evidence-provenance-pipeline",
+  "incident-response-controller",
+  "multi-tenant-webhook-router",
+  "scheduled-research-monitor",
+]);
 
 function readJson(root, relativePath) {
   return JSON.parse(readFileSync(path.join(root, relativePath), "utf8"));
@@ -76,6 +90,7 @@ export function verifyReleaseEvidence(root = path.resolve(import.meta.dirname, "
     if (!PACKED_EVIDENCE.has(relativePath) && "package" in evidence && evidence.package !== expectedPackage) {
       throw new Error(`${relativePath} records package ${String(evidence.package)}, expected ${expectedPackage}`);
     }
+    verifyBehavior(relativePath, evidence);
     currentIdentities.add(evidence.engine);
     currentFiles += 1;
   }
@@ -90,6 +105,47 @@ export function verifyReleaseEvidence(root = path.resolve(import.meta.dirname, "
   }
 
   return { version, engine, package: expectedPackage, currentFiles, historicalFiles };
+}
+
+function verifyBehavior(relativePath, evidence) {
+  if (relativePath === "gauntlet/results/mini-saas.json") {
+    verifyProjects(relativePath, evidence.projects, MINI_SAAS_PROJECTS);
+    if (evidence.result !== "green") {
+      throw new Error(`${relativePath} does not record a green result`);
+    }
+  }
+  if (relativePath === "gauntlet/projects-depth/results.json") {
+    verifyProjects(relativePath, evidence.projects, DEPTH_PROJECTS);
+    if (evidence.summary?.total !== 5
+      || evidence.summary?.succeeded !== 5
+      || evidence.summary?.result !== "green") {
+      throw new Error(`${relativePath} does not record a 5/5 green summary`);
+    }
+  }
+  if (relativePath === "gauntlet/results/recovery-e2e.json") {
+    if (evidence.process_count !== 2
+      || evidence.installed_from_pack !== true
+      || evidence.status !== "succeeded"
+      || !Array.isArray(evidence.resumed_sequences)
+      || evidence.resumed_sequences.length === 0
+      || !Array.isArray(evidence.duplicate_sequences)
+      || evidence.duplicate_sequences.length !== 0) {
+      throw new Error(`${relativePath} does not record successful duplicate-free two-process recovery`);
+    }
+  }
+}
+
+function verifyProjects(relativePath, projects, expectedNames) {
+  if (!Array.isArray(projects) || projects.length !== expectedNames.size) {
+    throw new Error(`${relativePath} does not record ${expectedNames.size} packed projects`);
+  }
+  const names = new Set(projects.map((project) => project.name ?? project.project));
+  if (names.size !== expectedNames.size
+    || [...expectedNames].some((name) => !names.has(name))
+    || projects.some((project) => project.status !== "succeeded"
+      || project.installed_from_pack !== true)) {
+    throw new Error(`${relativePath} has a missing or non-green packed project`);
+  }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

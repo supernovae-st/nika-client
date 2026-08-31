@@ -62,6 +62,61 @@ describe('release evidence identity', () => {
       `records package supernovae-st-nika-client-0.116.0.tgz, expected ${PACKAGE}`,
     );
   });
+
+  it('refuses empty or red mini-SaaS evidence with a current identity', () => {
+    const fixture = createFixture();
+    writeJson(fixture, 'gauntlet/results/mini-saas.json', {
+      schema_version: 1,
+      engine: ENGINE,
+      package: PACKAGE,
+      projects: [],
+      result: 'red',
+    });
+
+    expect(() => verifyReleaseEvidence(fixture)).toThrow(
+      'does not record 5 packed projects',
+    );
+  });
+
+  it('refuses a failed depth summary with a current identity', () => {
+    const fixture = createFixture();
+    const projects = packedProjects([
+      'deployment-gate',
+      'evidence-provenance-pipeline',
+      'incident-response-controller',
+      'multi-tenant-webhook-router',
+      'scheduled-research-monitor',
+    ]);
+    writeJson(fixture, 'gauntlet/projects-depth/results.json', {
+      schema_version: 1,
+      engine: ENGINE,
+      package: PACKAGE,
+      projects,
+      summary: { total: 5, succeeded: 0, result: 'red' },
+    });
+
+    expect(() => verifyReleaseEvidence(fixture)).toThrow(
+      'does not record a 5/5 green summary',
+    );
+  });
+
+  it('refuses one-process or unpacked recovery evidence', () => {
+    const fixture = createFixture();
+    writeJson(fixture, 'gauntlet/results/recovery-e2e.json', {
+      schema_version: 1,
+      engine: ENGINE,
+      package: PACKAGE,
+      process_count: 1,
+      installed_from_pack: false,
+      status: 'failed',
+      resumed_sequences: [],
+      duplicate_sequences: [1],
+    });
+
+    expect(() => verifyReleaseEvidence(fixture)).toThrow(
+      'does not record successful duplicate-free two-process recovery',
+    );
+  });
 });
 
 function createFixture(): string {
@@ -69,16 +124,61 @@ function createFixture(): string {
   scratch.push(fixture);
   writeJson(fixture, 'package.json', { version: '0.116.2' });
   for (const relativePath of currentEvidence) {
-    writeJson(fixture, relativePath, {
-      schema_version: 1,
-      engine: ENGINE,
-      ...(packedEvidence.has(relativePath) ? { package: PACKAGE } : {}),
-    });
+    writeJson(fixture, relativePath, evidenceFor(relativePath));
   }
   const reportPath = path.join(fixture, 'gauntlet/projects-depth/REPORT.md');
   mkdirSync(path.dirname(reportPath), { recursive: true });
   writeFileSync(reportPath, `engine \`${ENGINE}\` with \`${PACKAGE}\`\n`);
   return fixture;
+}
+
+function evidenceFor(relativePath: string): object {
+  const identity = {
+    schema_version: 1,
+    engine: ENGINE,
+    ...(packedEvidence.has(relativePath) ? { package: PACKAGE } : {}),
+  };
+  if (relativePath === 'gauntlet/results/mini-saas.json') {
+    return {
+      ...identity,
+      projects: packedProjects([
+        'commerce-enrichment',
+        'document-evidence',
+        'operator-console',
+        'research-monitor',
+        'support-webhook',
+      ]),
+      result: 'green',
+    };
+  }
+  if (relativePath === 'gauntlet/projects-depth/results.json') {
+    return {
+      ...identity,
+      projects: packedProjects([
+        'deployment-gate',
+        'evidence-provenance-pipeline',
+        'incident-response-controller',
+        'multi-tenant-webhook-router',
+        'scheduled-research-monitor',
+      ]),
+      summary: { total: 5, succeeded: 5, result: 'green' },
+    };
+  }
+  if (relativePath === 'gauntlet/results/recovery-e2e.json') {
+    return {
+      ...identity,
+      process_count: 2,
+      installed_from_pack: true,
+      status: 'succeeded',
+      resumed_sequences: [2],
+      duplicate_sequences: [],
+    };
+  }
+  return identity;
+}
+
+function packedProjects(names: string[]): object[] {
+  return names.map((project) => ({ project, status: 'succeeded', installed_from_pack: true }));
 }
 
 function writeJson(root: string, relativePath: string, value: object): void {

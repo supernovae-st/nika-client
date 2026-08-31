@@ -3,6 +3,7 @@ import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   chmodSync,
   cpSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -15,13 +16,17 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const source = path.join(root, 'gauntlet', 'recovery-e2e');
-const resultPath = path.join(root, 'gauntlet', 'results', 'recovery-e2e.json');
+const resultsRoot = process.env.NIKA_GAUNTLET_RESULTS_DIR
+  ? path.resolve(process.env.NIKA_GAUNTLET_RESULTS_DIR)
+  : path.join(root, 'gauntlet', 'results');
+const resultPath = path.join(resultsRoot, 'recovery-e2e.json');
 const nikaBin = process.env.NIKA_BIN;
 assert(nikaBin, 'NIKA_BIN must name the engine binary under test');
 const scratch = mkdtempSync(path.join(tmpdir(), 'nika-recovery-e2e-'));
 let server;
 
 try {
+  mkdirSync(resultsRoot, { recursive: true });
   execFileSync('npm', ['run', 'build'], { cwd: root, stdio: 'pipe' });
   const packed = JSON.parse(execFileSync(
     'npm',

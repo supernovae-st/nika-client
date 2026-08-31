@@ -60,6 +60,10 @@
         "execution.cancelled",
         "execution.started"
       ],
+      "sse_terminal": {
+        "kind": "execution.cancelled",
+        "status": "cancelled"
+      },
       "remote_receipt_verdict": {
         "verdict": "unavailable",
         "reason": "trace_journal_unavailable"

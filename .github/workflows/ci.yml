@@ -93,13 +93,17 @@ jobs:
           test "$(./nika --version | awk '{print $2}')" = "$version"
           ./nika key init --plain
 
-      - name: Replay deterministic and hostile evidence
+      - name: Replay every current behavioral evidence family
         env:
           NIKA_BIN: ${{ runner.temp }}/nika-release-asset/nika
           NIKA_GAUNTLET_RESULTS_DIR: ${{ runner.temp }}/nika-release-replay
         run: |
+          npm run check:release-evidence
           npm run gauntlet:run
+          npm run gauntlet:projects
+          npm run gauntlet:depth
           npm run gauntlet:hostile
+          npm run gauntlet:recovery
           npm run check:release-replay -- "$NIKA_GAUNTLET_RESULTS_DIR"
 
   # ── Type Drift Check ──────────────────────────────────

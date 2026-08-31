@@ -30,6 +30,40 @@ export function isDurableCancellationTerminal(event) {
     && event.status === "cancelled";
 }
 
+export function stableDepthEvidence(report) {
+  return {
+    ...report,
+    projects: report.projects.map((project) => {
+      if (project.project !== "incident-response-controller") return project;
+      const kinds = project.sse_event_kinds;
+      const terminalKinds = Array.isArray(kinds)
+        ? kinds.filter((kind) => CANCELLATION_TERMINAL_KINDS.has(kind))
+        : [];
+      if (project.cancelled_run_status !== "cancelled"
+        || project.cancellation_status !== "cancelled"
+        || project.cancellation_idempotent !== true
+        || terminalKinds.length !== 1
+        || !isDurableCancellationTerminal(project.sse_terminal)) {
+        throw new Error("depth cancellation project lacks an exact cancelled terminal result");
+      }
+      return {
+        ...project,
+        sse_event_kinds: kinds.map((kind) => CANCELLATION_TERMINAL_KINDS.has(kind)
+          ? "execution.cancelled|execution.settled"
+          : kind),
+        sse_terminal: {
+          ...project.sse_terminal,
+          kind: "execution.cancelled|execution.settled",
+        },
+      };
+    }),
+  };
+}
+
+export function stableRecoveryEvidence({ job_id: _jobId, ...report }) {
+  return report;
+}
+
 function stableHostileScenario(scenario) {
   if (scenario.name !== "remote-durable-cancellation" || scenario.result !== "green") {
     return scenario;
@@ -65,12 +99,36 @@ export function verifyReleaseReplay(repositoryRoot, replayResults) {
     throw new Error("hostile replay does not match committed stable behavioral evidence");
   }
 
+  const committedMiniSaas = readJson(committedResults, "mini-saas.json");
+  const replayedMiniSaas = readJson(replayResults, "mini-saas.json");
+  if (!isDeepStrictEqual(replayedMiniSaas, committedMiniSaas)) {
+    throw new Error("mini-SaaS replay does not match committed behavioral evidence");
+  }
+
+  const committedDepth = stableDepthEvidence(readJson(
+    path.join(repositoryRoot, "gauntlet", "projects-depth"),
+    "results.json",
+  ));
+  const replayedDepth = stableDepthEvidence(readJson(replayResults, "depth-projects.json"));
+  if (!isDeepStrictEqual(replayedDepth, committedDepth)) {
+    throw new Error("depth-project replay does not match committed stable behavioral evidence");
+  }
+
+  const committedRecovery = stableRecoveryEvidence(readJson(committedResults, "recovery-e2e.json"));
+  const replayedRecovery = stableRecoveryEvidence(readJson(replayResults, "recovery-e2e.json"));
+  if (!isDeepStrictEqual(replayedRecovery, committedRecovery)) {
+    throw new Error("recovery replay does not match committed stable behavioral evidence");
+  }
+
   return {
     engine: replayedLocal.engine,
     workflows: replayedLocal.workflows,
     distinctOutputHashes: replayedLocal.distinct_output_hashes,
     hostileScenarios: replayedHostile.summary.total,
     realEngineRuns: replayedHostile.summary.real_engine_runs,
+    miniSaasProjects: replayedMiniSaas.projects.length,
+    depthProjects: replayedDepth.projects.length,
+    recoveryProcesses: replayedRecovery.process_count,
   };
 }
 
@@ -84,6 +142,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   console.log(
     `public asset replay matches committed evidence: ${result.workflows} workflows, `
       + `${result.distinctOutputHashes} hashes, ${result.hostileScenarios} hostile scenarios, `
-      + `${result.realEngineRuns} real engine runs, ${result.engine}`,
+      + `${result.realEngineRuns} real engine runs, ${result.miniSaasProjects} mini-SaaS, `
+      + `${result.depthProjects} depth projects, ${result.recoveryProcesses} recovery processes, `
+      + result.engine,
   );
 }

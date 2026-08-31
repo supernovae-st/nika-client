@@ -111,14 +111,59 @@ describe('public release evidence replay', () => {
       'hostile replay does not match committed stable behavioral evidence',
     );
   });
+
+  it('refuses empty or red mini-SaaS replay evidence', () => {
+    const replay = createReplay();
+    const miniSaas = readJson(replay, 'mini-saas.json');
+    miniSaas.projects = [];
+    miniSaas.result = 'red';
+    writeJson(replay, 'mini-saas.json', miniSaas);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'mini-SaaS replay does not match committed behavioral evidence',
+    );
+  });
+
+  it('refuses a failed depth-project replay summary', () => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    depth.summary = { total: 5, succeeded: 0, result: 'red' };
+    writeJson(replay, 'depth-projects.json', depth);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'depth-project replay does not match committed stable behavioral evidence',
+    );
+  });
+
+  it('refuses failed or unpacked recovery replay evidence', () => {
+    const replay = createReplay();
+    const recovery = readJson(replay, 'recovery-e2e.json');
+    recovery.process_count = 1;
+    recovery.installed_from_pack = false;
+    recovery.status = 'failed';
+    writeJson(replay, 'recovery-e2e.json', recovery);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'recovery replay does not match committed stable behavioral evidence',
+    );
+  });
 });
 
 function createReplay(): string {
   const replay = mkdtempSync(path.join(tmpdir(), 'nika-release-replay-'));
   scratch.push(replay);
-  for (const name of ['local-execution.json', 'hostile.json']) {
+  for (const name of [
+    'local-execution.json',
+    'hostile.json',
+    'mini-saas.json',
+    'recovery-e2e.json',
+  ]) {
     writeFileSync(path.join(replay, name), readFileSync(path.join(committedResults, name)));
   }
+  writeFileSync(
+    path.join(replay, 'depth-projects.json'),
+    readFileSync(path.join(ROOT, 'gauntlet', 'projects-depth', 'results.json')),
+  );
   return replay;
 }
 

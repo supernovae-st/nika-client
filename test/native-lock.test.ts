@@ -19,10 +19,17 @@ interface PackageLock {
 interface NativeManifest {
   name: string;
   version: string;
+  license: string;
   os: string[];
   cpu: string[];
   libc?: string[];
+  files: string[];
+  engines: Record<string, string>;
+  preferUnplugged: boolean;
+  publishConfig: Record<string, string>;
 }
+
+const NATIVE_FILES = ['bin/nika', 'LICENSE', 'SOURCE.json', 'INTEGRITY.json'];
 
 const NATIVE_TARGETS = [
   { directory: 'darwin-arm64', name: '@supernovae-st/nika-darwin-arm64', os: 'darwin', cpu: 'arm64' },
@@ -51,16 +58,7 @@ describe('native package lock coverage', () => {
 
       const entry = lock.packages[`node_modules/${target.name}`];
       expect(entry, `${target.name} is absent from package-lock.json`).toBeDefined();
-      expect(entry).toMatchObject({ version: manifest.version, optional: true });
-      expect(entry.os).toHaveLength(1);
-      expect(entry.cpu).toHaveLength(1);
-
-      const expectedKeys = entry.libc
-        ? ['version', 'cpu', 'libc', 'license', 'optional', 'os', 'engines']
-        : ['version', 'cpu', 'license', 'optional', 'os', 'engines'];
-      expect(Object.keys(entry), `${target.name} must retain npm 11.19.1 lock order`).toEqual(
-        expectedKeys,
-      );
+      assertLockEntry(entry, target, manifest.version);
     }
   });
 
@@ -76,7 +74,59 @@ describe('native package lock coverage', () => {
       '0.116.2',
     )).toThrow('native manifest version 0.115.0 does not match root 0.116.2');
   });
+
+  it('refuses native package metadata that would omit the executable', () => {
+    const target = NATIVE_TARGETS[0];
+    const nativeManifest = readJson(
+      `packages/native/${target.directory}/package.json`,
+    ) as NativeManifest;
+
+    expect(() => assertNativeManifest(
+      { ...nativeManifest, files: nativeManifest.files.filter((file) => file !== 'bin/nika') },
+      target,
+      nativeManifest.version,
+    )).toThrow();
+  });
+
+  it('refuses a lock target that disagrees with its native manifest', () => {
+    const target = NATIVE_TARGETS[3];
+    const lock = readJson('package-lock.json') as PackageLock;
+    const entry = lock.packages[`node_modules/${target.name}`];
+
+    expect(() => assertLockEntry(
+      { ...entry, libc: ['musl'] },
+      target,
+      '0.116.2',
+    )).toThrow();
+  });
 });
+
+function assertLockEntry(
+  entry: PackageLock['packages'][string],
+  target: typeof NATIVE_TARGETS[number],
+  rootVersion: string,
+): void {
+  expect(entry).toMatchObject({
+    version: rootVersion,
+    license: 'AGPL-3.0-or-later',
+    optional: true,
+    os: [target.os],
+    cpu: [target.cpu],
+    engines: { node: '>=22' },
+  });
+  if ('libc' in target) {
+    expect(entry.libc).toEqual([target.libc]);
+  } else {
+    expect(entry.libc).toBeUndefined();
+  }
+
+  const expectedKeys = entry.libc
+    ? ['version', 'cpu', 'libc', 'license', 'optional', 'os', 'engines']
+    : ['version', 'cpu', 'license', 'optional', 'os', 'engines'];
+  expect(Object.keys(entry), `${target.name} must retain npm 11.19.1 lock order`).toEqual(
+    expectedKeys,
+  );
+}
 
 function assertNativeManifest(
   manifest: NativeManifest,
@@ -89,6 +139,7 @@ function assertNativeManifest(
     );
   }
   expect(manifest.name).toBe(target.name);
+  expect(manifest.license).toBe('AGPL-3.0-or-later');
   expect(manifest.os).toEqual([target.os]);
   expect(manifest.cpu).toEqual([target.cpu]);
   if ('libc' in target) {
@@ -96,6 +147,10 @@ function assertNativeManifest(
   } else {
     expect(manifest.libc).toBeUndefined();
   }
+  expect(manifest.files).toEqual(NATIVE_FILES);
+  expect(manifest.engines).toEqual({ node: '>=22' });
+  expect(manifest.preferUnplugged).toBe(true);
+  expect(manifest.publishConfig).toEqual({ access: 'public' });
 }
 
 function readJson(relativePath: string): unknown {

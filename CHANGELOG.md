@@ -28,6 +28,9 @@ v0.116.0 release assets before npm publication.
 - A generated 100-workflow corpus, deterministic trace gauntlet, packed Node
   project gauntlets, hostile transport suite, and public Persona evidence.
 - Architecture, HTTP contract, testing, Socratic risk, and migration guides.
+- Release tarballs embed one immutable prepared commit and version across the
+  SDK and all four native packages; finalization verifies every published
+  manifest before creating the SDK tag.
 
 ### Fixed
 

@@ -70,12 +70,17 @@ jobs:
               echo "::error::$package_name@$VERSION is not public after staged approval"
               exit 1
             fi
+            release_commit="$(npm view "$package_name@$VERSION" nikaRelease.preparedCommit)"
+            if [ "$release_commit" != "$PREPARED_SHA" ]; then
+              echo "::error::$package_name@$VERSION carries prepared commit $release_commit, expected $PREPARED_SHA"
+              exit 1
+            fi
+            release_version="$(npm view "$package_name@$VERSION" nikaRelease.version)"
+            if [ "$release_version" != "$VERSION" ]; then
+              echo "::error::$package_name@$VERSION carries release version $release_version"
+              exit 1
+            fi
           done
-          published_head="$(npm view "@supernovae-st/nika-client@$VERSION" gitHead)"
-          if [ "$published_head" != "$PREPARED_SHA" ]; then
-            echo "::error::npm provenance commit $published_head differs from prepared $PREPARED_SHA"
-            exit 1
-          fi
 
       - name: Create the immutable SDK tag and GitHub Release
         run: |

@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: main
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -179,6 +179,22 @@ jobs:
               --source-commit "$source_commit"
           done
 
+      - name: Seal release metadata in every package
+        id: release-metadata
+        run: |
+          prepared_sha="$(git rev-parse HEAD)"
+          if [ "$prepared_sha" != "$GITHUB_SHA" ]; then
+            echo "::error::checked-out preparation commit differs from dispatched main commit"
+            exit 1
+          fi
+          node scripts/stamp-release-commit.mjs "$prepared_sha"
+          jq -n \
+            --arg version "$VERSION" \
+            --arg prepared_sha "$prepared_sha" \
+            '{schema_version: 1, version: $version, prepared_sha: $prepared_sha}' \
+            > release-metadata.json
+          echo "prepared_sha=$prepared_sha" >> "$GITHUB_OUTPUT"
+
       - name: Pack and inspect all packages
         run: |
           set -euo pipefail
@@ -191,18 +207,6 @@ jobs:
           npm pack --ignore-scripts --json --pack-destination release-tarballs \
             > pack-reports/nika-client.json
           node scripts/verify-client-pack.mjs pack-reports/nika-client.json
-
-      - name: Seal release metadata
-        id: release-metadata
-        run: |
-          set -euo pipefail
-          prepared_sha="$(git rev-parse HEAD)"
-          jq -n \
-            --arg version "$VERSION" \
-            --arg prepared_sha "$prepared_sha" \
-            '{schema_version: 1, version: $version, prepared_sha: $prepared_sha}' \
-            > release-metadata.json
-          echo "prepared_sha=$prepared_sha" >> "$GITHUB_OUTPUT"
 
       - name: Refuse an already-started public train
         if: env.DRY_RUN != 'true'

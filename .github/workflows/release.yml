@@ -125,12 +125,21 @@ jobs:
           state_dir="$probe_root/state"
           token_file="$probe_root/token"
           server_pid=""
+          server_url=""
           cleanup() {
             if [ -n "$server_pid" ]; then
               kill "$server_pid" 2>/dev/null || true
               wait "$server_pid" 2>/dev/null || true
             fi
             find "$probe_root" -depth -delete
+          }
+          assert_server_live() {
+            phase=$1
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat "$probe_root/server.log" >&2
+              echo "::error::launched released nika serve exited $phase"
+              exit 1
+            fi
           }
           trap cleanup EXIT
           mkdir -p "$project_dir" "$workflows_dir" "$state_dir"
@@ -142,16 +151,39 @@ jobs:
           (
             cd "$project_dir"
             exec "$probe_root/nika" serve \
-              --bind 127.0.0.1:18787 \
+              --bind 127.0.0.1:0 \
               --workflows "$workflows_dir" \
               --token-file "$token_file" \
               --state-root "$state_dir" \
               --plain
           ) >"$probe_root/server.log" 2>&1 &
           server_pid=$!
+          # Port zero makes the kernel choose an unoccupied socket. The URL is
+          # then learned only from this PID's listener receipt, while liveness
+          # checks before and after every request bind the response to that PID.
+          for _ in {1..50}; do
+            assert_server_live "before listener discovery"
+            while IFS= read -r line; do
+              if [[ "$line" =~ ^nika\ serve.*listening\ (http://127\.0\.0\.1:[0-9]+) ]]; then
+                server_url="${BASH_REMATCH[1]}"
+                break
+              fi
+            done < "$probe_root/server.log"
+            if [ -n "$server_url" ]; then
+              break
+            fi
+            sleep 0.1
+          done
+          if ! [[ "$server_url" =~ ^http://127\.0\.0\.1:[0-9]+$ ]]; then
+            cat "$probe_root/server.log" >&2
+            echo "::error::launched released nika serve did not emit its loopback listener receipt"
+            exit 1
+          fi
           ok=0
           for _ in {1..50}; do
-            if curl -fsS http://127.0.0.1:18787/health >/dev/null; then
+            assert_server_live "before GET /health"
+            if curl -fsS "$server_url/health" >/dev/null; then
+              assert_server_live "after GET /health"
               ok=1
               break
             fi
@@ -162,17 +194,21 @@ jobs:
             echo "::error::released nika serve never answered GET /health"
             exit 1
           fi
+          assert_server_live "before GET /v1/openapi.json"
           curl -fsS \
             -H "Authorization: Bearer $token" \
-            http://127.0.0.1:18787/v1/openapi.json \
+            "$server_url/v1/openapi.json" \
             > "$probe_root/live.json"
+          assert_server_live "after GET /v1/openapi.json"
           jq -S . openapi.json > "$probe_root/pinned.sorted.json"
           jq -S . "$probe_root/live.json" > "$probe_root/live.sorted.json"
           if ! cmp -s "$probe_root/pinned.sorted.json" "$probe_root/live.sorted.json"; then
             echo "::error::openapi.json differs from the released v$VERSION binary"
             exit 1
           fi
-          NIKA_TOKEN="$token" npm run generate:types -- http://127.0.0.1:18787
+          assert_server_live "before generated-type fetch"
+          NIKA_TOKEN="$token" npm run generate:types -- "$server_url"
+          assert_server_live "after generated-type fetch"
           rm -f .openapi-cache.json
           git diff --exit-code -- openapi.json src/generated/openapi.d.ts
 

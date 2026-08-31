@@ -88,6 +88,29 @@ describe('release commit stamping', () => {
     expect(packStep).toContain('"$PREPARED_SHA"');
     expect(packStep).not.toContain('"$prepared_sha"');
   });
+
+  it.each([
+    ['CI type drift', '.github/workflows/ci.yml',
+      '      - name: Type drift (against live nika serve)\n',
+      '  # ── Version Sync Check'],
+    ['release contract', '.github/workflows/release.yml',
+      '      - name: Prove the pinned contract and generated types against the released binary\n',
+      '      - name: Build native payload packages\n'],
+  ])('%s probe cannot accept a fixed-port decoy', (_name, workflowPath, start, end) => {
+    const workflow = readFileSync(path.join(ROOT, workflowPath), 'utf8');
+    const step = workflow.split(start)[1]?.split(end)[0];
+
+    expect(step).toBeDefined();
+    expect(step).toContain('--bind 127.0.0.1:0');
+    expect(step).not.toMatch(/--bind 127\.0\.0\.1:(?:3000|18787)/);
+    expect(step).toContain('server_url="${BASH_REMATCH[1]}"');
+    expect(step).toContain('assert_server_live "before GET /health"');
+    expect(step).toContain('assert_server_live "after GET /health"');
+    expect(step).toContain('"$server_url/v1/openapi.json"');
+    expect(step).toContain('assert_server_live "after GET /v1/openapi.json"');
+    expect(step).toContain('generate:types -- "$server_url"');
+    expect(step).toContain('assert_server_live "after generated-type fetch"');
+  });
 });
 
 function createFixture(version: string): string {

@@ -81,7 +81,6 @@ jobs:
       - name: Type drift (against live nika serve)
         env:
           NIKA_SERVE_TOKEN: ci-test-token-32-chars-minimum!!
-          NIKA_URL: http://127.0.0.1:3000
           NIKA_TOKEN: ci-test-token-32-chars-minimum!!
         run: |
           set -euo pipefail
@@ -105,12 +104,21 @@ jobs:
           state_dir="$probe_root/state"
           token_file="$probe_root/serve.token"
           server_pid=""
+          server_url=""
           cleanup() {
             if [ -n "$server_pid" ]; then
               kill "$server_pid" 2>/dev/null || true
               wait "$server_pid" 2>/dev/null || true
             fi
             find "$probe_root" -depth -delete
+          }
+          assert_server_live() {
+            phase=$1
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat "$probe_root/server.log" >&2
+              echo "::error::launched nika serve exited $phase"
+              exit 1
+            fi
           }
           trap cleanup EXIT
           mkdir -p "$project_dir" "$workflows_dir" "$state_dir"
@@ -133,16 +141,39 @@ jobs:
           (
             cd "$project_dir"
             exec nika serve \
-              --bind 127.0.0.1:3000 \
+              --bind 127.0.0.1:0 \
               --workflows "$workflows_dir" \
               --token-file "$token_file" \
               --state-root "$state_dir" \
               --plain
           ) >"$probe_root/server.log" 2>&1 &
           server_pid=$!
+          # Port zero makes the kernel choose an unoccupied socket. The URL is
+          # then learned only from this PID's listener receipt, while liveness
+          # checks before and after every request bind the response to that PID.
+          for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            assert_server_live "before listener discovery"
+            while IFS= read -r line; do
+              if [[ "$line" =~ ^nika\ serve.*listening\ (http://127\.0\.0\.1:[0-9]+) ]]; then
+                server_url="${BASH_REMATCH[1]}"
+                break
+              fi
+            done < "$probe_root/server.log"
+            if [ -n "$server_url" ]; then
+              break
+            fi
+            sleep 1
+          done
+          if ! [[ "$server_url" =~ ^http://127\.0\.0\.1:[0-9]+$ ]]; then
+            cat "$probe_root/server.log" >&2
+            echo "::error::launched nika serve did not emit its loopback listener receipt"
+            exit 1
+          fi
           ok=0
           for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
-            if curl -sf http://127.0.0.1:3000/health >/dev/null; then
+            assert_server_live "before GET /health"
+            if curl -sf "$server_url/health" >/dev/null; then
+              assert_server_live "after GET /health"
               ok=1
               break
             fi
@@ -153,12 +184,16 @@ jobs:
             echo "::error::nika serve --bind never answered GET /health"
             exit 1
           fi
+          assert_server_live "before GET /v1/openapi.json"
           curl -sf -H "Authorization: Bearer $NIKA_TOKEN" \
-            http://127.0.0.1:3000/v1/openapi.json > "$probe_root/live-openapi.json"
+            "$server_url/v1/openapi.json" > "$probe_root/live-openapi.json"
+          assert_server_live "after GET /v1/openapi.json"
           jq -S . openapi.json > "$probe_root/pinned-openapi.sorted.json"
           jq -S . "$probe_root/live-openapi.json" > "$probe_root/live-openapi.sorted.json"
           diff -u "$probe_root/pinned-openapi.sorted.json" "$probe_root/live-openapi.sorted.json"
-          npm run generate:types -- http://127.0.0.1:3000
+          assert_server_live "before generated-type fetch"
+          npm run generate:types -- "$server_url"
+          assert_server_live "after generated-type fetch"
           git diff --exit-code -- src/generated/openapi.d.ts
           echo "Pinned OpenAPI and generated types match the live tagged engine"
 

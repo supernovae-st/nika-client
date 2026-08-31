@@ -1,4 +1,4 @@
-# local-driver.tape — the typed driver in ~12 seconds: eight lines of
+# local-driver.tape — the typed driver in ~12 seconds: one complete lifecycle
 # TypeScript check the workflow, gate on the honest report, run to the
 # end budget-capped. Every line of output is the SDK's own over the
 # released binary; scripts/media/render.sh stages the demo dir. House

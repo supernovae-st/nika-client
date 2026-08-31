@@ -89,6 +89,26 @@ describe('release commit stamping', () => {
     expect(packStep).not.toContain('"$prepared_sha"');
   });
 
+  it('binds release coverage, native proof, and packed execution to engine artifacts', () => {
+    const workflow = readFileSync(path.join(ROOT, '.github/workflows/release.yml'), 'utf8');
+
+    expect(workflow).toContain('cargo test --manifest-path nika-source/Cargo.toml');
+    expect(workflow).toContain('npm run check:coverage');
+    expect(workflow).toContain('gh attestation verify "$asset" --repo supernovae-st/nika');
+    expect(workflow).toContain('engine_commit=$(git -C nika-source rev-parse HEAD)');
+    expect(workflow).toContain('"$engine_commit" engine-assets/SHA256SUMS');
+    expect(workflow).toContain('scripts/verify-packed-install.mjs');
+    for (const target of [
+      'ubuntu-24.04',
+      'ubuntu-24.04-arm',
+      'macos-15-intel',
+      'macos-15',
+    ]) {
+      expect(workflow).toContain(`runner: ${target}`);
+    }
+    expect(workflow).toContain('needs: [prepare, verify-native-runtime]');
+  });
+
   it.each([
     ['CI type drift', '.github/workflows/ci.yml',
       '      - name: Type drift (against live nika serve)\n',

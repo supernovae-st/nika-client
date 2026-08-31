@@ -29,8 +29,14 @@ interface PackageLock {
 interface RootManifest {
   name: string;
   version: string;
+  type: string;
+  exports: unknown;
+  main: string;
+  module: string;
+  types: string;
   license: string;
   bin: Record<string, string>;
+  files: string[];
   engines: Record<string, string>;
   devDependencies: Record<string, string>;
   optionalDependencies: Record<string, string>;
@@ -62,6 +68,7 @@ describe('native package lock coverage', () => {
   it('locks every optional native payload for cross-platform npm ci', () => {
     const manifest = readJson('package.json') as RootManifest;
     const lock = readJson('package-lock.json') as PackageLock;
+    assertRootManifest(manifest);
     assertRootLock(lock, manifest);
 
     expect(Object.keys(manifest.optionalDependencies).sort()).toEqual(
@@ -131,7 +138,36 @@ describe('native package lock coverage', () => {
       manifest,
     )).toThrow();
   });
+
+  it('refuses a root manifest that redirects the installed CLI', () => {
+    const manifest = readJson('package.json') as RootManifest;
+
+    expect(() => assertRootManifest({
+      ...manifest,
+      bin: { nika: './dist/index.js' },
+    })).toThrow();
+  });
 });
+
+function assertRootManifest(manifest: RootManifest): void {
+  expect(manifest).toMatchObject({
+    name: '@supernovae-st/nika-client',
+    type: 'module',
+    exports: {
+      '.': {
+        import: { types: './dist/index.d.ts', default: './dist/index.js' },
+        require: { types: './dist/index.d.cts', default: './dist/index.cjs' },
+      },
+    },
+    main: './dist/index.cjs',
+    module: './dist/index.js',
+    types: './dist/index.d.ts',
+    bin: { nika: './dist/bin/nika.js' },
+    files: ['dist', 'docs', 'openapi.json', 'LICENSE'],
+    engines: { node: '>=22' },
+    license: 'Apache-2.0',
+  });
+}
 
 function assertRootLock(lock: PackageLock, manifest: RootManifest): void {
   expect(lock).toMatchObject({
@@ -144,12 +180,7 @@ function assertRootLock(lock: PackageLock, manifest: RootManifest): void {
     name: manifest.name,
     version: manifest.version,
     license: manifest.license,
-    bin: Object.fromEntries(
-      Object.entries(manifest.bin).map(([name, executable]) => [
-        name,
-        executable.replace(/^\.\//, ''),
-      ]),
-    ),
+    bin: { nika: 'dist/bin/nika.js' },
     devDependencies: manifest.devDependencies,
     engines: manifest.engines,
     optionalDependencies: manifest.optionalDependencies,

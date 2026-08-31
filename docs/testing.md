@@ -31,11 +31,14 @@ must remain labelled as non-gating evidence.
 CI adds a behavioral provenance replay. It downloads the Linux x64 asset for
 the exact root package version, verifies its GitHub attestation and published
 `SHA256SUMS` entry, then reruns all 100 deterministic workflows and the full
-14-scenario hostile suite. The parsed deterministic result must match exactly;
-the hostile comparison excludes only `generated_at` and per-scenario duration.
-This proves that the attested public release currently reproduces the committed
-behavioral claims. It does not claim cryptographic proof of when the committed
-JSON file itself was originally written.
+14-scenario hostile suite. The Linux runner installs `bubblewrap` for declared
+`exec` permits and mints an ephemeral run-signing key so cancellation and
+sealed-trace claims are tested under their stated preconditions. The parsed
+deterministic result must match exactly; the hostile comparison excludes only
+`generated_at` and per-scenario duration. This proves that the attested public
+release currently reproduces the committed behavioral claims. It does not
+claim cryptographic proof of when the committed JSON file itself was originally
+written.
 
 ## Test layers
 

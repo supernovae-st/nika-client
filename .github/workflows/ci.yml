@@ -52,6 +52,55 @@ jobs:
       - name: Check SDK coverage against the pinned contract
         run: npm run check:coverage
 
+  # Replays committed behavioral evidence against the exact attested public
+  # asset for package.json, rather than trusting the JSON identity string.
+  release-evidence-replay:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      attestations: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+
+      - run: npm ci
+      - name: Download and verify the exact public engine asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./package.json').version")
+          if ! [[ "$version" =~ ^0\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Invalid package version: $version"
+            exit 1
+          fi
+          asset="nika-linux-x64-$version.tar.gz"
+          asset_root="$RUNNER_TEMP/nika-release-asset"
+          mkdir -p "$asset_root"
+          gh release download "v$version" \
+            --repo supernovae-st/nika \
+            --dir "$asset_root" \
+            --pattern "$asset" \
+            --pattern SHA256SUMS
+          cd "$asset_root"
+          gh attestation verify "$asset" --repo supernovae-st/nika
+          grep -E "[[:space:]]${asset}$" SHA256SUMS | sha256sum --check --strict
+          tar xzf "$asset"
+          chmod +x nika
+          test "$(./nika --version | awk '{print $2}')" = "$version"
+
+      - name: Replay deterministic and hostile evidence
+        env:
+          NIKA_BIN: ${{ runner.temp }}/nika-release-asset/nika
+          NIKA_GAUNTLET_RESULTS_DIR: ${{ runner.temp }}/nika-release-replay
+        run: |
+          npm run gauntlet:run
+          npm run gauntlet:hostile
+          npm run check:release-replay -- "$NIKA_GAUNTLET_RESULTS_DIR"
+
   # ── Type Drift Check ──────────────────────────────────
   # Starts a live nika serve, generates types from OpenAPI,
   # and fails if generated types differ from committed ones.

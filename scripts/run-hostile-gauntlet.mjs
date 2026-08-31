@@ -16,7 +16,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const resultsPath = path.join(root, 'gauntlet', 'results', 'hostile.json');
+const resultsRoot = process.env.NIKA_GAUNTLET_RESULTS_DIR
+  ? path.resolve(process.env.NIKA_GAUNTLET_RESULTS_DIR)
+  : path.join(root, 'gauntlet', 'results');
+const resultsPath = path.join(resultsRoot, 'hostile.json');
 const scratch = mkdtempSync(path.join(tmpdir(), 'nika-hostile-'));
 const nikaBin = process.env.NIKA_BIN;
 const rows = [];
@@ -411,6 +414,7 @@ const report = {
   },
   result: rows.every((row) => row.result === 'green') ? 'green' : 'red',
 };
+mkdirSync(resultsRoot, { recursive: true });
 writeFileSync(resultsPath, `${JSON.stringify(report, null, 2)}\n`);
 rmSync(scratch, { recursive: true, force: true });
 

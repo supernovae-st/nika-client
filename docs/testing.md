@@ -28,6 +28,15 @@ current committed gauntlet result and packed tarball identity to the root
 package version. Historical ledgers are limited to an explicit allowlist and
 must remain labelled as non-gating evidence.
 
+CI adds a behavioral provenance replay. It downloads the Linux x64 asset for
+the exact root package version, verifies its GitHub attestation and published
+`SHA256SUMS` entry, then reruns all 100 deterministic workflows and the full
+14-scenario hostile suite. The parsed deterministic result must match exactly;
+the hostile comparison excludes only `generated_at` and per-scenario duration.
+This proves that the attested public release currently reproduces the committed
+behavioral claims. It does not claim cryptographic proof of when the committed
+JSON file itself was originally written.
+
 ## Test layers
 
 1. Unit tests cover configuration, local process framing, HTTP protocol

@@ -101,6 +101,7 @@ jobs:
         env:
           NIKA_BIN: ${{ runner.temp }}/nika-release-asset/nika
           NIKA_GAUNTLET_RESULTS_DIR: ${{ runner.temp }}/nika-release-replay
+          NIKA_SANDBOX: off
         run: |
           npm run gauntlet:run
           npm run gauntlet:hostile

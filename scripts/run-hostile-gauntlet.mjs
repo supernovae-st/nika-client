@@ -255,11 +255,23 @@ await scenario('parallel-run-load', async () => {
 await scenario('real-cancellation-race', async () => {
   const client = new Nika({ bin: nikaBin, cwd: scratch });
   const run = await client.run(cancellable, { maxCostUsd: 0 });
+  let terminalBeforeRequest;
+  let terminalAt;
+  void run.done.then((result) => {
+    terminalBeforeRequest = result;
+    terminalAt = performance.now();
+  });
   await new Promise((resolve) => setTimeout(resolve, 150));
+  const requestedAt = performance.now();
   const first = client.cancel(run);
   assert.equal(client.cancel(run), first);
   const [cancelled, result] = await bounded(Promise.all([first, run.done]), 4_000, 'cancellation');
-  assert.equal(cancelled.accepted, true);
+  assert.equal(cancelled.accepted, true, JSON.stringify({
+    cancelled,
+    terminal_before_request: terminalAt !== undefined && terminalAt <= requestedAt,
+    terminal: terminalBeforeRequest,
+    result,
+  }));
   assert.equal(result.status, 'interrupted');
   return { cancel_status: cancelled.status, run_status: result.status, exit_code: result.exitCode };
 });
@@ -297,9 +309,14 @@ await scenario('remote-durable-cancellation', async () => {
     assert.notEqual(parseFatal.exitCode, 0);
     const run = await client.run('slow.nika.yaml', { idempotencyKey: 'hostile-cancel-1' });
     await new Promise((resolve) => setTimeout(resolve, 100));
+    const statusBeforeCancellation = await client.status(run);
     const cancellation = await client.cancel(run);
     const result = await bounded(run.done, 5_000, 'remote cancellation');
-    assert.equal(cancellation.accepted, true);
+    assert.equal(cancellation.accepted, true, JSON.stringify({
+      cancellation,
+      status_before_cancellation: statusBeforeCancellation,
+      result,
+    }));
     assert.equal(result.status, 'cancelled');
     assert(result.receipt);
     const recovered = await client.attachRun(run.id);

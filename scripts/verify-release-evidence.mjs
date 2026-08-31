@@ -32,6 +32,11 @@ const DEPTH_PROJECTS = new Set([
   "multi-tenant-webhook-router",
   "scheduled-research-monitor",
 ]);
+const CANCELLATION_TERMINAL_KINDS = new Set([
+  "execution.cancelled",
+  "execution.settled",
+]);
+const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 
 function readJson(root, relativePath) {
   return JSON.parse(readFileSync(path.join(root, relativePath), "utf8"));
@@ -121,6 +126,18 @@ function verifyBehavior(relativePath, evidence) {
       || evidence.summary?.result !== "green") {
       throw new Error(`${relativePath} does not record a 5/5 green summary`);
     }
+    const incident = evidence.projects.find(
+      (project) => project.project === "incident-response-controller",
+    );
+    const kinds = incident?.sse_event_kinds;
+    const terminal = incident?.sse_terminal;
+    if (!Array.isArray(kinds)
+      || kinds.filter((kind) => CANCELLATION_TERMINAL_KINDS.has(kind)).length !== 1
+      || !CANCELLATION_TERMINAL_KINDS.has(terminal?.kind)
+      || terminal?.status !== "cancelled"
+      || !kinds.includes(terminal.kind)) {
+      throw new Error(`${relativePath} has contradictory cancellation event evidence`);
+    }
   }
   if (relativePath === "gauntlet/results/recovery-e2e.json") {
     if (evidence.process_count !== 2
@@ -129,7 +146,9 @@ function verifyBehavior(relativePath, evidence) {
       || !Array.isArray(evidence.resumed_sequences)
       || evidence.resumed_sequences.length === 0
       || !Array.isArray(evidence.duplicate_sequences)
-      || evidence.duplicate_sequences.length !== 0) {
+      || evidence.duplicate_sequences.length !== 0
+      || typeof evidence.job_id !== "string"
+      || !UUID_PATTERN.test(evidence.job_id)) {
       throw new Error(`${relativePath} does not record successful duplicate-free two-process recovery`);
     }
   }

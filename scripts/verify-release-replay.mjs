@@ -43,7 +43,8 @@ export function stableDepthEvidence(report) {
         || project.cancellation_status !== "cancelled"
         || project.cancellation_idempotent !== true
         || terminalKinds.length !== 1
-        || !isDurableCancellationTerminal(project.sse_terminal)) {
+        || !isDurableCancellationTerminal(project.sse_terminal)
+        || !kinds.includes(project.sse_terminal.kind)) {
         throw new Error("depth cancellation project lacks an exact cancelled terminal result");
       }
       return {
@@ -61,6 +62,10 @@ export function stableDepthEvidence(report) {
 }
 
 export function stableRecoveryEvidence({ job_id: _jobId, ...report }) {
+  if (typeof _jobId !== "string"
+    || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/.test(_jobId)) {
+    throw new Error("recovery evidence lacks a valid job UUID");
+  }
   return report;
 }
 

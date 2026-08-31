@@ -147,6 +147,31 @@ describe('public release evidence replay', () => {
       'recovery replay does not match committed stable behavioral evidence',
     );
   });
+
+  it('refuses contradictory depth terminal and event-kind evidence', () => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    const incident = depth.projects.find(
+      (project: any) => project.project === 'incident-response-controller',
+    );
+    incident.sse_terminal.kind = 'execution.settled';
+    writeJson(replay, 'depth-projects.json', depth);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'depth cancellation project lacks an exact cancelled terminal result',
+    );
+  });
+
+  it('refuses a missing or malformed recovery job identity', () => {
+    const replay = createReplay();
+    const recovery = readJson(replay, 'recovery-e2e.json');
+    recovery.job_id = 'not-a-uuid';
+    writeJson(replay, 'recovery-e2e.json', recovery);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'recovery evidence lacks a valid job UUID',
+    );
+  });
 });
 
 function createReplay(): string {

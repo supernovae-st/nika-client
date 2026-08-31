@@ -111,10 +111,25 @@ describe('release evidence identity', () => {
       status: 'failed',
       resumed_sequences: [],
       duplicate_sequences: [1],
+      job_id: 'not-a-uuid',
     });
 
     expect(() => verifyReleaseEvidence(fixture)).toThrow(
       'does not record successful duplicate-free two-process recovery',
+    );
+  });
+
+  it('refuses contradictory depth cancellation event evidence', () => {
+    const fixture = createFixture();
+    const evidence = evidenceFor('gauntlet/projects-depth/results.json') as any;
+    const incident = evidence.projects.find(
+      (project: any) => project.project === 'incident-response-controller',
+    );
+    incident.sse_terminal.kind = 'execution.settled';
+    writeJson(fixture, 'gauntlet/projects-depth/results.json', evidence);
+
+    expect(() => verifyReleaseEvidence(fixture)).toThrow(
+      'has contradictory cancellation event evidence',
     );
   });
 });
@@ -152,15 +167,22 @@ function evidenceFor(relativePath: string): object {
     };
   }
   if (relativePath === 'gauntlet/projects-depth/results.json') {
+    const projects = packedProjects([
+      'deployment-gate',
+      'evidence-provenance-pipeline',
+      'incident-response-controller',
+      'multi-tenant-webhook-router',
+      'scheduled-research-monitor',
+    ]).map((project: any) => project.project === 'incident-response-controller'
+      ? {
+          ...project,
+          sse_event_kinds: ['execution.cancelled', 'execution.started'],
+          sse_terminal: { kind: 'execution.cancelled', status: 'cancelled' },
+        }
+      : project);
     return {
       ...identity,
-      projects: packedProjects([
-        'deployment-gate',
-        'evidence-provenance-pipeline',
-        'incident-response-controller',
-        'multi-tenant-webhook-router',
-        'scheduled-research-monitor',
-      ]),
+      projects,
       summary: { total: 5, succeeded: 5, result: 'green' },
     };
   }
@@ -172,6 +194,7 @@ function evidenceFor(relativePath: string): object {
       status: 'succeeded',
       resumed_sequences: [2],
       duplicate_sequences: [],
+      job_id: '41b407c3-cc3e-4b08-9aeb-23cc2815034b',
     };
   }
   return identity;

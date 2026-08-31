@@ -73,6 +73,7 @@ for (const [label, actual, expected] of [
   ['workflow list JSON', contract.paths?.['/v1/workflows']?.get?.responses?.['200']?.content?.['application/json']?.schema?.$ref, '#/components/schemas/WorkflowList'],
   ['workflow metadata JSON', contract.paths?.['/v1/workflows/{name}']?.get?.responses?.['200']?.content?.['application/json']?.schema?.$ref, '#/components/schemas/WorkflowMetadata'],
   ['SSE event extension', contract.paths?.['/v1/jobs/{id}/events']?.get?.responses?.['200']?.content?.['text/event-stream']?.['x-nika-event-schema']?.$ref, '#/components/schemas/JobEvent'],
+  ['receipt origin schema', contract.components?.schemas?.JobReceipt?.properties?.origin?.$ref, '#/components/schemas/JobOrigin'],
 ]) {
   if (actual !== expected) {
     console.log(`  MISSING  ${label}: expected ${expected}`);

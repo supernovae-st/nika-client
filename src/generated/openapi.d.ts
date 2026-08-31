@@ -926,12 +926,33 @@ export interface components {
             sequence: number;
             status: components["schemas"]["JobStatus"] | null;
         };
+        JobOrigin: {
+            /** @constant */
+            kind: "manual";
+        } | {
+            arm_generation: string;
+            /** @enum {string} */
+            decision: "scheduled" | "catch_up";
+            /** Format: date-time */
+            fired_at: string;
+            /** @constant */
+            kind: "schedule";
+            /** @description Origin-local identifier, bounded to 255 UTF-8 bytes by the server */
+            schedule_id: string;
+            /** @enum {string} */
+            schedule_origin: "project" | "api";
+            schedule_revision: string;
+            /** Format: date-time */
+            scheduled_for: string;
+            slot_id: string;
+        };
         /** @description Terminal binding to the exact immutable admitted execution */
         JobReceipt: {
             chain_head?: string;
             execution_id: string;
             /** Format: uuid */
             job_id: string;
+            origin?: components["schemas"]["JobOrigin"];
             snapshot_digest: string;
             trace_id: string;
         };

@@ -43,6 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   way to read status, outputs, and receipt together was dead on that
   transport.
 
+### Security
+
+- `allowInsecureHttp: true` now admits plaintext HTTP only for a loopback host
+  (`localhost`, `127.0.0.0/8`, `[::1]`); any other host over `http:` is a
+  `NikaConfigurationError`, so the opt-in can no longer send a bearer token in
+  clear text to a routable address.
+
 ## [0.116.2] - 2026-08-31
 
 Lockstep recovery release for engine v0.116.2. The HTTP schema is unchanged

@@ -72,6 +72,53 @@ describe('HTTP configuration and bearer boundaries', () => {
       .toThrow(NikaConfigurationError);
   });
 
+  it.each([
+    ['http://198.51.100.7:8787', '198.51.100.7'],
+    ['http://example.test', 'example.test'],
+    ['http://[2001:db8::1]:8787', '[2001:db8::1]'],
+    ['http://127.0.0.1.evil.test', '127.0.0.1.evil.test'],
+  ])('refuses plaintext %s off loopback even with the opt-in', (url, host) => {
+    let thrown: unknown;
+    try {
+      new Nika({ url, token: TOKEN_A, allowInsecureHttp: true, bin: HTTP_DEPTH_FIXTURE });
+    } catch (cause) {
+      thrown = cause;
+    }
+    expect(thrown).toBeInstanceOf(NikaConfigurationError);
+    const message = (thrown as NikaConfigurationError).message;
+    expect(message).toContain('loopback');
+    expect(message).toContain(host);
+    expect(message).not.toContain(TOKEN_A);
+  });
+
+  it.each([
+    'http://127.0.0.1:8787',
+    'http://127.1.2.3:8787',
+    'http://localhost:8787',
+    'http://[::1]:8787',
+    'http://[::ffff:127.0.0.1]:8787',
+  ])('admits explicit loopback plaintext %s', (url) => {
+    expect(new Nika({
+      url,
+      token: TOKEN_A,
+      allowInsecureHttp: true,
+      bin: HTTP_DEPTH_FIXTURE,
+    }).transportKind).toBe('http');
+  });
+
+  it('still demands the explicit opt-in on loopback and never on HTTPS', () => {
+    expect(() => new Nika({
+      url: 'http://127.0.0.1:8787',
+      token: TOKEN_A,
+      bin: HTTP_DEPTH_FIXTURE,
+    })).toThrow(/allowInsecureHttp/);
+    expect(new Nika({
+      url: 'https://198.51.100.7',
+      token: TOKEN_A,
+      bin: HTTP_DEPTH_FIXTURE,
+    }).transportKind).toBe('http');
+  });
+
   it('keeps token rotation instance-scoped and never authenticates health', async () => {
     let activeToken = TOKEN_A;
     const seen: Array<{ path: string; authorization: string | null }> = [];

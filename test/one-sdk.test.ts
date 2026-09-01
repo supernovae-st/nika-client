@@ -8,10 +8,12 @@ import {
   Nika,
   NikaCompatibilityError,
   NikaConfigurationError,
+  NikaEngineUnavailable,
   NikaEventBufferOverflowError,
   NikaOperationError,
   NikaRunOwnershipError,
 } from '../src/index.js';
+import { resolveNikaEngine } from '../src/lib/binary/index.js';
 import type {
   NikaEvent,
   NikaLocalConfig,
@@ -881,4 +883,184 @@ describe('HTTP transport', () => {
     expect(String(failure)).toContain('[REDACTED]');
     expect(String(failure)).not.toContain(SERVER_TOKEN);
   });
+});
+
+describe('remote observation without a local engine', () => {
+  const scheduleOptions: NikaScheduleOptions = {
+    id: 'daily',
+    when: { kind: 'cadence', expression: 'daily at 09:00 Europe/Paris' },
+    maxCostUsd: 0.25,
+    missed: 'catch-up-once',
+    maxLatenessSeconds: 3600,
+    overlap: 'skip',
+    afterSkip: 'next_slot',
+  };
+
+  const hostEngineUnavailable = (() => {
+    try {
+      resolveNikaEngine(undefined, { env: {} });
+      return false;
+    } catch (cause) {
+      if (cause instanceof NikaEngineUnavailable) return true;
+      throw cause;
+    }
+  })();
+
+  function withoutNikaBin(run: () => void): void {
+    const saved = process.env.NIKA_BIN;
+    delete process.env.NIKA_BIN;
+    try {
+      run();
+    } finally {
+      if (saved === undefined) delete process.env.NIKA_BIN;
+      else process.env.NIKA_BIN = saved;
+    }
+  }
+
+  it('constructs a remote observer without resolving any local engine', () => {
+    withoutNikaBin(() => {
+      const client = new Nika({
+        url: 'https://nika.example',
+        token: SERVER_TOKEN,
+        fetch: vi.fn() as typeof globalThis.fetch,
+      });
+      expect(client.transportKind).toBe('http');
+    });
+  });
+
+  it('runs every observer operation with zero local engine contact', async () => {
+    const status = scheduleProjection();
+    let lastEventId: string | null = null;
+    const fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input));
+      if (url.pathname === '/health') {
+        return healthResponse({
+          supportedCapabilities: [
+            'check',
+            'executionSnapshot',
+            'eventStream',
+            'trace',
+            'schedule',
+          ],
+        });
+      }
+      if (url.pathname === '/v1/workflows') {
+        return jsonResponse({ workflows: ['flow.nika.yaml'] });
+      }
+      if (url.pathname === '/v1/workflows/flow.nika.yaml') {
+        return jsonResponse({ workflow: 'flow.nika.yaml' });
+      }
+      if (url.pathname === '/v1/jobs/durable-job') {
+        return jsonResponse({ id: 'durable-job', status: 'running' });
+      }
+      if (url.pathname === '/v1/jobs/durable-job/events') {
+        lastEventId = new Headers(init?.headers).get('Last-Event-ID');
+        return sseResponse([{ sequence: 5, kind: 'settled', status: 'succeeded' }]);
+      }
+      if (url.pathname === '/v1/jobs/durable-job/status') {
+        return jsonResponse({ status: 'running' });
+      }
+      if (url.pathname === '/v1/jobs/durable-job/cancel') {
+        return jsonResponse({ id: 'durable-job', status: 'succeeded' });
+      }
+      if (url.pathname === '/v1/schedules/daily' && init?.method === 'PUT') {
+        return jsonResponse({ applied: true, changed: true, status });
+      }
+      if (url.pathname === '/v1/schedules/daily') return jsonResponse(status);
+      if (url.pathname === '/v1/jobs/job-1/trace/verify') {
+        return jsonResponse({
+          verdict: 'unavailable',
+          reason: 'trace_journal_unavailable',
+          trace_id: 'trace-remote',
+        });
+      }
+      throw new Error(`unexpected URL ${url.pathname}`);
+    });
+    // A bin that can never spawn: any local engine contact fails this test.
+    const client = new Nika({
+      url: 'https://nika.example',
+      token: SERVER_TOKEN,
+      bin: '/nonexistent/nika-engine',
+      fetch: fetch as typeof globalThis.fetch,
+    });
+
+    const run = await client.attachRun('durable-job', { lastEventId: 4 });
+    await expect(run.done).resolves.toMatchObject({
+      id: 'durable-job',
+      status: 'succeeded',
+      transport: 'http',
+    });
+    expect(lastEventId).toBe('4');
+    await expect(client.status(run)).resolves.toBe('running');
+    await expect(collect(client.events(run))).resolves.toEqual([
+      { sequence: 5, kind: 'settled', status: 'succeeded' },
+    ]);
+    await expect(client.cancel(run)).resolves.toMatchObject({
+      accepted: false,
+      status: 'already_settled',
+      transport: 'http',
+    });
+    await expect(client.listWorkflows()).resolves.toEqual(['flow.nika.yaml']);
+    await expect(client.workflow('flow.nika.yaml')).resolves.toEqual({
+      workflow: 'flow.nika.yaml',
+    });
+    await expect(client.schedule('flow.nika.yaml', scheduleOptions)).resolves.toEqual({
+      applied: true,
+      changed: true,
+      status,
+    });
+    await expect(client.scheduleStatus('daily')).resolves.toEqual(status);
+    await expect(client.traceVerify({ job_id: 'job-1', trace_id: 'trace-remote' }))
+      .resolves.toMatchObject({ verified: false, verdict: 'unavailable' });
+    expect(
+      fetch.mock.calls.filter(([url]) => String(url).endsWith('/health')),
+    ).toHaveLength(1);
+  });
+
+  it('gates caller-owned capture behind a verifiable local engine', async () => {
+    const fetch = vi.fn();
+    const client = new Nika({
+      url: 'https://nika.example',
+      token: SERVER_TOKEN,
+      bin: '/nonexistent/nika-engine',
+      fetch: fetch as typeof globalThis.fetch,
+    });
+    await expect(client.check('flow.nika.yaml')).rejects.toMatchObject({
+      name: 'NikaCompatibilityError',
+      capability: 'engineIdentity',
+    });
+    await expect(client.run('flow.nika.yaml')).rejects.toMatchObject({
+      name: 'NikaCompatibilityError',
+      capability: 'engineIdentity',
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.runIf(hostEngineUnavailable)(
+    'refuses remote capture with the typed engine-unavailable error when no engine resolves',
+    async () => {
+      const saved = process.env.NIKA_BIN;
+      delete process.env.NIKA_BIN;
+      try {
+        const fetch = vi.fn();
+        const client = new Nika({
+          url: 'https://nika.example',
+          token: SERVER_TOKEN,
+          fetch: fetch as typeof globalThis.fetch,
+        });
+        await expect(client.check('flow.nika.yaml')).rejects.toMatchObject({
+          name: 'NikaEngineUnavailable',
+          code: 'NIKA_ENGINE_UNAVAILABLE',
+        });
+        await expect(client.run('flow.nika.yaml')).rejects.toMatchObject({
+          name: 'NikaEngineUnavailable',
+          code: 'NIKA_ENGINE_UNAVAILABLE',
+        });
+        expect(fetch).not.toHaveBeenCalled();
+      } finally {
+        if (saved === undefined) delete process.env.NIKA_BIN;
+        else process.env.NIKA_BIN = saved;
+      }
+    },
+  );
 });

@@ -61,7 +61,7 @@ function transport(
     fetch,
     requestTimeout: options.requestTimeout ?? 1_000,
     machineBufferBytes: options.machineBufferBytes ?? 64 * 1024,
-    engine: resolveNikaEngine(HTTP_DEPTH_FIXTURE),
+    resolveEngine: () => resolveNikaEngine(HTTP_DEPTH_FIXTURE),
     retryDelay: async () => {},
   });
 }

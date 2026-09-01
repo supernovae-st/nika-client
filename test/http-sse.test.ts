@@ -2,7 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { Nika, NikaProtocolError, NikaTransportError } from '../src/index.js';
-import { resolveNikaEngine } from '../src/lib/binary/index.js';
+import { NikaEngineUnavailable, resolveNikaEngine } from '../src/lib/binary/index.js';
 import { HttpTransport } from '../src/lib/http-transport.js';
 import { SseParseError, SseParser } from '../src/lib/sse/parser.js';
 import type { NikaEvent } from '../src/types.js';
@@ -72,7 +72,7 @@ function transport(
     fetch,
     requestTimeout: 1_000,
     machineBufferBytes: 64 * 1024,
-    engine: resolveNikaEngine(FIXTURE),
+    resolveEngine: () => resolveNikaEngine(FIXTURE),
     retryDelay: async (milliseconds) => {
       delays.push(milliseconds);
     },
@@ -334,5 +334,53 @@ describe('HTTP observation state machine', () => {
     await expect(source.done).rejects.not.toThrow(/server-token/);
     expect(delays).toHaveLength(5);
     expect(fetch).toHaveBeenCalledTimes(8);
+  });
+});
+
+describe('HTTP engine resolution boundary', () => {
+  function lazyTransport(
+    fetch: ReturnType<typeof vi.fn>,
+    resolveEngine: () => ReturnType<typeof resolveNikaEngine>,
+  ): HttpTransport {
+    return new HttpTransport({
+      url: 'https://nika.example',
+      token: SERVER_TOKEN,
+      fetch: fetch as typeof globalThis.fetch,
+      requestTimeout: 1_000,
+      machineBufferBytes: 64 * 1024,
+      resolveEngine,
+      retryDelay: async () => {},
+    });
+  }
+
+  it('resolves the local engine only for caller-owned source capture', async () => {
+    const resolveEngine = vi.fn(() => resolveNikaEngine(FIXTURE));
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
+      .mockResolvedValueOnce(jsonResponse({ workflows: ['flow.nika.yaml'] }))
+      .mockResolvedValueOnce(jsonResponse({
+        status: 'accepted',
+        snapshot_digest: 'a'.repeat(64),
+        root: 'fixture.nika.yaml',
+        units: 1,
+      }));
+    const transport = lazyTransport(fetch, resolveEngine);
+    await expect(transport.listWorkflows()).resolves.toEqual(['flow.nika.yaml']);
+    expect(resolveEngine).not.toHaveBeenCalled();
+    await expect(transport.check('flow.nika.yaml', {}))
+      .resolves.toMatchObject({ clean: true });
+    expect(resolveEngine).toHaveBeenCalledTimes(1);
+  });
+
+  it('defers the typed engine-unavailable refusal to capture time', async () => {
+    const fetch = vi.fn();
+    const transport = lazyTransport(fetch, () => {
+      throw new NikaEngineUnavailable('darwin', 'arm64', '@supernovae-st/nika-darwin-arm64');
+    });
+    await expect(transport.check('flow.nika.yaml', {}))
+      .rejects.toBeInstanceOf(NikaEngineUnavailable);
+    await expect(transport.startRun('flow.nika.yaml', {}))
+      .rejects.toBeInstanceOf(NikaEngineUnavailable);
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

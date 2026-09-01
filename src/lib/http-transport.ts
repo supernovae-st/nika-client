@@ -40,7 +40,7 @@ export interface HttpTransportOptions {
   fetch: typeof globalThis.fetch;
   requestTimeout: number;
   machineBufferBytes: number;
-  engine: ResolvedNikaEngine;
+  resolveEngine: () => ResolvedNikaEngine;
   cwd?: string;
   retryDelay?: (milliseconds: number, signal: AbortSignal) => Promise<void>;
 }
@@ -96,7 +96,9 @@ const RETRY_MAX_MILLISECONDS = 5_000;
 
 export class HttpTransport implements Transport {
   readonly kind = 'http' as const;
-  private ready?: Promise<NikaEngineIdentity>;
+  private serverIdentity?: Promise<NikaEngineIdentity>;
+  private localIdentity?: Promise<NikaEngineIdentity>;
+  private resolvedEngine?: ResolvedNikaEngine;
   private remoteIdentity?: NikaEngineIdentity;
 
   constructor(private readonly options: HttpTransportOptions) {}
@@ -177,7 +179,7 @@ export class HttpTransport implements Transport {
   }
 
   async attachRun(id: string, options: NikaAttachRunOptions): Promise<TransportRun> {
-    await this.ensureReady();
+    await this.ensureServerIdentity();
     const object = await this.json(`/v1/jobs/${encodeURIComponent(id)}`, {
       method: 'GET',
       headers: { Accept: 'application/json' },
@@ -187,7 +189,7 @@ export class HttpTransport implements Transport {
   }
 
   async listWorkflows(): Promise<readonly string[]> {
-    await this.ensureReady();
+    await this.ensureServerIdentity();
     const object = await this.json('/v1/workflows', {
       method: 'GET',
       headers: { Accept: 'application/json' },
@@ -204,7 +206,7 @@ export class HttpTransport implements Transport {
   }
 
   async workflow(name: string): Promise<NikaWorkflowMetadata> {
-    await this.ensureReady();
+    await this.ensureServerIdentity();
     const object = await this.json(`/v1/workflows/${workflowPath(name)}`, {
       method: 'GET',
       headers: { Accept: 'application/json' },
@@ -263,7 +265,7 @@ export class HttpTransport implements Transport {
     receipt: NikaReceipt,
     options: NikaTraceVerifyOptions,
   ): Promise<NikaTraceVerifyResult> {
-    await this.ensureReady();
+    await this.ensureServerIdentity();
     const jobId = receipt.job_id;
     if (typeof jobId !== 'string' || jobId.length === 0) {
       throw this.gap('traceVerify', 'The engine receipt does not carry a remote job_id');
@@ -794,15 +796,12 @@ export class HttpTransport implements Transport {
     return new NikaCompatibilityError(capability, this.kind, message);
   }
 
-  private ensureReady(): Promise<NikaEngineIdentity> {
-    this.ready ??= this.verifyIdentities();
-    return this.ready;
+  private ensureServerIdentity(): Promise<NikaEngineIdentity> {
+    this.serverIdentity ??= this.probeServerIdentity();
+    return this.serverIdentity;
   }
 
-  private async verifyIdentities(): Promise<NikaEngineIdentity> {
-    // Verify local package integrity first: a modified capture engine must not
-    // reach even the remote liveness probe.
-    const local = await verifyNikaEngine(this.options.engine);
+  private async probeServerIdentity(): Promise<NikaEngineIdentity> {
     const health = await this.json('/health', { method: 'GET' }, false);
     if (health.status !== 'ok' || health.service !== 'nika-serve') {
       throw new NikaCompatibilityError(
@@ -811,12 +810,33 @@ export class HttpTransport implements Transport {
         'GET /health did not identify a live nika-serve engine',
       );
     }
-    this.remoteIdentity = compatibleEngineIdentity(health, this.kind, local);
+    // Server-only comparison: the advertised identity must satisfy the SDK's
+    // expected protocol vector without any local engine involvement.
+    this.remoteIdentity = compatibleEngineIdentity(health, this.kind);
+    return this.remoteIdentity;
+  }
+
+  private ensureLocalEngine(): Promise<NikaEngineIdentity> {
+    this.localIdentity ??= this.verifyLocalEngine();
+    return this.localIdentity;
+  }
+
+  private localEngine(): ResolvedNikaEngine {
+    this.resolvedEngine ??= this.options.resolveEngine();
+    return this.resolvedEngine;
+  }
+
+  private async verifyLocalEngine(): Promise<NikaEngineIdentity> {
+    // Verify local package integrity first: a modified capture engine must not
+    // reach even the remote liveness probe.
+    const local = await verifyNikaEngine(this.localEngine());
+    const remote = await this.ensureServerIdentity();
+    compatibleEngineIdentity(remote, this.kind, local);
     return local;
   }
 
   private async ensureScheduleCapability(): Promise<void> {
-    await this.ensureReady();
+    await this.ensureServerIdentity();
     if (!this.remoteIdentity?.supportedCapabilities.includes('schedule')) {
       throw this.gap(
         'schedule',
@@ -829,9 +849,9 @@ export class HttpTransport implements Transport {
     workflow: string,
     signal?: AbortSignal,
   ): Promise<CapturedSnapshot> {
-    const identity = await this.ensureReady();
+    const identity = await this.ensureLocalEngine();
     const captured = await captureEngine(
-      this.options.engine.bin,
+      this.localEngine().bin,
       ['check', workflow, '--json', '--sdk-snapshot'],
       {
         cwd: this.options.cwd,

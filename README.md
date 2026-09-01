@@ -135,8 +135,12 @@ in for `cancel(run)`.
 
 Remote admission is bytes-first: the local compatible engine captures an
 immutable execution snapshot, then the SDK sends those exact bytes to the
-authenticated server. A remote client therefore still needs a local `nika`
-binary through `bin`, `NIKA_BIN`, or the exact optional platform package.
+authenticated server. Capturing those snapshots for `check` and `run`
+therefore still needs a local `nika` binary through `bin`, `NIKA_BIN`, or the
+exact optional platform package, resolved lazily at capture time.
+Observation-only clients need no local engine: `attachRun`, `status`,
+`events`, `cancel`, `schedule`, `scheduleStatus`, `listWorkflows`, `workflow`,
+and `traceVerify` run against the advertised server identity alone.
 
 The current persistent server requires a project file. A minimal `nika.yaml`
 is enough:

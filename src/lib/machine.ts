@@ -73,7 +73,35 @@ export function eventError(event: NikaEvent | undefined): NikaMachineError | und
       ...(typeof event.message === 'string' ? { message: event.message } : {}),
     };
   }
-  return undefined;
+  return fieldsError(event);
+}
+
+/**
+ * A native `task_failed` frame carries its failure as field rows, not as an
+ * `error` object: `detail` holds `NIKA-<CODE> · <message>` and `task` names
+ * the task. The later `workflow_failed` and `run_settled` frames carry no
+ * error at all, so this is the only place the engine states why a run
+ * failed. Read it the same way status, receipt, and outputs are read.
+ */
+function fieldsError(event: NikaEvent | undefined): NikaMachineError | undefined {
+  if (event?.kind !== 'task_failed') return undefined;
+  const fields = Array.isArray(event.fields) ? event.fields : [];
+  let detail: string | undefined;
+  let task: string | undefined;
+  for (const field of fields) {
+    const row = machineObject(field);
+    if (row?.key === 'detail' && typeof row.value === 'string') detail = row.value;
+    if (row?.key === 'task' && typeof row.value === 'string') task = row.value;
+  }
+  if (detail === undefined) return undefined;
+  const match = detail.trim().match(/^(NIKA-[A-Z0-9-]+)\s*·?\s*([\s\S]*)$/);
+  const code = match?.[1];
+  const message = (match ? match[2] : detail).trim();
+  return {
+    ...(code ? { code } : {}),
+    ...(message.length > 0 ? { message } : {}),
+    ...(task ? { task } : {}),
+  };
 }
 
 export function receiptTraceLocator(receipt: NikaReceipt): string | undefined {

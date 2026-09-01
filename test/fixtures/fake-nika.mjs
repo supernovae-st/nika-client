@@ -146,6 +146,22 @@ if (command === 'run' && argv.includes('--json')) {
     for (let index = 0; index < count; index += 1) {
       emit({ kind: 'task_completed', sequence: index + 1, value: index });
     }
+    if (workflow.includes('fields-failure')) {
+      // The released engine's shape: the failure rides field rows on
+      // task_failed; workflow_failed and run_settled carry no error.
+      emit({
+        kind: 'task_failed',
+        fields: [
+          { key: 'task', value: 'boom' },
+          { key: 'note', value: 'exec · false' },
+          { key: 'detail', value: 'NIKA-EXEC-001 · command exited with status 1: ' },
+          { key: 'duration_ms', value: 7 },
+        ],
+      });
+      emit({ kind: 'workflow_failed', fields: [{ key: 'workflow', value: 'fixture' }] });
+      emit({ kind: 'run_settled', status: 'failed', outputs: { boom: null } });
+      process.exit(1);
+    }
     if (workflow.includes('failing')) {
       emit({
         kind: 'workflow_failed',

@@ -27,6 +27,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of an opaque `HTTP <status> for <path>: [REDACTED]`; untyped bodies
   keep the redacted transport error, and a reflected bearer token is redacted
   from any server message. `NikaOperation` widens accordingly.
+- A failed native run now settles `run.done` with the failure the engine
+  named. The engine states a task failure as field rows on `task_failed`
+  (`detail: "NIKA-EXEC-001 · command exited with status 1"`, `task`), and
+  the later `workflow_failed` and `run_settled` frames carry no error, so
+  `NikaRunResult.error` stayed undefined on every native failure. It now
+  carries `{ code, message, task }`; `NikaMachineError` gains an optional
+  `task`.
 
 ### Added
 

@@ -128,7 +128,8 @@ the check → teach → re-draft loop reads one shape whether the engine runs
 locally or behind `nika serve`.
 
 `run()` returns after stable admission. `run.done` is the sole terminal result.
-An admitted workflow failure is result data with `status: "failed"`; transport,
+An admitted workflow failure is result data with `status: "failed"` and, when
+the engine named the failing task, `error: { code, message, task }`; transport,
 protocol, configuration, and compatibility failures throw typed SDK errors.
 A `try { await run.done } catch {}` alone therefore never catches a failed
 workflow: a CI job or an application must read `result.status` and treat

@@ -647,6 +647,9 @@ describe('cancellation and terminal identity', () => {
       id: 'job-1',
       status: 'succeeded',
       transport: 'http',
+      // Named by the engine on the receipt, checked against admission, never invented.
+      execution_id: 'execution-1',
+      trace_id: 'trace-1',
       outputs: { answer: 42 },
       receipt: RECEIPT,
     });

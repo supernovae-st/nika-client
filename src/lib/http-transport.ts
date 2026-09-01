@@ -336,18 +336,28 @@ export class HttpTransport implements Transport {
       ) {
         throw new NikaProtocolError(this.kind, 'Durable trace identity changed after attach');
       }
-      const executionId = attachedState?.execution_id ?? durable?.execution_id;
-      const traceId = attachedState?.trace_id ?? durable?.trace_id;
+      const knownExecutionId = attachedState?.execution_id ?? durable?.execution_id;
+      const knownTraceId = attachedState?.trace_id ?? durable?.trace_id;
       if (receipt) {
         assertReceiptIdentity(
           receipt,
           id,
           this.kind,
-          executionId,
-          traceId,
+          knownExecutionId,
+          knownTraceId,
           expectedSnapshotDigest,
         );
       }
+      // A run admitted by POST and settled from its SSE frame has no durable
+      // read to name its identities; the receipt on that frame carries them
+      // and was just checked against every identity already known, so the
+      // result names the same execution and trace on both settlement paths.
+      const executionId = knownExecutionId
+        ?? (typeof receipt?.execution_id === 'string'
+          ? receipt.execution_id as NikaExecutionId
+          : undefined);
+      const traceId = knownTraceId
+        ?? (typeof receipt?.trace_id === 'string' ? receipt.trace_id : undefined);
       terminalObserved = true;
       const outputs = event ? eventOutputs(event) : durable?.outputs;
       const error = event ? eventError(event) : durable?.error;

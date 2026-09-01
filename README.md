@@ -49,6 +49,15 @@ not implement the root facade documented below. The publication is complete
 only when the four matching native payload packages and this root client are
 all visible on npm.
 
+Verify the package that the current project actually resolved:
+
+```sh
+node -p "require('@supernovae-st/nika-client/package.json').version"
+```
+
+This package metadata subpath is exported for CommonJS, ESM build tools and CI
+pin checks. It reports the installed dependency, not a moving registry tag.
+
 ## First local run
 
 The lowest-friction creation door is the engine-owned scaffold:

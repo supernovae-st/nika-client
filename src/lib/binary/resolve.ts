@@ -36,18 +36,12 @@ export function resolveNikaEngine(
   host: BinaryResolverHost = {},
 ): ResolvedNikaEngine {
   if (configuredBin !== undefined) {
-    if (configuredBin.length === 0) {
-      throw new NikaConfigurationError('bin must be a non-empty string');
-    }
-    return { bin: configuredBin };
+    return { bin: absoluteEnginePath(configuredBin, 'bin') };
   }
 
   const envBin = (host.env ?? process.env).NIKA_BIN;
   if (envBin !== undefined) {
-    if (envBin.length === 0) {
-      throw new NikaConfigurationError('NIKA_BIN must be a non-empty string');
-    }
-    return { bin: envBin };
+    return { bin: absoluteEnginePath(envBin, 'NIKA_BIN') };
   }
 
   const platform = host.platform ?? process.platform;
@@ -75,6 +69,26 @@ export function resolveNikaEngine(
     }
     throw cause;
   }
+}
+
+/**
+ * An explicit engine path must be absolute. A bare name (`nika`) or a
+ * relative path would be resolved by the operating system through PATH or
+ * the working directory, which is exactly the implicit lookup this client
+ * refuses: the README promises that a `nika` found on PATH is never used.
+ */
+function absoluteEnginePath(value: string, source: 'bin' | 'NIKA_BIN'): string {
+  if (value.length === 0) {
+    throw new NikaConfigurationError(`${source} must be a non-empty string`);
+  }
+  if (!path.isAbsolute(value)) {
+    throw new NikaConfigurationError(
+      `${source} must be an absolute path to a nika engine (got "${value}"); `
+      + 'a bare name or a relative path would be resolved through PATH or the '
+      + 'working directory, which this client refuses',
+    );
+  }
+  return value;
 }
 
 function runtimeIsGlibc(platform: NodeJS.Platform): boolean {

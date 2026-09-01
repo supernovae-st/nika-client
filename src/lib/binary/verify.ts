@@ -78,27 +78,37 @@ async function verifyManagedPayload(engine: ResolvedNikaEngine): Promise<string>
 }
 
 async function probeIdentity(bin: string): Promise<NikaEngineIdentity> {
+  // The probe is version negotiation with whatever executable sits at `bin`;
+  // it authenticates nothing. When it fails, the likeliest cause is the path
+  // (a wrong NIKA_BIN, a script that is not the engine), so every refusal
+  // names the path and the one command that settles the question.
+  const notAnEngine = `is ${bin} a nika engine? (run "${bin} --sdk-identity" by hand)`;
   const captured = await captureEngine(bin, ['--sdk-identity'], {
     bufferBytes: IDENTITY_BUFFER_BYTES,
     transport: 'native-process',
     label: 'Engine identity probe',
   }).catch((cause: unknown) => {
     throw incompatible(
-      'Engine identity probe failed',
+      `Engine identity probe of ${bin} failed`,
       cause,
     );
   });
   if (captured.exitCode !== 0) {
-    throw incompatible(`Engine identity probe exited with code ${captured.exitCode}`);
+    throw incompatible(
+      `Engine identity probe of ${bin} exited with code ${captured.exitCode}; ${notAnEngine}`,
+    );
   }
   let value: unknown;
   try {
     value = JSON.parse(captured.stdout.trim());
   } catch (cause) {
-    throw incompatible('Engine identity probe did not emit one JSON object', cause);
+    throw incompatible(
+      `Engine identity probe of ${bin} did not emit one JSON object; ${notAnEngine}`,
+      cause,
+    );
   }
   if (captured.stderr.trim()) {
-    throw incompatible('Engine identity probe wrote unexpected diagnostics');
+    throw incompatible(`Engine identity probe of ${bin} wrote unexpected diagnostics`);
   }
   try {
     return compatibleEngineIdentity(value, 'native-process');

@@ -21,8 +21,10 @@ not parse YAML or reconstruct proof in TypeScript.
 ## Requirements
 
 - Node.js 22 or newer
-- a compatible `nika` engine, resolved from `config.bin`, then `NIKA_BIN`,
-  then the exact optional platform package; implicit `PATH` lookup is refused
+- a compatible `nika` engine, resolved from `config.bin`, then `NIKA_BIN`
+  (absolute paths only), then the exact optional platform package; a bare
+  name or a relative path is refused because the operating system would
+  resolve it through `PATH` or the working directory
 - a `.nika.yaml` workflow
 
 ## Documentation

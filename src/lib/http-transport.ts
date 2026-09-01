@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   NikaCompatibilityError,
+  NikaObservationInterrupted,
   NikaOperationError,
   NikaProtocolError,
   NikaTransportError,
@@ -78,6 +79,12 @@ interface DurableJob {
 interface RetryObservation {
   retry: true;
   retryAfterMilliseconds?: number;
+}
+
+interface ObservationSettlement {
+  jobPath: string;
+  id: string;
+  settle: (source: NikaEvent | DurableJob) => void;
 }
 
 const JOB_STATUSES = new Set([
@@ -424,6 +431,7 @@ export class HttpTransport implements Transport {
     };
     const jobPath = `/v1/jobs/${encodeURIComponent(id)}`;
     const eventsPath = `/v1/jobs/${encodeURIComponent(id)}/events`;
+    const settlement: ObservationSettlement = { jobPath, id, settle };
 
     while (!state.terminalObserved) {
       const headers = new Headers({ Accept: 'text/event-stream' });
@@ -435,7 +443,7 @@ export class HttpTransport implements Transport {
       } catch {
         await this.retryObservation(state, signal, {
           retry: true,
-        });
+        }, settlement);
         continue;
       }
 
@@ -443,7 +451,7 @@ export class HttpTransport implements Transport {
         await discardResponse(response);
         const durable = await this.inspectDurableJob(jobPath, id, signal);
         if (isRetryObservation(durable)) {
-          await this.retryObservation(state, signal, durable);
+          await this.retryObservation(state, signal, durable, settlement);
           continue;
         }
         if (isTerminal(durable.status)) {
@@ -451,7 +459,7 @@ export class HttpTransport implements Transport {
           settle(durable);
           return;
         }
-        await this.retryObservation(state, signal, { retry: true });
+        await this.retryObservation(state, signal, { retry: true }, settlement);
         continue;
       }
 
@@ -461,7 +469,7 @@ export class HttpTransport implements Transport {
         await this.retryObservation(state, signal, {
           retry: true,
           ...(retryAfterMilliseconds !== undefined ? { retryAfterMilliseconds } : {}),
-        });
+        }, settlement);
         continue;
       }
 
@@ -515,7 +523,7 @@ export class HttpTransport implements Transport {
 
       const durable = await this.inspectDurableJob(jobPath, id, signal);
       if (isRetryObservation(durable)) {
-        await this.retryObservation(state, signal, durable);
+        await this.retryObservation(state, signal, durable, settlement);
         continue;
       }
       if (isTerminal(durable.status)) {
@@ -523,7 +531,7 @@ export class HttpTransport implements Transport {
         settle(durable);
         return;
       }
-      await this.retryObservation(state, signal, { retry: true });
+      await this.retryObservation(state, signal, { retry: true }, settlement);
     }
   }
 
@@ -766,11 +774,27 @@ export class HttpTransport implements Transport {
     state: ObservationState,
     signal: AbortSignal,
     retry: RetryObservation,
+    settlement: ObservationSettlement,
   ): Promise<void> {
     if (state.attempt >= MAX_OBSERVATION_RETRIES) {
-      throw new NikaTransportError(
+      // Exhaustion is a settlement question, not an error by itself: the
+      // durable record is the workflow's truth, so one final read wins over
+      // observer connectivity. Only a still non-terminal record interrupts.
+      const durable = await this.inspectDurableJob(
+        settlement.jobPath,
+        settlement.id,
+        signal,
+      );
+      if (!isRetryObservation(durable) && isTerminal(durable.status)) {
+        state.terminalObserved = true;
+        settlement.settle(durable);
+        return;
+      }
+      throw new NikaObservationInterrupted(
         this.kind,
-        `HTTP observation exhausted ${MAX_OBSERVATION_RETRIES} retries`,
+        settlement.id,
+        state.lastSequence,
+        state.attempt,
       );
     }
     state.attempt += 1;

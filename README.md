@@ -207,6 +207,12 @@ idempotency namespace spans the server's entire `state-root` and currently has
 no TTL; use globally unique business keys and do not recycle them between
 workflows.
 
+When observation loses connectivity past its retry budget, the SDK performs
+one final durable read before giving up: a terminal record settles `run.done`
+from the workflow's truth, and a still-running record rejects with
+`NikaObservationInterrupted`, whose `lastSequence` feeds
+`attachRun(id, { lastEventId })` to resume.
+
 Plain HTTP is refused unless `allowInsecureHttp: true` is explicit. Use HTTPS
 for a non-loopback deployment. A URL may not contain credentials, a query, or a
 fragment, and a 32–512 byte visible-ASCII token is mandatory.
@@ -323,7 +329,8 @@ Every SDK error extends `NikaError`:
 NikaError
 ├── NikaConfigurationError
 ├── NikaTransportError
-│   └── NikaProtocolError
+│   ├── NikaProtocolError
+│   └── NikaObservationInterrupted
 ├── NikaCompatibilityError
 ├── NikaOperationError
 ├── NikaEventBufferOverflowError

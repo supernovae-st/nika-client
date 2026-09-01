@@ -234,6 +234,7 @@ export {
   NikaConfigurationError,
   NikaError,
   NikaEventBufferOverflowError,
+  NikaObservationInterrupted,
   NikaOperationError,
   NikaProtocolError,
   NikaRunOwnershipError,

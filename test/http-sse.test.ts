@@ -1,7 +1,12 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
-import { Nika, NikaProtocolError, NikaTransportError } from '../src/index.js';
+import {
+  Nika,
+  NikaObservationInterrupted,
+  NikaProtocolError,
+  NikaTransportError,
+} from '../src/index.js';
 import { NikaEngineUnavailable, resolveNikaEngine } from '../src/lib/binary/index.js';
 import { HttpTransport } from '../src/lib/http-transport.js';
 import { SseParseError, SseParser } from '../src/lib/sse/parser.js';
@@ -328,12 +333,86 @@ describe('HTTP observation state machine', () => {
     const delays: number[] = [];
     const fetch = admittedFetch(
       ...Array.from({ length: 6 }, () => new TypeError('reset server-token')),
+      jsonResponse({ id: 'job-1', status: 'running' }),
     );
     const { source, events } = await startObserved(fetch, delays);
-    await expect(events).rejects.toThrow(/exhausted 5 retries/);
+    await expect(events).rejects.toBeInstanceOf(NikaObservationInterrupted);
+    await expect(source.done).rejects.toBeInstanceOf(NikaObservationInterrupted);
     await expect(source.done).rejects.not.toThrow(/server-token/);
     expect(delays).toHaveLength(5);
-    expect(fetch).toHaveBeenCalledTimes(8);
+    expect(fetch).toHaveBeenCalledTimes(9);
+  });
+
+  it('settles done from a final durable read when observation exhausts', async () => {
+    const fetch = admittedFetch(
+      ...Array.from({ length: 6 }, () => new TypeError('connection reset')),
+      jsonResponse({
+        id: 'job-1',
+        status: 'succeeded',
+        execution_id: 'exe-1',
+        trace_id: 'trace-1',
+      }),
+    );
+    const { source, events } = await startObserved(fetch);
+    await expect(events).resolves.toEqual([]);
+    await expect(source.done).resolves.toMatchObject({
+      id: 'job-1',
+      status: 'succeeded',
+      execution_id: 'exe-1',
+      trace_id: 'trace-1',
+    });
+    expect(String(fetch.mock.calls[8]?.[0])).toBe('https://nika.example/v1/jobs/job-1');
+  });
+
+  it('interrupts with a resumable cursor when the final durable read stays non-terminal', async () => {
+    const one = { sequence: 1, kind: 'running', status: 'running' } as const;
+    const two = { sequence: 2, kind: 'settled', status: 'succeeded' } as const;
+    const delays: number[] = [];
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
+      .mockResolvedValueOnce(jsonResponse({ id: 'job-1', status: 'queued' }, 202))
+      .mockResolvedValueOnce(sse(frame(one), true))
+      .mockResolvedValueOnce(jsonResponse({ id: 'job-1', status: 'running' }))
+      .mockRejectedValueOnce(new TypeError('connection reset'))
+      .mockRejectedValueOnce(new TypeError('connection reset'))
+      .mockRejectedValueOnce(new TypeError('connection reset'))
+      .mockRejectedValueOnce(new TypeError('connection reset'))
+      .mockRejectedValueOnce(new TypeError('connection reset'))
+      .mockResolvedValueOnce(jsonResponse({ id: 'job-1', status: 'running' }))
+      .mockResolvedValueOnce(jsonResponse({ id: 'job-1', status: 'running' }))
+      .mockResolvedValueOnce(sse(frame(two)));
+    const direct = transport(fetch as typeof globalThis.fetch, delays);
+    const source = await direct.startRun('flow.nika.yaml', {});
+    const events = collect(source.events);
+
+    await expect(events).rejects.toBeInstanceOf(NikaObservationInterrupted);
+    let failure: unknown;
+    try {
+      await source.done;
+    } catch (cause) {
+      failure = cause;
+    }
+    expect(failure).toBeInstanceOf(NikaObservationInterrupted);
+    expect(failure).toBeInstanceOf(NikaTransportError);
+    expect(failure).toMatchObject({
+      name: 'NikaObservationInterrupted',
+      transport: 'http',
+      runId: 'job-1',
+      lastSequence: 1,
+      attempts: 5,
+    });
+    expect(delays).toHaveLength(5);
+
+    const cursor = (failure as NikaObservationInterrupted).lastSequence;
+    const resumed = await direct.attachRun('job-1', { lastEventId: cursor });
+    const resumedEvents = collect(resumed.events);
+    await expect(resumed.done).resolves.toMatchObject({
+      id: 'job-1',
+      status: 'succeeded',
+    });
+    await expect(resumedEvents).resolves.toEqual([two]);
+    const resumeHeaders = new Headers(fetch.mock.calls[11]?.[1]?.headers);
+    expect(resumeHeaders.get('Last-Event-ID')).toBe('1');
   });
 });
 

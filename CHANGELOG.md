@@ -28,6 +28,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   previous transport shape, so existing callers compile unchanged.
 - Branded opaque `NikaRunId`, `NikaExecutionId`, and `NikaJobId` identity
   types on the run surfaces that already carried those identities.
+- Typed HTTP transport event kinds on the `NikaEvent` union
+  (`NikaExecutionStartedEvent`, `NikaExecutionSettledEvent`,
+  `NikaExecutionCancelledEvent`, `NikaExecutionRefusedEvent`,
+  `NikaExecutionInterruptedEvent`), alongside the transport-agnostic
+  `isNikaTerminalEvent` guard, which narrows any frame the engine reported
+  with a terminal status rather than matching on its kind.
+
+### Fixed
+
+- `isNikaRunSettledEvent` now narrows the HTTP settlement frame
+  (`execution.settled`) as well as the native `run_settled` one. It
+  previously never returned true on a `nika serve` stream, so the documented
+  way to read status, outputs, and receipt together was dead on that
+  transport.
 
 ## [0.116.2] - 2026-08-31
 

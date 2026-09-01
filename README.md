@@ -348,17 +348,22 @@ Remote-only options:
 
 ### Typed events, outputs, and identities
 
-`NikaEvent` is a discriminated union over the known lifecycle kinds
-(`workflow_started`, `task_scheduled`, `task_started`, `task_completed`,
-`workflow_completed`, `workflow_failed`, `workflow_interrupted`,
-`run_settled`, `run_sealed`). Kinds this SDK version does not know yet stay
-representable through the `NikaUnknownEvent` fallback, so the union is
-intentionally non-exhaustive and every variant keeps its future fields open.
+`NikaEvent` is a discriminated union over the known lifecycle kinds of both
+transports. A native engine process emits `workflow_started`,
+`task_scheduled`, `task_started`, `task_completed`, `workflow_completed`,
+`workflow_failed`, `workflow_interrupted`, `run_settled`, and `run_sealed`. A
+`nika serve` job streams `execution.started`, `execution.settled`,
+`execution.cancelled`, `execution.refused`, and `execution.interrupted` (a
+resident that restarts marks an orphaned running job `interrupted`). Kinds
+this SDK version does not know yet stay representable through the
+`NikaUnknownEvent` fallback, so the union is intentionally non-exhaustive and
+every variant keeps its future fields open.
 
 `run`, `attachRun`, and `events` accept one `Outputs` type argument. It types
 the terminal settlement — `run.done` and the `run_settled` /
-`workflow_completed` frames — without any runtime validation, and defaults to
-`Record<string, unknown>` so untyped callers see no change:
+`execution.settled` / `workflow_completed` frames — without any runtime
+validation, and defaults to `Record<string, unknown>` so untyped callers see
+no change:
 
 ```ts
 const run = await nika.run<{ answer: number }>('flow.nika.yaml');
@@ -366,9 +371,24 @@ const result = await run.done;          // result.outputs?: { answer: number }
 
 for await (const event of nika.events(run)) {
   if (isNikaRunSettledEvent(event)) {
-    // event is NikaRunSettledEvent<{ answer: number }> here:
-    // status, outputs, and receipt typed together on the terminal frame.
+    // The settlement frame of either transport (`run_settled` natively,
+    // `execution.settled` over HTTP): status, outputs, and receipt typed
+    // together on the one frame that carries all three.
     console.log(event.status, event.outputs?.answer, event.receipt);
+  }
+}
+```
+
+A run can also end without settling outputs — cancelled, refused, or
+interrupted. `isNikaTerminalEvent(event)` narrows those too: it reads the
+engine-reported `status` (`succeeded`, `failed`, `interrupted`, `cancelled`)
+rather than the kind, so it holds on either transport and on kinds this SDK
+version does not know yet:
+
+```ts
+for await (const event of nika.events(run)) {
+  if (isNikaTerminalEvent(event)) {
+    console.log('no further frames for this run:', event.status);
   }
 }
 ```

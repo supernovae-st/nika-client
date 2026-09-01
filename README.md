@@ -20,9 +20,11 @@ not parse YAML or reconstruct proof in TypeScript.
 
 ## Requirements
 
-- Node.js 22 or newer
+- Node.js 22 or newer (the tested floor; an older major is unsupported, not
+  refused, and `npm install` does not warn about it)
 - a compatible `nika` engine, resolved from `config.bin`, then `NIKA_BIN`,
-  then the exact optional platform package; implicit `PATH` lookup is refused
+  then the exact optional platform package; a `nika` found on `PATH` is
+  deliberately never used
 - a `.nika.yaml` workflow
 
 ## Documentation
@@ -68,8 +70,11 @@ The lowest-friction creation door is the engine-owned scaffold:
 ```
 
 `nika.yaml` is the project control plane. `hello.nika.yaml` is executable
-workflow intent and is the file passed to `check()` and `run()`. The generated
-workflow has this public envelope:
+workflow intent and is the file passed to `check()` and `run()`. The scaffold
+writes the engine's own annotated `01-hello` example (its task is named
+`greet` and its prompt asks for French); the contract this README relies on is
+the `outputs.greeting` key and the `mock/echo` model, and the same file can be
+written by hand with this public envelope:
 
 ```yaml
 nika: sdk-hello
@@ -102,7 +107,8 @@ if (!report.clean) throw new Error('workflow did not pass nika check');
 const run = await nika.run('hello.nika.yaml', { maxCostUsd: 0 });
 const watching = (async () => {
   for await (const event of nika.events(run)) {
-    console.log(event.kind, event.status);
+    // Native progress frames carry no status; only the terminal frame does.
+    console.log(event.kind, event.status ?? '');
   }
 })();
 
@@ -110,6 +116,10 @@ const result = await run.done;
 await watching;
 console.log(result.status, result.outputs, result.receipt);
 ```
+
+Expected output: `workflow_started`, `task_scheduled`, `task_started`,
+`task_completed`, `workflow_completed`, then `run_settled succeeded`, then the
+terminal `succeeded` line with the outputs and the receipt.
 
 `run()` returns after stable admission. `run.done` is the sole terminal result.
 An admitted workflow failure is result data with `status: "failed"`; transport,
@@ -291,8 +301,11 @@ Treat any `status.finding` recovered from older state as non-runnable. New activ
 declarations the current engine cannot plan are refused before durable mutation.
 Timed hash jitter is currently unsupported and returns a typed refusal.
 Cron expressions carry their zone as `TZ=<IANA zone> ...`; `tolerance` uses
-`m/k`; `afterSkip` requires `overlap: "skip"`; and `active: false` requires a
-`pauseUntil` ISO calendar date (`YYYY-MM-DD`).
+`m/k`; `afterSkip` requires `overlap: "skip"` (the engine's default, so an
+omitted `overlap` satisfies it); and `active: false` requires a `pauseReason`
+together with a `pauseUntil` ISO calendar date (`YYYY-MM-DD`). Schedules refuse
+`maxCostUsd: 0` ("must be positive and finite") where a native `run()` accepts
+it; a scheduled budget is always a real number.
 
 ## Transport matrix
 
@@ -379,7 +392,11 @@ plain `string` no longer stands in for one.
 
 ## Errors
 
-Every SDK error extends `NikaError`:
+Every error the SDK raises for an engine, transport, configuration, or
+compatibility condition extends `NikaError`. Misuse of the API itself (an empty
+workflow name, a negative event cursor, a receipt that is not an object, a
+workflow name that escapes the catalog) throws a plain `TypeError` or
+`RangeError` before any engine or network work starts:
 
 ```text
 NikaError

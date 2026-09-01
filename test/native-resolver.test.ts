@@ -62,5 +62,12 @@ describe('native binary resolver', () => {
       code: 'NIKA_ENGINE_UNAVAILABLE',
       packageName: '@supernovae-st/nika-darwin-arm64',
     });
+    // The refusal teaches every valid path and names the one it will not take.
+    const message = String((caught as Error).message);
+    expect(message).toContain('NIKA_BIN=/absolute/path/to/nika');
+    expect(message).toContain('config.bin');
+    expect(message).toContain('payload package');
+    expect(message).toContain('PATH is deliberately not used');
+    expect(message).toContain('UNMET OPTIONAL');
   });
 });

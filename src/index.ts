@@ -259,6 +259,7 @@ export { NikaEngineUnavailable };
 export {
   isNikaRunSealedEvent,
   isNikaRunSettledEvent,
+  isNikaTerminalEvent,
 } from './events.js';
 
 export type {
@@ -271,7 +272,12 @@ export type {
   NikaRemoteConfig,
   NikaEvent,
   NikaEventsOptions,
+  NikaExecutionCancelledEvent,
   NikaExecutionId,
+  NikaExecutionInterruptedEvent,
+  NikaExecutionRefusedEvent,
+  NikaExecutionSettledEvent,
+  NikaExecutionStartedEvent,
   NikaJobId,
   NikaMachineError,
   NikaReceipt,

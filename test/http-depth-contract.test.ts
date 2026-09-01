@@ -95,7 +95,13 @@ describe('HTTP configuration and bearer boundaries', () => {
       .resolves.toMatchObject({ verified: false });
     activeToken = TOKEN_B;
     await expect(oldClient.traceVerify({ job_id: 'job-1', trace_id: 'trace-1' }))
-      .rejects.toMatchObject({ name: 'NikaTransportError', transport: 'http' });
+      .rejects.toMatchObject({
+        name: 'NikaOperationError',
+        transport: 'http',
+        operation: 'traceVerify',
+        code: 'unauthorized',
+        status: 401,
+      });
     const rotatedClient = client(fetch as typeof globalThis.fetch, TOKEN_B);
     await expect(rotatedClient.traceVerify({ job_id: 'job-1', trace_id: 'trace-1' }))
       .resolves.toMatchObject({ trace_id: 'trace-1' });
@@ -297,7 +303,13 @@ describe('cross-client concurrency contracts', () => {
       ]);
       await expect(conflictClient.run('flow.nika.yaml', {
         idempotencyKey: 'shared-key',
-      })).rejects.toMatchObject({ name: 'NikaTransportError', transport: 'http' });
+      })).rejects.toMatchObject({
+        name: 'NikaOperationError',
+        transport: 'http',
+        operation: 'run',
+        code: 'idempotency_conflict',
+        status: 409,
+      });
       expect(admissions).toHaveLength(1);
     } finally {
       fixtureA.cleanup();

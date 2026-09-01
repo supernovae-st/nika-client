@@ -65,15 +65,25 @@ describe('typed HTTP refusals', () => {
     });
   });
 
-  it('keeps a durable-job refusal typed on status and cancel', async () => {
-    const fetch = vi.fn()
-      .mockResolvedValueOnce(healthResponse())
-      .mockResolvedValueOnce(jsonResponse({ id: 'job-1', status: 'running' }))
-      .mockResolvedValueOnce(jsonResponse(
-        { error: { code: 'job_not_found', message: 'job not found' } },
-        404,
-      ));
-    const nika = client(fetch as typeof globalThis.fetch);
+  it('keeps a durable-job refusal typed on status, then settles cancel', async () => {
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const path = new URL(String(input)).pathname;
+      if (path === '/health') return healthResponse();
+      if (path === '/v1/jobs/job-1') return jsonResponse({ id: 'job-1', status: 'running' });
+      if (path === '/v1/jobs/job-1/events') {
+        // An open stream that never yields: the run stays observed and non-terminal.
+        return new Response(new ReadableStream<Uint8Array>({ start() {} }), {
+          status: 200,
+          headers: { 'Content-Type': 'text/event-stream' },
+        });
+      }
+      if (path === '/v1/jobs/job-1/status') {
+        return jsonResponse({ error: { code: 'job_not_found', message: 'job not found' } }, 404);
+      }
+      if (path === '/v1/jobs/job-1/cancel') return jsonResponse({ id: 'job-1', status: 'cancelled' });
+      throw new Error(`unexpected ${path}`);
+    });
+    const nika = client(fetch as unknown as typeof globalThis.fetch);
     const run = await nika.attachRun('job-1');
     const refused = await failure(nika.status(run));
     expect(refused).toMatchObject({
@@ -82,6 +92,8 @@ describe('typed HTTP refusals', () => {
       code: 'job_not_found',
       status: 404,
     });
+    await expect(nika.cancel(run)).resolves.toMatchObject({ accepted: true, status: 'cancelled' });
+    await expect(run.done).resolves.toMatchObject({ status: 'cancelled' });
   });
 
   it('redacts a reflected bearer token inside the server message', async () => {

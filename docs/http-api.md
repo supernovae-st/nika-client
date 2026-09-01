@@ -2,6 +2,10 @@
 
 `openapi.json` is the checked-in contract pin. The SDK authenticates every
 route except public `GET /health`; bearer tokens are redacted from failures.
+A non-2xx answer typed as `{ error: { code, message } }` becomes a
+`NikaOperationError` carrying `status`, `code`, and the refused `operation`;
+any other non-2xx body is discarded and reported as a redacted
+`NikaTransportError`.
 
 | HTTP route | SDK surface | Contract |
 |---|---|---|

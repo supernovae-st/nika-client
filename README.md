@@ -39,12 +39,28 @@ not parse YAML or reconstruct proof in TypeScript.
 ## Install
 
 ```sh
-npm install @supernovae-st/nika-client
+npm view @supernovae-st/nika-client@0.116.2 version  # must report 0.116.2
+npm install @supernovae-st/nika-client@0.116.2
 ```
+
+If the registry reports any other version, the 0.116.2 release train is not
+complete. Earlier packages expose the retired `LocalNika`/HTTP split and do
+not implement the root facade documented below. The publication is complete
+only when the four matching native payload packages and this root client are
+all visible on npm.
 
 ## First local run
 
-Create `hello.nika.yaml`:
+The lowest-friction creation door is the engine-owned scaffold:
+
+```sh
+./node_modules/.bin/nika init --project-file
+./node_modules/.bin/nika new 01-hello hello.nika.yaml
+```
+
+`nika.yaml` is the project control plane. `hello.nika.yaml` is executable
+workflow intent and is the file passed to `check()` and `run()`. The generated
+workflow has this public envelope:
 
 ```yaml
 nika: sdk-hello

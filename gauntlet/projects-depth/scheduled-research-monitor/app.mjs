@@ -32,7 +32,10 @@ try {
   });
   assert.equal(created.applied, true);
   const originalRevision = created.status.revision;
-  const pauseUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  // Fixed far-future civil date: the declaration feeds the schedule revision,
+  // so a wall-clock date would make the committed replay evidence go stale at
+  // every UTC midnight (#63).
+  const pauseUntil = '2099-01-01';
   const paused = await nika.schedule('workflow.nika.yaml', {
     id: 'research-six-hourly',
     when: { kind: 'cadence', expression: 'TZ=UTC 0 */6 * * *' },

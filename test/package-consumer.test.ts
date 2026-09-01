@@ -11,5 +11,5 @@ describe('packed Node consumer surfaces', () => {
       timeout: 120_000,
     });
     expect(output).toContain('exposes typed ESM, CommonJS and package metadata');
-  });
+  }, 120_000);
 });

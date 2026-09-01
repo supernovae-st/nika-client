@@ -186,8 +186,9 @@ Observation-only clients need no local engine: `attachRun`, `status`,
 `events`, `cancel`, `schedule`, `scheduleStatus`, `listWorkflows`, `workflow`,
 and `traceVerify` run against the advertised server identity alone.
 
-The current persistent server requires a project file. A minimal `nika.yaml`
-is enough:
+The current persistent server requires a project file. If you ran
+`nika init --project-file` above you already have one (it carries a default
+cost ceiling); do not overwrite it. Otherwise a minimal `nika.yaml` is enough:
 
 ```yaml
 nika: my-project
@@ -400,7 +401,13 @@ for await (const event of nika.events(run)) {
 
 Run, execution, and job identities are branded opaque strings (`NikaRunId`,
 `NikaExecutionId`, `NikaJobId`). They remain assignable to `string`, but a
-plain `string` no longer stands in for one.
+plain `string` no longer stands in for one. Four words name three things:
+a **workflow** is the file (or resident name) you pass in; a **run** is this
+client's handle on one admission (`run.id`), and over HTTP that same string
+is the server's **job** id (`/v1/jobs/{id}`, `attachRun(jobId)`); an
+**execution** is the engine's own identity for what actually ran
+(`execution_id`, the `execution.*` event kinds), distinct from the run id and
+carried by the receipt together with the `trace_id`.
 
 ## Errors
 

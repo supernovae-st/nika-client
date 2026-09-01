@@ -7,8 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- `bin` and `NIKA_BIN` must be absolute paths. A bare name such as `nika`
+  reached `spawn()`, where the operating system resolved it through `PATH`,
+  the implicit lookup the README promises never happens; a relative path was
+  resolved against the working directory the same way. Both now refuse with
+  a message that names the value and the rule.
+
 ### Fixed
 
+- Engine identity probe refusals name the executable path and, when it did
+  not answer like an engine, the one command that settles it
+  (`<bin> --sdk-identity`) instead of `Engine identity probe failed`.
 - HTTP refusals that `nika serve` types as `{ error: { code, message } }`
   (401 `unauthorized`, 404 `job_not_found`, 409 `idempotency_conflict`, 422
   `malformed_snapshot` or a stamped `NIKA-…` admission code) now surface as

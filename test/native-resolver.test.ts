@@ -34,6 +34,27 @@ describe('native binary resolver', () => {
       .toThrow(NikaConfigurationError);
   });
 
+  it('refuses a bare name or a relative path, which the OS would resolve through PATH or cwd', () => {
+    // A bare `nika` in NIKA_BIN used to reach spawn(), where the operating
+    // system walked PATH for it: the implicit lookup the README refuses.
+    for (const value of ['nika', './nika', 'bin/nika', '../nika']) {
+      expect(() => resolveNikaBinary(value, { env: {} })).toThrow(NikaConfigurationError);
+      expect(() => resolveNikaBinary(undefined, { env: { NIKA_BIN: value } }))
+        .toThrow(NikaConfigurationError);
+    }
+    let caught: unknown;
+    try {
+      resolveNikaBinary(undefined, { env: { NIKA_BIN: 'nika' } });
+    } catch (error) {
+      caught = error;
+    }
+    const message = String((caught as Error).message);
+    expect(message).toContain('NIKA_BIN must be an absolute path');
+    expect(message).toContain('"nika"');
+    expect(message).toContain('PATH');
+    expect(resolveNikaBinary('/absolute/nika', { env: {} })).toBe('/absolute/nika');
+  });
+
   it('uses the stable unavailable error for unsupported and missing payloads', () => {
     expect(() => resolveNikaBinary(undefined, {
       env: {},

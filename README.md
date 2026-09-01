@@ -22,9 +22,11 @@ not parse YAML or reconstruct proof in TypeScript.
 
 - Node.js 22 or newer (the tested floor; an older major is unsupported, not
   refused, and `npm install` does not warn about it)
-- a compatible `nika` engine, resolved from `config.bin`, then `NIKA_BIN`,
-  then the exact optional platform package; a `nika` found on `PATH` is
-  deliberately never used
+- a compatible `nika` engine, resolved from `config.bin`, then `NIKA_BIN`
+  (absolute paths only), then the exact optional platform package; a bare
+  name or a relative path is refused because the operating system would
+  resolve it through `PATH` or the working directory, and a `nika` found on
+  `PATH` is deliberately never used
 - a `.nika.yaml` workflow
 
 ## Documentation

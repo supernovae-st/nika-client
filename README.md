@@ -398,6 +398,14 @@ closed, redacted `JobEvent` projection advertised by the pinned OpenAPI contract
 unknown HTTP fields are rejected at the trust boundary. The SDK never turns an
 unpriced model into `$0`.
 
+A refusal that `nika serve` types as `{ error: { code, message } }` surfaces as
+`NikaOperationError` with the HTTP `status`, the server `code` (for example
+`unauthorized`, `job_not_found`, `idempotency_conflict`, `malformed_snapshot`,
+or a stamped `NIKA-…` admission code) and the `operation` that was refused.
+Server messages are engine-owned and path-free; a reflected bearer token is
+redacted before it reaches an error message. A non-2xx answer without that
+typed body stays a `NikaTransportError` whose body is redacted entirely.
+
 ## Security boundaries
 
 - Token files stay out of argv and must be private (`0600`, 32–512 visible

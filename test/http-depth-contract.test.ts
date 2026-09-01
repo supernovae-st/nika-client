@@ -209,9 +209,32 @@ describe('HTTP response framing, status, and deadlines', () => {
     } catch (cause) {
       failure = cause;
     }
-    expect(failure).toBeInstanceOf(NikaTransportError);
-    expect(failure).toMatchObject({ name: 'NikaTransportError', transport: 'http' });
+    expect(failure).toBeInstanceOf(NikaOperationError);
+    expect(failure).toMatchObject({
+      name: 'NikaOperationError',
+      transport: 'http',
+      operation: 'run',
+      code: 'idempotency_conflict',
+      status: 409,
+    });
+    expect(String(failure)).toContain('HTTP 409 for /v1/jobs: idempotency_conflict');
     expect(String(failure)).toContain('[REDACTED]');
+    expect(String(failure)).not.toContain(TOKEN_A);
+  });
+
+  it('keeps an untyped non-2xx body redacted', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
+      .mockResolvedValueOnce(new Response(`reflected ${TOKEN_A}`, { status: 502 }));
+    let failure: unknown;
+    try {
+      await transport(fetch as typeof globalThis.fetch).startRun('flow.nika.yaml', {});
+    } catch (cause) {
+      failure = cause;
+    }
+    expect(failure).toBeInstanceOf(NikaTransportError);
+    expect(failure).not.toBeInstanceOf(NikaOperationError);
+    expect(String(failure)).toContain('HTTP 502 for /v1/jobs: [REDACTED]');
     expect(String(failure)).not.toContain(TOKEN_A);
   });
 });

@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- HTTP refusals that `nika serve` types as `{ error: { code, message } }`
+  (401 `unauthorized`, 404 `job_not_found`, 409 `idempotency_conflict`, 422
+  `malformed_snapshot` or a stamped `NIKA-…` admission code) now surface as
+  `NikaOperationError` with `status`, `code`, and the refused `operation`
+  instead of an opaque `HTTP <status> for <path>: [REDACTED]`; untyped bodies
+  keep the redacted transport error, and a reflected bearer token is redacted
+  from any server message. `NikaOperation` widens accordingly.
+
 ### Added
 
 - Discriminated `NikaEvent` union over the known lifecycle kinds with an

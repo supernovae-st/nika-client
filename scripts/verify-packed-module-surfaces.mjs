@@ -49,8 +49,35 @@ try {
   ].join(' ');
   run(process.execPath, ['--input-type=module', '--eval', esm], { cwd: consumer });
 
+  const typedConsumer = [
+    `import { Nika, type NikaConfig } from '${packageName}';`,
+    "const config: NikaConfig = { bin: '/tmp/nika' };",
+    'const client: Nika = new Nika(config);',
+    'void client;',
+    '',
+  ].join('\n');
+  await writeFile(path.join(consumer, 'consumer.mts'), typedConsumer);
+  await writeFile(path.join(consumer, 'consumer.cts'), typedConsumer);
+  run(process.execPath, [
+    path.join(root, 'node_modules/typescript/bin/tsc'),
+    '--module',
+    'NodeNext',
+    '--moduleResolution',
+    'NodeNext',
+    '--target',
+    'ES2022',
+    '--strict',
+    '--noEmit',
+    '--types',
+    'node',
+    '--typeRoots',
+    path.join(root, 'node_modules/@types'),
+    'consumer.mts',
+    'consumer.cts',
+  ], { cwd: consumer });
+
   process.stdout.write(
-    `Packed ${packageName}@${expectedVersion} exposes ESM, CommonJS and package metadata\n`,
+    `Packed ${packageName}@${expectedVersion} exposes typed ESM, CommonJS and package metadata\n`,
   );
 } finally {
   await rm(scratch, { recursive: true, force: true });

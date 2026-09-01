@@ -60,9 +60,10 @@ export function captureEngine(
       if (options.signal?.aborted) {
         reject(new NikaTransportError(options.transport, `${options.label} aborted by caller`));
       } else if (spawnError) {
+        // Name the path and the errno: a wrong NIKA_BIN is the common cause.
         reject(new NikaTransportError(
           options.transport,
-          `Cannot spawn engine for ${options.label}`,
+          `Cannot spawn ${bin} for ${options.label}: ${spawnError.message}`,
           { cause: spawnError },
         ));
       } else if (overflow) {

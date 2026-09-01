@@ -461,7 +461,10 @@ describe('HTTP transport', () => {
       .mockResolvedValueOnce(jsonResponse({ error: { code: 'not_found' } }, 404));
     await expect(remote(fetch as typeof globalThis.fetch).attachRun('absent'))
       .rejects.toMatchObject({
-        name: 'NikaTransportError',
+        name: 'NikaOperationError',
+        operation: 'attachRun',
+        code: 'not_found',
+        status: 404,
         message: expect.stringContaining('HTTP 404'),
       });
     expect(fetch).toHaveBeenCalledTimes(2);

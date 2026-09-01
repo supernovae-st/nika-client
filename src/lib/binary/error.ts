@@ -10,11 +10,14 @@ export class NikaEngineUnavailable extends NikaError {
   constructor(platform: string, arch: string, packageName?: string) {
     const target = `${platform}-${arch}`;
     const detail = packageName
-      ? `the optional payload ${packageName} is not installed`
+      ? `the optional payload ${packageName} is not installed `
+        + '(npm leaves it UNMET OPTIONAL when the registry has no version matching this client)'
       : 'there is no packaged payload for this host';
     super(
       `Nika engine unavailable for ${target}: ${detail}. `
-      + 'Install optional dependencies, set NIKA_BIN, or pass config.bin.',
+      + 'A nika found on PATH is deliberately not used. '
+      + 'Set NIKA_BIN=/absolute/path/to/nika, pass config.bin, '
+      + 'or install the matching payload package.',
     );
     this.name = 'NikaEngineUnavailable';
     this.platform = platform;

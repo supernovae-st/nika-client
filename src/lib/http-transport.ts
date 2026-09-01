@@ -119,7 +119,7 @@ export class HttpTransport implements Transport {
         'Remote snapshot capture does not support model or nativeStrict overrides',
       );
     }
-    const captured = await this.captureSnapshot(workflow, options.signal);
+    const captured = await this.captureSnapshot(workflow, options.signal, true);
     if (captured.bytes === undefined) return captured.report;
     const snapshot = captured.identity;
     if (!snapshot) {
@@ -130,7 +130,7 @@ export class HttpTransport implements Transport {
       headers: { 'Content-Type': 'application/json' },
       body: captured.bytes,
       signal: options.signal,
-    });
+    }, true, [200], 'check');
     if (
       Object.keys(acknowledged).some((key) => ![
         'status', 'snapshot_digest', 'root', 'units',
@@ -174,7 +174,7 @@ export class HttpTransport implements Transport {
         'Idempotency-Key': idempotencyKey,
       },
       body: captured.bytes,
-    }, true, [200, 202]);
+    }, true, [200, 202], 'run');
     const id = typeof admitted.id === 'string' ? admitted.id as NikaRunId : undefined;
     if (!id) {
       throw new NikaProtocolError(this.kind, 'Job admission response omitted its id');
@@ -192,7 +192,7 @@ export class HttpTransport implements Transport {
     const object = await this.json(`/v1/jobs/${encodeURIComponent(id)}`, {
       method: 'GET',
       headers: { Accept: 'application/json' },
-    });
+    }, true, [200], 'attachRun');
     const durable = durableJob(object, id, this.kind);
     return this.httpRun(id as NikaRunId, options.lastEventId ?? 0, durable);
   }
@@ -202,7 +202,7 @@ export class HttpTransport implements Transport {
     const object = await this.json('/v1/workflows', {
       method: 'GET',
       headers: { Accept: 'application/json' },
-    });
+    }, true, [200], 'listWorkflows');
     if (
       Object.keys(object).some((key) => key !== 'workflows')
       || !Array.isArray(object.workflows)
@@ -219,7 +219,7 @@ export class HttpTransport implements Transport {
     const object = await this.json(`/v1/workflows/${workflowPath(name)}`, {
       method: 'GET',
       headers: { Accept: 'application/json' },
-    });
+    }, true, [200], 'workflow');
     if (
       Object.keys(object).some((key) => key !== 'workflow')
       || !isContainedWorkflowName(object.workflow)
@@ -282,6 +282,9 @@ export class HttpTransport implements Transport {
     const object = await this.json(
       `/v1/jobs/${encodeURIComponent(jobId)}/trace/verify`,
       { method: 'GET', signal: options.signal },
+      true,
+      [200],
+      'traceVerify',
     );
     if (
       typeof object.verdict !== 'string'
@@ -391,7 +394,7 @@ export class HttpTransport implements Transport {
         const object = await this.json(`/v1/jobs/${encodeURIComponent(id)}/status`, {
           method: 'GET',
           headers: { Accept: 'application/json' },
-        });
+        }, true, [200], 'status');
         if (typeof object.status !== 'string' || !JOB_STATUSES.has(object.status)) {
           throw new NikaProtocolError(this.kind, 'Job status response was malformed');
         }
@@ -400,7 +403,7 @@ export class HttpTransport implements Transport {
       cancel: async (): Promise<NikaCancelResult> => {
         const object = await this.json(`/v1/jobs/${encodeURIComponent(id)}/cancel`, {
           method: 'POST',
-        });
+        }, true, [200], 'cancel');
         const durable = durableJob(object, id, this.kind);
         if (!isTerminal(durable.status)) {
           throw new NikaProtocolError(this.kind, 'Cancellation did not return a terminal job');
@@ -874,6 +877,7 @@ export class HttpTransport implements Transport {
   private async captureSnapshot(
     workflow: string,
     signal?: AbortSignal,
+    teach = false,
   ): Promise<CapturedSnapshot> {
     const identity = await this.ensureLocalEngine();
     const captured = await captureEngine(
@@ -901,6 +905,9 @@ export class HttpTransport implements Transport {
     delete report.execution_snapshot;
     if (captured.exitCode !== 0 || outer.clean !== true) {
       report.clean = false;
+      if (teach && !Array.isArray(outer.findings)) {
+        return { report: await this.teachingReport(workflow, report, signal) };
+      }
       return { report: report as NikaCheckResult };
     }
     compatibleEngineIdentity(outer, this.kind, identity);
@@ -927,21 +934,81 @@ export class HttpTransport implements Transport {
     };
   }
 
+  /**
+   * A red workflow has no exportable snapshot, so the capture returns one
+   * error line and no findings. Ask the same local engine for its plain
+   * teaching report, so `findings[]` reads the same on both transports. The
+   * refused capture line is preserved as `snapshot_error` rather than
+   * overwriting whatever the engine put in `error`. No bytes leave the
+   * machine on this path: the caller still sees `clean: false`.
+   */
+  private async teachingReport(
+    workflow: string,
+    refused: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<NikaCheckResult> {
+    const captured = await captureEngine(
+      this.localEngine().bin,
+      ['check', workflow, '--json'],
+      {
+        cwd: this.options.cwd,
+        signal,
+        bufferBytes: this.options.machineBufferBytes,
+        transport: this.kind,
+        label: 'SDK teaching check',
+      },
+    );
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(captured.stdout.trim());
+    } catch {
+      return refused as NikaCheckResult;
+    }
+    const plain = machineObject(parsed);
+    if (!plain) return refused as NikaCheckResult;
+    const report: Record<string, unknown> = {
+      ...plain,
+      clean: false,
+      exitCode: captured.exitCode,
+      ...(refused.error === undefined ? {} : { snapshot_error: refused.error }),
+    };
+    delete report.execution_snapshot;
+    return report as NikaCheckResult;
+  }
+
   private async json(
     path: string,
     init: RequestInit,
     authenticated = true,
     acceptedStatuses: readonly number[] = [200],
+    operation?: NikaOperation,
   ): Promise<Record<string, unknown>> {
     const response = await this.fetchResponse(path, init, true, authenticated, false);
     if (!acceptedStatuses.includes(response.status)) {
-      await discardResponse(response);
       if (response.ok) {
+        await discardResponse(response);
         throw new NikaProtocolError(
           this.kind,
           `HTTP ${path} returned non-contract status ${response.status}`,
         );
       }
+      // A refusal the server typed as `{ error: { code, message } }` keeps its
+      // code. The message is engine-owned and already path-free; the bearer
+      // token is redacted defensively in case a hostile server echoes it.
+      const refusal = operation === undefined
+        ? undefined
+        : await this.readRefusal(response, path);
+      if (operation !== undefined && refusal) {
+        throw new NikaOperationError(
+          operation,
+          this.kind,
+          refusal.code,
+          `HTTP ${response.status} for ${path}: ${refusal.code}`
+          + (refusal.message ? ` (${refusal.message})` : ''),
+          { status: response.status, machineCode: refusal.code },
+        );
+      }
+      await discardResponse(response);
       throw new NikaTransportError(
         this.kind,
         `HTTP ${response.status} for ${path}: [REDACTED]`,
@@ -957,6 +1024,55 @@ export class HttpTransport implements Transport {
       throw new NikaProtocolError(this.kind, `HTTP ${path} returned an invalid content-type`);
     }
     return this.readObservationObject(response, path, init.signal ?? undefined);
+  }
+
+  /**
+   * Read a non-2xx body only when the server typed it as an engine refusal.
+   * Anything else (plain text, oversized, malformed, a code that is not a
+   * plain identifier, a code that carries the bearer token) is discarded and
+   * the caller falls back to the redacted transport error.
+   */
+  private async readRefusal(
+    response: Response,
+    path: string,
+  ): Promise<{ code: string; message?: string } | undefined> {
+    const contentType = response.headers
+      .get('Content-Type')
+      ?.split(';', 1)[0]
+      ?.trim()
+      .toLowerCase();
+    if (contentType !== 'application/json') {
+      await discardResponse(response);
+      return undefined;
+    }
+    let object: Record<string, unknown>;
+    try {
+      object = await this.readObservationObject(response, path);
+    } catch {
+      return undefined;
+    }
+    const error = machineObject(object.error);
+    const code = error?.code;
+    if (
+      typeof code !== 'string'
+      || !/^[A-Za-z][A-Za-z0-9_.:-]{0,63}$/.test(code)
+      || code.includes(this.options.token)
+    ) {
+      return undefined;
+    }
+    const message = typeof error?.message === 'string' && error.message.length > 0
+      ? this.redact(error.message)
+      : undefined;
+    return { code, ...(message ? { message } : {}) };
+  }
+
+  /** Engine messages are already path-free; a reflected bearer token never survives. */
+  private redact(text: string): string {
+    const clean = text
+      .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+      .split(this.options.token)
+      .join('[REDACTED]');
+    return clean.length > 240 ? `${clean.slice(0, 240)}...` : clean;
   }
 
   private async operationJson(
@@ -1185,7 +1301,9 @@ function operationFindings(values: unknown[]): NikaOperationFinding[] | undefine
 }
 
 function pathForOperation(operation: NikaOperation): string {
-  return operation === 'schedule' ? 'schedule apply' : 'schedule status';
+  if (operation === 'schedule') return 'schedule apply';
+  if (operation === 'scheduleStatus') return 'schedule status';
+  return operation;
 }
 
 function isTerminal(status: unknown): status is string {

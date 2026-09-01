@@ -51,6 +51,9 @@ Some operations deliberately have one authority:
   `NikaCompatibilityError`;
 - remote execution still needs a compatible local engine to capture an
   immutable snapshot before any network admission;
+- when that capture is red the HTTP adapter returns the local engine's plain
+  `nika check --json` report, so `findings[]` stays canonical and no workflow
+  bytes are sent;
 - HTTP observation (attach, durable status, events, cancel, workflow catalog,
   schedule status, trace verdicts) needs no local engine;
 - remote trace verification currently returns the engine's typed unavailable

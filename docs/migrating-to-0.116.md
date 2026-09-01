@@ -71,6 +71,31 @@ a process restart instead of rebuilding a handle by hand.
 `nika run --dry-run --json`, and `nika test`) until a future typed authority is
 explicitly admitted. This release does not silently emulate them.
 
+## The check report changed shape
+
+`check()` still returns `clean` and `exitCode`, but the object around them is
+no longer the 0.115 `LocalCheckReport` (eleven curated fields plus a `raw`
+escape hatch). It is the engine's own machine report, passed through: the
+former `raw` contents are now the top level, `reportVersion` is
+`report_version`, and `parseFatal` and `warnings` are gone. The engine emits
+its identity under both casings (`engineVersion` and `engine_version`,
+`buildSha` and `build_sha`, `specSha` and `spec_sha`, `checkReportVersion`
+and `report_version`); read either, do not diff them. In TypeScript only
+`report_version`, `clean`, and `exitCode` are typed; every other field,
+including `cost`, `findings`, and `hints`, is `unknown` behind an index
+signature, so strict callers narrow it themselves. Two problems that look like
+findings (a missing `permits:` block, a missing `max_tokens:`) are reported
+under `hints[]` (`{ kind, task, advice }`, no `code`), not `findings[]`, in
+both versions.
+
+`runToEnd()` returned `{ ok, exitCode, events[] }` with every event buffered.
+`run.done` returns the terminal result only; the events ride `events(run)`
+as a bounded live iterator (default 256), so observe it concurrently or the
+prefix is gone. The removed methods (`version()`, `dryRunPlan()`, path-based
+`traceVerify()`) are absent, not stubbed: calling them throws a plain
+`TypeError: … is not a function`, and a trace that only exists as a file
+path in a later process has no SDK verification door in 0.116.
+
 ## New resident discovery
 
 ```ts

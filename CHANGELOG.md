@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- HTTP refusals that `nika serve` types as `{ error: { code, message } }`
+  (401 `unauthorized`, 404 `job_not_found`, 409 `idempotency_conflict`, 422
+  `malformed_snapshot` or a stamped `NIKA-…` admission code) now surface as
+  `NikaOperationError` with `status`, `code`, and the refused `operation`
+  instead of an opaque `HTTP <status> for <path>: [REDACTED]`; untyped bodies
+  keep the redacted transport error, and a reflected bearer token is redacted
+  from any server message. `NikaOperation` widens accordingly.
+
 ### Added
 
 - Discriminated `NikaEvent` union over the known lifecycle kinds with an
@@ -18,6 +28,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   previous transport shape, so existing callers compile unchanged.
 - Branded opaque `NikaRunId`, `NikaExecutionId`, and `NikaJobId` identity
   types on the run surfaces that already carried those identities.
+- Typed HTTP transport event kinds on the `NikaEvent` union
+  (`NikaExecutionStartedEvent`, `NikaExecutionSettledEvent`,
+  `NikaExecutionCancelledEvent`, `NikaExecutionRefusedEvent`,
+  `NikaExecutionInterruptedEvent`), alongside the transport-agnostic
+  `isNikaTerminalEvent` guard, which narrows any frame the engine reported
+  with a terminal status rather than matching on its kind.
+
+### Fixed
+
+- `isNikaRunSettledEvent` now narrows the HTTP settlement frame
+  (`execution.settled`) as well as the native `run_settled` one. It
+  previously never returned true on a `nika serve` stream, so the documented
+  way to read status, outputs, and receipt together was dead on that
+  transport.
+
+### Security
+
+- `allowInsecureHttp: true` now admits plaintext HTTP only for a loopback host
+  (`localhost`, `127.0.0.0/8`, `[::1]`); any other host over `http:` is a
+  `NikaConfigurationError`, so the opt-in can no longer send a bearer token in
+  clear text to a routable address.
 
 ### Fixed
 

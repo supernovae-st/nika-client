@@ -72,6 +72,53 @@ describe('HTTP configuration and bearer boundaries', () => {
       .toThrow(NikaConfigurationError);
   });
 
+  it.each([
+    ['http://198.51.100.7:8787', '198.51.100.7'],
+    ['http://example.test', 'example.test'],
+    ['http://[2001:db8::1]:8787', '[2001:db8::1]'],
+    ['http://127.0.0.1.evil.test', '127.0.0.1.evil.test'],
+  ])('refuses plaintext %s off loopback even with the opt-in', (url, host) => {
+    let thrown: unknown;
+    try {
+      new Nika({ url, token: TOKEN_A, allowInsecureHttp: true, bin: HTTP_DEPTH_FIXTURE });
+    } catch (cause) {
+      thrown = cause;
+    }
+    expect(thrown).toBeInstanceOf(NikaConfigurationError);
+    const message = (thrown as NikaConfigurationError).message;
+    expect(message).toContain('loopback');
+    expect(message).toContain(host);
+    expect(message).not.toContain(TOKEN_A);
+  });
+
+  it.each([
+    'http://127.0.0.1:8787',
+    'http://127.1.2.3:8787',
+    'http://localhost:8787',
+    'http://[::1]:8787',
+    'http://[::ffff:127.0.0.1]:8787',
+  ])('admits explicit loopback plaintext %s', (url) => {
+    expect(new Nika({
+      url,
+      token: TOKEN_A,
+      allowInsecureHttp: true,
+      bin: HTTP_DEPTH_FIXTURE,
+    }).transportKind).toBe('http');
+  });
+
+  it('still demands the explicit opt-in on loopback and never on HTTPS', () => {
+    expect(() => new Nika({
+      url: 'http://127.0.0.1:8787',
+      token: TOKEN_A,
+      bin: HTTP_DEPTH_FIXTURE,
+    })).toThrow(/allowInsecureHttp/);
+    expect(new Nika({
+      url: 'https://198.51.100.7',
+      token: TOKEN_A,
+      bin: HTTP_DEPTH_FIXTURE,
+    }).transportKind).toBe('http');
+  });
+
   it('keeps token rotation instance-scoped and never authenticates health', async () => {
     let activeToken = TOKEN_A;
     const seen: Array<{ path: string; authorization: string | null }> = [];
@@ -95,7 +142,13 @@ describe('HTTP configuration and bearer boundaries', () => {
       .resolves.toMatchObject({ verified: false });
     activeToken = TOKEN_B;
     await expect(oldClient.traceVerify({ job_id: 'job-1', trace_id: 'trace-1' }))
-      .rejects.toMatchObject({ name: 'NikaTransportError', transport: 'http' });
+      .rejects.toMatchObject({
+        name: 'NikaOperationError',
+        transport: 'http',
+        operation: 'traceVerify',
+        code: 'unauthorized',
+        status: 401,
+      });
     const rotatedClient = client(fetch as typeof globalThis.fetch, TOKEN_B);
     await expect(rotatedClient.traceVerify({ job_id: 'job-1', trace_id: 'trace-1' }))
       .resolves.toMatchObject({ trace_id: 'trace-1' });
@@ -209,9 +262,32 @@ describe('HTTP response framing, status, and deadlines', () => {
     } catch (cause) {
       failure = cause;
     }
-    expect(failure).toBeInstanceOf(NikaTransportError);
-    expect(failure).toMatchObject({ name: 'NikaTransportError', transport: 'http' });
+    expect(failure).toBeInstanceOf(NikaOperationError);
+    expect(failure).toMatchObject({
+      name: 'NikaOperationError',
+      transport: 'http',
+      operation: 'run',
+      code: 'idempotency_conflict',
+      status: 409,
+    });
+    expect(String(failure)).toContain('HTTP 409 for /v1/jobs: idempotency_conflict');
     expect(String(failure)).toContain('[REDACTED]');
+    expect(String(failure)).not.toContain(TOKEN_A);
+  });
+
+  it('keeps an untyped non-2xx body redacted', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
+      .mockResolvedValueOnce(new Response(`reflected ${TOKEN_A}`, { status: 502 }));
+    let failure: unknown;
+    try {
+      await transport(fetch as typeof globalThis.fetch).startRun('flow.nika.yaml', {});
+    } catch (cause) {
+      failure = cause;
+    }
+    expect(failure).toBeInstanceOf(NikaTransportError);
+    expect(failure).not.toBeInstanceOf(NikaOperationError);
+    expect(String(failure)).toContain('HTTP 502 for /v1/jobs: [REDACTED]');
     expect(String(failure)).not.toContain(TOKEN_A);
   });
 });
@@ -274,7 +350,13 @@ describe('cross-client concurrency contracts', () => {
       ]);
       await expect(conflictClient.run('flow.nika.yaml', {
         idempotencyKey: 'shared-key',
-      })).rejects.toMatchObject({ name: 'NikaTransportError', transport: 'http' });
+      })).rejects.toMatchObject({
+        name: 'NikaOperationError',
+        transport: 'http',
+        operation: 'run',
+        code: 'idempotency_conflict',
+        status: 409,
+      });
       expect(admissions).toHaveLength(1);
     } finally {
       fixtureA.cleanup();

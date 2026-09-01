@@ -5,6 +5,7 @@ import type {
   NikaCheckResult,
   NikaEvent,
   NikaReceipt,
+  NikaRunId,
   NikaRunOptions,
   NikaRunResult,
   NikaRunStatus,
@@ -18,7 +19,7 @@ import type {
 } from '../types.js';
 
 export interface TransportRun {
-  readonly id: string;
+  readonly id: NikaRunId;
   readonly events: AsyncIterable<NikaEvent>;
   readonly done: Promise<NikaRunResult>;
   status(): Promise<NikaRunStatus>;

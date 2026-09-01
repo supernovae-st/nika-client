@@ -13,6 +13,7 @@ import type {
   NikaCheckResult,
   NikaEvent,
   NikaReceipt,
+  NikaRunId,
   NikaRunOptions,
   NikaRunResult,
   NikaRunStatus,
@@ -87,7 +88,7 @@ export class NativeProcessTransport implements Transport {
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: false,
     });
-    return this.processRun(randomUUID(), child);
+    return this.processRun(randomUUID() as NikaRunId, child);
   }
 
   async attachRun(_id: string, _options: NikaAttachRunOptions): Promise<TransportRun> {
@@ -177,7 +178,7 @@ export class NativeProcessTransport implements Transport {
     };
   }
 
-  private processRun(id: string, child: ChildProcessByStdio<null, Readable, Readable>): TransportRun {
+  private processRun(id: NikaRunId, child: ChildProcessByStdio<null, Readable, Readable>): TransportRun {
     let settled = false;
     let lastEvent: NikaEvent | undefined;
     let receipt: NikaReceipt | undefined;

@@ -18,6 +18,7 @@ import type {
   NikaEvent,
   NikaLocalConfig,
   NikaRun,
+  NikaRunId,
   NikaRunOptions,
   NikaScheduleOptions,
 } from '../src/index.js';
@@ -313,9 +314,9 @@ describe.skipIf(!posix)('native-process transport', () => {
     await expect(client.run('ok.nika.yaml', { idempotencyKey: 'remote-only' }))
       .rejects.toBeInstanceOf(NikaCompatibilityError);
     const foreign: NikaRun = {
-      id: 'foreign',
+      id: 'foreign' as NikaRunId,
       done: Promise.resolve({
-        id: 'foreign',
+        id: 'foreign' as NikaRunId,
         status: 'succeeded',
         transport: 'native-process',
       }),

@@ -99,15 +99,25 @@ export class Nika {
     return this.transport.check(workflowName(workflow), options);
   }
 
-  async run(workflow: string, options: NikaRunOptions = {}): Promise<NikaRun> {
+  /**
+   * `Outputs` is the caller's projection of the engine-emitted outputs map;
+   * the SDK transports outputs without validating their shape.
+   */
+  async run<Outputs extends Record<string, unknown> = Record<string, unknown>>(
+    workflow: string,
+    options: NikaRunOptions = {},
+  ): Promise<NikaRun<Outputs>> {
     const source = await this.transport.startRun(workflowName(workflow), options);
     const session = new RunSession(source, this.eventBufferSize);
     this.sessions.set(session.run, session);
-    return session.run;
+    return session.run as NikaRun<Outputs>;
   }
 
   /** Reattach this client process to an already-admitted durable HTTP job. */
-  async attachRun(id: string, options: NikaAttachRunOptions = {}): Promise<NikaRun> {
+  async attachRun<Outputs extends Record<string, unknown> = Record<string, unknown>>(
+    id: string,
+    options: NikaAttachRunOptions = {},
+  ): Promise<NikaRun<Outputs>> {
     const lastEventId = options.lastEventId ?? 0;
     if (!Number.isSafeInteger(lastEventId) || lastEventId < 0) {
       throw new RangeError('lastEventId must be a non-negative safe integer');
@@ -115,7 +125,7 @@ export class Nika {
     const source = await this.transport.attachRun(jobId(id), { lastEventId });
     const session = new RunSession(source, this.eventBufferSize);
     this.sessions.set(session.run, session);
-    return session.run;
+    return session.run as NikaRun<Outputs>;
   }
 
   /** List contained workflow names from a resident HTTP authority. */
@@ -128,8 +138,11 @@ export class Nika {
     return this.transport.workflow(workflowName(name));
   }
 
-  events(run: NikaRun, options: NikaEventsOptions = {}): AsyncIterable<NikaEvent> {
-    return this.session(run).events(options);
+  events<Outputs extends Record<string, unknown> = Record<string, unknown>>(
+    run: NikaRun<Outputs>,
+    options: NikaEventsOptions = {},
+  ): AsyncIterable<NikaEvent<Outputs>> {
+    return this.session(run).events(options) as AsyncIterable<NikaEvent<Outputs>>;
   }
 
   cancel(run: NikaRun): Promise<NikaCancelResult> {
@@ -243,6 +256,11 @@ export {
 
 export { NikaEngineUnavailable };
 
+export {
+  isNikaRunSealedEvent,
+  isNikaRunSettledEvent,
+} from './events.js';
+
 export type {
   NikaCancelResult,
   NikaAttachRunOptions,
@@ -253,13 +271,18 @@ export type {
   NikaRemoteConfig,
   NikaEvent,
   NikaEventsOptions,
+  NikaExecutionId,
+  NikaJobId,
   NikaMachineError,
   NikaReceipt,
   NikaOperation,
   NikaOperationFinding,
   NikaRun,
+  NikaRunId,
   NikaRunOptions,
   NikaRunResult,
+  NikaRunSealedEvent,
+  NikaRunSettledEvent,
   NikaRunStatus,
   NikaScheduleAfterSkip,
   NikaScheduleApplyResult,
@@ -275,8 +298,16 @@ export type {
   NikaScheduleSlot,
   NikaScheduleStatus,
   NikaScheduleWhen,
+  NikaTaskCompletedEvent,
+  NikaTaskScheduledEvent,
+  NikaTaskStartedEvent,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
   NikaTransportKind,
+  NikaUnknownEvent,
+  NikaWorkflowCompletedEvent,
+  NikaWorkflowFailedEvent,
+  NikaWorkflowInterruptedEvent,
   NikaWorkflowMetadata,
+  NikaWorkflowStartedEvent,
 } from './types.js';

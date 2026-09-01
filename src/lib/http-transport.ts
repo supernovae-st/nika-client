@@ -12,7 +12,9 @@ import type {
   NikaCheckOptions,
   NikaCheckResult,
   NikaEvent,
+  NikaExecutionId,
   NikaReceipt,
+  NikaRunId,
   NikaRunOptions,
   NikaRunResult,
   NikaRunStatus,
@@ -69,7 +71,7 @@ interface ObservationState {
 interface DurableJob {
   id: string;
   status: string;
-  execution_id?: string;
+  execution_id?: NikaExecutionId;
   trace_id?: string;
   outputs?: Record<string, unknown>;
   receipt?: NikaReceipt;
@@ -173,7 +175,7 @@ export class HttpTransport implements Transport {
       },
       body: captured.bytes,
     }, true, [200, 202]);
-    const id = typeof admitted.id === 'string' ? admitted.id : undefined;
+    const id = typeof admitted.id === 'string' ? admitted.id as NikaRunId : undefined;
     if (!id) {
       throw new NikaProtocolError(this.kind, 'Job admission response omitted its id');
     }
@@ -192,7 +194,7 @@ export class HttpTransport implements Transport {
       headers: { Accept: 'application/json' },
     });
     const durable = durableJob(object, id, this.kind);
-    return this.httpRun(id, options.lastEventId ?? 0, durable);
+    return this.httpRun(id as NikaRunId, options.lastEventId ?? 0, durable);
   }
 
   async listWorkflows(): Promise<readonly string[]> {
@@ -298,7 +300,7 @@ export class HttpTransport implements Transport {
   }
 
   private httpRun(
-    id: string,
+    id: NikaRunId,
     initialSequence = 0,
     attachedState?: DurableJob,
     expectedSnapshotDigest?: string,
@@ -1295,7 +1297,9 @@ function durableJob(
   return {
     id: value.id,
     status: value.status,
-    ...(typeof value.execution_id === 'string' ? { execution_id: value.execution_id } : {}),
+    ...(typeof value.execution_id === 'string'
+      ? { execution_id: value.execution_id as NikaExecutionId }
+      : {}),
     ...(typeof value.trace_id === 'string' ? { trace_id: value.trace_id } : {}),
     ...(outputs ? { outputs } : {}),
     ...(receipt ? { receipt: Object.freeze(receipt) } : {}),

@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Discriminated `NikaEvent` union over the known lifecycle kinds with an
+  intentional `NikaUnknownEvent` fallback, typed `status`/`outputs`/`receipt`
+  on the terminal `run_settled` and `workflow_completed` frames, and the
+  `isNikaRunSettledEvent` / `isNikaRunSealedEvent` narrowing guards.
+- Caller-owned `Outputs` type argument on `run`, `attachRun`, and `events`,
+  flowing into `NikaRunResult` and the terminal frames; it defaults to the
+  previous transport shape, so existing callers compile unchanged.
+- Branded opaque `NikaRunId`, `NikaExecutionId`, and `NikaJobId` identity
+  types on the run surfaces that already carried those identities.
+
 ## [0.116.2] - 2026-08-31
 
 Lockstep recovery release for engine v0.116.2. The HTTP schema is unchanged

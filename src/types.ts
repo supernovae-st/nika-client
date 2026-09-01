@@ -41,6 +41,26 @@ export type NikaConfig = NikaLocalConfig | NikaRemoteConfig;
 
 export type NikaTransportKind = 'native-process' | 'http';
 
+/**
+ * Brand carrier for engine-issued identities. The SDK brands an identity
+ * only where the engine (or its durable record) issues it; it never invents
+ * one itself.
+ */
+declare const NikaIdentityBrand: unique symbol;
+
+interface NikaIdentity<Name extends string> {
+  readonly [NikaIdentityBrand]: Name;
+}
+
+/** A run identity issued by `run()` or `attachRun()`. Assignable to `string`. */
+export type NikaRunId = string & NikaIdentity<'NikaRunId'>;
+
+/** An engine execution identity carried by terminal settlements and receipts. */
+export type NikaExecutionId = string & NikaIdentity<'NikaExecutionId'>;
+
+/** A durable `nika serve` job identity accepted by `attachRun()`. */
+export type NikaJobId = string & NikaIdentity<'NikaJobId'>;
+
 /** Machine vocabulary is additive. Known words aid completion without closing the set. */
 export type NikaRunStatus =
   | 'queued'
@@ -60,15 +80,106 @@ export interface NikaCheckResult {
   [key: string]: unknown;
 }
 
-/** One engine-owned run event. Event kinds and future fields stay open. */
-export interface NikaEvent {
-  kind?: string;
+/** Fields every engine event can carry, whether its kind is known or not. */
+interface NikaEventFields {
   status?: NikaRunStatus;
   sequence?: number;
   receipt?: NikaReceipt;
   outputs?: Record<string, unknown>;
   [key: string]: unknown;
 }
+
+/** The workflow graph started executing. */
+export interface NikaWorkflowStartedEvent extends NikaEventFields {
+  kind: 'workflow_started';
+}
+
+/** A task was scheduled for execution. */
+export interface NikaTaskScheduledEvent extends NikaEventFields {
+  kind: 'task_scheduled';
+}
+
+/** A task started executing. */
+export interface NikaTaskStartedEvent extends NikaEventFields {
+  kind: 'task_started';
+}
+
+/** A task settled. Per-task payloads ride the open fields. */
+export interface NikaTaskCompletedEvent extends NikaEventFields {
+  kind: 'task_completed';
+}
+
+/**
+ * The workflow graph settled. This is the terminal frame of a native-process
+ * run and carries the run's outputs, receipt, and final status together.
+ */
+export interface NikaWorkflowCompletedEvent<
+  Outputs extends Record<string, unknown> = Record<string, unknown>,
+> extends NikaEventFields {
+  kind: 'workflow_completed';
+  status?: NikaRunStatus;
+  outputs?: Outputs;
+  receipt?: NikaReceipt;
+}
+
+/** The workflow graph failed. */
+export interface NikaWorkflowFailedEvent extends NikaEventFields {
+  kind: 'workflow_failed';
+  error?: NikaMachineError;
+}
+
+/** The workflow graph was interrupted before settling. */
+export interface NikaWorkflowInterruptedEvent extends NikaEventFields {
+  kind: 'workflow_interrupted';
+}
+
+/**
+ * The terminal settlement frame of a durable `nika serve` job: the one frame
+ * that carries the run's outputs, receipt, and final status together.
+ */
+export interface NikaRunSettledEvent<
+  Outputs extends Record<string, unknown> = Record<string, unknown>,
+> extends NikaEventFields {
+  kind: 'run_settled';
+  status?: NikaRunStatus;
+  outputs?: Outputs;
+  receipt?: NikaReceipt;
+}
+
+/** The run's trace chain was sealed. */
+export interface NikaRunSealedEvent extends NikaEventFields {
+  kind: 'run_sealed';
+  receipt?: NikaReceipt;
+}
+
+/**
+ * Forward-compatibility variant: any kind this SDK version does not know
+ * yet stays representable, so the event union is intentionally
+ * non-exhaustive.
+ */
+export interface NikaUnknownEvent extends NikaEventFields {
+  kind?: string;
+}
+
+/**
+ * One engine-owned run event. Known kinds discriminate on `kind`; unknown
+ * kinds fall back to `NikaUnknownEvent`. Future fields stay open on every
+ * variant. `Outputs` types the terminal frames' outputs and defaults to the
+ * transport shape, so untyped callers see no change.
+ */
+export type NikaEvent<
+  Outputs extends Record<string, unknown> = Record<string, unknown>,
+> =
+  | NikaWorkflowStartedEvent
+  | NikaTaskScheduledEvent
+  | NikaTaskStartedEvent
+  | NikaTaskCompletedEvent
+  | NikaWorkflowCompletedEvent<Outputs>
+  | NikaWorkflowFailedEvent
+  | NikaWorkflowInterruptedEvent
+  | NikaRunSettledEvent<Outputs>
+  | NikaRunSealedEvent
+  | NikaUnknownEvent;
 
 /**
  * Engine-issued proof material. The SDK transports it but never constructs,
@@ -83,25 +194,31 @@ export interface NikaMachineError {
 }
 
 /** The only terminal value for a run. */
-export interface NikaRunResult {
-  id: string;
+export interface NikaRunResult<
+  Outputs extends Record<string, unknown> = Record<string, unknown>,
+> {
+  id: NikaRunId;
   status: NikaRunStatus;
   transport: NikaTransportKind;
   exitCode?: number;
-  outputs?: Record<string, unknown>;
+  outputs?: Outputs;
   receipt?: NikaReceipt;
   error?: NikaMachineError;
+  /** Engine execution identity, when the transport surface reports one. */
+  execution_id?: NikaExecutionId;
   [key: string]: unknown;
 }
 
 /** A run identity plus its one terminal settlement. */
-export interface NikaRun {
-  readonly id: string;
-  readonly done: Promise<NikaRunResult>;
+export interface NikaRun<
+  Outputs extends Record<string, unknown> = Record<string, unknown>,
+> {
+  readonly id: NikaRunId;
+  readonly done: Promise<NikaRunResult<Outputs>>;
 }
 
 export interface NikaCancelResult {
-  runId: string;
+  runId: NikaRunId;
   accepted: boolean;
   status: string;
   transport: NikaTransportKind;

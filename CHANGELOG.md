@@ -7,8 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- `bin` and `NIKA_BIN` must be absolute paths. A bare name such as `nika`
+  reached `spawn()`, where the operating system resolved it through `PATH`,
+  the implicit lookup the README promises never happens; a relative path was
+  resolved against the working directory the same way. Both now refuse with
+  a message that names the value and the rule.
+
 ### Fixed
 
+- Engine identity probe refusals name the executable path and, when it did
+  not answer like an engine, the one command that settles it
+  (`<bin> --sdk-identity`) instead of `Engine identity probe failed`.
+- HTTP refusals that `nika serve` types as `{ error: { code, message } }`
+  (401 `unauthorized`, 404 `job_not_found`, 409 `idempotency_conflict`, 422
+  `malformed_snapshot` or a stamped `NIKA-…` admission code) now surface as
+  `NikaOperationError` with `status`, `code`, and the refused `operation`
+  instead of an opaque `HTTP <status> for <path>: [REDACTED]`; untyped bodies
+  keep the redacted transport error, and a reflected bearer token is redacted
+  from any server message. `NikaOperation` widens accordingly.
+- A failed native run now settles `run.done` with the failure the engine
+  named. The engine states a task failure as field rows on `task_failed`
+  (`detail: "NIKA-EXEC-001 · command exited with status 1"`, `task`), and
+  the later `workflow_failed` and `run_settled` frames carry no error, so
+  `NikaRunResult.error` stayed undefined on every native failure. It now
+  carries `{ code, message, task }`; `NikaMachineError` gains an optional
+  `task`.
 - A remote run admitted by `POST /v1/jobs` and settled from its SSE frame
   now carries `execution_id` and `trace_id` on `run.done`, read from the
   receipt on that frame after it passed the identity checks; before, only a
@@ -29,6 +54,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   previous transport shape, so existing callers compile unchanged.
 - Branded opaque `NikaRunId`, `NikaExecutionId`, and `NikaJobId` identity
   types on the run surfaces that already carried those identities.
+- Typed HTTP transport event kinds on the `NikaEvent` union
+  (`NikaExecutionStartedEvent`, `NikaExecutionSettledEvent`,
+  `NikaExecutionCancelledEvent`, `NikaExecutionRefusedEvent`,
+  `NikaExecutionInterruptedEvent`), alongside the transport-agnostic
+  `isNikaTerminalEvent` guard, which narrows any frame the engine reported
+  with a terminal status rather than matching on its kind.
+
+### Fixed
+
+- `isNikaRunSettledEvent` now narrows the HTTP settlement frame
+  (`execution.settled`) as well as the native `run_settled` one. It
+  previously never returned true on a `nika serve` stream, so the documented
+  way to read status, outputs, and receipt together was dead on that
+  transport.
+
+### Security
+
+- `allowInsecureHttp: true` now admits plaintext HTTP only for a loopback host
+  (`localhost`, `127.0.0.0/8`, `[::1]`); any other host over `http:` is a
+  `NikaConfigurationError`, so the opt-in can no longer send a bearer token in
+  clear text to a routable address.
+
+### Fixed
+
+- HTTP `check()` of a red workflow now returns the engine's plain teaching
+  report with `findings[]`; the snapshot capture refuses such a workflow with
+  one error line, which is preserved as `snapshot_error`. No workflow bytes
+  are sent on that path.
+- Native `check()` now reads the check report the engine routes to stderr
+  behind its `nika: ` prefix instead of reporting an engine incompatibility;
+  when neither stream carries a report, the typed error appends a bounded
+  single-line excerpt of stderr.
+- A pre-run engine refusal printed as a plain `NIKA-…` line under `--json`
+  now settles `run.done` with `NikaOperationError` (`operation: 'run'`, the
+  engine code, the full refusal line) instead of a protocol error; any other
+  unreadable machine line keeps `NikaProtocolError` and now quotes a bounded
+  excerpt of the offending line. `NikaOperation` gains `'run'`, additively.
+- Engine spawn failures name the engine path and the underlying errno, so a
+  wrong `bin`/`NIKA_BIN` reads as `spawn /path/to/nika ENOENT`.
 
 ## [0.116.2] - 2026-08-31
 

@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import type { Readable } from 'node:stream';
 import {
   NikaCompatibilityError,
+  NikaOperationError,
   NikaProtocolError,
   NikaTransportError,
 } from '../errors.js';
@@ -22,6 +23,7 @@ import type {
   NikaScheduleStatus,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
+  NikaTransportKind,
   NikaWorkflowMetadata,
 } from '../types.js';
 import {
@@ -60,14 +62,18 @@ export class NativeProcessTransport implements Transport {
     if (options.model) args.push('--model', options.model);
     if (options.nativeStrict) args.push('--native-strict');
     const captured = await this.capture(args, options.signal);
-    let report: Record<string, unknown>;
-    try {
-      report = parseMachineObject(captured.stdout.trim(), this.kind);
-    } catch (cause) {
+    // The engine routes some reports (a missing file, a parse-fatal read) to
+    // stderr behind a `nika: ` prefix. That is still the engine judging these
+    // bytes, so read it rather than blaming the engine for incompatibility.
+    const report = reportObject(captured.stdout)
+      ?? reportObject(stripEnginePrefix(captured.stderr));
+    if (!report) {
+      const excerpt = diagnosticExcerpt(captured.stderr);
       throw new NikaCompatibilityError(
         'check',
         this.kind,
-        `This engine did not emit the required JSON check report (exit ${captured.exitCode})`,
+        `This engine did not emit the required JSON check report (exit ${captured.exitCode})`
+        + (excerpt ? `: ${excerpt}` : ''),
       );
     }
     return { ...report, exitCode: captured.exitCode } as NikaCheckResult;
@@ -190,6 +196,7 @@ export class NativeProcessTransport implements Transport {
     let outputs: Record<string, unknown> | undefined;
     let machineError: ReturnType<typeof eventError>;
     let streamError: Error | undefined;
+    let refusal: EngineRefusal | undefined;
     let resolveDrained!: () => void;
     const drained = new Promise<void>((resolve) => {
       resolveDrained = resolve;
@@ -220,6 +227,17 @@ export class NativeProcessTransport implements Transport {
 
     const kind = this.kind;
     const machineBufferBytes = this.options.machineBufferBytes;
+    // A plain `NIKA-…` line under --json is the engine refusing the run, not a
+    // broken machine stream. Hold it and let run.done carry the typed verdict
+    // with the real exit status; the event stream simply carried no frame.
+    const lineEvent = (line: string): NikaEvent | undefined => {
+      const refused = engineRefusal(line);
+      if (refused) {
+        refusal ??= refused;
+        return undefined;
+      }
+      return machineLine(line, kind) as NikaEvent;
+    };
     const events: AsyncIterable<NikaEvent> = {
       [Symbol.asyncIterator]: async function* () {
         let buffer = '';
@@ -232,7 +250,8 @@ export class NativeProcessTransport implements Transport {
               const line = buffer.slice(0, newline).trim();
               buffer = buffer.slice(newline + 1);
               if (!line) continue;
-              const event = parseMachineObject(line, kind) as NikaEvent;
+              const event = lineEvent(line);
+              if (!event) continue;
               lastEvent = event;
               receipt = eventReceipt(event) ?? receipt;
               outputs = eventOutputs(event) ?? outputs;
@@ -248,12 +267,14 @@ export class NativeProcessTransport implements Transport {
           }
           const tail = buffer.trim();
           if (tail) {
-            const event = parseMachineObject(tail, kind) as NikaEvent;
-            lastEvent = event;
-            receipt = eventReceipt(event) ?? receipt;
-            outputs = eventOutputs(event) ?? outputs;
-            machineError = eventError(event) ?? machineError;
-            yield event;
+            const event = lineEvent(tail);
+            if (event) {
+              lastEvent = event;
+              receipt = eventReceipt(event) ?? receipt;
+              outputs = eventOutputs(event) ?? outputs;
+              machineError = eventError(event) ?? machineError;
+              yield event;
+            }
           }
         } catch (cause) {
           streamError = cause instanceof Error ? cause : new Error(String(cause));
@@ -267,6 +288,15 @@ export class NativeProcessTransport implements Transport {
 
     const done = Promise.all([closed, drained]).then(([exitCode]): NikaRunResult => {
       if (streamError) throw streamError;
+      if (refusal) {
+        throw new NikaOperationError(
+          'run',
+          this.kind,
+          refusal.code,
+          refusal.line,
+          { status: exitCode },
+        );
+      }
       const status = eventStatus(lastEvent) ?? statusForExit(exitCode, lastEvent?.kind);
       return {
         id,
@@ -363,6 +393,63 @@ export class NativeProcessTransport implements Transport {
   private ensureReady(): Promise<void> {
     this.ready ??= verifyNikaEngine(this.options.engine).then(() => undefined);
     return this.ready;
+  }
+}
+
+interface EngineRefusal {
+  code: string;
+  line: string;
+}
+
+/** The engine prefixes a stream-routed report with its own name. */
+const ENGINE_PREFIX = /^nika:\s*/;
+/** A refusal line opens with the engine code that owns the verdict. */
+const REFUSAL_CODE = /^(NIKA-[A-Z0-9-]+)\b/;
+const DIAGNOSTIC_EXCERPT_LIMIT = 240;
+
+function reportObject(text: string): Record<string, unknown> | undefined {
+  const trimmed = text.trim();
+  if (!trimmed) return undefined;
+  let value: unknown;
+  try {
+    value = JSON.parse(trimmed);
+  } catch {
+    return undefined;
+  }
+  return machineObject(value);
+}
+
+function stripEnginePrefix(text: string): string {
+  return text.trim().replace(ENGINE_PREFIX, '');
+}
+
+/** One bounded single-line excerpt so a typed refusal still teaches. */
+function diagnosticExcerpt(text: string, limit = DIAGNOSTIC_EXCERPT_LIMIT): string | undefined {
+  const single = stripEnginePrefix(text).replace(/\s+/g, ' ').trim();
+  if (!single) return undefined;
+  return single.length > limit ? `${single.slice(0, limit)}…` : single;
+}
+
+/** No JSON value can open with `NIKA-`, so a match is never a machine frame. */
+function engineRefusal(line: string): EngineRefusal | undefined {
+  const code = REFUSAL_CODE.exec(line)?.[1];
+  return code ? { code, line } : undefined;
+}
+
+/** Keep the protocol verdict, and quote the line that earned it. */
+function machineLine(line: string, kind: NikaTransportKind): Record<string, unknown> {
+  try {
+    return parseMachineObject(line, kind);
+  } catch (cause) {
+    const verdict = cause instanceof Error
+      ? cause.message
+      : 'Engine machine output was unreadable';
+    const excerpt = diagnosticExcerpt(line);
+    throw new NikaProtocolError(
+      kind,
+      excerpt ? `${verdict}: ${excerpt}` : verdict,
+      { cause: cause instanceof Error ? cause : undefined },
+    );
   }
 }
 

@@ -40,11 +40,16 @@ if (
 ) {
   throw new Error(`${result.name} packed release metadata does not bind ${preparedCommit}`);
 }
+// The canonical entrypoints of the root client. The repository manifest is
+// held to this exact shape by test/release-pack-verification.test.ts, so a
+// manifest change that forgets this verifier turns red at `npm test`, not at
+// release time.
 const expectedExports = {
   '.': {
     import: { types: './dist/index.d.ts', default: './dist/index.js' },
     require: { types: './dist/index.d.cts', default: './dist/index.cjs' },
   },
+  './package.json': './package.json',
 };
 if (
   manifest.name !== '@supernovae-st/nika-client'

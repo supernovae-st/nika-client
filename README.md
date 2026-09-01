@@ -20,9 +20,13 @@ not parse YAML or reconstruct proof in TypeScript.
 
 ## Requirements
 
-- Node.js 22 or newer
-- a compatible `nika` engine, resolved from `config.bin`, then `NIKA_BIN`,
-  then the exact optional platform package; implicit `PATH` lookup is refused
+- Node.js 22 or newer (the tested floor; an older major is unsupported, not
+  refused, and `npm install` does not warn about it)
+- a compatible `nika` engine, resolved from `config.bin`, then `NIKA_BIN`
+  (absolute paths only), then the exact optional platform package; a bare
+  name or a relative path is refused because the operating system would
+  resolve it through `PATH` or the working directory, and a `nika` found on
+  `PATH` is deliberately never used
 - a `.nika.yaml` workflow
 
 ## Documentation
@@ -68,8 +72,11 @@ The lowest-friction creation door is the engine-owned scaffold:
 ```
 
 `nika.yaml` is the project control plane. `hello.nika.yaml` is executable
-workflow intent and is the file passed to `check()` and `run()`. The generated
-workflow has this public envelope:
+workflow intent and is the file passed to `check()` and `run()`. The scaffold
+writes the engine's own annotated `01-hello` example (its task is named
+`greet` and its prompt asks for French); the contract this README relies on is
+the `outputs.greeting` key and the `mock/echo` model, and the same file can be
+written by hand with this public envelope:
 
 ```yaml
 nika: sdk-hello
@@ -102,7 +109,8 @@ if (!report.clean) throw new Error('workflow did not pass nika check');
 const run = await nika.run('hello.nika.yaml', { maxCostUsd: 0 });
 const watching = (async () => {
   for await (const event of nika.events(run)) {
-    console.log(event.kind, event.status);
+    // Native progress frames carry no status; only the terminal frame does.
+    console.log(event.kind, event.status ?? '');
   }
 })();
 
@@ -111,9 +119,21 @@ await watching;
 console.log(result.status, result.outputs, result.receipt);
 ```
 
+Expected output: `workflow_started`, `task_scheduled`, `task_started`,
+`task_completed`, `workflow_completed`, then `run_settled succeeded`, then the
+terminal `succeeded` line with the outputs and the receipt.
+
+A red `check()` report carries the engine's `findings[]` on both transports, so
+the check → teach → re-draft loop reads one shape whether the engine runs
+locally or behind `nika serve`.
+
 `run()` returns after stable admission. `run.done` is the sole terminal result.
-An admitted workflow failure is result data with `status: "failed"`; transport,
+An admitted workflow failure is result data with `status: "failed"` and, when
+the engine named the failing task, `error: { code, message, task }`; transport,
 protocol, configuration, and compatibility failures throw typed SDK errors.
+A `try { await run.done } catch {}` alone therefore never catches a failed
+workflow: a CI job or an application must read `result.status` and treat
+anything but `succeeded` as its own failure, or a red run passes silently.
 
 ## Verify a local trace
 
@@ -127,7 +147,13 @@ if (!proof.verified) throw new Error(proof.output ?? 'trace verification failed'
 ```
 
 The SDK does not implement cryptography or inspect the trace itself. It asks the
-engine to verify the receipt and its signed binding. The remote endpoint
+engine to verify the receipt and its signed binding. A receipt from a native
+run carries the proof-bearing fields (`chain_head`, `chain_len`, `sealed`,
+`trace_path`) and verifies locally. A receipt from a `nika serve` job carries
+identity only (`job_id`, `execution_id`, `trace_id`, `snapshot_digest`,
+`origin`): the resident writes no trace journal yet, so that receipt verifies
+through no door today, and the same `NikaReceipt` type covers both shapes.
+Persist it as the job's identity, not as evidence. The remote endpoint
 currently returns `{ verified: false, verdict: "unavailable", reason:
 "trace_journal_unavailable" }` because the server has no path-free journal
 authority; the typed verdict is preserved instead of being hidden as a 404.
@@ -167,8 +193,9 @@ Observation-only clients need no local engine: `attachRun`, `status`,
 `events`, `cancel`, `schedule`, `scheduleStatus`, `listWorkflows`, `workflow`,
 and `traceVerify` run against the advertised server identity alone.
 
-The current persistent server requires a project file. A minimal `nika.yaml`
-is enough:
+The current persistent server requires a project file. If you ran
+`nika init --project-file` above you already have one (it carries a default
+cost ceiling); do not overwrite it. Otherwise a minimal `nika.yaml` is enough:
 
 ```yaml
 nika: my-project
@@ -238,15 +265,21 @@ from the workflow's truth, and a still-running record rejects with
 `NikaObservationInterrupted`, whose `lastSequence` feeds
 `attachRun(id, { lastEventId })` to resume.
 
-Plain HTTP is refused unless `allowInsecureHttp: true` is explicit. Use HTTPS
-for a non-loopback deployment. A URL may not contain credentials, a query, or a
-fragment, and a 32–512 byte visible-ASCII token is mandatory.
+Plain HTTP is accepted only for a loopback host (`localhost`, `127.0.0.0/8`,
+`[::1]`), and only when `allowInsecureHttp: true` is explicit. Every other host
+must use HTTPS: the opt-in widens the scheme, never the destination, so the
+bearer token never leaves the machine in plaintext. A URL may not contain
+credentials, a query, or a fragment, and a 32–512 byte visible-ASCII token is
+mandatory.
 
-Remote snapshots currently do not have request envelopes for per-call `vars`,
-`model`, or `maxCostUsd`; declare those facts in the workflow. Likewise,
-remote `check` does not accept `model` or `nativeStrict` overrides. Supplying
-these options returns a typed compatibility refusal instead of silently
-dropping them.
+Remote snapshots currently do not have request envelopes for per-call `vars`
+or `model`; declare those facts in the workflow. There is no per-run spend
+bound over HTTP at all today: `maxCostUsd` is refused, the workflow language
+has no budget field, and the resident applies its own server-wide default
+ceiling. Bound a remote run by its model and `max_tokens` until the request
+envelope carries a ceiling. Likewise, remote `check` does not accept `model`
+or `nativeStrict` overrides. Supplying these options returns a typed
+compatibility refusal instead of silently dropping them.
 
 ## Resident schedules
 
@@ -291,8 +324,11 @@ Treat any `status.finding` recovered from older state as non-runnable. New activ
 declarations the current engine cannot plan are refused before durable mutation.
 Timed hash jitter is currently unsupported and returns a typed refusal.
 Cron expressions carry their zone as `TZ=<IANA zone> ...`; `tolerance` uses
-`m/k`; `afterSkip` requires `overlap: "skip"`; and `active: false` requires a
-`pauseUntil` ISO calendar date (`YYYY-MM-DD`).
+`m/k`; `afterSkip` requires `overlap: "skip"` (the engine's default, so an
+omitted `overlap` satisfies it); and `active: false` requires a `pauseReason`
+together with a `pauseUntil` ISO calendar date (`YYYY-MM-DD`). Schedules refuse
+`maxCostUsd: 0` ("must be positive and finite") where a native `run()` accepts
+it; a scheduled budget is always a real number.
 
 ## Transport matrix
 
@@ -348,17 +384,22 @@ Remote-only options:
 
 ### Typed events, outputs, and identities
 
-`NikaEvent` is a discriminated union over the known lifecycle kinds
-(`workflow_started`, `task_scheduled`, `task_started`, `task_completed`,
-`workflow_completed`, `workflow_failed`, `workflow_interrupted`,
-`run_settled`, `run_sealed`). Kinds this SDK version does not know yet stay
-representable through the `NikaUnknownEvent` fallback, so the union is
-intentionally non-exhaustive and every variant keeps its future fields open.
+`NikaEvent` is a discriminated union over the known lifecycle kinds of both
+transports. A native engine process emits `workflow_started`,
+`task_scheduled`, `task_started`, `task_completed`, `workflow_completed`,
+`workflow_failed`, `workflow_interrupted`, `run_settled`, and `run_sealed`. A
+`nika serve` job streams `execution.started`, `execution.settled`,
+`execution.cancelled`, `execution.refused`, and `execution.interrupted` (a
+resident that restarts marks an orphaned running job `interrupted`). Kinds
+this SDK version does not know yet stay representable through the
+`NikaUnknownEvent` fallback, so the union is intentionally non-exhaustive and
+every variant keeps its future fields open.
 
 `run`, `attachRun`, and `events` accept one `Outputs` type argument. It types
 the terminal settlement — `run.done` and the `run_settled` /
-`workflow_completed` frames — without any runtime validation, and defaults to
-`Record<string, unknown>` so untyped callers see no change:
+`execution.settled` / `workflow_completed` frames — without any runtime
+validation, and defaults to `Record<string, unknown>` so untyped callers see
+no change:
 
 ```ts
 const run = await nika.run<{ answer: number }>('flow.nika.yaml');
@@ -366,24 +407,50 @@ const result = await run.done;          // result.outputs?: { answer: number }
 
 for await (const event of nika.events(run)) {
   if (isNikaRunSettledEvent(event)) {
-    // event is NikaRunSettledEvent<{ answer: number }> here:
-    // status, outputs, and receipt typed together on the terminal frame.
+    // The settlement frame of either transport (`run_settled` natively,
+    // `execution.settled` over HTTP): status, outputs, and receipt typed
+    // together on the one frame that carries all three.
     console.log(event.status, event.outputs?.answer, event.receipt);
+  }
+}
+```
+
+A run can also end without settling outputs — cancelled, refused, or
+interrupted. `isNikaTerminalEvent(event)` narrows those too: it reads the
+engine-reported `status` (`succeeded`, `failed`, `interrupted`, `cancelled`)
+rather than the kind, so it holds on either transport and on kinds this SDK
+version does not know yet:
+
+```ts
+for await (const event of nika.events(run)) {
+  if (isNikaTerminalEvent(event)) {
+    console.log('no further frames for this run:', event.status);
   }
 }
 ```
 
 Run, execution, and job identities are branded opaque strings (`NikaRunId`,
 `NikaExecutionId`, `NikaJobId`). They remain assignable to `string`, but a
-plain `string` no longer stands in for one.
+plain `string` no longer stands in for one. Four words name three things:
+a **workflow** is the file (or resident name) you pass in; a **run** is this
+client's handle on one admission (`run.id`), and over HTTP that same string
+is the server's **job** id (`/v1/jobs/{id}`, `attachRun(jobId)`); an
+**execution** is the engine's own identity for what actually ran
+(`execution_id`, the `execution.*` event kinds), distinct from the run id and
+carried by the receipt together with the `trace_id`.
 
 ## Errors
 
-Every SDK error extends `NikaError`:
+Every error the SDK raises for an engine, transport, configuration, or
+compatibility condition extends `NikaError`. Misuse of the API itself (an empty
+workflow name, a negative event cursor, a receipt that is not an object, a
+workflow name that escapes the catalog) throws a plain `TypeError` or
+`RangeError` before any engine or network work starts:
 
 ```text
 NikaError
 ├── NikaConfigurationError
+├── NikaEngineUnavailable
 ├── NikaTransportError
 │   ├── NikaProtocolError
 │   └── NikaObservationInterrupted
@@ -398,11 +465,24 @@ closed, redacted `JobEvent` projection advertised by the pinned OpenAPI contract
 unknown HTTP fields are rejected at the trust boundary. The SDK never turns an
 unpriced model into `$0`.
 
+A refusal that `nika serve` types as `{ error: { code, message } }` surfaces as
+`NikaOperationError` with the HTTP `status`, the server `code` (for example
+`unauthorized`, `job_not_found`, `idempotency_conflict`, `malformed_snapshot`,
+or a stamped `NIKA-…` admission code) and the `operation` that was refused.
+Server messages are engine-owned and path-free; a reflected bearer token is
+redacted before it reaches an error message. A non-2xx answer without that
+typed body stays a `NikaTransportError` whose body is redacted entirely.
+
+An engine refusal printed before a run starts — a `NIKA-…` code line such as a
+cost-floor refusal — settles `run.done` with a `NikaOperationError` carrying
+`operation: 'run'`, the engine's code, and its full refusal line.
+
 ## Security boundaries
 
 - Token files stay out of argv and must be private (`0600`, 32–512 visible
   ASCII bytes).
-- The constructor refuses accidental plaintext HTTP.
+- The constructor refuses plaintext HTTP off loopback, and requires the
+  explicit `allowInsecureHttp: true` opt-in on loopback.
 - `permits` remain default-deny engine policy; SDK types do not grant authority.
 - Machine frames, diagnostics, SSE lines, and observer queues are bounded.
 - Receipts and traces are engine-issued proof. The SDK never synthesizes them.

@@ -134,8 +134,9 @@ export interface NikaWorkflowInterruptedEvent extends NikaEventFields {
 }
 
 /**
- * The terminal settlement frame of a durable `nika serve` job: the one frame
- * that carries the run's outputs, receipt, and final status together.
+ * The terminal settlement frame of a native engine process: the one frame
+ * that carries the run's outputs, receipt, and final status together. Its
+ * HTTP peer is `execution.settled`; one guard narrows both.
  */
 export interface NikaRunSettledEvent<
   Outputs extends Record<string, unknown> = Record<string, unknown>,
@@ -153,6 +154,46 @@ export interface NikaRunSealedEvent extends NikaEventFields {
 }
 
 /**
+ * The HTTP transport admitted the execution and it is running. This is the
+ * first lifecycle frame `nika serve --bind` streams for a durable job.
+ */
+export interface NikaExecutionStartedEvent extends NikaEventFields {
+  kind: 'execution.started';
+}
+
+/**
+ * The terminal settlement frame of the HTTP transport, and the peer of
+ * `run_settled`: the one frame that carries the run's outputs, receipt, and
+ * final status together.
+ */
+export interface NikaExecutionSettledEvent<
+  Outputs extends Record<string, unknown> = Record<string, unknown>,
+> extends NikaEventFields {
+  kind: 'execution.settled';
+  status?: NikaRunStatus;
+  outputs?: Outputs;
+  receipt?: NikaReceipt;
+}
+
+/** An accepted cancellation ended the execution before it settled. */
+export interface NikaExecutionCancelledEvent extends NikaEventFields {
+  kind: 'execution.cancelled';
+}
+
+/** The server refused the execution. */
+export interface NikaExecutionRefusedEvent extends NikaEventFields {
+  kind: 'execution.refused';
+}
+
+/**
+ * The execution was interrupted before settling. A resident that restarts
+ * marks an orphaned running job with either word, so both are one variant.
+ */
+export interface NikaExecutionInterruptedEvent extends NikaEventFields {
+  kind: 'execution.interrupted' | 'interrupted';
+}
+
+/**
  * Forward-compatibility variant: any kind this SDK version does not know
  * yet stays representable, so the event union is intentionally
  * non-exhaustive.
@@ -162,10 +203,12 @@ export interface NikaUnknownEvent extends NikaEventFields {
 }
 
 /**
- * One engine-owned run event. Known kinds discriminate on `kind`; unknown
- * kinds fall back to `NikaUnknownEvent`. Future fields stay open on every
- * variant. `Outputs` types the terminal frames' outputs and defaults to the
- * transport shape, so untyped callers see no change.
+ * One engine-owned run event, from either transport: the native process emits
+ * the `workflow_*` / `task_*` / `run_*` kinds, `nika serve` emits the
+ * `execution.*` kinds. Known kinds discriminate on `kind`; unknown kinds fall
+ * back to `NikaUnknownEvent`. Future fields stay open on every variant.
+ * `Outputs` types the terminal frames' outputs and defaults to the transport
+ * shape, so untyped callers see no change.
  */
 export type NikaEvent<
   Outputs extends Record<string, unknown> = Record<string, unknown>,
@@ -179,6 +222,11 @@ export type NikaEvent<
   | NikaWorkflowInterruptedEvent
   | NikaRunSettledEvent<Outputs>
   | NikaRunSealedEvent
+  | NikaExecutionStartedEvent
+  | NikaExecutionSettledEvent<Outputs>
+  | NikaExecutionCancelledEvent
+  | NikaExecutionRefusedEvent
+  | NikaExecutionInterruptedEvent
   | NikaUnknownEvent;
 
 /**
@@ -190,6 +238,8 @@ export type NikaReceipt = Readonly<Record<string, unknown>>;
 export interface NikaMachineError {
   code?: string;
   message?: string;
+  /** The task that failed, when a native `task_failed` frame named it. */
+  task?: string;
   [key: string]: unknown;
 }
 
@@ -281,8 +331,18 @@ export interface NikaTraceVerifyOptions {
   signal?: AbortSignal;
 }
 
-/** The two operations that can fail before returning an engine projection. */
-export type NikaOperation = 'schedule' | 'scheduleStatus';
+/** The SDK operations whose engine refusal can be returned as a typed error. */
+export type NikaOperation =
+  | 'check'
+  | 'run'
+  | 'attachRun'
+  | 'status'
+  | 'cancel'
+  | 'listWorkflows'
+  | 'workflow'
+  | 'traceVerify'
+  | 'schedule'
+  | 'scheduleStatus';
 
 /** One engine-owned schedule finding. The vocabulary remains additive. */
 export interface NikaScheduleFinding {

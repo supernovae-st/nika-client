@@ -32,6 +32,52 @@ if (command === 'check') {
     }, 5_000);
     return;
   }
+  if (workflow.includes('stderr-report')) {
+    // The engine wrote its report to stderr behind a `nika: ` prefix.
+    console.error(`nika: ${JSON.stringify({
+      clean: false,
+      findings: [{
+        gate: 'PARSE',
+        kind: 'parse',
+        message: `cannot read ${workflow}: No such file or directory (os error 2)`,
+        severity: 'error',
+      }],
+      parse_fatal: true,
+      report_version: 1,
+    }, null, 1)}`);
+    process.exit(3);
+  }
+  if (workflow.includes('stderr-plain')) {
+    // Neither stream carries a JSON object; only prose reaches the caller.
+    console.error('nika: the engine could not produce a check report for this input');
+    process.exit(3);
+  }
+  if (workflow.includes('red-snapshot')) {
+    if (sdkSnapshot) {
+      // A red workflow has no exportable snapshot: one error line, no findings.
+      console.log(JSON.stringify({
+        error: {
+          message: 'cannot export execution snapshot: captured workflow failed check: '
+            + `NIKA-AUTH-006 ${workflow}: invoke \`nika:write\` is not permitted `
+            + '— fix: add "nika:write" to permits.tools',
+        },
+      }));
+      process.exit(2);
+    }
+    console.log(JSON.stringify({
+      report_version: 1,
+      clean: false,
+      argv,
+      findings: [{
+        code: 'NIKA-AUTH-006',
+        gate: 'AUTH',
+        kind: 'permits',
+        severity: 'error',
+        message: 'invoke `nika:write` is not permitted — fix: add "nika:write" to permits.tools',
+      }],
+    }));
+    process.exit(2);
+  }
   if (sdkSnapshot && workflow.includes('parse-fatal')) {
     console.log(JSON.stringify({
       report_version: 1,
@@ -66,6 +112,21 @@ if (command === 'check') {
 if (command === 'run' && argv.includes('--json')) {
   const emit = (value) => console.log(JSON.stringify(value));
 
+  if (workflow.includes('refuse-1709')) {
+    // A pre-run refusal: one plain code line under --json, no machine frame.
+    console.log(
+      "NIKA-1709 · refusing to start: the workflow's unavoidable cost floor $0.000005 "
+      + 'exceeds --max-cost-usd $0.000000 (cheapest static path · gates closed · first-try) '
+      + '— raise the budget or trim the workflow (`nika check` shows the envelope)',
+    );
+    process.exit(2);
+  }
+
+  if (workflow.includes('garbage-line')) {
+    console.log('this line is not machine output at all');
+    process.exit(0);
+  }
+
   if (workflow.includes('cancel')) {
     emit({ kind: 'workflow_started' });
     process.on('SIGTERM', () => {
@@ -84,6 +145,22 @@ if (command === 'run' && argv.includes('--json')) {
     const count = workflow.includes('burst') ? 6 : 1;
     for (let index = 0; index < count; index += 1) {
       emit({ kind: 'task_completed', sequence: index + 1, value: index });
+    }
+    if (workflow.includes('fields-failure')) {
+      // The released engine's shape: the failure rides field rows on
+      // task_failed; workflow_failed and run_settled carry no error.
+      emit({
+        kind: 'task_failed',
+        fields: [
+          { key: 'task', value: 'boom' },
+          { key: 'note', value: 'exec · false' },
+          { key: 'detail', value: 'NIKA-EXEC-001 · command exited with status 1: ' },
+          { key: 'duration_ms', value: 7 },
+        ],
+      });
+      emit({ kind: 'workflow_failed', fields: [{ key: 'workflow', value: 'fixture' }] });
+      emit({ kind: 'run_settled', status: 'failed', outputs: { boom: null } });
+      process.exit(1);
     }
     if (workflow.includes('failing')) {
       emit({

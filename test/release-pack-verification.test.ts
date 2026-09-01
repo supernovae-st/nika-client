@@ -1,6 +1,6 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { chmodSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -35,6 +35,7 @@ function fixture(
         import: { types: './dist/index.d.ts', default: './dist/index.js' },
         require: { types: './dist/index.d.cts', default: './dist/index.cjs' },
       },
+      './package.json': './package.json',
     },
     main: './dist/index.cjs',
     module: './dist/index.js',
@@ -73,6 +74,48 @@ describe('packed release commit proof', () => {
       sha,
       version,
     ])).not.toThrow();
+  });
+
+  it('accepts the repository manifest entrypoints as canonical', () => {
+    // The release gate runs only at tag time. Binding it to the checked-in
+    // manifest here keeps a manifest edit from turning the train red later.
+    const manifest = JSON.parse(readFileSync(path.join(repo, 'package.json'), 'utf8')) as {
+      exports: unknown; main: string; module: string; types: string; bin: unknown;
+    };
+    const packed = fixture(sha, {
+      exports: manifest.exports,
+      main: manifest.main,
+      module: manifest.module,
+      types: manifest.types,
+      bin: manifest.bin,
+    });
+    expect(() => execFileSync('node', [
+      path.join(repo, 'scripts/verify-client-pack.mjs'),
+      packed.report,
+      packed.tarballs,
+      sha,
+      version,
+    ])).not.toThrow();
+  });
+
+  it('refuses a tarball that drops the package.json export', () => {
+    const packed = fixture(sha, {
+      exports: {
+        '.': {
+          import: { types: './dist/index.d.ts', default: './dist/index.js' },
+          require: { types: './dist/index.d.cts', default: './dist/index.cjs' },
+        },
+      },
+    });
+    const result = spawnSync('node', [
+      path.join(repo, 'scripts/verify-client-pack.mjs'),
+      packed.report,
+      packed.tarballs,
+      sha,
+      version,
+    ]);
+    expect(result.status).not.toBe(0);
+    expect(result.stderr.toString()).toContain('manifest entrypoints are not canonical');
   });
 
   it('refuses a tarball stamped for another commit', () => {

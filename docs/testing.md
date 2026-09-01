@@ -64,6 +64,9 @@ was originally written.
    binary/help, loopback HTTP, and public documentation. They are synthetic
    users, never substitutes for human usability evidence.
 
+The latest public-only first-contact wave and its convergent debt are recorded
+in [`gauntlet/personas/REPORT.md`](../gauntlet/personas/REPORT.md).
+
 ## Socratic risk matrix
 
 Every release wave must ask and demonstrate an answer to these questions:

@@ -111,6 +111,10 @@ await watching;
 console.log(result.status, result.outputs, result.receipt);
 ```
 
+A red `check()` report carries the engine's `findings[]` on both transports, so
+the check → teach → re-draft loop reads one shape whether the engine runs
+locally or behind `nika serve`.
+
 `run()` returns after stable admission. `run.done` is the sole terminal result.
 An admitted workflow failure is result data with `status: "failed"`; transport,
 protocol, configuration, and compatibility failures throw typed SDK errors.
@@ -397,6 +401,10 @@ Native engine event vocabulary stays open. HTTP events instead enforce the
 closed, redacted `JobEvent` projection advertised by the pinned OpenAPI contract;
 unknown HTTP fields are rejected at the trust boundary. The SDK never turns an
 unpriced model into `$0`.
+
+An engine refusal printed before a run starts — a `NIKA-…` code line such as a
+cost-floor refusal — settles `run.done` with a `NikaOperationError` carrying
+`operation: 'run'`, the engine's code, and its full refusal line.
 
 ## Security boundaries
 

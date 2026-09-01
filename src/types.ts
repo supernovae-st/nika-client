@@ -281,8 +281,8 @@ export interface NikaTraceVerifyOptions {
   signal?: AbortSignal;
 }
 
-/** The two operations that can fail before returning an engine projection. */
-export type NikaOperation = 'schedule' | 'scheduleStatus';
+/** The operations that can be refused before they return an engine projection. */
+export type NikaOperation = 'run' | 'schedule' | 'scheduleStatus';
 
 /** One engine-owned schedule finding. The vocabulary remains additive. */
 export interface NikaScheduleFinding {

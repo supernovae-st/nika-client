@@ -119,7 +119,7 @@ export class HttpTransport implements Transport {
         'Remote snapshot capture does not support model or nativeStrict overrides',
       );
     }
-    const captured = await this.captureSnapshot(workflow, options.signal);
+    const captured = await this.captureSnapshot(workflow, options.signal, true);
     if (captured.bytes === undefined) return captured.report;
     const snapshot = captured.identity;
     if (!snapshot) {
@@ -874,6 +874,7 @@ export class HttpTransport implements Transport {
   private async captureSnapshot(
     workflow: string,
     signal?: AbortSignal,
+    teach = false,
   ): Promise<CapturedSnapshot> {
     const identity = await this.ensureLocalEngine();
     const captured = await captureEngine(
@@ -901,6 +902,9 @@ export class HttpTransport implements Transport {
     delete report.execution_snapshot;
     if (captured.exitCode !== 0 || outer.clean !== true) {
       report.clean = false;
+      if (teach && !Array.isArray(outer.findings)) {
+        return { report: await this.teachingReport(workflow, report, signal) };
+      }
       return { report: report as NikaCheckResult };
     }
     compatibleEngineIdentity(outer, this.kind, identity);
@@ -925,6 +929,48 @@ export class HttpTransport implements Transport {
       bytes,
       identity: snapshotIdentity(bytes, this.kind),
     };
+  }
+
+  /**
+   * A red workflow has no exportable snapshot, so the capture returns one
+   * error line and no findings. Ask the same local engine for its plain
+   * teaching report, so `findings[]` reads the same on both transports. The
+   * refused capture line is preserved as `snapshot_error` rather than
+   * overwriting whatever the engine put in `error`. No bytes leave the
+   * machine on this path: the caller still sees `clean: false`.
+   */
+  private async teachingReport(
+    workflow: string,
+    refused: Record<string, unknown>,
+    signal?: AbortSignal,
+  ): Promise<NikaCheckResult> {
+    const captured = await captureEngine(
+      this.localEngine().bin,
+      ['check', workflow, '--json'],
+      {
+        cwd: this.options.cwd,
+        signal,
+        bufferBytes: this.options.machineBufferBytes,
+        transport: this.kind,
+        label: 'SDK teaching check',
+      },
+    );
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(captured.stdout.trim());
+    } catch {
+      return refused as NikaCheckResult;
+    }
+    const plain = machineObject(parsed);
+    if (!plain) return refused as NikaCheckResult;
+    const report: Record<string, unknown> = {
+      ...plain,
+      clean: false,
+      exitCode: captured.exitCode,
+      ...(refused.error === undefined ? {} : { snapshot_error: refused.error }),
+    };
+    delete report.execution_snapshot;
+    return report as NikaCheckResult;
   }
 
   private async json(
@@ -1185,7 +1231,9 @@ function operationFindings(values: unknown[]): NikaOperationFinding[] | undefine
 }
 
 function pathForOperation(operation: NikaOperation): string {
-  return operation === 'schedule' ? 'schedule apply' : 'schedule status';
+  if (operation === 'schedule') return 'schedule apply';
+  if (operation === 'scheduleStatus') return 'schedule status';
+  return operation;
 }
 
 function isTerminal(status: unknown): status is string {

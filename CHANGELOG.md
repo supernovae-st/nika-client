@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A remote run admitted by `POST /v1/jobs` and settled from its SSE frame
+  now carries `execution_id` and `trace_id` on `run.done`, read from the
+  receipt on that frame after it passed the identity checks; before, only a
+  run settled from a durable read (cancel, attach) named them, so the same
+  script saw them on a cancelled run and not on a succeeded one.
+- Native `traceVerify` returns `verdict` (`verified` or `invalid`, with
+  `reason: receipt_mismatch` when the evidence does not bind the receipt),
+  the vocabulary the HTTP verdict already speaks.
+
 ### Added
 
 - Discriminated `NikaEvent` union over the known lifecycle kinds with an

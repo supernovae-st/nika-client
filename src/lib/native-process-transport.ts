@@ -151,6 +151,7 @@ export class NativeProcessTransport implements Transport {
     if (captured.exitCode !== 0) {
       return {
         verified: false,
+        verdict: 'invalid',
         exitCode: captured.exitCode,
         output: captured.stdout + captured.stderr,
       };
@@ -172,6 +173,10 @@ export class NativeProcessTransport implements Transport {
     const mismatch = receiptMismatch(receipt, manifest);
     return {
       verified: mismatch === undefined,
+      // The same vocabulary the HTTP verdict speaks, so a caller reads one
+      // field on both transports instead of inferring it from exitCode.
+      verdict: mismatch === undefined ? 'verified' : 'invalid',
+      ...(mismatch === undefined ? {} : { reason: 'receipt_mismatch' }),
       exitCode: mismatch === undefined ? 0 : 2,
       output: captured.stdout + captured.stderr
         + (mismatch === undefined ? '' : `\nRECEIPT MISMATCH: ${mismatch}\n`),

@@ -10,6 +10,6 @@ describe('packed Node consumer surfaces', () => {
       encoding: 'utf8',
       timeout: 120_000,
     });
-    expect(output).toContain('exposes ESM, CommonJS and package metadata');
+    expect(output).toContain('exposes typed ESM, CommonJS and package metadata');
   });
 });

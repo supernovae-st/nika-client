@@ -112,7 +112,8 @@ console.log(result.status, result.outputs, result.receipt);
 ```
 
 `run()` returns after stable admission. `run.done` is the sole terminal result.
-An admitted workflow failure is result data with `status: "failed"`; transport,
+An admitted workflow failure is result data with `status: "failed"` and, when
+the engine named the failing task, `error: { code, message, task }`; transport,
 protocol, configuration, and compatibility failures throw typed SDK errors.
 
 ## Verify a local trace

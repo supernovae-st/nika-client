@@ -190,6 +190,8 @@ export type NikaReceipt = Readonly<Record<string, unknown>>;
 export interface NikaMachineError {
   code?: string;
   message?: string;
+  /** The task that failed, when a native `task_failed` frame named it. */
+  task?: string;
   [key: string]: unknown;
 }
 

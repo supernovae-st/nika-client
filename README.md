@@ -321,6 +321,37 @@ Remote-only options:
 | `listWorkflows()` | contained resident workflow names |
 | `workflow(name)` | path-free resident workflow metadata |
 
+### Typed events, outputs, and identities
+
+`NikaEvent` is a discriminated union over the known lifecycle kinds
+(`workflow_started`, `task_scheduled`, `task_started`, `task_completed`,
+`workflow_completed`, `workflow_failed`, `workflow_interrupted`,
+`run_settled`, `run_sealed`). Kinds this SDK version does not know yet stay
+representable through the `NikaUnknownEvent` fallback, so the union is
+intentionally non-exhaustive and every variant keeps its future fields open.
+
+`run`, `attachRun`, and `events` accept one `Outputs` type argument. It types
+the terminal settlement — `run.done` and the `run_settled` /
+`workflow_completed` frames — without any runtime validation, and defaults to
+`Record<string, unknown>` so untyped callers see no change:
+
+```ts
+const run = await nika.run<{ answer: number }>('flow.nika.yaml');
+const result = await run.done;          // result.outputs?: { answer: number }
+
+for await (const event of nika.events(run)) {
+  if (isNikaRunSettledEvent(event)) {
+    // event is NikaRunSettledEvent<{ answer: number }> here:
+    // status, outputs, and receipt typed together on the terminal frame.
+    console.log(event.status, event.outputs?.answer, event.receipt);
+  }
+}
+```
+
+Run, execution, and job identities are branded opaque strings (`NikaRunId`,
+`NikaExecutionId`, `NikaJobId`). They remain assignable to `string`, but a
+plain `string` no longer stands in for one.
+
 ## Errors
 
 Every SDK error extends `NikaError`:

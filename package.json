@@ -31,7 +31,8 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
-    }
+    },
+    "./package.json": "./package.json"
   },
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
@@ -49,6 +50,7 @@
     "build": "tsup",
     "test": "vitest run",
     "test:watch": "vitest",
+    "check:package-surface": "node scripts/verify-packed-module-surfaces.mjs",
     "check:coverage": "node scripts/check-sdk-coverage.js",
     "check:release-evidence": "node scripts/verify-release-evidence.mjs",
     "check:release-replay": "node scripts/verify-release-replay.mjs",

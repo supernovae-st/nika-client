@@ -121,6 +121,10 @@ Expected output: `workflow_started`, `task_scheduled`, `task_started`,
 `task_completed`, `workflow_completed`, then `run_settled succeeded`, then the
 terminal `succeeded` line with the outputs and the receipt.
 
+A red `check()` report carries the engine's `findings[]` on both transports, so
+the check → teach → re-draft loop reads one shape whether the engine runs
+locally or behind `nika serve`.
+
 `run()` returns after stable admission. `run.done` is the sole terminal result.
 An admitted workflow failure is result data with `status: "failed"`; transport,
 protocol, configuration, and compatibility failures throw typed SDK errors.
@@ -465,6 +469,10 @@ or a stamped `NIKA-…` admission code) and the `operation` that was refused.
 Server messages are engine-owned and path-free; a reflected bearer token is
 redacted before it reaches an error message. A non-2xx answer without that
 typed body stays a `NikaTransportError` whose body is redacted entirely.
+
+An engine refusal printed before a run starts — a `NIKA-…` code line such as a
+cost-floor refusal — settles `run.done` with a `NikaOperationError` carrying
+`operation: 'run'`, the engine's code, and its full refusal line.
 
 ## Security boundaries
 

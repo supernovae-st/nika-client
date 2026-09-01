@@ -50,6 +50,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `NikaConfigurationError`, so the opt-in can no longer send a bearer token in
   clear text to a routable address.
 
+### Fixed
+
+- HTTP `check()` of a red workflow now returns the engine's plain teaching
+  report with `findings[]`; the snapshot capture refuses such a workflow with
+  one error line, which is preserved as `snapshot_error`. No workflow bytes
+  are sent on that path.
+- Native `check()` now reads the check report the engine routes to stderr
+  behind its `nika: ` prefix instead of reporting an engine incompatibility;
+  when neither stream carries a report, the typed error appends a bounded
+  single-line excerpt of stderr.
+- A pre-run engine refusal printed as a plain `NIKA-…` line under `--json`
+  now settles `run.done` with `NikaOperationError` (`operation: 'run'`, the
+  engine code, the full refusal line) instead of a protocol error; any other
+  unreadable machine line keeps `NikaProtocolError` and now quotes a bounded
+  excerpt of the offending line. `NikaOperation` gains `'run'`, additively.
+- Engine spawn failures name the engine path and the underlying errno, so a
+  wrong `bin`/`NIKA_BIN` reads as `spawn /path/to/nika ENOENT`.
+
 ## [0.116.2] - 2026-08-31
 
 Lockstep recovery release for engine v0.116.2. The HTTP schema is unchanged

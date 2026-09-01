@@ -124,6 +124,9 @@ terminal `succeeded` line with the outputs and the receipt.
 `run()` returns after stable admission. `run.done` is the sole terminal result.
 An admitted workflow failure is result data with `status: "failed"`; transport,
 protocol, configuration, and compatibility failures throw typed SDK errors.
+A `try { await run.done } catch {}` alone therefore never catches a failed
+workflow: a CI job or an application must read `result.status` and treat
+anything but `succeeded` as its own failure, or a red run passes silently.
 
 ## Verify a local trace
 
@@ -410,6 +413,7 @@ workflow name that escapes the catalog) throws a plain `TypeError` or
 ```text
 NikaError
 ├── NikaConfigurationError
+├── NikaEngineUnavailable
 ├── NikaTransportError
 │   ├── NikaProtocolError
 │   └── NikaObservationInterrupted

@@ -25,6 +25,13 @@ if (command === 'wait-for-signal') {
 
 if (command === 'check') {
   const sdkSnapshot = argv.includes('--sdk-snapshot');
+  if (workflow.includes('hang')) {
+    setTimeout(() => {
+      console.log(JSON.stringify({ report_version: 1, clean: true, argv }));
+      process.exit(0);
+    }, 5_000);
+    return;
+  }
   if (sdkSnapshot && workflow.includes('parse-fatal')) {
     console.log(JSON.stringify({
       report_version: 1,

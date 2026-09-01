@@ -135,8 +135,12 @@ in for `cancel(run)`.
 
 Remote admission is bytes-first: the local compatible engine captures an
 immutable execution snapshot, then the SDK sends those exact bytes to the
-authenticated server. A remote client therefore still needs a local `nika`
-binary through `bin`, `NIKA_BIN`, or the exact optional platform package.
+authenticated server. Capturing those snapshots for `check` and `run`
+therefore still needs a local `nika` binary through `bin`, `NIKA_BIN`, or the
+exact optional platform package, resolved lazily at capture time.
+Observation-only clients need no local engine: `attachRun`, `status`,
+`events`, `cancel`, `schedule`, `scheduleStatus`, `listWorkflows`, `workflow`,
+and `traceVerify` run against the advertised server identity alone.
 
 The current persistent server requires a project file. A minimal `nika.yaml`
 is enough:
@@ -202,6 +206,12 @@ Persist the job id and last committed sequence in application state. The
 idempotency namespace spans the server's entire `state-root` and currently has
 no TTL; use globally unique business keys and do not recycle them between
 workflows.
+
+When observation loses connectivity past its retry budget, the SDK performs
+one final durable read before giving up: a terminal record settles `run.done`
+from the workflow's truth, and a still-running record rejects with
+`NikaObservationInterrupted`, whose `lastSequence` feeds
+`attachRun(id, { lastEventId })` to resume.
 
 Plain HTTP is refused unless `allowInsecureHttp: true` is explicit. Use HTTPS
 for a non-loopback deployment. A URL may not contain credentials, a query, or a
@@ -319,7 +329,8 @@ Every SDK error extends `NikaError`:
 NikaError
 ├── NikaConfigurationError
 ├── NikaTransportError
-│   └── NikaProtocolError
+│   ├── NikaProtocolError
+│   └── NikaObservationInterrupted
 ├── NikaCompatibilityError
 ├── NikaOperationError
 ├── NikaEventBufferOverflowError

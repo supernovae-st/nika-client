@@ -27,9 +27,10 @@ local nika process         authenticated nika serve
 - `src/lib/native-process-transport.ts` is the local Adapter. It spawns the
   selected engine without a shell and consumes newline-delimited machine
   events.
-- `src/lib/http-transport.ts` is the remote Adapter. It verifies local and
-  remote engine identities, captures immutable snapshot bytes locally, then
-  uses the authenticated HTTP contract.
+- `src/lib/http-transport.ts` is the remote Adapter. It verifies the remote
+  server identity once per client, resolves and verifies a local engine only
+  for caller-owned snapshot capture, then uses the authenticated HTTP
+  contract.
 - `src/lib/run-session.ts` is the lifecycle Seam. It owns the eager event
   pump, bounded independent observers, cancellation memoization, and the sole
   terminal `run.done` settlement.
@@ -50,6 +51,8 @@ Some operations deliberately have one authority:
   `NikaCompatibilityError`;
 - remote execution still needs a compatible local engine to capture an
   immutable snapshot before any network admission;
+- HTTP observation (attach, durable status, events, cancel, workflow catalog,
+  schedule status, trace verdicts) needs no local engine;
 - remote trace verification currently returns the engine's typed unavailable
   verdict because the server has no path-free journal authority.
 

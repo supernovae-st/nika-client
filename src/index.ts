@@ -64,7 +64,10 @@ export class Nika {
           'requestTimeout',
         ),
         machineBufferBytes,
-        engine: resolveNikaEngine(config.bin),
+        // Lazy: HTTP observation needs no local engine. Resolution (and its
+        // typed NikaEngineUnavailable refusal) is deferred to caller-owned
+        // source capture in check/run.
+        resolveEngine: () => resolveNikaEngine(config.bin),
         cwd: config.cwd,
       });
     } else {
@@ -231,6 +234,7 @@ export {
   NikaConfigurationError,
   NikaError,
   NikaEventBufferOverflowError,
+  NikaObservationInterrupted,
   NikaOperationError,
   NikaProtocolError,
   NikaRunOwnershipError,

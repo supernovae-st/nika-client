@@ -52,6 +52,33 @@ export class NikaProtocolError extends NikaTransportError {
   }
 }
 
+/**
+ * Observation broke before terminal settlement and the final durable read
+ * stayed non-terminal. The cursor feeds attachRun(id, { lastEventId }).
+ */
+export class NikaObservationInterrupted extends NikaTransportError {
+  readonly runId: string;
+  readonly lastSequence: number;
+  readonly attempts: number;
+
+  constructor(
+    transport: NikaTransportKind,
+    runId: string,
+    lastSequence: number,
+    attempts: number,
+  ) {
+    super(
+      transport,
+      `HTTP observation interrupted after ${attempts} retries; `
+      + `run ${runId} last acknowledged sequence ${lastSequence}`,
+    );
+    this.name = 'NikaObservationInterrupted';
+    this.runId = runId;
+    this.lastSequence = lastSequence;
+    this.attempts = attempts;
+  }
+}
+
 /** One taxonomy for engine refusals returned by an SDK operation. */
 export class NikaOperationError extends NikaError {
   readonly operation: NikaOperation;

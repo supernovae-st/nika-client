@@ -238,9 +238,12 @@ from the workflow's truth, and a still-running record rejects with
 `NikaObservationInterrupted`, whose `lastSequence` feeds
 `attachRun(id, { lastEventId })` to resume.
 
-Plain HTTP is refused unless `allowInsecureHttp: true` is explicit. Use HTTPS
-for a non-loopback deployment. A URL may not contain credentials, a query, or a
-fragment, and a 32–512 byte visible-ASCII token is mandatory.
+Plain HTTP is accepted only for a loopback host (`localhost`, `127.0.0.0/8`,
+`[::1]`), and only when `allowInsecureHttp: true` is explicit. Every other host
+must use HTTPS: the opt-in widens the scheme, never the destination, so the
+bearer token never leaves the machine in plaintext. A URL may not contain
+credentials, a query, or a fragment, and a 32–512 byte visible-ASCII token is
+mandatory.
 
 Remote snapshots currently do not have request envelopes for per-call `vars`,
 `model`, or `maxCostUsd`; declare those facts in the workflow. Likewise,
@@ -402,7 +405,8 @@ unpriced model into `$0`.
 
 - Token files stay out of argv and must be private (`0600`, 32–512 visible
   ASCII bytes).
-- The constructor refuses accidental plaintext HTTP.
+- The constructor refuses plaintext HTTP off loopback, and requires the
+  explicit `allowInsecureHttp: true` opt-in on loopback.
 - `permits` remain default-deny engine policy; SDK types do not grant authority.
 - Machine frames, diagnostics, SSE lines, and observer queues are bounded.
 - Receipts and traces are engine-issued proof. The SDK never synthesizes them.

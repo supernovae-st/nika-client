@@ -193,15 +193,42 @@ function checkedUrl(value: string, allowInsecureHttp: boolean): string {
   if (url.protocol !== 'https:' && url.protocol !== 'http:') {
     throw new NikaConfigurationError('Nika URL must use https: or http:');
   }
-  if (url.protocol === 'http:' && !allowInsecureHttp) {
-    throw new NikaConfigurationError(
-      'Plain HTTP requires allowInsecureHttp: true; prefer HTTPS for remote engines',
-    );
+  if (url.protocol === 'http:') {
+    if (!allowInsecureHttp) {
+      throw new NikaConfigurationError(
+        'Plain HTTP requires allowInsecureHttp: true; prefer HTTPS for remote engines',
+      );
+    }
+    // The opt-in widens the scheme, never the destination: a bearer token
+    // must not leave the host in plaintext.
+    if (!isLoopbackHost(url.hostname)) {
+      throw new NikaConfigurationError(
+        'Plain HTTP is limited to loopback hosts (localhost, 127.0.0.0/8, [::1]); '
+        + `use HTTPS for ${url.hostname}`,
+      );
+    }
   }
   if (url.username || url.password || url.search || url.hash) {
     throw new NikaConfigurationError('Nika URL cannot contain credentials, a query, or a fragment');
   }
   return url.toString().replace(/\/$/, '');
+}
+
+const LOOPBACK_IPV4 = /^127(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}$/;
+const IPV4_MAPPED_IPV6 = /^::ffff:([0-9a-f]{1,4}):[0-9a-f]{1,4}$/;
+
+/**
+ * `URL.hostname` is already normalized: IPv4 shorthand becomes a dotted quad,
+ * IPv6 stays bracketed and compressed (`[::ffff:127.0.0.1]` -> `[::ffff:7f00:1]`).
+ */
+function isLoopbackHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  if (host === 'localhost') return true;
+  if (LOOPBACK_IPV4.test(host)) return true;
+  const literal = host.startsWith('[') && host.endsWith(']') ? host.slice(1, -1) : host;
+  if (literal === '::1') return true;
+  const mapped = literal.match(IPV4_MAPPED_IPV6);
+  return mapped !== null && Number.parseInt(mapped[1], 16) >>> 8 === 0x7f;
 }
 
 function checkedToken(value: string): string {

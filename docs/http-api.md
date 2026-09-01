@@ -20,8 +20,9 @@ route except public `GET /health`; bearer tokens are redacted from failures.
 
 ## Connection rules
 
-- HTTPS is required by default. Loopback HTTP needs
-  `allowInsecureHttp: true`.
+- HTTPS is required for every host except loopback. Plain HTTP is accepted
+  only for `localhost`, `127.0.0.0/8`, or `[::1]`, and only with an explicit
+  `allowInsecureHttp: true`; that opt-in never admits a routable host.
 - URLs containing credentials, a query, or a fragment are rejected.
 - Tokens must contain 32–512 visible ASCII bytes and are never sent to
   `/health`.

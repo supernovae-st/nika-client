@@ -137,7 +137,13 @@ if (!proof.verified) throw new Error(proof.output ?? 'trace verification failed'
 ```
 
 The SDK does not implement cryptography or inspect the trace itself. It asks the
-engine to verify the receipt and its signed binding. The remote endpoint
+engine to verify the receipt and its signed binding. A receipt from a native
+run carries the proof-bearing fields (`chain_head`, `chain_len`, `sealed`,
+`trace_path`) and verifies locally. A receipt from a `nika serve` job carries
+identity only (`job_id`, `execution_id`, `trace_id`, `snapshot_digest`,
+`origin`): the resident writes no trace journal yet, so that receipt verifies
+through no door today, and the same `NikaReceipt` type covers both shapes.
+Persist it as the job's identity, not as evidence. The remote endpoint
 currently returns `{ verified: false, verdict: "unavailable", reason:
 "trace_journal_unavailable" }` because the server has no path-free journal
 authority; the typed verdict is preserved instead of being hidden as a 404.
@@ -252,11 +258,14 @@ Plain HTTP is refused unless `allowInsecureHttp: true` is explicit. Use HTTPS
 for a non-loopback deployment. A URL may not contain credentials, a query, or a
 fragment, and a 32–512 byte visible-ASCII token is mandatory.
 
-Remote snapshots currently do not have request envelopes for per-call `vars`,
-`model`, or `maxCostUsd`; declare those facts in the workflow. Likewise,
-remote `check` does not accept `model` or `nativeStrict` overrides. Supplying
-these options returns a typed compatibility refusal instead of silently
-dropping them.
+Remote snapshots currently do not have request envelopes for per-call `vars`
+or `model`; declare those facts in the workflow. There is no per-run spend
+bound over HTTP at all today: `maxCostUsd` is refused, the workflow language
+has no budget field, and the resident applies its own server-wide default
+ceiling. Bound a remote run by its model and `max_tokens` until the request
+envelope carries a ceiling. Likewise, remote `check` does not accept `model`
+or `nativeStrict` overrides. Supplying these options returns a typed
+compatibility refusal instead of silently dropping them.
 
 ## Resident schedules
 

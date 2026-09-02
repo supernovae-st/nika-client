@@ -112,8 +112,9 @@ evidence. A failed or skipped lane stays named; it is not rounded into a pass.
 The release ceremony is deliberately two-step. `release.yml` validates the
 tagged engine assets, starts the released Linux binary, proves the live
 OpenAPI/types pin, embeds the exact prepared commit and release version in all
-five package manifests before packing, and stages four payloads plus the SDK
-through npm OIDC. A maintainer then inspects and approves the staged packages
-with 2FA. `release-finalize.yml` refuses to create the SDK tag and GitHub
+five package manifests before packing, and publishes four payloads plus the SDK
+with the repository's npm token and a Sigstore provenance attestation bound to
+the workflow identity (a version already on the registry is skipped, never
+re-published). `release-finalize.yml` refuses to create the SDK tag and GitHub
 Release until all five exact versions are publicly observable on npm and every
 published manifest carries the same prepared commit and version.

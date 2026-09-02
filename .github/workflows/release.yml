@@ -1,7 +1,10 @@
 name: Release
 
 # SECURITY: no github.event text is interpolated directly into shell source.
-# npm trusted publishing must authorize this exact workflow for all five packages.
+# npm publishes with the repository's NPM_TOKEN and a Sigstore provenance
+# attestation bound to this workflow identity (id-token). npm trusted
+# publishing (OIDC, no write token) replaces the token the day a trusted
+# publisher is registered for all five packages on npmjs.com.
 on:
   workflow_dispatch:
     inputs:
@@ -9,7 +12,7 @@ on:
         description: 'Checked-in SDK + engine release train version (e.g. 0.115.0)'
         required: true
       dry_run:
-        description: 'Build and inspect without staging on npm'
+        description: 'Build and inspect without publishing on npm'
         type: boolean
         default: false
 
@@ -45,10 +48,8 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
-      - name: Pin trusted-publishing npm CLI
-        run: |
-          npm install --global npm@11.19.1
-          npm stage --help
+      - name: Pin npm CLI
+        run: npm install --global npm@11.19.1
 
       - name: Validate checked-in release train
         env:
@@ -378,12 +379,12 @@ jobs:
             "release-candidate/release-tarballs/$NATIVE_TARBALL-$VERSION.tgz" \
             "$VERSION" "$PREPARED_SHA" "$NATIVE_PACKAGE"
 
-  stage:
+  publish:
     if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
     needs: [prepare, verify-native-runtime]
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    environment: npm-staging
+    environment: npm-publish
     permissions:
       contents: read
       id-token: write
@@ -406,12 +407,12 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
-      - name: Pin trusted-publishing npm CLI
-        run: |
-          npm install --global npm@11.19.1
-          npm stage --help
+      - name: Pin npm CLI
+        run: npm install --global npm@11.19.1
 
-      - name: Stage payloads, then SDK through OIDC
+      - name: Publish payloads, then the SDK, with provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
           prepared_sha="$(jq -r .prepared_sha release-candidate/release-metadata.json)"
@@ -419,26 +420,35 @@ jobs:
             echo "::error::artifact commit and checked-out publishing commit differ"
             exit 1
           fi
-          payloads=(
-            "release-candidate/release-tarballs/supernovae-st-nika-darwin-arm64-$VERSION.tgz"
-            "release-candidate/release-tarballs/supernovae-st-nika-darwin-x64-$VERSION.tgz"
-            "release-candidate/release-tarballs/supernovae-st-nika-linux-arm64-$VERSION.tgz"
-            "release-candidate/release-tarballs/supernovae-st-nika-linux-x64-$VERSION.tgz"
-          )
-          for tarball in "${payloads[@]}"; do
-            npm stage publish "$tarball" --access public
-          done
-          npm stage publish \
-            "release-candidate/release-tarballs/supernovae-st-nika-client-$VERSION.tgz" \
-            --access public
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::error::NPM_TOKEN is not set on this repository · nothing can publish"
+            exit 1
+          fi
+          # A replay after a partial publish must not fail on the packages that
+          # already landed: a version already on the registry is skipped, never
+          # re-published (npm refuses to publish over a version anyway).
+          publish_once() {
+            local pkg="$1" tarball="$2"
+            if npm view "$pkg@$VERSION" version >/dev/null 2>&1; then
+              echo "already on npm: $pkg@$VERSION · skipped"
+              return 0
+            fi
+            npm publish "$tarball" --access public --provenance
+          }
+          tarballs=release-candidate/release-tarballs
+          publish_once "@supernovae-st/nika-darwin-arm64" "$tarballs/supernovae-st-nika-darwin-arm64-$VERSION.tgz"
+          publish_once "@supernovae-st/nika-darwin-x64" "$tarballs/supernovae-st-nika-darwin-x64-$VERSION.tgz"
+          publish_once "@supernovae-st/nika-linux-arm64" "$tarballs/supernovae-st-nika-linux-arm64-$VERSION.tgz"
+          publish_once "@supernovae-st/nika-linux-x64" "$tarballs/supernovae-st-nika-linux-x64-$VERSION.tgz"
+          publish_once "@supernovae-st/nika-client" "$tarballs/supernovae-st-nika-client-$VERSION.tgz"
 
-      - name: Approval summary
+      - name: Release summary
         run: |
           {
-            echo "### Nika client release staged"
+            echo "### Nika client release published"
             echo "- Version: $VERSION"
             echo "- Order: four native payloads, then root SDK"
-            echo "- Authentication: npm trusted publishing (OIDC), no write token"
+            echo "- Authentication: repository NPM_TOKEN · Sigstore provenance attested through this workflow identity"
             echo "- Prepared commit: $(jq -r .prepared_sha release-candidate/release-metadata.json)"
-            echo "- Next gate: inspect and approve all five staged packages with human 2FA"
+            echo "- Next: release-finalize.yml tags the SDK once all five versions are observable on npm"
           } >> "$GITHUB_STEP_SUMMARY"

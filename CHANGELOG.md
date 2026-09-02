@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `NikaRunSettledEvent.error`: engine 0.117+ repeats the first failed task's
+  code, message and task id on the terminal `run_settled` frame; `eventError`
+  already read an `error` object first, so `run.done` carries it on both
+  engines without a code change (the frame is typed and the reader is pinned).
+
 ### Security
 
 - `bin` and `NIKA_BIN` must be absolute paths. A bare name such as `nika`

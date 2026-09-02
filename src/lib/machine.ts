@@ -79,9 +79,10 @@ export function eventError(event: NikaEvent | undefined): NikaMachineError | und
 /**
  * A native `task_failed` frame carries its failure as field rows, not as an
  * `error` object: `detail` holds `NIKA-<CODE> · <message>` and `task` names
- * the task. The later `workflow_failed` and `run_settled` frames carry no
- * error at all, so this is the only place the engine states why a run
- * failed. Read it the same way status, receipt, and outputs are read.
+ * the task. Engines before 0.117 name the cause nowhere else; from 0.117 the
+ * terminal `run_settled` frame repeats it as an `error` object, which
+ * `eventError` reads first. Read it the same way status, receipt, and
+ * outputs are read.
  */
 function fieldsError(event: NikaEvent | undefined): NikaMachineError | undefined {
   if (event?.kind !== 'task_failed') return undefined;

@@ -145,6 +145,12 @@ export interface NikaRunSettledEvent<
   status?: NikaRunStatus;
   outputs?: Outputs;
   receipt?: NikaReceipt;
+  /**
+   * The cause of a `failed` settlement (engine 0.117+): the first failed
+   * task's code, message and task id. Absent on a succeeded or paused run,
+   * and on engines that only name the cause on their `task_failed` frame.
+   */
+  error?: NikaMachineError;
 }
 
 /** The run's trace chain was sealed. */

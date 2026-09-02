@@ -32,6 +32,21 @@ describe('a failed native run carries the engine failure', () => {
     })).toEqual({ message: 'the provider hung up' });
   });
 
+  it('reads the cause a 0.117+ run_settled frame carries', () => {
+    expect(eventError({
+      kind: 'run_settled',
+      status: 'failed',
+      outputs: { result: null },
+      error: { code: 'NIKA-BUILTIN-READ-001', message: 'no such file: ./missing.md', task: 'brief' },
+    })).toEqual({
+      code: 'NIKA-BUILTIN-READ-001',
+      message: 'no such file: ./missing.md',
+      task: 'brief',
+    });
+    expect(eventError({ kind: 'run_settled', status: 'succeeded', outputs: { result: 1 } }))
+      .toBeUndefined();
+  });
+
   it('reads nothing from frames that carry no failure', () => {
     expect(eventError({ kind: 'task_started', fields: [{ key: 'task', value: 'boom' }] }))
       .toBeUndefined();

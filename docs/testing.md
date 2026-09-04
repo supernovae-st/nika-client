@@ -16,6 +16,7 @@ NIKA_BIN=/path/to/nika npm run gauntlet:projects
 NIKA_BIN=/path/to/nika npm run gauntlet:depth
 NIKA_BIN=/path/to/nika npm run gauntlet:hostile
 NIKA_BIN=/path/to/nika npm run gauntlet:recovery
+NIKA_BIN=/path/to/nika npm run gauntlet:one-door
 npm audit
 npm pack --dry-run
 ```
@@ -37,9 +38,10 @@ mints an ephemeral run-signing key. Its
 cancellation fixtures use the engine's in-process `nika:wait` primitive, so the
 replay needs no shell command, platform sandbox, or sandbox waiver. Cancellation
 and sealed-trace claims are exercised against the public binary. The attached
-cancellation replay records both event kind and status: Nika 0.116.2 ratifies
-the `cancel_job` writer (`execution.cancelled`) and the racing worker settlement
-writer (`execution.settled`), but either is accepted only with `status=cancelled`.
+cancellation replay records both event kind and status. A cancel request is
+not a settlement: an active runtime may finish successfully, fail, or cancel
+at its boundary; lost ownership is `interrupted`. The cancellation fixture
+uses a cooperative wait and must observe `status=cancelled`.
 The parsed deterministic and packed-project results must match exactly except
 for the recovery job UUID. The hostile comparison excludes `generated_at` and
 per-scenario duration and canonicalizes only those two ratified cancellation
@@ -47,6 +49,63 @@ writer kinds after checking the exact cancelled status. This proves that the
 attested public release currently reproduces the committed behavioral claims.
 It does not claim cryptographic proof of when the committed JSON file itself
 was originally written.
+
+The One Door comparison separately asserts success, failure, recovery, cancellation and
+pause through six execution paths: CLI, raw HTTP by name and by snapshot,
+and the installed SDK over native, by-name and snapshot transports. It also
+checks trace projection, terminal-cursor reattachment, and replay before a
+changed registry is read. A pause resolves the current observation leg; it
+does not make the durable job impossible to resume. Ordinary `check --json`
+must omit snapshot bytes, which appear only with `--sdk-snapshot`.
+
+Independent executions compare stable facts while allowing elapsed time and
+redacted diagnostic prose to differ. Within one job, the SDK result, original
+terminal event, terminal-cursor attachment and idempotent replay must preserve
+the full settlement and error exactly, including elapsed time and additive
+HTTP fields. Native flat events project the known settlement fields with their
+original optional-field presence.
+
+One Door's cancellation fixture uses a controlled loopback rendezvous. Its
+first `nika:fetch` reaches a listener owned by the harness, which withholds the
+response. Each door requests cancellation at that same point, then releases
+the response after the CLI signal was accepted, HTTP returned 202, or the SDK
+returned `cancellation_requested`. A second fetch depends on the first task's
+success. A green requires the engine's own `cancelled/operator` settlement,
+exactly one completed task, exactly one cancelled and never-started task, and
+zero requests to the dependent endpoint. A 10-second rendezvous deadline fails
+the proof; it never releases the task on a timer. No sleep chooses the outcome.
+An accepted request still does not guarantee cancellation in general: the
+engine may settle successfully when completion races the request. This fixture
+proves cancellation with a held task and unstarted dependent; it does not claim
+preemption of in-flight work or coverage of every possible race interleaving.
+
+The artifact retains full original settlements and states exactly which
+boundaries were compared. CLI event/trace settlement equality covers all five
+scenarios. SDK event/result equality and HTTP terminal-cursor attachment remain
+exact, and every raw HTTP or SDK HTTP job additionally compares GET against its
+terminal event, including output presence and receipt. GET's authoritative
+error is the full nested settlement error; its separate legacy code/message
+summary is not compared as a full diagnostic. For cancellation, the supervisor
+also reads the journal belonging to each of the six executions and compares its
+full settlement against the original terminal event or SDK result. Journal
+lookup uses the full execution identity in the recorded event. This is a read
+of the supervisor's own scratch project, not a remote SDK trace capability;
+the by-name consumer still has neither workflow source nor a usable binary.
+Trace output maps are per-task data, so no workflow-output equivalence is claimed
+for that projection. Mutation tests reject fabricated cancellation, lost actual
+settlements, and changed elapsed time, diagnostics, or additive settlement fields.
+
+Development installation uses `npm install --offline` on the local tarball.
+Child processes receive a fresh HOME, disabled Keychain, and no inherited
+provider credentials or proxy environment. The fixture declares only loopback
+HTTP access. Public npm mode additionally needs registry access to install the
+published package; the cancellation fixture itself remains local.
+
+After publication, run the same comparison with
+`NIKA_PUBLIC_SDK_VERSION=0.118.1` and the verified public `NIKA_BIN` artifact.
+That mode installs the exact public npm package and exercises its optional
+native payload without an explicit binary override. A local pack or a dirty
+development binary is useful regression evidence, never public-install proof.
 
 ## Test layers
 

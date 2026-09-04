@@ -40,6 +40,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Completed HTTP reads, terminal-cursor attachment and idempotent replay
+  preserve the full engine settlement, including diagnostic, tally and spend.
+  A pause ends the current observation without making the job unresumable.
+  Cancellation acknowledges a request and retains the runtime's actual result;
+  a refused cancellation can be retried. A recovered native task failure no
+  longer overrides a successful authoritative settlement.
+- A six-door execution comparison checks success, failure, recovery, pause
+  and controlled cancellation through CLI, raw HTTP and the installed SDK.
+  Same-job event/result/GET/trace comparisons retain exact settlement facts;
+  cross-run comparisons exclude only execution-specific fields. Public-asset
+  replay and type drift now refuse unavailable or incompatible release
+  artifacts. Source version 0.118.1 remains a candidate until those release
+  proofs and the matching npm/native publications complete.
 - Engine identity probe refusals name the executable path and, when it did
   not answer like an engine, the one command that settles it
   (`<bin> --sdk-identity`) instead of `Engine identity probe failed`.

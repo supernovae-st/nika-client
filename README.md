@@ -43,13 +43,13 @@ not parse YAML or reconstruct proof in TypeScript.
 ## Install
 
 ```sh
-npm view @supernovae-st/nika-client@0.116.2 version  # must report 0.116.2
-npm install @supernovae-st/nika-client@0.116.2
+npm view @supernovae-st/nika-client@0.118.1 version  # must report 0.118.1
+npm install @supernovae-st/nika-client@0.118.1
 ```
 
-If the registry reports any other version, the 0.116.2 release train is not
-complete. Earlier packages expose the retired `LocalNika`/HTTP split and do
-not implement the root facade documented below. The publication is complete
+If the registry does not expose that exact version, the 0.118.1 release train
+is not complete. Earlier 0.116 releases introduced the unified facade but do
+not cover all the by-name and settlement guarantees documented below. The publication is complete
 only when the four matching native payload packages and this root client are
 all visible on npm.
 
@@ -123,11 +123,17 @@ Expected output: `workflow_started`, `task_scheduled`, `task_started`,
 `task_completed`, `workflow_completed`, then `run_settled succeeded`, then the
 terminal `succeeded` line with the outputs and the receipt.
 
-A red `check()` report carries the engine's `findings[]` on both transports, so
-the check → teach → re-draft loop reads one shape whether the engine runs
-locally or behind `nika serve`.
+A local `check()` report carries the engine's `findings[]`; an HTTP check of
+an explicit local path preserves that report when capture is refused.
+Checking a served name instead returns the resident's compact admission
+acknowledgement or typed `error` with `clean: false`, without a local process,
+invented findings, or a process exit code.
 
-`run()` returns after stable admission. `run.done` is the sole terminal result.
+`run()` returns after stable admission. `run.done` is the sole result of the
+current execution leg, including `paused` when a human gate needs an answer.
+Pause is not failure and the SDK never supplies the human's answer. The
+engine's `settlement` survives completed-job reattachment and idempotent
+admission replay; it is not reconstructed from earlier task events.
 An admitted workflow failure is result data with `status: "failed"` and, when
 the engine named the failing task, `error: { code, message, task }`; transport,
 protocol, configuration, and compatibility failures throw typed SDK errors.
@@ -177,6 +183,11 @@ const result = await run.done;
 
 console.log(cancellation.accepted, result.status);
 ```
+
+`cancel()` acknowledges the action, not a guaranteed cancelled outcome. An
+active HTTP run may return `cancellation_requested`; keep awaiting `run.done`
+for the engine's success, failure or cancellation. Lost execution ownership
+is reported as `interrupted`. A paused observation replays its existing result.
 
 Cancellation is idempotent per `NikaRun`. An `AbortSignal` passed to `check`,
 `events`, or `traceVerify` only stops that request or observer; it never stands
@@ -379,7 +390,7 @@ Remote-only options:
 
 | Method | Result |
 |---|---|
-| `check(workflow, options?)` | engine check report, including `clean` and `exitCode` |
+| `check(workflow, options?)` | `clean` plus a local engine report (with `exitCode`) or served-name acknowledgement/refusal |
 | `run(workflow, options?)` | admitted `NikaRun` |
 | `attachRun(id, options?)` | reattached durable HTTP `NikaRun` |
 | `status(run)` | current durable HTTP status |
@@ -396,7 +407,8 @@ Remote-only options:
 `NikaEvent` is a discriminated union over the known lifecycle kinds of both
 transports. A native engine process emits `workflow_started`,
 `task_scheduled`, `task_started`, `task_completed`, `workflow_completed`,
-`workflow_failed`, `workflow_interrupted`, `run_settled`, and `run_sealed`. A
+`workflow_failed`, `workflow_paused`, `workflow_cancelled`, `run_settled`,
+and `run_sealed`. A
 `nika serve` job streams `execution.started`, `execution.settled`,
 `execution.cancelled`, `execution.refused`, and `execution.interrupted` (a
 resident that restarts marks an orphaned running job `interrupted`). Kinds

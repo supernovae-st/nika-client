@@ -97,6 +97,7 @@ jobs:
         env:
           NIKA_BIN: ${{ runner.temp }}/nika-release-asset/nika
           NIKA_GAUNTLET_RESULTS_DIR: ${{ runner.temp }}/nika-release-replay
+          NIKA_ONE_DOOR_REPORT: ${{ runner.temp }}/nika-one-door.json
         run: |
           npm run check:release-evidence
           npm run gauntlet:run
@@ -104,7 +105,18 @@ jobs:
           npm run gauntlet:depth
           npm run gauntlet:hostile
           npm run gauntlet:recovery
+          npm run gauntlet:one-door
           npm run check:release-replay -- "$NIKA_GAUNTLET_RESULTS_DIR"
+
+      - name: Preserve the exact replay evidence, including an incomplete proof
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: released-engine-replay
+          path: |
+            ${{ runner.temp }}/nika-release-replay
+            ${{ runner.temp }}/nika-one-door.json
+          if-no-files-found: warn
 
   # ── Type Drift Check ──────────────────────────────────
   # Starts a live nika serve, generates types from OpenAPI,
@@ -113,6 +125,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      attestations: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -132,16 +145,19 @@ jobs:
           gh release download "v$version" \
             --repo supernovae-st/nika \
             --dir "$asset_root" \
-            --pattern "nika-linux-x64-$version.tar.gz"
-          tar xzf "$asset_root/nika-linux-x64-$version.tar.gz" -C "$asset_root"
+            --pattern "nika-linux-x64-$version.tar.gz" \
+            --pattern SHA256SUMS
+          cd "$asset_root"
+          asset="nika-linux-x64-$version.tar.gz"
+          gh attestation verify "$asset" --repo supernovae-st/nika
+          grep -F " $asset" SHA256SUMS | sha256sum --check --strict
+          tar xzf "$asset"
           chmod +x "$asset_root/nika"
           sudo mv "$asset_root/nika" /usr/local/bin/
 
       - run: npm ci
-      # The type-drift check needs the target-facing HTTP `nika serve` surface
-      # (see CHANGELOG). The released CLI already owns `nika serve` for its
-      # resident scheduler, so command existence alone is not a capability
-      # probe. Re-activate only when help exposes both HTTP contract flags.
+      # This train promises the HTTP contract. An unavailable or incompatible
+      # artifact is a failed gate, never an advisory success.
       - name: Type drift (against live nika serve)
         env:
           NIKA_SERVE_TOKEN: ci-test-token-32-chars-minimum!!
@@ -151,13 +167,13 @@ jobs:
           sdk_version=$(node -p "require('./package.json').version")
           engine_version=$(nika --version | awk '{print $2}')
           if [ "$sdk_version" != "$engine_version" ]; then
-            echo "::warning::type-drift deferred — SDK $sdk_version targets the next engine train; latest release is $engine_version"
-            exit 0
+            echo "::error::SDK $sdk_version requires engine $sdk_version, received $engine_version"
+            exit 1
           fi
           serve_help=$(nika serve --help 2>&1 || true)
           if [[ "$serve_help" != *"--bind"* || "$serve_help" != *"--workflows"* ]]; then
-            echo "::warning::type-drift advisory — nika serve currently exposes the resident scheduler, not the target-facing HTTP surface. Re-activates when --bind and --workflows ship."
-            exit 0
+            echo "::error::The exact engine artifact is missing the promised HTTP serve contract"
+            exit 1
           fi
           # The fixture speaks the shipped nine-key envelope — this exact file
           # passes `nika check` clean (rc=0) on the released binary

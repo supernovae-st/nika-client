@@ -1,6 +1,6 @@
 {
   "name": "@supernovae-st/nika-linux-arm64",
-  "version": "0.116.2",
+  "version": "0.118.1",
   "description": "Nika native engine payload for Linux arm64 GNU",
   "license": "AGPL-3.0-or-later",
   "os": [

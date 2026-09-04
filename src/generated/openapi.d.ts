@@ -329,8 +329,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Idempotently cancel a queued, running, or paused job
-         * @description Cancellation signals the run-scoped engine token before durable terminal settlement. A terminal replay returns the existing result unchanged.
+         * Request cancellation or replay an ended observation
+         * @description A queued job cancels atomically before execution claims it. An active job receives the run-scoped cancellation signal and returns 202 until its execution owner settles: the result may be success, failure or cancellation; expired grace means interrupted, never an invented cancellation. A paused or final observation returns its existing result unchanged.
          */
         post: {
             parameters: {
@@ -343,8 +343,17 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Cancelled or already terminal job */
+                /** @description Cancelled before execution, or already ended observation */
                 200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Job"];
+                    };
+                };
+                /** @description Cancellation requested; execution has not yet settled */
+                202: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -915,6 +924,7 @@ export interface components {
                 [key: string]: unknown;
             };
             receipt?: components["schemas"]["JobReceipt"];
+            settlement?: components["schemas"]["RunSettlement"];
             status: components["schemas"]["JobStatus"];
             trace_id?: string;
         };
@@ -973,7 +983,7 @@ export interface components {
         JobStatusOnly: {
             status: components["schemas"]["JobStatus"];
         };
-        /** @description The run's settlement (ADR-128), built once by the runtime and projected whole: the state word every door speaks, why, the elapsed time on the kernel clock, the task tally, the spend with its qualifier, the failure named. Unknown cost is never zero: `total_cost_usd` is absent when nothing was metered. Present on the terminal event of a job whose runtime settled; absent when the resident lost the execution (interrupted) or refused it before any task. */
+        /** @description The run's settlement (ADR-128), built once by the runtime and projected whole: the state word every door speaks, why, the elapsed time on the kernel clock, the task tally, the spend with its qualifier, the failure named. Unknown cost is never zero: `total_cost_usd` is absent when nothing was metered. Present on the terminal event and durable job response of a job whose runtime settled; absent when the resident lost the execution (interrupted) or refused it before any task. Reattachment and idempotent admission replay project the same hash-bound terminal event, never a new settlement. */
         RunSettlement: {
             /** @enum {string} */
             cause: "normal" | "human_gate" | "task_failed" | "output_contract" | "budget" | "operator" | "refused";

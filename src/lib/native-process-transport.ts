@@ -258,8 +258,9 @@ export class NativeProcessTransport implements Transport {
               lastEvent = event;
               receipt = eventReceipt(event) ?? receipt;
               outputs = eventOutputs(event) ?? outputs;
-              machineError = eventError(event) ?? machineError;
-              settlement = eventSettlement(event) ?? settlement;
+              const currentSettlement = eventSettlement(event, this.kind);
+              machineError = currentSettlement ? eventError(event) : eventError(event) ?? machineError;
+              settlement = currentSettlement ?? settlement;
               yield event;
             }
             if (Buffer.byteLength(buffer) > machineBufferBytes) {
@@ -276,8 +277,9 @@ export class NativeProcessTransport implements Transport {
               lastEvent = event;
               receipt = eventReceipt(event) ?? receipt;
               outputs = eventOutputs(event) ?? outputs;
-              machineError = eventError(event) ?? machineError;
-              settlement = eventSettlement(event) ?? settlement;
+              const currentSettlement = eventSettlement(event, this.kind);
+              machineError = currentSettlement ? eventError(event) : eventError(event) ?? machineError;
+              settlement = currentSettlement ?? settlement;
               yield event;
             }
           }

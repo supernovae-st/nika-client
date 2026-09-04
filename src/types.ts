@@ -189,11 +189,13 @@ export interface NikaExecutionSettledEvent<
   status?: NikaRunStatus;
   outputs?: Outputs;
   receipt?: NikaReceipt;
+  settlement?: NikaSettlement;
 }
 
-/** An accepted cancellation ended the execution before it settled. */
+/** Runtime cancellation, or queued cancellation without a runtime settlement. */
 export interface NikaExecutionCancelledEvent extends NikaEventFields {
   kind: 'execution.cancelled';
+  settlement?: NikaSettlement;
 }
 
 /** The server refused the execution. */
@@ -310,10 +312,13 @@ export interface NikaSpend {
  * Absent on engines before 0.118; never derived from an exit code.
  */
 export interface NikaSettlement {
+  /** Engine-owned status on nested or flat settlement projections. */
+  status?: NikaRunStatus;
   cause?: NikaRunCause;
   elapsed_ms?: number;
   tasks?: NikaTaskTally;
   spend?: NikaSpend;
+  error?: NikaMachineError;
   [key: string]: unknown;
 }
 

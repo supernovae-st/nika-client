@@ -15,10 +15,10 @@ any other non-2xx body is discarded and reported as a redacted
 | `GET /v1/workflows/{name}` | `workflow(name)` | path-free metadata, never source bytes |
 | `POST /v1/check` | `check()` | judges a served name, or immutable snapshot bytes, without a job |
 | `POST /v1/jobs` | `run()` | admits a served name, or exact snapshot bytes, with an idempotency key |
-| `GET /v1/jobs/{id}` | internal settlement | durable job identity, outputs, receipt, or redacted error |
+| `GET /v1/jobs/{id}` | internal settlement | durable job identity, settlement, outputs, receipt, or redacted error |
 | `GET /v1/jobs/{id}/status` | `status(run)` | current status only |
 | `GET /v1/jobs/{id}/events` | `events(run)` / `attachRun()` | bounded, sequenced SSE with replay |
-| `POST /v1/jobs/{id}/cancel` | `cancel(run)` | idempotent cancellation or terminal replay |
+| `POST /v1/jobs/{id}/cancel` | `cancel(run)` | `202` acknowledges an active cancellation request; `200` returns queued cancellation or an already observed outcome |
 | `GET /v1/jobs/{id}/trace/verify` | `traceVerify(receipt)` | engine-owned typed trace verdict |
 | `GET/PUT /v1/schedules/{id}` | `scheduleStatus()` / `schedule()` | resident schedule projection and CAS mutation |
 
@@ -51,6 +51,19 @@ SDK proves that the durable job exists before returning an owned run handle,
 then sends the cursor as `Last-Event-ID`. Persist the job id and last event
 sequence in the same application transaction that records each consumed event.
 A cursor means “fully processed”, not merely “received”.
+
+The stored settlement also supplies `run.done` when the terminal event was
+already consumed or admission replays an existing job. A paused event closes
+the current observation and resolves `done`, while the job remains resumable
+under engine authority. Attachment does not answer a human gate.
+
+An active cancellation returns `cancellation_requested` without waiting for
+the runtime to finish. Await `run.done` for its actual result: cancellation
+can race success or failure, and ownership lost without a runtime result is
+`interrupted`. The SDK does not replace that result with the requested one.
+Concurrent accepted cancellation requests share one action result. A failed
+request is not cached forever: the caller may retry it on the same run handle
+without abandoning the independently observed execution.
 
 ## Idempotency and schedules
 

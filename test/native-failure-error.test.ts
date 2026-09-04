@@ -11,6 +11,20 @@ const FIXTURE = path.join(
 );
 
 describe('a failed native run carries the engine failure', () => {
+  it('a successful current settlement clears an earlier handled task error', async () => {
+    const nika = new Nika({ bin: FIXTURE });
+    const run = await nika.run('recovered-settled.nika.yaml');
+    const result = await run.done;
+    expect(result.status).toBe('succeeded');
+    expect(result.error).toBeUndefined();
+  });
+
+  it('the resident error retains the runtime failing task', () => {
+    const error = { code: 'NIKA-EXEC-001', message: 'failed', task: 'build' };
+    expect(eventError({ kind: 'execution.settled', status: 'failed',
+      code: error.code, message: error.message, settlement: { error },
+    })).toEqual(error);
+  });
   it('reads the code, message and task from a task_failed frame', () => {
     expect(eventError({
       kind: 'task_failed',

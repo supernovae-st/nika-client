@@ -1,4 +1,5 @@
 import { NikaProtocolError } from '../errors.js';
+import { readSettlement } from './settlement.js';
 import type {
   NikaEvent,
   NikaMachineError,
@@ -46,21 +47,22 @@ export function eventStatus(event: NikaEvent | undefined): NikaRunStatus | undef
  * `spend`), the resident's `execution.settled` may nest it under
  * `settlement`. Absent on older engines; never invented from an exit code.
  */
-export function eventSettlement(event: NikaEvent | undefined): NikaSettlement | undefined {
+export function eventSettlement(
+  event: NikaEvent | undefined,
+  transport: NikaTransportKind = 'http',
+): NikaSettlement | undefined {
   if (!event) return undefined;
   const record = event as Record<string, unknown>;
-  const source = machineObject(record.settlement) ?? record;
-  const cause = typeof source.cause === 'string' ? source.cause : undefined;
-  const elapsed = typeof source.elapsed_ms === 'number' ? source.elapsed_ms : undefined;
-  const tasks = machineObject(source.tasks);
-  const spend = machineObject(source.spend);
-  if (cause === undefined && elapsed === undefined && !tasks && !spend) return undefined;
-  return {
-    ...(cause !== undefined ? { cause } : {}),
-    ...(elapsed !== undefined ? { elapsed_ms: elapsed } : {}),
-    ...(tasks ? { tasks } : {}),
-    ...(spend ? { spend } : {}),
-  };
+  // The resident already owns this object. Keep additive fields and the
+  // named failure exactly as recorded, on SSE and on durable reattachment.
+  if (record.settlement !== undefined) {
+    return readSettlement(record.settlement, transport, eventStatus(event));
+  }
+  if (['cause', 'elapsed_ms', 'tasks', 'spend'].every((key) => record[key] === undefined)) return undefined;
+  const fields = ['status', 'cause', 'elapsed_ms', 'tasks', 'spend', 'error'];
+  return readSettlement(Object.fromEntries(fields
+    .filter((key) => record[key] !== undefined)
+    .map((key) => [key, record[key]])), transport, eventStatus(event));
 }
 
 export function eventReceipt(event: NikaEvent | undefined): NikaReceipt | undefined {
@@ -89,6 +91,8 @@ export function eventOutputs(event: NikaEvent | undefined): Record<string, unkno
 }
 
 export function eventError(event: NikaEvent | undefined): NikaMachineError | undefined {
+  const settled = machineObject(machineObject(event?.settlement)?.error);
+  if (settled) return settled;
   const direct = machineObject(event?.error);
   if (direct) return direct as NikaMachineError;
   if (typeof event?.code === 'string' || typeof event?.message === 'string') {

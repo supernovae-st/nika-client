@@ -224,7 +224,7 @@ describe('terminal frame guards', () => {
     expect(isNikaTerminalEvent({ kind: 'workflow_started', status: 'queued' })).toBe(false);
     expect(isNikaTerminalEvent({ kind: 'task_completed' })).toBe(false);
     expect(isNikaTerminalEvent({ kind: 'run_sealed' })).toBe(false);
-    expect(isNikaTerminalEvent({ status: 'paused' })).toBe(false);
+    expect(isNikaTerminalEvent({ status: 'paused' })).toBe(true);
     expect(isNikaTerminalEvent({})).toBe(false);
   });
 

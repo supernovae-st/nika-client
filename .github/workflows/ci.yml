@@ -86,8 +86,7 @@ jobs:
             --pattern "$asset" \
             --pattern SHA256SUMS
           cd "$asset_root"
-          gh attestation verify "$asset" --repo supernovae-st/nika
-          grep -E "[[:space:]]${asset}$" SHA256SUMS | sha256sum --check --strict
+          node "$GITHUB_WORKSPACE/scripts/verify-engine-archive.mjs" "$asset" SHA256SUMS "$version"
           tar xzf "$asset"
           chmod +x nika
           test "$(./nika --version | awk '{print $2}')" = "$version"
@@ -149,8 +148,7 @@ jobs:
             --pattern SHA256SUMS
           cd "$asset_root"
           asset="nika-linux-x64-$version.tar.gz"
-          gh attestation verify "$asset" --repo supernovae-st/nika
-          grep -F " $asset" SHA256SUMS | sha256sum --check --strict
+          node "$GITHUB_WORKSPACE/scripts/verify-engine-archive.mjs" "$asset" SHA256SUMS "$version"
           tar xzf "$asset"
           chmod +x "$asset_root/nika"
           sudo mv "$asset_root/nika" /usr/local/bin/

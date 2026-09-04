@@ -119,9 +119,9 @@ jobs:
             --pattern "nika-linux-x64-$VERSION.tar.gz" \
             --pattern SHA256SUMS
           cd engine-assets
+          source_commit=$(git -C "$GITHUB_WORKSPACE/nika-source" rev-parse HEAD)
           for asset in nika-*"$VERSION".tar.gz; do
-            gh attestation verify "$asset" --repo supernovae-st/nika
-            grep -E "[[:space:]]${asset}$" SHA256SUMS | sha256sum --check --strict
+            node "$GITHUB_WORKSPACE/scripts/verify-engine-archive.mjs" "$asset" SHA256SUMS "$VERSION" "$source_commit"
           done
 
       - name: Prove the pinned contract and generated types against the released binary

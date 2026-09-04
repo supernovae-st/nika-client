@@ -45,8 +45,12 @@ export async function runDepthProjects() {
   const projectsRoot = path.join(root, 'gauntlet', 'projects-depth');
   const resultsRoot = process.env.NIKA_GAUNTLET_RESULTS_DIR ? path.resolve(process.env.NIKA_GAUNTLET_RESULTS_DIR) : projectsRoot;
   const resultsPath = path.join(resultsRoot, process.env.NIKA_GAUNTLET_RESULTS_DIR ? 'depth-projects.json' : 'results.json');
+  mkdirSync(resultsRoot, { recursive: true });
+  // Invalidate a prior green before any probe/build: an interrupted invocation
+  // is not evidence that the previous measured result still describes this run.
+  writeFileSync(resultsPath, `${JSON.stringify({ schema_version: 1,
+    summary: { result: 'incomplete' }, pid: process.pid })}\n`);
   const nikaBin = process.env.NIKA_BIN;
-  assert(nikaBin, 'NIKA_BIN must name the engine binary under test');
   const scratch = mkdtempSync(path.join(tmpdir(), 'nika-depth-projects-'));
   const owned = new OwnedProcesses();
   const handles = [];
@@ -65,7 +69,7 @@ export async function runDepthProjects() {
   let report;
   let failure;
   try {
-    mkdirSync(resultsRoot, { recursive: true });
+    assert(nikaBin && path.isAbsolute(nikaBin), 'NIKA_BIN must name an absolute engine binary under test');
     await run('npm', ['run', 'build'], { cwd: root, timeoutMs: 60_000 });
     const packed = JSON.parse(await run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', scratch],
       { cwd: root, timeoutMs: 30_000 }));
@@ -131,7 +135,11 @@ export async function runDepthProjects() {
     // Do not delete scratch if supervision cannot establish process exit.
     if (!errors.length) rmSync(scratch, { recursive: true, force: true });
   }
-  if (failure) throw failure;
+  if (failure) {
+    writeFileSync(resultsPath, `${JSON.stringify({ ...report, schema_version: 1,
+      summary: { ...report?.summary, result: 'red' }, error: String(failure) }, null, 2)}\n`);
+    throw failure;
+  }
   writeFileSync(resultsPath, `${JSON.stringify(report, null, 2)}\n`);
   process.stdout.write(`${report.projects.length}/${expected.length} packed depth projects green · ${resultsPath}\n`);
   return report;

@@ -14,6 +14,28 @@ test('depth runner does not substitute a second incident application', () => {
   assert(!runner.includes('gauntlet-depth-incident.mjs'), 'execute the committed app, not a replacement');
 });
 
+test('a failed depth invocation invalidates its previous green report', async () => {
+  const scratch = mkdtempSync(path.join(tmpdir(), 'depth-failure-proof-'));
+  const owned = new OwnedProcesses();
+  const report = path.join(scratch, 'depth-projects.json');
+  try {
+    writeFileSync(report, JSON.stringify({ summary: { result: 'green' } }));
+    writeFileSync(path.join(scratch, 'npm'), `#!${process.execPath}\nprocess.exitCode = 13;\n`, { mode: 0o755 });
+    const result = await owned.start(process.execPath,
+      [new URL('../scripts/run-depth-projects.mjs', import.meta.url).pathname],
+      { timeoutMs: 3000, env: { PATH: scratch, HOME: scratch, NIKA_KEYCHAIN: 'off',
+        NIKA_BIN: process.execPath, NIKA_GAUNTLET_RESULTS_DIR: scratch } }).done;
+    assert.equal(result.code, 1);
+    assert.equal(result.signal, null);
+    const failed = JSON.parse(readFileSync(report, 'utf8'));
+    assert.equal(failed.summary.result, 'red');
+    assert.match(failed.error, /npm failed \(13/);
+  } finally {
+    await owned.close();
+    rmSync(scratch, { recursive: true, force: true });
+  }
+});
+
 test('the committed incident app uses the shared controlled cancellation primitive', () => {
   const app = readFileSync(new URL('../gauntlet/projects-depth/incident-response-controller/app.mjs', import.meta.url), 'utf8');
   assert(app.includes('../../../scripts/gauntlet-cancellation.mjs'));

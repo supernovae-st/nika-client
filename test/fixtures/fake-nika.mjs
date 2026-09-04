@@ -146,6 +146,24 @@ if (command === 'run' && argv.includes('--json')) {
     for (let index = 0; index < count; index += 1) {
       emit({ kind: 'task_completed', sequence: index + 1, value: index });
     }
+    if (workflow.includes('settled')) {
+      // The 0.118 engine's terminal shape (ADR-128): the settlement rides
+      // run_settled flattened · status · cause · elapsed_ms · tasks · spend.
+      emit({
+        kind: 'workflow_completed',
+        fields: [{ key: 'status', value: 'succeeded' }, { key: 'cause', value: 'normal' }],
+      });
+      emit({
+        kind: 'run_settled',
+        status: 'succeeded',
+        cause: 'normal',
+        elapsed_ms: 12,
+        tasks: { total: 2, ok: 2, failed: 0, recovered: 1, skipped: 0, cancelled: 0, never_started: 0 },
+        spend: { total_cost_usd: null, priced_calls: 0, unpriced_calls: 0, qualifier: 'unmetered' },
+        outputs: { answer: 'x' },
+      });
+      process.exit(0);
+    }
     if (workflow.includes('fields-failure')) {
       // The released engine's shape: the failure rides field rows on
       // task_failed; workflow_failed and run_settled carry no error.

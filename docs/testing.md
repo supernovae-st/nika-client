@@ -102,7 +102,7 @@ HTTP access. Public npm mode additionally needs registry access to install the
 published package; the cancellation fixture itself remains local.
 
 After publication, run the same comparison with
-`NIKA_PUBLIC_SDK_VERSION=0.118.1` and the verified public `NIKA_BIN` artifact.
+`NIKA_PUBLIC_SDK_VERSION=0.118.2` and the verified public `NIKA_BIN` artifact.
 That mode installs the exact public npm package and exercises its optional
 native payload without an explicit binary override. A local pack or a dirty
 development binary is useful regression evidence, never public-install proof.

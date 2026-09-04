@@ -43,11 +43,11 @@ not parse YAML or reconstruct proof in TypeScript.
 ## Install
 
 ```sh
-npm view @supernovae-st/nika-client@0.118.1 version  # must report 0.118.1
-npm install @supernovae-st/nika-client@0.118.1
+npm view @supernovae-st/nika-client@0.118.2 version  # must report 0.118.2
+npm install @supernovae-st/nika-client@0.118.2
 ```
 
-If the registry does not expose that exact version, the 0.118.1 release train
+If the registry does not expose that exact version, the 0.118.2 release train
 is not complete. Earlier 0.116 releases introduced the unified facade but do
 not cover all the by-name and settlement guarantees documented below. The publication is complete
 only when the four matching native payload packages and this root client are

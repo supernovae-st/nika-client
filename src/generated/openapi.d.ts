@@ -50,8 +50,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Judge immutable snapshot bytes without creating a job
-         * @description Runs the same decode and ExecutionService readmission as POST /v1/jobs over the exact request body.
+         * Judge a workflow without creating a job — by served name, or as immutable snapshot bytes
+         * @description Runs the same admission as POST /v1/jobs (ADR-131 · both forms) over the exact request body, and creates nothing.
          */
         post: {
             parameters: {
@@ -62,7 +62,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["ExecutionSnapshot"];
+                    "application/json": components["schemas"]["JobByName"] | components["schemas"]["ExecutionSnapshot"];
                 };
             };
             responses: {
@@ -138,8 +138,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Admit immutable snapshot bytes as a durable job
-         * @description The server decodes and readmits this exact body through ExecutionService and never interprets a caller filesystem path. Idempotency binds to the exact snapshot payload bytes.
+         * Admit a workflow as a durable job — by served name, or as immutable snapshot bytes
+         * @description Two forms, one admission (ADR-131). `{"workflow": "<name>"}` names a workflow the served registry lists: the resident captures its world through ExecutionService, exactly as a schedule does. A snapshot body is the world `nika check <file> --json --sdk-snapshot` prints, decoded and readmitted through the same ExecutionService; its digests are optional attestations. The server never interprets a caller filesystem path. Idempotency binds to the exact request bytes.
          */
         post: {
             parameters: {
@@ -152,7 +152,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["ExecutionSnapshot"];
+                    "application/json": components["schemas"]["JobByName"] | components["schemas"]["ExecutionSnapshot"];
                 };
             };
             responses: {
@@ -773,7 +773,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Relative .nika.yaml names */
+                /** @description Project-relative .nika.yaml names under the served registry (--workflows) */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -867,15 +867,18 @@ export interface components {
                 message: string;
             };
         };
-        /** @description Immutable byte-owned execution world. Unit bytes are canonical lowercase hexadecimal and digests are canonical lowercase SHA-256. The decoded unit aggregate is limited to 16 MiB and the complete encoded request to 33 MiB. This object is the request body itself, not a path-bearing wrapper. */
+        /** @description Immutable byte-owned execution world — the body `nika check <file> --json --sdk-snapshot` prints (the engine is the one producer; a client never hashes). Unit bytes are canonical lowercase hexadecimal. `digest` and every unit `digest` are OPTIONAL attestations (canonical lowercase SHA-256): absent, the resident computes them and the receipt carries the result; present, they must match the bytes or the request is refused as `snapshot_tampered`. The decoded unit aggregate is limited to 16 MiB and the complete encoded request to 33 MiB. This object is the request body itself, not a path-bearing wrapper. */
         ExecutionSnapshot: {
-            digest: string;
+            /** @description Optional attestation of the world's digest */
+            digest?: string;
             /** @constant */
             format_version: 1;
             root: string;
             units: {
                 bytes_hex: string;
-                digest: string;
+                /** @description Optional attestation of the unit's digest */
+                digest?: string;
+                /** @description 0 root (the admitted workflow) · 1 child (a transitively invoked workflow) · 2 skill (an Agent Skill document) · 3 import (an opaque import the caller supplied) */
                 kind: number;
                 path: string;
             }[];
@@ -915,6 +918,10 @@ export interface components {
             status: components["schemas"]["JobStatus"];
             trace_id?: string;
         };
+        /** @description The by-name form (ADR-131): a workflow the served registry lists (GET /v1/workflows · project-root-relative, `.nika.yaml`). The resident captures its world exactly as a schedule does — the one owner of the snapshot and its digest domain. Idempotency binds to these request bytes. */
+        JobByName: {
+            workflow: string;
+        };
         JobEvent: {
             code?: string;
             kind: string | null;
@@ -924,6 +931,7 @@ export interface components {
             };
             receipt?: components["schemas"]["JobReceipt"];
             sequence: number;
+            settlement?: components["schemas"]["RunSettlement"];
             status: components["schemas"]["JobStatus"] | null;
         };
         JobOrigin: {
@@ -956,11 +964,51 @@ export interface components {
             snapshot_digest: string;
             trace_id: string;
         };
-        /** @enum {string} */
+        /**
+         * @description queued and running: the resident owns the execution. interrupted: execution ownership was lost and effect settlement is unknown — an EVIDENCE state (the journal is INCOMPLETE), never a run state (ADR-129). paused, succeeded, failed and cancelled: the run's own settlement, the words its terminal frame carries (ADR-128).
+         * @enum {string}
+         */
         JobStatus: "queued" | "running" | "interrupted" | "paused" | "succeeded" | "failed" | "cancelled";
         /** @description Status only. Redacted diagnosis lives on GET /v1/jobs/{id} and SSE, never here. */
         JobStatusOnly: {
             status: components["schemas"]["JobStatus"];
+        };
+        /** @description The run's settlement (ADR-128), built once by the runtime and projected whole: the state word every door speaks, why, the elapsed time on the kernel clock, the task tally, the spend with its qualifier, the failure named. Unknown cost is never zero: `total_cost_usd` is absent when nothing was metered. Present on the terminal event of a job whose runtime settled; absent when the resident lost the execution (interrupted) or refused it before any task. */
+        RunSettlement: {
+            /** @enum {string} */
+            cause: "normal" | "human_gate" | "task_failed" | "output_contract" | "budget" | "operator" | "refused";
+            elapsed_ms?: number;
+            error?: {
+                code: string;
+                message: string;
+                /** @description The task that failed · absent for a run-level cause */
+                task?: string;
+            };
+            spend: {
+                by_source?: {
+                    [key: string]: number;
+                };
+                priced_calls: number;
+                pricing_as_of?: string;
+                /** @enum {string} */
+                qualifier: "priced" | "partially_priced" | "unpriced" | "unmetered";
+                /** @description Present only when at least one leaf metered real spend */
+                total_cost_usd?: number;
+                unpriced_calls: number;
+            };
+            /** @enum {string} */
+            status: "succeeded" | "failed" | "paused" | "cancelled";
+            tasks?: {
+                cancelled: number;
+                failed: number;
+                /** @description Cancelled at the boundary without ever starting (counted in `cancelled` too) */
+                never_started: number;
+                /** @description A recovered task IS a success (counted here too) */
+                ok: number;
+                recovered: number;
+                skipped: number;
+                total: number;
+            };
         };
         ScheduleApply: {
             /** @constant */

@@ -143,6 +143,11 @@ export interface NikaRunSettledEvent<
 > extends NikaEventFields {
   kind: 'run_settled';
   status?: NikaRunStatus;
+  /** Why the run settled this way (engine 0.118+ · flattened on this frame). */
+  cause?: NikaRunCause;
+  elapsed_ms?: number;
+  tasks?: NikaTaskTally;
+  spend?: NikaSpend;
   outputs?: Outputs;
   receipt?: NikaReceipt;
   /**
@@ -249,6 +254,64 @@ export interface NikaMachineError {
   [key: string]: unknown;
 }
 
+/** Why a run settled the way it did (engine 0.118+ · ADR-128). */
+export type NikaRunCause =
+  | 'normal'
+  | 'human_gate'
+  | 'task_failed'
+  | 'output_contract'
+  | 'budget'
+  | 'operator'
+  | 'refused'
+  | (string & {});
+
+/**
+ * How much of the spend is priced (engine 0.118+): `unmetered` = no metered
+ * call · `unpriced` = a local or subscription seat, never free · `partially_priced`
+ * · `priced`.
+ */
+export type NikaCostQualifier =
+  | 'priced'
+  | 'partially_priced'
+  | 'unpriced'
+  | 'unmetered'
+  | (string & {});
+
+/** How the run's tasks ended (engine 0.118+): `recovered` is a tally, never a state. */
+export interface NikaTaskTally {
+  total?: number;
+  ok?: number;
+  failed?: number;
+  recovered?: number;
+  skipped?: number;
+  cancelled?: number;
+  never_started?: number;
+  [key: string]: unknown;
+}
+
+/** What the run spent and how much of it is priced (engine 0.118+). */
+export interface NikaSpend {
+  total_cost_usd?: number | null;
+  priced_calls?: number;
+  unpriced_calls?: number;
+  qualifier?: NikaCostQualifier;
+  pricing_as_of?: string | null;
+  [key: string]: unknown;
+}
+
+/**
+ * The run's settlement as the engine built it once (ADR-128): the state's
+ * cause, the task tally, the spend and its qualifier, the elapsed time.
+ * Absent on engines before 0.118; never derived from an exit code.
+ */
+export interface NikaSettlement {
+  cause?: NikaRunCause;
+  elapsed_ms?: number;
+  tasks?: NikaTaskTally;
+  spend?: NikaSpend;
+  [key: string]: unknown;
+}
+
 /** The only terminal value for a run. */
 export interface NikaRunResult<
   Outputs extends Record<string, unknown> = Record<string, unknown>,
@@ -262,6 +325,8 @@ export interface NikaRunResult<
   error?: NikaMachineError;
   /** Engine execution identity, when the transport surface reports one. */
   execution_id?: NikaExecutionId;
+  /** The settlement's cause, tally and spend (engine 0.118+), when the terminal frame carried them. */
+  settlement?: NikaSettlement;
   [key: string]: unknown;
 }
 

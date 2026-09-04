@@ -33,7 +33,7 @@ import {
   compatibleEngineIdentity,
   type NikaEngineIdentity,
 } from './engine-identity.js';
-import { eventError, eventOutputs, eventReceipt, machineObject } from './machine.js';
+import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
 import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
 import type { Transport, TransportRun } from './transport.js';
 
@@ -361,6 +361,7 @@ export class HttpTransport implements Transport {
       terminalObserved = true;
       const outputs = event ? eventOutputs(event) : durable?.outputs;
       const error = event ? eventError(event) : durable?.error;
+      const settlement = event ? eventSettlement(event) : undefined;
       resolveDone({
         id,
         status: source.status!,
@@ -370,6 +371,7 @@ export class HttpTransport implements Transport {
         ...(outputs ? { outputs } : {}),
         ...(receipt ? { receipt } : {}),
         ...(error ? { error } : {}),
+        ...(settlement ? { settlement } : {}),
       });
     };
     if (attachedState && isTerminal(attachedState.status)) settle(attachedState);

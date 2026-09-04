@@ -4,6 +4,7 @@ import type {
   NikaMachineError,
   NikaReceipt,
   NikaRunStatus,
+  NikaSettlement,
   NikaTransportKind,
 } from '../types.js';
 
@@ -37,6 +38,29 @@ export function eventStatus(event: NikaEvent | undefined): NikaRunStatus | undef
     if (row?.key === 'status' && typeof row.value === 'string') return row.value;
   }
   return undefined;
+}
+
+/**
+ * The settlement a terminal frame carries (engine 0.118+ · ADR-128): the
+ * native `run_settled` flattens it (`cause` · `elapsed_ms` · `tasks` ·
+ * `spend`), the resident's `execution.settled` may nest it under
+ * `settlement`. Absent on older engines; never invented from an exit code.
+ */
+export function eventSettlement(event: NikaEvent | undefined): NikaSettlement | undefined {
+  if (!event) return undefined;
+  const record = event as Record<string, unknown>;
+  const source = machineObject(record.settlement) ?? record;
+  const cause = typeof source.cause === 'string' ? source.cause : undefined;
+  const elapsed = typeof source.elapsed_ms === 'number' ? source.elapsed_ms : undefined;
+  const tasks = machineObject(source.tasks);
+  const spend = machineObject(source.spend);
+  if (cause === undefined && elapsed === undefined && !tasks && !spend) return undefined;
+  return {
+    ...(cause !== undefined ? { cause } : {}),
+    ...(elapsed !== undefined ? { elapsed_ms: elapsed } : {}),
+    ...(tasks ? { tasks } : {}),
+    ...(spend ? { spend } : {}),
+  };
 }
 
 export function eventReceipt(event: NikaEvent | undefined): NikaReceipt | undefined {

@@ -120,7 +120,9 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
       code: 'NIKA_ENGINE_UNAVAILABLE',
       packageName: HOST_PACKAGE,
     });
-  });
+    // A real `npm install` against the registry: the timeout is the
+    // install's, not vitest's five seconds (measured 61 s on a cold runner).
+  }, 120_000);
 
   it('does not select a payload for the wrong platform', () => {
     const wrong = allPackages().find((name) => name !== HOST_PACKAGE);

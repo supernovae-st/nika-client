@@ -33,7 +33,9 @@ export function isNikaRunSettledEvent<
  * not by its kind, so it holds on either transport and across kinds this SDK
  * version does not know yet. It therefore also covers the frames that end a
  * run without settling outputs: `execution.cancelled`, `execution.refused`,
- * `interrupted`, `workflow_failed`, and `workflow_interrupted`.
+ * `interrupted`, `workflow_failed` and `workflow_cancelled` (the engine's
+ * four run terminals are `workflow_completed` · `workflow_failed` ·
+ * `workflow_paused` · `workflow_cancelled` · ADR-128).
  */
 export function isNikaTerminalEvent<
   Outputs extends Record<string, unknown> = Record<string, unknown>,

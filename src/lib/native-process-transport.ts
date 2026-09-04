@@ -25,11 +25,13 @@ import type {
   NikaTraceVerifyResult,
   NikaTransportKind,
   NikaWorkflowMetadata,
+  NikaSettlement,
 } from '../types.js';
 import {
   eventError,
   eventOutputs,
   eventReceipt,
+  eventSettlement,
   eventStatus,
   machineObject,
   parseMachineObject,
@@ -195,6 +197,7 @@ export class NativeProcessTransport implements Transport {
     let receipt: NikaReceipt | undefined;
     let outputs: Record<string, unknown> | undefined;
     let machineError: ReturnType<typeof eventError>;
+    let settlement: NikaSettlement | undefined;
     let streamError: Error | undefined;
     let refusal: EngineRefusal | undefined;
     let resolveDrained!: () => void;
@@ -256,6 +259,7 @@ export class NativeProcessTransport implements Transport {
               receipt = eventReceipt(event) ?? receipt;
               outputs = eventOutputs(event) ?? outputs;
               machineError = eventError(event) ?? machineError;
+              settlement = eventSettlement(event) ?? settlement;
               yield event;
             }
             if (Buffer.byteLength(buffer) > machineBufferBytes) {
@@ -273,6 +277,7 @@ export class NativeProcessTransport implements Transport {
               receipt = eventReceipt(event) ?? receipt;
               outputs = eventOutputs(event) ?? outputs;
               machineError = eventError(event) ?? machineError;
+              settlement = eventSettlement(event) ?? settlement;
               yield event;
             }
           }
@@ -306,6 +311,7 @@ export class NativeProcessTransport implements Transport {
         ...(outputs ? { outputs } : {}),
         ...(receipt ? { receipt } : {}),
         ...(machineError ? { error: machineError } : {}),
+        ...(settlement ? { settlement } : {}),
         ...(stderr ? { diagnostics: stderr } : {}),
       };
     });
@@ -463,9 +469,18 @@ function runFlags(options: NikaRunOptions): string[] {
   return flags;
 }
 
+/**
+ * The state when the terminal frame carried none: the frame's kind first
+ * (the engine's four run terminals · ADR-128), then the exit class. An exit
+ * of 130 with no terminal frame is `interrupted` — the evidence word: the
+ * run ended before any settlement reached this SDK, which never invents a
+ * `cancelled` it did not read.
+ */
 function statusForExit(exitCode: number, kind?: string): string {
   if (kind === 'workflow_completed') return 'succeeded';
   if (kind === 'workflow_failed') return 'failed';
+  if (kind === 'workflow_paused') return 'paused';
+  if (kind === 'workflow_cancelled') return 'cancelled';
   switch (exitCode) {
     case 0: return 'succeeded';
     case 4: return 'paused';

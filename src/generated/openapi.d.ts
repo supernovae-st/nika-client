@@ -139,7 +139,7 @@ export interface paths {
         put?: never;
         /**
          * Admit a workflow as a durable job — by served name, or as immutable snapshot bytes
-         * @description Two forms, one admission (ADR-131). `{"workflow": "<name>"}` names a workflow the served registry lists: the resident captures its world through ExecutionService, exactly as a schedule does. A snapshot body is the world `nika check <file> --json --sdk-snapshot` prints, decoded and readmitted through the same ExecutionService; its digests are optional attestations. The server never interprets a caller filesystem path. Idempotency binds to the exact request bytes.
+         * @description Two forms, one admission (ADR-131). `{"workflow": "<name>"}` names a workflow the served registry lists: the resident captures its world through ExecutionService, exactly as a schedule does. A snapshot body is the world `nika check <file> --json --sdk-snapshot` prints, decoded and readmitted through the same ExecutionService; its digests are optional caller-supplied integrity digests (a content assertion, never a signature). The server never interprets a caller filesystem path. Idempotency binds to the exact request bytes.
          */
         post: {
             parameters: {
@@ -867,16 +867,16 @@ export interface components {
                 message: string;
             };
         };
-        /** @description Immutable byte-owned execution world — the body `nika check <file> --json --sdk-snapshot` prints (the engine is the one producer; a client never hashes). Unit bytes are canonical lowercase hexadecimal. `digest` and every unit `digest` are OPTIONAL attestations (canonical lowercase SHA-256): absent, the resident computes them and the receipt carries the result; present, they must match the bytes or the request is refused as `snapshot_tampered`. The decoded unit aggregate is limited to 16 MiB and the complete encoded request to 33 MiB. This object is the request body itself, not a path-bearing wrapper. */
+        /** @description Immutable byte-owned execution world — the body `nika check <file> --json --sdk-snapshot` prints (the engine is the one producer; a client never hashes). Unit bytes are canonical lowercase hexadecimal. `digest` and every unit `digest` are OPTIONAL caller-supplied integrity digests (canonical lowercase SHA-256 · a content assertion, never a signature): absent, the resident computes them and the receipt carries the result; present, they must match the bytes or the request is refused as `snapshot_tampered`. The decoded unit aggregate is limited to 16 MiB and the complete encoded request to 33 MiB. This object is the request body itself, not a path-bearing wrapper. */
         ExecutionSnapshot: {
-            /** @description Optional attestation of the world's digest */
+            /** @description Optional caller-supplied integrity digest of the world (never a signature) */
             digest?: string;
             /** @constant */
             format_version: 1;
             root: string;
             units: {
                 bytes_hex: string;
-                /** @description Optional attestation of the unit's digest */
+                /** @description Optional caller-supplied integrity digest of the unit (never a signature) */
                 digest?: string;
                 /** @description 0 root (the admitted workflow) · 1 child (a transitively invoked workflow) · 2 skill (an Agent Skill document) · 3 import (an opaque import the caller supplied) */
                 kind: number;

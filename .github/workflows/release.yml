@@ -296,10 +296,7 @@ jobs:
             @supernovae-st/nika-client
           )
           for package_name in "${packages[@]}"; do
-            if npm view "$package_name@$VERSION" version >/dev/null 2>&1; then
-              echo "::error::$package_name@$VERSION already exists publicly"
-              exit 1
-            fi
+            node scripts/npm-publication.mjs assert-absent "$package_name" "$VERSION"
           done
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -424,16 +421,12 @@ jobs:
             echo "::error::NPM_TOKEN is not set on this repository · nothing can publish"
             exit 1
           fi
-          # A replay after a partial publish must not fail on the packages that
-          # already landed: a version already on the registry is skipped, never
-          # re-published (npm refuses to publish over a version anyway).
+          # A partial-publish replay accepts occupied coordinates only after
+          # matching their SRI AND downloaded bytes to this prepared artifact.
+          # Registry errors are not absence; divergent versions never pass.
           publish_once() {
             local pkg="$1" tarball="$2"
-            if npm view "$pkg@$VERSION" version >/dev/null 2>&1; then
-              echo "already on npm: $pkg@$VERSION · skipped"
-              return 0
-            fi
-            npm publish "$tarball" --access public --provenance
+            node scripts/npm-publication.mjs publish "$pkg" "$VERSION" "$tarball"
           }
           tarballs=release-candidate/release-tarballs
           publish_once "@supernovae-st/nika-darwin-arm64" "$tarballs/supernovae-st-nika-darwin-arm64-$VERSION.tgz"

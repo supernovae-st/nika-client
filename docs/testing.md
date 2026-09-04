@@ -173,7 +173,13 @@ tagged engine assets, starts the released Linux binary, proves the live
 OpenAPI/types pin, embeds the exact prepared commit and release version in all
 five package manifests before packing, and publishes four payloads plus the SDK
 with the repository's npm token and a Sigstore provenance attestation bound to
-the workflow identity (a version already on the registry is skipped, never
-re-published). `release-finalize.yml` refuses to create the SDK tag and GitHub
+the workflow identity. Both registry absence and partial-publish recovery use
+`scripts/npm-publication.mjs`: only an explicit HTTP 404 establishes absence;
+network errors and other responses refuse. An occupied version is never
+re-published or accepted by name alone: its SHA-512 SRI and independently
+downloaded tarball must equal the prepared artifact. The same byte proof runs
+after each publication, with bounded requests and no redirects. This proves
+byte convergence, not cross-package atomicity or replayed npm provenance.
+`release-finalize.yml` refuses to create the SDK tag and GitHub
 Release until all five exact versions are publicly observable on npm and every
 published manifest carries the same prepared commit and version.

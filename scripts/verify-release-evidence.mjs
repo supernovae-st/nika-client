@@ -1,3 +1,4 @@
+import { requiresCurrentCancellation, stableDepthEvidence, stableHostileEvidence } from './verify-release-replay.mjs';
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
@@ -113,6 +114,10 @@ export function verifyReleaseEvidence(root = path.resolve(import.meta.dirname, "
 }
 
 function verifyBehavior(relativePath, evidence) {
+  if (requiresCurrentCancellation(evidence.engine)) {
+    if (relativePath === 'gauntlet/projects-depth/results.json') stableDepthEvidence(evidence);
+    if (relativePath === 'gauntlet/results/hostile.json') stableHostileEvidence(evidence);
+  }
   if (relativePath === "gauntlet/results/mini-saas.json") {
     verifyProjects(relativePath, evidence.projects, MINI_SAAS_PROJECTS);
     if (evidence.result !== "green") {

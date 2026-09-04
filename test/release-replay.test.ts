@@ -4,6 +4,8 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   isDurableCancellationTerminal,
+  stableDepthEvidence,
+  stableHostileEvidence,
   verifyReleaseReplay,
 } from '../scripts/verify-release-replay.mjs';
 
@@ -25,8 +27,8 @@ describe('public release evidence replay', () => {
     );
     const workflow = readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
 
-    expect(hostileRunner).toContain('tools: ["nika:wait"]');
-    expect(hostileRunner).toContain('args: { duration: "10s" }');
+    expect(hostileRunner).toContain('cancellationFixture(gate.url)');
+    expect(hostileRunner).toContain('cancelHeldRun(client, run, gate)');
     expect(hostileRunner).toContain('isDurableCancellationTerminal(events.at(-1))');
     expect(hostileRunner).not.toContain("events.includes('execution.cancelled')");
     expect(hostileRunner).not.toContain('command: ["sleep"');
@@ -203,3 +205,56 @@ function readJson(directory: string, name: string): any {
 function writeJson(directory: string, name: string, value: unknown): void {
   writeFileSync(path.join(directory, name), `${JSON.stringify(value, null, 2)}\n`);
 }
+
+const currentCancellation = {
+  settlement: { status: 'cancelled', cause: 'operator',
+    tasks: { total: 2, ok: 1, failed: 0, recovered: 0, skipped: 0, cancelled: 1, never_started: 1 },
+    spend: { qualifier: 'unmetered', priced_calls: 0, unpriced_calls: 0 }, error_code: null, error_task: null },
+  cancellation_rendezvous: { requests: { hold: 1, dependent: 0 }, dependent_unstarted: true,
+    cancel_point: 'loopback fetch held before response', release: 'after cancellation request acknowledgement' },
+  same_job_terminal_and_replay_matched: true,
+};
+function currentDepth(): any {
+  return { engine: 'nika 0.118.1 (71397bf28)', projects: [{
+    project: 'incident-response-controller', cancellation_status: 'cancellation_requested',
+    cancelled_run_status: 'cancelled', cancellation_idempotent: true,
+    sse_event_kinds: ['execution.started', 'execution.cancelled'],
+    sse_terminal: { kind: 'execution.cancelled', status: 'cancelled' }, ...structuredClone(currentCancellation),
+  }] };
+}
+describe('current cancellation evidence separates the action from the actual result', () => {
+  it('accepts the request acknowledgement only with controlled actual cancellation', () => {
+    expect(() => stableDepthEvidence(currentDepth())).not.toThrow();
+  });
+  it.each(['succeeded', 'failed', 'interrupted'])('rejects a fabricated cancelled result over %s facts', (status) => {
+    const report = currentDepth();
+    report.projects[0].settlement.status = status;
+    expect(() => stableDepthEvidence(report)).toThrow();
+  });
+  it.each([
+    (p: any) => { p.cancellation_status = 'cancelled'; },
+    (p: any) => { delete p.settlement; },
+    (p: any) => { p.cancellation_rendezvous.requests.dependent = 1; },
+    (p: any) => { p.settlement.tasks.never_started = 0; },
+    (p: any) => { p.same_job_terminal_and_replay_matched = false; },
+  ])('refuses obsolete, missing or contradictory cancellation proof', (mutate) => {
+    const report = currentDepth();
+    mutate(report.projects[0]);
+    expect(() => stableDepthEvidence(report)).toThrow();
+  });
+  it('requires both current hostile cancellation cases to be green with actual engine facts', () => {
+    const report: any = { engine: 'nika 0.118.1 (71397bf28)', scenarios: [
+      { name: 'real-cancellation-race', result: 'green', evidence: { ...structuredClone(currentCancellation),
+        cancel_status: 'cancellation_requested', run_status: 'cancelled', same_job_terminal_matched: true,
+        terminal: { kind: 'run_settled', status: 'cancelled' } } },
+      { name: 'remote-durable-cancellation', result: 'green', evidence: { ...structuredClone(currentCancellation),
+        cancel_status: 'cancellation_requested', run_status: 'cancelled',
+        events: [{ kind: 'execution.cancelled', status: 'cancelled' }] } },
+    ] };
+    expect(() => stableHostileEvidence(report)).not.toThrow();
+    report.scenarios[0].evidence.settlement.status = 'succeeded';
+    expect(() => stableHostileEvidence(report)).toThrow();
+    report.scenarios = [];
+    expect(() => stableHostileEvidence(report)).toThrow();
+  });
+});

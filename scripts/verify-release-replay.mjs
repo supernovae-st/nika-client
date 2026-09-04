@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { compareControlledCancellation } from './one-door/contract.mjs';
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
@@ -13,11 +15,19 @@ function readJson(directory, name) {
 }
 
 export function stableHostileEvidence(report) {
+  const current = requiresCurrentCancellation(report.engine);
+  if (current) {
+    for (const name of ['real-cancellation-race', 'remote-durable-cancellation']) {
+      const matches = report.scenarios.filter((scenario) => scenario.name === name);
+      assert.equal(matches.length, 1, `missing or duplicate current cancellation scenario: ${name}`);
+      assert.equal(matches[0].result, 'green', `current cancellation scenario is not green: ${name}`);
+    }
+  }
   return {
     schema_version: report.schema_version,
     engine: report.engine,
     scenarios: report.scenarios.map(({ duration_ms: _duration, ...scenario }) =>
-      stableHostileScenario(scenario)),
+      stableHostileScenario(scenario, current)),
     summary: report.summary,
     result: report.result,
   };
@@ -31,16 +41,19 @@ export function isDurableCancellationTerminal(event) {
 }
 
 export function stableDepthEvidence(report) {
+  const current = requiresCurrentCancellation(report.engine);
   return {
     ...report,
     projects: report.projects.map((project) => {
       if (project.project !== "incident-response-controller") return project;
+      if (current) validateCurrentCancellation(project, project.cancellation_status,
+        project.cancelled_run_status, project.sse_terminal, project.same_job_terminal_and_replay_matched);
       const kinds = project.sse_event_kinds;
       const terminalKinds = Array.isArray(kinds)
         ? kinds.filter((kind) => CANCELLATION_TERMINAL_KINDS.has(kind))
         : [];
       if (project.cancelled_run_status !== "cancelled"
-        || project.cancellation_status !== "cancelled"
+        || project.cancellation_status !== (current ? "cancellation_requested" : "cancelled")
         || project.cancellation_idempotent !== true
         || terminalKinds.length !== 1
         || !isDurableCancellationTerminal(project.sse_terminal)
@@ -69,7 +82,14 @@ export function stableRecoveryEvidence({ job_id: _jobId, ...report }) {
   return report;
 }
 
-function stableHostileScenario(scenario) {
+function stableHostileScenario(scenario, current) {
+  if (current && ['real-cancellation-race', 'remote-durable-cancellation'].includes(scenario.name)) {
+    const evidence = scenario.evidence;
+    const native = scenario.name === 'real-cancellation-race';
+    validateCurrentCancellation(evidence, evidence?.cancel_status, evidence?.run_status,
+      native ? evidence?.terminal : evidence?.events?.at(-1),
+      native ? evidence?.same_job_terminal_matched : evidence?.same_job_terminal_and_replay_matched);
+  }
   if (scenario.name !== "remote-durable-cancellation" || scenario.result !== "green") {
     return scenario;
   }
@@ -88,6 +108,30 @@ function stableHostileScenario(scenario) {
       ],
     },
   };
+}
+
+// Older measured records retain their historical contract. Current release
+// records must prove the accepted action and the actual result separately.
+export function requiresCurrentCancellation(engine) {
+  const match = typeof engine === 'string' && engine.match(/^nika (\d+)\.(\d+)\./);
+  return Boolean(match && (Number(match[1]) > 0 || Number(match[2]) >= 118));
+}
+
+function validateCurrentCancellation(evidence, action, status, terminal, matched) {
+  assert.equal(action, 'cancellation_requested', 'current cancellation action');
+  assert.equal(status, 'cancelled', 'actual controlled cancellation result');
+  assert.equal(terminal?.status, status, 'terminal and result must agree');
+  assert(['run_settled', 'execution.cancelled', 'execution.settled'].includes(terminal?.kind));
+  assert.equal(matched, true, 'whole same-job settlement was not compared');
+  assert(evidence?.settlement, 'missing actual engine settlement');
+  compareControlledCancellation({ ...evidence.settlement, outputs: {} });
+  assert.equal(evidence.settlement.error_code, null);
+  assert.equal(evidence.settlement.error_task, null);
+  const gate = evidence.cancellation_rendezvous;
+  assert.deepEqual(gate?.requests, { hold: 1, dependent: 0 });
+  assert.equal(gate?.dependent_unstarted, true);
+  assert.equal(gate?.cancel_point, 'loopback fetch held before response');
+  assert.equal(gate?.release, 'after cancellation request acknowledgement');
 }
 
 export function verifyReleaseReplay(repositoryRoot, replayResults) {

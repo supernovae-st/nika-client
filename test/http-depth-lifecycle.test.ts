@@ -580,7 +580,8 @@ describe('cancellation and terminal identity', () => {
       receipt: { ...RECEIPT, snapshot_digest: 'b'.repeat(64) },
     }]));
     const nika = client(fetch as typeof globalThis.fetch);
-    const run = await nika.run('flow.nika.yaml');
+    // A local path is captured here, so the admission digest is known and bound.
+    const run = await nika.run('./flow.nika.yaml');
     await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);
   });
 

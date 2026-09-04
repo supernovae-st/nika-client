@@ -13,8 +13,8 @@ any other non-2xx body is discarded and reported as a redacted
 | `GET /v1/openapi.json` | generation only | authenticated OpenAPI 3.1 document |
 | `GET /v1/workflows` | `listWorkflows()` | contained relative workflow names |
 | `GET /v1/workflows/{name}` | `workflow(name)` | path-free metadata, never source bytes |
-| `POST /v1/check` | `check()` | validates immutable snapshot bytes without a job |
-| `POST /v1/jobs` | `run()` | admits exact snapshot bytes with an idempotency key |
+| `POST /v1/check` | `check()` | judges a served name, or immutable snapshot bytes, without a job |
+| `POST /v1/jobs` | `run()` | admits a served name, or exact snapshot bytes, with an idempotency key |
 | `GET /v1/jobs/{id}` | internal settlement | durable job identity, outputs, receipt, or redacted error |
 | `GET /v1/jobs/{id}/status` | `status(run)` | current status only |
 | `GET /v1/jobs/{id}/events` | `events(run)` / `attachRun()` | bounded, sequenced SSE with replay |

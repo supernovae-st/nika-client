@@ -72,7 +72,12 @@ export type NikaRunStatus =
   | 'cancelled'
   | (string & {});
 
-/** A machine check report. Unknown engine fields deliberately ride through. */
+/**
+ * A machine check report. Unknown engine fields deliberately ride through.
+ * A served name checked by name over HTTP (ADR-131) carries the resident's
+ * acknowledgement (`status`, `snapshot_digest`, `root`, `units`) with
+ * `clean: true`, or `clean: false` with the `error` the resident typed.
+ */
 export interface NikaCheckResult {
   report_version?: number;
   clean?: boolean;

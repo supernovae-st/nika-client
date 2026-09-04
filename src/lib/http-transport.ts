@@ -60,6 +60,14 @@ interface SnapshotIdentity {
   units: number;
 }
 
+/** The compact acknowledgement `POST /v1/check` answers (`SnapshotValidationAck`). */
+interface SnapshotAck {
+  status: 'accepted';
+  snapshot_digest: string;
+  root: string;
+  units: number;
+}
+
 interface ObservationState {
   lastSequence: number;
   lastData?: string;
@@ -89,6 +97,15 @@ interface ObservationSettlement {
   settle: (source: NikaEvent | DurableJob) => void;
 }
 
+/** A non-2xx answer the server typed as `{ error: { code, message } }` for one operation. */
+interface JsonRefusal {
+  operation: NikaOperation;
+  status: number;
+  refusal: { code: string; message?: string };
+}
+
+type JsonOutcome = { object: Record<string, unknown> } | JsonRefusal;
+
 const JOB_STATUSES = new Set([
   'queued',
   'running',
@@ -102,6 +119,13 @@ const MAX_OBSERVATION_RETRIES = 5;
 const RETRY_BASE_MILLISECONDS = 100;
 const RETRY_MIN_MILLISECONDS = 25;
 const RETRY_MAX_MILLISECONDS = 5_000;
+/**
+ * The statuses on which a by-name refusal is the resident's verdict on the
+ * workflow (ADR-131): 404, the served registry does not list the name; 422,
+ * the capture or the admission refused it. Every other status judges the
+ * request and stays an error.
+ */
+const WORKFLOW_REFUSAL_STATUSES = new Set([404, 422]);
 
 export class HttpTransport implements Transport {
   readonly kind = 'http' as const;
@@ -116,26 +140,24 @@ export class HttpTransport implements Transport {
     if (options.model !== undefined || options.nativeStrict === true) {
       throw this.gap(
         'checkOptions',
-        'Remote snapshot capture does not support model or nativeStrict overrides',
+        'nika serve admission has no request envelope for model or nativeStrict overrides',
       );
     }
+    if (isContainedWorkflowName(workflow)) return this.checkByName(workflow, options.signal);
     const captured = await this.captureSnapshot(workflow, options.signal, true);
     if (captured.bytes === undefined) return captured.report;
     const snapshot = captured.identity;
     if (!snapshot) {
       throw this.gap('executionSnapshot', 'Local engine omitted execution snapshot identity');
     }
-    const acknowledged = await this.json('/v1/check', {
+    const acknowledged = snapshotAck(await this.json('/v1/check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: captured.bytes,
       signal: options.signal,
-    }, true, [200], 'check');
+    }, true, [200], 'check'));
     if (
-      Object.keys(acknowledged).some((key) => ![
-        'status', 'snapshot_digest', 'root', 'units',
-      ].includes(key))
-      || acknowledged.status !== 'accepted'
+      !acknowledged
       || acknowledged.snapshot_digest !== snapshot.digest
       || acknowledged.root !== snapshot.root
       || acknowledged.units !== snapshot.units
@@ -153,12 +175,20 @@ export class HttpTransport implements Transport {
     ) {
       throw this.gap(
         'runOptions',
-        'nika serve snapshot admission has no request envelope for vars, model, or maxCostUsd',
+        'nika serve admission has no request envelope for vars, model, or maxCostUsd',
       );
     }
     const idempotencyKey = options.idempotencyKey ?? randomUUID();
     if (Buffer.byteLength(idempotencyKey) < 1 || Buffer.byteLength(idempotencyKey) > 255) {
       throw new NikaTransportError(this.kind, 'Idempotency-Key must be 1-255 bytes');
+    }
+    if (isContainedWorkflowName(workflow)) {
+      // The by-name form (ADR-131): the resident captures the world of a
+      // workflow its registry lists and computes the digest its receipt
+      // carries. No local engine is spawned and no digest is expected here.
+      await this.ensureServerIdentity();
+      const job = await this.admitJob(JSON.stringify({ workflow }), idempotencyKey);
+      return this.httpRun(job.id as NikaRunId, 0, job);
     }
     const captured = await this.captureSnapshot(workflow);
     if (captured.bytes === undefined) {
@@ -167,24 +197,52 @@ export class HttpTransport implements Transport {
     if (!captured.identity) {
       throw this.gap('executionSnapshot', 'Local engine omitted execution snapshot identity');
     }
+    const job = await this.admitJob(captured.bytes, idempotencyKey);
+    return this.httpRun(job.id as NikaRunId, 0, job, captured.identity.digest);
+  }
+
+  /**
+   * The by-name form of `POST /v1/check` (ADR-131): the resident captures
+   * the world of a workflow its registry lists and answers the compact
+   * acknowledgement; nothing is hashed or spawned here. A refusal that
+   * judges the workflow is a red result, as it is on the native transport:
+   * 404 (the name is not served) and 422 (the capture or admission refused
+   * it). Authorization, deadline, envelope and availability refusals still
+   * throw, because they judge the request, not the workflow.
+   */
+  private async checkByName(workflow: string, signal?: AbortSignal): Promise<NikaCheckResult> {
+    await this.ensureServerIdentity();
+    const outcome = await this.jsonOutcome('/v1/check', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workflow }),
+      signal,
+    }, true, [200], 'check');
+    if ('refusal' in outcome) {
+      if (!WORKFLOW_REFUSAL_STATUSES.has(outcome.status)) throw this.refused('/v1/check', outcome);
+      return { clean: false, error: outcome.refusal };
+    }
+    const acknowledged = snapshotAck(outcome.object);
+    if (!acknowledged) {
+      throw new NikaProtocolError(this.kind, 'Check admission did not acknowledge the workflow');
+    }
+    return { clean: true, ...acknowledged };
+  }
+
+  private async admitJob(body: string, idempotencyKey: string): Promise<DurableJob> {
     const admitted = await this.json('/v1/jobs', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Idempotency-Key': idempotencyKey,
       },
-      body: captured.bytes,
+      body,
     }, true, [200, 202], 'run');
-    const id = typeof admitted.id === 'string' ? admitted.id as NikaRunId : undefined;
+    const id = typeof admitted.id === 'string' ? admitted.id : undefined;
     if (!id) {
       throw new NikaProtocolError(this.kind, 'Job admission response omitted its id');
     }
-    return this.httpRun(
-      id,
-      0,
-      durableJob(admitted, id, this.kind),
-      captured.identity.digest,
-    );
+    return durableJob(admitted, id, this.kind);
   }
 
   async attachRun(id: string, options: NikaAttachRunOptions): Promise<TransportRun> {
@@ -573,8 +631,11 @@ export class HttpTransport implements Transport {
     }
     const event = machineObject(value);
     if (!event) throw new NikaProtocolError(this.kind, 'SSE data was not an object');
+    // The resident's projection (`nika serve` sse.rs): the frame identity,
+    // the terminal outputs and receipt, and the settlement it carries whole
+    // on the terminal frame (ADR-128).
     const allowed = new Set([
-      'sequence', 'kind', 'status', 'code', 'message', 'outputs', 'receipt',
+      'sequence', 'kind', 'status', 'code', 'message', 'outputs', 'receipt', 'settlement',
     ]);
     if (Object.keys(event).some((key) => !allowed.has(key))) {
       throw new NikaProtocolError(this.kind, 'SSE data contained fields outside the public projection');
@@ -603,6 +664,9 @@ export class HttpTransport implements Transport {
     }
     if (event.outputs !== undefined && !machineObject(event.outputs)) {
       throw new NikaProtocolError(this.kind, 'SSE data.outputs was not an object');
+    }
+    if (event.settlement !== undefined && !machineObject(event.settlement)) {
+      throw new NikaProtocolError(this.kind, 'SSE data.settlement was not an object');
     }
     if (event.receipt !== undefined) {
       const receipt = machineObject(event.receipt);
@@ -995,6 +1059,26 @@ export class HttpTransport implements Transport {
     acceptedStatuses: readonly number[] = [200],
     operation?: NikaOperation,
   ): Promise<Record<string, unknown>> {
+    const outcome = await this.jsonOutcome(path, init, authenticated, acceptedStatuses, operation);
+    if ('refusal' in outcome) throw this.refused(path, outcome);
+    return outcome.object;
+  }
+
+  /**
+   * The JSON object an accepted status carries, or the refusal the server
+   * typed as `{ error: { code, message } }` for `operation`, so a caller may
+   * return it as a result rather than throw it. An untyped refusal, or one
+   * no operation claims, is the redacted transport error. The message is
+   * engine-owned and already path-free; the bearer token is redacted
+   * defensively in case a hostile server echoes it.
+   */
+  private async jsonOutcome(
+    path: string,
+    init: RequestInit,
+    authenticated: boolean,
+    acceptedStatuses: readonly number[],
+    operation: NikaOperation | undefined,
+  ): Promise<JsonOutcome> {
     const response = await this.fetchResponse(path, init, true, authenticated, false);
     if (!acceptedStatuses.includes(response.status)) {
       if (response.ok) {
@@ -1004,21 +1088,11 @@ export class HttpTransport implements Transport {
           `HTTP ${path} returned non-contract status ${response.status}`,
         );
       }
-      // A refusal the server typed as `{ error: { code, message } }` keeps its
-      // code. The message is engine-owned and already path-free; the bearer
-      // token is redacted defensively in case a hostile server echoes it.
       const refusal = operation === undefined
         ? undefined
         : await this.readRefusal(response, path);
       if (operation !== undefined && refusal) {
-        throw new NikaOperationError(
-          operation,
-          this.kind,
-          refusal.code,
-          `HTTP ${response.status} for ${path}: ${refusal.code}`
-          + (refusal.message ? ` (${refusal.message})` : ''),
-          { status: response.status, machineCode: refusal.code },
-        );
+        return { operation, status: response.status, refusal };
       }
       await discardResponse(response);
       throw new NikaTransportError(
@@ -1035,7 +1109,18 @@ export class HttpTransport implements Transport {
       await discardResponse(response);
       throw new NikaProtocolError(this.kind, `HTTP ${path} returned an invalid content-type`);
     }
-    return this.readObservationObject(response, path, init.signal ?? undefined);
+    return { object: await this.readObservationObject(response, path, init.signal ?? undefined) };
+  }
+
+  private refused(path: string, outcome: JsonRefusal): NikaOperationError {
+    const { code, message } = outcome.refusal;
+    return new NikaOperationError(
+      outcome.operation,
+      this.kind,
+      code,
+      `HTTP ${outcome.status} for ${path}: ${code}` + (message ? ` (${message})` : ''),
+      { status: outcome.status, machineCode: code },
+    );
   }
 
   /**
@@ -1485,6 +1570,30 @@ function assertReceiptIdentity(
   ) {
     throw new NikaProtocolError(transport, 'Receipt snapshot digest did not match its admission');
   }
+}
+
+/** The compact acknowledgement `POST /v1/check` answers, or undefined for any other shape. */
+function snapshotAck(value: Record<string, unknown>): SnapshotAck | undefined {
+  const allowed = new Set(['status', 'snapshot_digest', 'root', 'units']);
+  if (
+    Object.keys(value).some((key) => !allowed.has(key))
+    || value.status !== 'accepted'
+    || typeof value.snapshot_digest !== 'string'
+    || !/^[0-9a-f]{64}$/.test(value.snapshot_digest)
+    || typeof value.root !== 'string'
+    || value.root.length === 0
+    || typeof value.units !== 'number'
+    || !Number.isSafeInteger(value.units)
+    || value.units < 1
+  ) {
+    return undefined;
+  }
+  return {
+    status: 'accepted',
+    snapshot_digest: value.snapshot_digest,
+    root: value.root,
+    units: value.units,
+  };
 }
 
 function snapshotIdentity(bytes: string, transport: 'http'): SnapshotIdentity {

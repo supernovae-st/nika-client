@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- HTTP `run()` and `check()` submit a served workflow by name (engine 0.118+,
+  ADR-131). A contained name the resident lists (`daily-brief.nika.yaml`) is
+  posted as `{ "workflow": "<name>" }` to `POST /v1/jobs` or `POST /v1/check`;
+  the resident captures the execution world and computes the digest its
+  receipt carries, so a client built from `url` and `token` alone runs a real
+  job with no local engine and hashes nothing. A by-name `check` returns the
+  resident's acknowledgement (`status`, `snapshot_digest`, `root`, `units`)
+  with `clean: true`, or `{ clean: false, error: { code, message } }` when the
+  resident refuses the workflow (404 `not_found`, 422); a refusal of the
+  request itself (401, 408, 413, 415, 5xx) keeps throwing. A local path
+  (`./flow.nika.yaml`, an absolute path) still captures through the local
+  engine and posts the snapshot bytes. The SSE projection admits the
+  `settlement` object the 0.118 resident carries on its terminal frame, so
+  `run.done.settlement` is filled on both transports. The pinned
+  `openapi.json` is the 0.118 document (`JobByName`, `oneOf` request bodies,
+  optional digests).
 - `NikaRunSettledEvent.error`: engine 0.117+ repeats the first failed task's
   code, message and task id on the terminal `run_settled` frame; `eventError`
   already read an `error` object first, so `run.done` carries it on both

@@ -184,14 +184,19 @@ in for `cancel(run)`.
 
 ## Connect to `nika serve`
 
-Remote admission is bytes-first: the local compatible engine captures an
-immutable execution snapshot, then the SDK sends those exact bytes to the
-authenticated server. Capturing those snapshots for `check` and `run`
-therefore still needs a local `nika` binary through `bin`, `NIKA_BIN`, or the
-exact optional platform package, resolved lazily at capture time.
-Observation-only clients need no local engine: `attachRun`, `status`,
-`events`, `cancel`, `schedule`, `scheduleStatus`, `listWorkflows`, `workflow`,
-and `traceVerify` run against the advertised server identity alone.
+Remote admission has two forms and one door (engine 0.118+, ADR-131). A
+contained name the resident lists (`GET /v1/workflows`, e.g.
+`daily-brief.nika.yaml`) is submitted by name: the resident captures the
+execution world itself and the SDK never hashes, so a client built from `url`
+and `token` alone can `check` and `run` it with no local engine. A local path
+(`./flow.nika.yaml`, an absolute path) is still captured through the local
+engine, which prints the immutable execution snapshot the SDK then sends as
+exact bytes; that capture is the one step that needs a local `nika` binary
+through `bin`, `NIKA_BIN`, or the exact optional platform package, resolved
+lazily at capture time. Observation-only clients need no local engine:
+`attachRun`, `status`, `events`, `cancel`, `schedule`, `scheduleStatus`,
+`listWorkflows`, `workflow`, and `traceVerify` run against the advertised
+server identity alone.
 
 The current persistent server requires a project file. If you ran
 `nika init --project-file` above you already have one (it carries a default
@@ -227,10 +232,14 @@ const nika = new Nika({
   url: 'http://127.0.0.1:8787',
   token,
   allowInsecureHttp: true, // required for explicit loopback HTTP
-  cwd: process.cwd(),
+  // A local path needs the local engine; a served name needs neither of these.
+  // cwd: process.cwd(),
   // bin: '/absolute/path/to/nika',
 });
 
+// A served name: the resident judges and captures it. `report` is its
+// acknowledgement ({ clean: true, status, snapshot_digest, root, units }), or
+// { clean: false, error: { code, message } } when it refuses the workflow.
 const report = await nika.check('hello.nika.yaml');
 const run = await nika.run('hello.nika.yaml', {
   idempotencyKey: 'hello-2026-08-30',

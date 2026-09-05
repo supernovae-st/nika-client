@@ -24,9 +24,16 @@ npm pack --dry-run
 Engine-backed gauntlets use an absolute `NIKA_BIN` as the explicit binary.
 The corpus scripts refuse missing, empty or relative selections before any
 engine spawn; they never fall back to a retired variable or `PATH` binary.
-The mini-SaaS and recovery runners also invalidate old results before work,
+The corpus execution, mini-SaaS and recovery runners share one supervisor.
+They invalidate old results before work,
 bound build/pack/install and application processes, and own descendant cleanup.
 They write green only after every child has exited and scratch cleanup succeeds.
+Corpus execution copies the unchanged workflow bytes into an owned project,
+uses a fresh signing home with no inherited provider credentials, and applies
+a 30-second deadline to each execution within a five-minute overall deadline.
+Its journals and retention effects never target the repository. Failed engine
+selection, identity probes, malformed output and interrupted execution replace
+an earlier green report with a failed result; no partial prefix is successful.
 Recovery readiness and graceful server shutdown each have a 3-second deadline;
 forced cleanup preserves a failed verdict. Hostile and recovery readiness and
 shutdown use the same supervisor helpers, with deadline/output/interrupt tests.
@@ -121,8 +128,9 @@ development binary is useful regression evidence, never public-install proof.
    validation, SSE recovery, independent observer backpressure, scheduling,
    receipts, and typed errors.
 2. The generated corpus holds 100 distinct use cases and 100 valid workflows.
-3. The deterministic runner executes every workflow with `mock/echo` and
-   seals trace evidence without paid-provider dependence.
+3. The deterministic runner executes every workflow with `mock/echo` without
+   paid-provider dependence. Its output comparison is not a trace-integrity
+   verification; the engine remains the journal and signing authority.
 4. Project gauntlets install the tarball into fresh applications and exercise
    realistic multi-step use cases.
 5. Hostile tests mutate transport frames, timing, status codes, identities,

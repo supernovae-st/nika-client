@@ -5,7 +5,7 @@ import path from 'node:path';
 import { test } from 'vitest';
 import { bounded } from '../scripts/gauntlet-cancellation.mjs';
 import { OwnedProcesses } from '../scripts/one-door/process.mjs';
-import { packedGauntlet } from '../scripts/packed-gauntlet.mjs';
+import { supervisedGauntlet } from '../scripts/gauntlet.mjs';
 
 const runners = [
   ['mini-saas', 'run-mini-saas-gauntlet.mjs'],
@@ -92,7 +92,7 @@ test.each(['success', 'failure', 'interrupted'])('packed evidence remains incomp
   const entered = new Promise((resolve) => { reachedCleanup = resolve; });
   const owned = { close: () => { reachedCleanup(); return closing; } };
   try {
-    const proof = packedGauntlet({ name: 'proof', root, owned,
+    const proof = supervisedGauntlet({ name: 'proof', root, owned,
       env: { NIKA_BIN: process.execPath, NIKA_GAUNTLET_RESULTS_DIR: root } }, async (context) => {
       scratch = context.scratch;
       return { measured: true };
@@ -121,7 +121,7 @@ test('an unawaited live consumer is reaped but cannot produce green', async () =
   const root = mkdtempSync(path.join(tmpdir(), 'packed-live-test-'));
   let handle;
   try {
-    await assert.rejects(packedGauntlet({ name: 'proof', root,
+    await assert.rejects(supervisedGauntlet({ name: 'proof', root,
       env: { NIKA_BIN: process.execPath, NIKA_GAUNTLET_RESULTS_DIR: root } }, async ({ start }) => {
       let ready;
       const started = new Promise((resolve) => { ready = resolve; });
@@ -139,7 +139,7 @@ test('the packed runner deadline aborts and reaps a blocked build', async () => 
   const root = mkdtempSync(path.join(tmpdir(), 'packed-deadline-test-'));
   let handle;
   try {
-    await assert.rejects(packedGauntlet({ name: 'proof', root, timeoutMs: 50,
+    await assert.rejects(supervisedGauntlet({ name: 'proof', root, timeoutMs: 50,
       env: { NIKA_BIN: process.execPath, NIKA_GAUNTLET_RESULTS_DIR: root } }, async ({ start }) => {
       handle = start(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { timeoutMs: 2000 });
       await handle.done;

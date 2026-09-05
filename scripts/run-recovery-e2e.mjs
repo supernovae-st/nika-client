@@ -4,13 +4,13 @@ import { createServer } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bounded } from './gauntlet-cancellation.mjs';
-import { installProject, packedGauntlet, packSdk } from './packed-gauntlet.mjs';
+import { installProject, supervisedGauntlet, packSdk } from './gauntlet.mjs';
 import { stopResident, waitForHealth } from './one-door/resident.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export async function runRecoveryE2e() {
-  return packedGauntlet({ name: 'recovery-e2e', root }, async ({ scratch, nikaBin, env, start, run, signal }) => {
+  return supervisedGauntlet({ name: 'recovery-e2e', root }, async ({ scratch, nikaBin, env, start, run, signal }) => {
     const { filename, tarball } = await packSdk(root, scratch, run);
     const project = path.join(scratch, 'project');
     await installProject(path.join(root, 'gauntlet', 'recovery-e2e'), project, tarball, run);

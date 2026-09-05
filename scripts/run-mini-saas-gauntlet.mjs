@@ -2,12 +2,12 @@ import assert from 'node:assert/strict';
 import { readdirSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { installProject, packedGauntlet, packSdk } from './packed-gauntlet.mjs';
+import { installProject, supervisedGauntlet, packSdk } from './gauntlet.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export async function runMiniSaasGauntlet() {
-  return packedGauntlet({ name: 'mini-saas', root }, async ({ scratch, nikaBin, run }) => {
+  return supervisedGauntlet({ name: 'mini-saas', root }, async ({ scratch, nikaBin, run }) => {
     const { filename, tarball } = await packSdk(root, scratch, run);
     const projectsRoot = path.join(root, 'gauntlet', 'projects');
     const rows = [];

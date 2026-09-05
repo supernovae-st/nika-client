@@ -16,11 +16,8 @@ beforeEach(() => {
   mkdirSync(path.join(scratch, 'home'));
   writeFileSync(fixture, `#!${process.execPath}
 import { appendFileSync } from 'node:fs';
-appendFileSync(process.env.NIKA_TEST_MARKER, 'called\\n');
-if (process.env.NIKA_TEST_SUCCESS !== 'yes') {
-  if (process.argv.includes('--version')) process.exit(7);
-  process.stdout.write('{');
-} else if (process.argv.includes('--version')) process.stdout.write('fixture');
+appendFileSync(${JSON.stringify(path.join(scratch, 'calls'))}, 'called\\n');
+if (process.argv.includes('--version')) process.stdout.write('fixture');
 else if (process.argv.includes('check')) process.stdout.write(JSON.stringify({ clean: true, paid_ready: true }));
 else process.stdout.write(JSON.stringify({ file: process.argv[3] }));
 `);
@@ -43,20 +40,22 @@ describe.each(['verify-gauntlet-corpus.mjs', 'execute-gauntlet-corpus.mjs'])('%s
     expect(result.signal).toBeNull();
     expect(result.stderr).toContain('NIKA_BIN must name an absolute engine binary under test');
     expect(existsSync(environment.NIKA_TEST_MARKER)).toBe(false);
-    expect(existsSync(environment.NIKA_GAUNTLET_RESULTS_DIR)).toBe(false);
+    if (script.startsWith('execute-')) {
+      const report = JSON.parse(readFileSync(path.join(environment.NIKA_GAUNTLET_RESULTS_DIR, 'local-execution.json'), 'utf8'));
+      expect(report.result).toBe('red');
+    } else expect(existsSync(environment.NIKA_GAUNTLET_RESULTS_DIR)).toBe(false);
   });
 
   it('uses only the explicit binary for the complete corpus', () => {
     environment.NIKA_BIN = fixture;
     environment.NIKA_GAUNTLET_BIN = path.join(scratch, 'retired-must-not-run');
-    environment.NIKA_TEST_SUCCESS = 'yes';
     const result = spawnSync(process.execPath, [path.join(root, 'scripts', script)], {
       cwd: root, env: environment, encoding: 'utf8', timeout: 15000,
     });
     expect(result.error).toBeUndefined();
     expect(result.signal).toBeNull();
     expect(result.status, result.stderr).toBe(0);
-    const expected = script.startsWith('verify-') ? 100 : 101;
+    const expected = script.startsWith('verify-') ? 100 : 102;
     expect(readFileSync(environment.NIKA_TEST_MARKER, 'utf8').trim().split('\n')).toHaveLength(expected);
   }, 20000);
 });

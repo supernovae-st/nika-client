@@ -4,9 +4,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { OwnedProcesses, runOwnedProcess } from './one-door/process.mjs';
 
-// Both packed application runners share process ownership and evidence commit
+// Corpus and packed application runners share process ownership and evidence commit
 // ordering. Body assertions and graceful resident shutdown must finish first.
-export async function packedGauntlet({ name, root, env = process.env,
+export async function supervisedGauntlet({ name, root, env = process.env,
   owned = new OwnedProcesses(), timeoutMs = 300_000 }, exercise) {
   assert(Number.isFinite(timeoutMs) && timeoutMs > 0);
   const resultsRoot = env.NIKA_GAUNTLET_RESULTS_DIR

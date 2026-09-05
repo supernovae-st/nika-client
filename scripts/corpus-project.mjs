@@ -14,9 +14,15 @@ export function stageCorpus(root, scratch, env) {
   const inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
   const workflowFiles = readdirSync(path.join(source, 'workflows'))
     .filter((file) => file.endsWith('.nika.yaml')).sort();
+  assert(Array.isArray(inventory), 'corpus inventory must be an array');
   assert.equal(inventory.length, 100, 'expected exactly 100 corpus cases');
   assert.equal(workflowFiles.length, 100, 'expected exactly 100 corpus workflows');
-  for (const field of ['id', 'actor', 'trigger', 'failure_oracle', 'business_outcome', 'workflow']) {
+  const uniqueFields = ['id', 'actor', 'trigger', 'failure_oracle', 'business_outcome', 'workflow'];
+  for (const field of [...uniqueFields, 'domain', 'recipe']) {
+    assert(inventory.every((entry) => typeof entry?.[field] === 'string' && entry[field].trim().length > 0),
+      `${field} values must be non-empty strings`);
+  }
+  for (const field of uniqueFields) {
     assert.equal(new Set(inventory.map((entry) => entry[field])).size, 100, `${field} must be unique`);
   }
   assert.equal(new Set(inventory.map((entry) => entry.domain)).size, 20, 'expected 20 distinct domains');

@@ -35,3 +35,30 @@ for (const mode of ['clean', 'undeclared-file', 'symlink-workflow']) {
     } finally { rmSync(scratch, { recursive: true }); }
   });
 }
+
+for (const [name, mutate] of [
+  ['missing-id', (rows) => { delete rows[0].id; }],
+  ['empty-actor', (rows) => { rows[0].actor = '  '; }],
+  ['numeric-trigger', (rows) => { rows[0].trigger = 7; }],
+  ['missing-domain', (rows) => {
+    const domain = rows[0].domain;
+    for (const row of rows) if (row.domain === domain) delete row.domain;
+  }],
+  ['missing-recipe', (rows) => { delete rows[0].recipe; }],
+]) {
+  test(`corpus metadata is present before any project is staged: ${name}`, () => {
+    const scratch = mkdtempSync(path.join(tmpdir(), 'corpus-metadata-test-'));
+    const sourceRoot = path.join(scratch, 'source');
+    const source = path.join(sourceRoot, 'gauntlet', 'corpus');
+    try {
+      cpSync(path.join(repo, 'gauntlet', 'corpus'), source, { recursive: true });
+      const inventoryPath = path.join(source, 'use-cases.json');
+      const rows = JSON.parse(readFileSync(inventoryPath, 'utf8'));
+      mutate(rows);
+      writeFileSync(inventoryPath, JSON.stringify(rows));
+      assert.throws(() => stageCorpus(sourceRoot, scratch, {}), /non-empty strings/);
+      assert.equal(existsSync(path.join(scratch, 'project')), false);
+      assert.equal(existsSync(path.join(scratch, 'home')), false);
+    } finally { rmSync(scratch, { recursive: true }); }
+  });
+}

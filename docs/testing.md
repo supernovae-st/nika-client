@@ -30,6 +30,8 @@ bound build/pack/install and application processes, and own descendant cleanup.
 They write green only after every child has exited and scratch cleanup succeeds.
 Corpus checks and execution share the unchanged workflow bytes, validated
 inventory and owned project/home staging, without inherited provider credentials.
+Required corpus identities, domains and recipe names must be present non-empty
+strings; uniqueness does not make a missing value a valid case.
 Only declared regular workflow files and the inventory are copied; an explicit
 project manifest stops ancestor configuration discovery. This isolates the known
 fixtures, not arbitrary hostile workflows. Each engine call has a deadline of

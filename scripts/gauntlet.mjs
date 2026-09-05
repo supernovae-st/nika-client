@@ -7,13 +7,18 @@ import { OwnedProcesses, runOwnedProcess } from './one-door/process.mjs';
 // Corpus and packed application runners share process ownership and evidence commit
 // ordering. Body assertions and graceful resident shutdown must finish first.
 export async function supervisedGauntlet({ name, root, env = process.env,
-  owned = new OwnedProcesses(), timeoutMs = 300_000 }, exercise) {
+  owned = new OwnedProcesses(), timeoutMs = 300_000, persistReport = true }, exercise) {
   assert(Number.isFinite(timeoutMs) && timeoutMs > 0);
+  assert.equal(typeof persistReport, 'boolean');
   const resultsRoot = env.NIKA_GAUNTLET_RESULTS_DIR
     ? path.resolve(env.NIKA_GAUNTLET_RESULTS_DIR) : path.join(root, 'gauntlet', 'results');
-  const resultsPath = path.join(resultsRoot, `${name}.json`);
-  mkdirSync(resultsRoot, { recursive: true });
-  const writeReport = (report) => writeFileSync(resultsPath, `${JSON.stringify(report, null, 2)}\n`);
+  // Static corpus checks have no durable execution ledger. They still share
+  // all deadlines, signal handling and close-before-green obligations.
+  const resultsPath = persistReport ? path.join(resultsRoot, `${name}.json`) : undefined;
+  if (resultsPath) mkdirSync(resultsRoot, { recursive: true });
+  const writeReport = (report) => {
+    if (resultsPath) writeFileSync(resultsPath, `${JSON.stringify(report, null, 2)}\n`);
+  };
   writeReport({ schema_version: 1, result: 'incomplete', pid: process.pid });
   const controller = new AbortController();
   const stop = (reason) => {
@@ -64,7 +69,7 @@ export async function supervisedGauntlet({ name, root, env = process.env,
   }
   const evidence = { ...report, schema_version: 1, result: 'green' };
   writeReport(evidence);
-  process.stdout.write(`${name} green after owned cleanup · ${resultsPath}\n`);
+  process.stdout.write(`${name} green after owned cleanup${resultsPath ? ` · ${resultsPath}` : ''}\n`);
   return evidence;
 }
 

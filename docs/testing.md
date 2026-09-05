@@ -24,14 +24,19 @@ npm pack --dry-run
 Engine-backed gauntlets use an absolute `NIKA_BIN` as the explicit binary.
 The corpus scripts refuse missing, empty or relative selections before any
 engine spawn; they never fall back to a retired variable or `PATH` binary.
-The corpus execution, mini-SaaS and recovery runners share one supervisor.
-They invalidate old results before work,
+The corpus check/execution, mini-SaaS and recovery runners share one supervisor.
+Execution runners invalidate old recorded results before work,
 bound build/pack/install and application processes, and own descendant cleanup.
 They write green only after every child has exited and scratch cleanup succeeds.
-Corpus execution copies the unchanged workflow bytes into an owned project,
-uses a fresh signing home with no inherited provider credentials, and applies
-a 30-second deadline to each execution within a five-minute overall deadline.
-Its journals and retention effects never target the repository. Failed engine
+Corpus checks and execution share the unchanged workflow bytes, validated
+inventory and owned project/home staging, without inherited provider credentials.
+Only declared regular workflow files and the inventory are copied; an explicit
+project manifest stops ancestor configuration discovery. This isolates the known
+fixtures, not arbitrary hostile workflows. Each engine call has a deadline of
+at most 30 seconds within a five-minute overall deadline;
+execution alone initializes its disposable signing key. Journals and retention
+effects never target the repository. Static checks produce no execution ledger
+and cannot substitute for actual runs. Failed engine
 selection, identity probes, malformed output and interrupted execution replace
 an earlier green report with a failed result; no partial prefix is successful.
 Recovery readiness and graceful server shutdown each have a 3-second deadline;

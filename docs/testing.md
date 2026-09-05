@@ -21,9 +21,10 @@ npm audit
 npm pack --dry-run
 ```
 
-All engine-backed gauntlets use `NIKA_BIN` as the canonical explicit binary.
-`NIKA_GAUNTLET_BIN` remains a compatibility fallback for the corpus-only
-scripts. Evidence is invalid when the recorded engine identity does not match
+Engine-backed gauntlets use an absolute `NIKA_BIN` as the explicit binary.
+The corpus scripts refuse missing, empty or relative selections before any
+engine spawn; they never fall back to a retired variable or `PATH` binary.
+Evidence is invalid when the recorded engine identity does not match
 the intended release candidate. `npm run check:release-evidence` binds every
 current committed gauntlet result and packed tarball identity to the root
 package version. Historical ledgers are limited to an explicit allowlist and
@@ -34,14 +35,15 @@ the exact root package version, verifies its GitHub attestation and published
 `SHA256SUMS` entry, then reruns all 100 deterministic workflows, the full
 14-scenario hostile suite, all five mini-SaaS projects, all five depth projects,
 and the two-process recovery scenario from a freshly packed SDK. The runner
-mints an ephemeral run-signing key. Its
-cancellation fixtures use the engine's in-process `nika:wait` primitive, so the
-replay needs no shell command, platform sandbox, or sandbox waiver. Cancellation
+mints an ephemeral run-signing key. Cancellation fixtures use a controlled
+loopback HTTP rendezvous: hold the first fetch, request cancellation, then
+release it while a dependent fetch remains unstarted. No sleep chooses the
+result and no shell command or sandbox waiver is required. Cancellation
 and sealed-trace claims are exercised against the public binary. The attached
 cancellation replay records both event kind and status. A cancel request is
 not a settlement: an active runtime may finish successfully, fail, or cancel
-at its boundary; lost ownership is `interrupted`. The cancellation fixture
-uses a cooperative wait and must observe `status=cancelled`.
+at its boundary; lost ownership is `interrupted`. The controlled fixture
+must observe `status=cancelled` with the engine's actual task tally.
 The parsed deterministic and packed-project results must match exactly except
 for the recovery job UUID. The hostile comparison excludes `generated_at` and
 per-scenario duration and canonicalizes only those two ratified cancellation

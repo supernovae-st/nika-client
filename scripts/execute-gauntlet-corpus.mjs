@@ -10,7 +10,10 @@ const resultsRoot = process.env.NIKA_GAUNTLET_RESULTS_DIR
   ? path.resolve(process.env.NIKA_GAUNTLET_RESULTS_DIR)
   : join(root, "gauntlet", "results");
 const inventory = JSON.parse(readFileSync(join(corpusRoot, "use-cases.json"), "utf8"));
-const nikaBin = process.env.NIKA_BIN || process.env.NIKA_GAUNTLET_BIN || "nika";
+const nikaBin = process.env.NIKA_BIN;
+if (!nikaBin || !path.isAbsolute(nikaBin)) {
+  throw new Error("NIKA_BIN must name an absolute engine binary under test");
+}
 const version = spawnSync(nikaBin, ["--version"], { encoding: "utf8" });
 
 if (version.status !== 0) throw new Error(`cannot identify ${nikaBin}: ${version.stderr}`);

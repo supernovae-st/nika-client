@@ -92,9 +92,7 @@ export class OwnedProcesses {
   }
 
   async run(command, args, options) {
-    const result = await this.start(command, args, options).done;
-    assert.equal(result.code, 0, `${command} ${args.join(' ')}\n${result.stdout}\n${result.stderr}`);
-    return result.stdout;
+    return runOwnedProcess(this.start.bind(this), command, args, options);
   }
 
   close() {
@@ -108,4 +106,13 @@ export class OwnedProcesses {
     })();
     return this.#closing;
   }
+}
+
+// Native engines inherit their consumer's group; a zero code alone is not a
+// successful result if supervision also observed a signal or live descendants.
+export async function runOwnedProcess(start, command, args, options) {
+  const result = await start(command, args, options).done;
+  assert.equal(result.code, 0, `${command} failed (${result.code}, ${result.signal})\n${result.stdout}\n${result.stderr}`);
+  assert.equal(result.signal, null, `${command} exited via ${result.signal}`);
+  return result.stdout;
 }

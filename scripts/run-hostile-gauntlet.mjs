@@ -18,18 +18,10 @@ import { isDurableCancellationTerminal } from './verify-release-replay.mjs';
 import { CancellationRendezvous } from './one-door/cancellation.mjs';
 import { cancellationFixture, compareSameJobResult, settlementFacts } from './one-door/contract.mjs';
 import { bounded, cancelHeldRun, collectRunEvents } from './gauntlet-cancellation.mjs';
-import { OwnedProcesses } from './one-door/process.mjs';
+import { OwnedProcesses, runOwnedProcess } from './one-door/process.mjs';
+import { stopResident, waitForHealth } from './one-door/resident.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-// Native SDK children inherit the consumer's owned process group. This keeps
-// even a stuck identity probe or run.done inside a reaped, bounded execution.
-export async function runHostileProcess(start, command, args, options) {
-  const result = await start(command, args, options).done;
-  assert.equal(result.code, 0, `${command} failed (${result.code}, ${result.signal})\n${result.stdout}\n${result.stderr}`);
-  assert.equal(result.signal, null, `${command} exited via ${result.signal}`);
-  return result.stdout;
-}
-
 export async function observeHostileReplay(client, run, signal,
   { timeoutMs = 5_000, cleanupMs = 2_000, ...limits } = {}) {
   const observer = new AbortController();
@@ -47,51 +39,6 @@ export async function observeHostileReplay(client, run, signal,
     observer.abort();
     await bounded(observation.catch(() => {}), cleanupMs, 'replay observer cleanup');
   }
-}
-
-export async function stopHostileServer(server, { timeoutMs = 5_000 } = {}) {
-  if (!server) return;
-  let result;
-  try {
-    // OwnedProcesses installed done/close at spawn time, before any signal.
-    server.signal('SIGINT');
-    result = await bounded(server.done, timeoutMs, 'server shutdown');
-  } finally {
-    // A deadline remains a failure even when TERM/KILL successfully reaps it.
-    await server.stop();
-    await server.done.catch(() => {});
-  }
-  assert.equal(result.signal, null, `server exited via ${result.signal}`);
-  assert([0, 130].includes(result.code), `server exited ${result.code}: ${result.stderr.slice(-500)}`);
-}
-
-export async function waitForHealth(url, server, signal,
-  { timeoutMs = 5_000, requestMs = 500, pollMs = 25 } = {}) {
-  const deadline = performance.now() + timeoutMs;
-  const exited = server.done.then(() => { throw new Error(`server exited before readiness: ${server.stderr ?? ''}`); });
-  exited.catch(() => {});
-  while (performance.now() < deadline) {
-    signal?.throwIfAborted();
-    assert(server.child.exitCode === null && server.child.signalCode === null, 'server exited before readiness');
-    const request = new AbortController();
-    const requestSignal = signal ? AbortSignal.any([signal, request.signal]) : request.signal;
-    const remaining = Math.max(1, Math.min(requestMs, deadline - performance.now()));
-    try {
-      const healthy = await bounded(Promise.race([exited, (async () => {
-        const response = await fetch(`${url}/health`, { signal: requestSignal });
-        await response.body?.cancel();
-        return response.ok;
-      })()]), remaining, 'server health request', signal);
-      signal?.throwIfAborted();
-      if (healthy) return;
-    } catch {
-      signal?.throwIfAborted();
-      // Retry startup connection errors and nonresponsive health requests,
-      // but only inside the overall readiness deadline.
-    } finally { request.abort(); }
-    await bounded(new Promise((resolve) => setTimeout(resolve, pollMs)), pollMs + 100, 'health retry', signal);
-  }
-  throw new Error(`server did not become healthy at ${url} within ${timeoutMs}ms`);
 }
 
 async function exerciseScenarios({ scratch, nikaBin, scenario, start, signal }) {
@@ -362,7 +309,7 @@ if (process.argv.includes('--sdk-identity')) {
     } finally {
       remoteAbort.abort();
       try { await bounded(gate.close(), 2_000, 'remote rendezvous cleanup'); }
-      finally { await stopHostileServer(server); }
+      finally { await stopResident(server); }
     }
   });
 
@@ -482,8 +429,8 @@ export async function runHostileGauntlet() {
   let engine;
   let failure;
   try {
-    await runHostileProcess(start, 'npm', ['run', 'build'], { cwd: root, env: process.env, timeoutMs: 60_000 });
-    engine = (await runHostileProcess(start, nikaBin, ['--version'], { timeoutMs: 5_000 })).trim();
+    await runOwnedProcess(start, 'npm', ['run', 'build'], { cwd: root, env: process.env, timeoutMs: 60_000 });
+    engine = (await runOwnedProcess(start, nikaBin, ['--version'], { timeoutMs: 5_000 })).trim();
     const directRuns = await exerciseScenarios({ scratch, nikaBin, start, signal: abort.signal,
       scenario: async (name, body) => {
         const started = performance.now();
@@ -492,7 +439,7 @@ export async function runHostileGauntlet() {
           let evidence;
           if (name === 'remote-durable-cancellation') evidence = await body();
           else {
-            const output = await runHostileProcess(start, process.execPath,
+            const output = await runOwnedProcess(start, process.execPath,
               [fileURLToPath(import.meta.url), '--native-scenario', name, scratch],
               { cwd: root, env: process.env, timeoutMs: name === 'sequential-soak' ? 120_000 : 60_000,
                 maxBuffer: 1024 * 1024 });

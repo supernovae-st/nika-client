@@ -5,9 +5,10 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { test } from 'vitest';
-import { OwnedProcesses } from '../scripts/one-door/process.mjs';
+import { OwnedProcesses, runOwnedProcess } from '../scripts/one-door/process.mjs';
 import { bounded } from '../scripts/gauntlet-cancellation.mjs';
-import { observeHostileReplay, runHostileProcess, stopHostileServer, waitForHealth } from '../scripts/run-hostile-gauntlet.mjs';
+import { observeHostileReplay } from '../scripts/run-hostile-gauntlet.mjs';
+import { stopResident, waitForHealth } from '../scripts/one-door/resident.mjs';
 
 const never = () => new Promise(() => {});
 const gone = (pid) => assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' });
@@ -105,7 +106,7 @@ test('hostile server close is observed even when it preceded shutdown', async ()
   const handle = owned.start(process.execPath, ['-e', ''], { timeoutMs: 1000 });
   try {
     await handle.done;
-    await stopHostileServer(handle, { timeoutMs: 50 });
+    await stopResident(handle, { timeoutMs: 50 });
     gone(handle.child.pid);
   } finally { await owned.close(); }
 });
@@ -121,7 +122,7 @@ test.each([false, true])('hostile shutdown awaits TERM/KILL fallback and never g
   `], { timeoutMs: 2000, graceMs: 50, killMs: 1000, onStdout: ready });
   try {
     await started;
-    await assert.rejects(stopHostileServer(handle, { timeoutMs: 30 }), /server shutdown exceeded/);
+    await assert.rejects(stopResident(handle, { timeoutMs: 30 }), /server shutdown exceeded/);
     gone(handle.child.pid);
     assert.equal(handle.child.signalCode, ignoreTerm ? 'SIGKILL' : 'SIGTERM');
   } finally { await owned.close(); }
@@ -131,7 +132,7 @@ test('hostile owned consumer timeout reaps native-like descendants', async () =>
   const owned = new OwnedProcesses();
   let pids;
   try {
-    await assert.rejects(runHostileProcess(owned.start.bind(owned), process.execPath, ['-e', `
+    await assert.rejects(runOwnedProcess(owned.start.bind(owned), process.execPath, ['-e', `
       const { spawn } = require('node:child_process');
       const child = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
       process.on('SIGTERM', () => {});
@@ -146,9 +147,9 @@ test('hostile owned consumer timeout reaps native-like descendants', async () =>
 test('hostile owned process cannot green a signal exit or excessive output', async () => {
   const owned = new OwnedProcesses();
   try {
-    await assert.rejects(runHostileProcess(owned.start.bind(owned), process.execPath,
+    await assert.rejects(runOwnedProcess(owned.start.bind(owned), process.execPath,
       ['-e', "process.kill(process.pid, 'SIGKILL')"], { timeoutMs: 1000 }), /SIGKILL/);
-    await assert.rejects(runHostileProcess(owned.start.bind(owned), process.execPath,
+    await assert.rejects(runOwnedProcess(owned.start.bind(owned), process.execPath,
       ['-e', "console.log('x'.repeat(10000))"], { timeoutMs: 1000, maxBuffer: 100 }), /exceeded/);
   } finally { await owned.close(); }
 });

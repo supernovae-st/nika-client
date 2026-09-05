@@ -24,6 +24,12 @@ npm pack --dry-run
 Engine-backed gauntlets use an absolute `NIKA_BIN` as the explicit binary.
 The corpus scripts refuse missing, empty or relative selections before any
 engine spawn; they never fall back to a retired variable or `PATH` binary.
+The mini-SaaS and recovery runners also invalidate old results before work,
+bound build/pack/install and application processes, and own descendant cleanup.
+They write green only after every child has exited and scratch cleanup succeeds.
+Recovery readiness and graceful server shutdown each have a 3-second deadline;
+forced cleanup preserves a failed verdict. Hostile and recovery readiness and
+shutdown use the same supervisor helpers, with deadline/output/interrupt tests.
 Evidence is invalid when the recorded engine identity does not match
 the intended release candidate. `npm run check:release-evidence` binds every
 current committed gauntlet result and packed tarball identity to the root

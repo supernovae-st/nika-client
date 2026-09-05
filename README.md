@@ -43,13 +43,13 @@ not parse YAML or reconstruct proof in TypeScript.
 ## Install
 
 ```sh
-npm view @supernovae-st/nika-client@0.116.2 version  # must report 0.116.2
-npm install @supernovae-st/nika-client@0.116.2
+npm view @supernovae-st/nika-client@0.118.2 version  # must report 0.118.2
+npm install @supernovae-st/nika-client@0.118.2
 ```
 
-If the registry reports any other version, the 0.116.2 release train is not
-complete. Earlier packages expose the retired `LocalNika`/HTTP split and do
-not implement the root facade documented below. The publication is complete
+If the registry does not expose that exact version, the 0.118.2 release train
+is not complete. Earlier 0.116 releases introduced the unified facade but do
+not cover all the by-name and settlement guarantees documented below. The publication is complete
 only when the four matching native payload packages and this root client are
 all visible on npm.
 
@@ -123,11 +123,17 @@ Expected output: `workflow_started`, `task_scheduled`, `task_started`,
 `task_completed`, `workflow_completed`, then `run_settled succeeded`, then the
 terminal `succeeded` line with the outputs and the receipt.
 
-A red `check()` report carries the engine's `findings[]` on both transports, so
-the check → teach → re-draft loop reads one shape whether the engine runs
-locally or behind `nika serve`.
+A local `check()` report carries the engine's `findings[]`; an HTTP check of
+an explicit local path preserves that report when capture is refused.
+Checking a served name instead returns the resident's compact admission
+acknowledgement or typed `error` with `clean: false`, without a local process,
+invented findings, or a process exit code.
 
-`run()` returns after stable admission. `run.done` is the sole terminal result.
+`run()` returns after stable admission. `run.done` is the sole result of the
+current execution leg, including `paused` when a human gate needs an answer.
+Pause is not failure and the SDK never supplies the human's answer. The
+engine's `settlement` survives completed-job reattachment and idempotent
+admission replay; it is not reconstructed from earlier task events.
 An admitted workflow failure is result data with `status: "failed"` and, when
 the engine named the failing task, `error: { code, message, task }`; transport,
 protocol, configuration, and compatibility failures throw typed SDK errors.
@@ -178,20 +184,30 @@ const result = await run.done;
 console.log(cancellation.accepted, result.status);
 ```
 
+`cancel()` acknowledges the action, not a guaranteed cancelled outcome. An
+active HTTP run may return `cancellation_requested`; keep awaiting `run.done`
+for the engine's success, failure or cancellation. Lost execution ownership
+is reported as `interrupted`. A paused observation replays its existing result.
+
 Cancellation is idempotent per `NikaRun`. An `AbortSignal` passed to `check`,
 `events`, or `traceVerify` only stops that request or observer; it never stands
 in for `cancel(run)`.
 
 ## Connect to `nika serve`
 
-Remote admission is bytes-first: the local compatible engine captures an
-immutable execution snapshot, then the SDK sends those exact bytes to the
-authenticated server. Capturing those snapshots for `check` and `run`
-therefore still needs a local `nika` binary through `bin`, `NIKA_BIN`, or the
-exact optional platform package, resolved lazily at capture time.
-Observation-only clients need no local engine: `attachRun`, `status`,
-`events`, `cancel`, `schedule`, `scheduleStatus`, `listWorkflows`, `workflow`,
-and `traceVerify` run against the advertised server identity alone.
+Remote admission has two forms and one door (engine 0.118+, ADR-131). A
+contained name the resident lists (`GET /v1/workflows`, e.g.
+`daily-brief.nika.yaml`) is submitted by name: the resident captures the
+execution world itself and the SDK never hashes, so a client built from `url`
+and `token` alone can `check` and `run` it with no local engine. A local path
+(`./flow.nika.yaml`, an absolute path) is still captured through the local
+engine, which prints the immutable execution snapshot the SDK then sends as
+exact bytes; that capture is the one step that needs a local `nika` binary
+through `bin`, `NIKA_BIN`, or the exact optional platform package, resolved
+lazily at capture time. Observation-only clients need no local engine:
+`attachRun`, `status`, `events`, `cancel`, `schedule`, `scheduleStatus`,
+`listWorkflows`, `workflow`, and `traceVerify` run against the advertised
+server identity alone.
 
 The current persistent server requires a project file. If you ran
 `nika init --project-file` above you already have one (it carries a default
@@ -227,10 +243,14 @@ const nika = new Nika({
   url: 'http://127.0.0.1:8787',
   token,
   allowInsecureHttp: true, // required for explicit loopback HTTP
-  cwd: process.cwd(),
+  // A local path needs the local engine; a served name needs neither of these.
+  // cwd: process.cwd(),
   // bin: '/absolute/path/to/nika',
 });
 
+// A served name: the resident judges and captures it. `report` is its
+// acknowledgement ({ clean: true, status, snapshot_digest, root, units }), or
+// { clean: false, error: { code, message } } when it refuses the workflow.
 const report = await nika.check('hello.nika.yaml');
 const run = await nika.run('hello.nika.yaml', {
   idempotencyKey: 'hello-2026-08-30',
@@ -370,7 +390,7 @@ Remote-only options:
 
 | Method | Result |
 |---|---|
-| `check(workflow, options?)` | engine check report, including `clean` and `exitCode` |
+| `check(workflow, options?)` | `clean` plus a local engine report (with `exitCode`) or served-name acknowledgement/refusal |
 | `run(workflow, options?)` | admitted `NikaRun` |
 | `attachRun(id, options?)` | reattached durable HTTP `NikaRun` |
 | `status(run)` | current durable HTTP status |
@@ -387,7 +407,8 @@ Remote-only options:
 `NikaEvent` is a discriminated union over the known lifecycle kinds of both
 transports. A native engine process emits `workflow_started`,
 `task_scheduled`, `task_started`, `task_completed`, `workflow_completed`,
-`workflow_failed`, `workflow_interrupted`, `run_settled`, and `run_sealed`. A
+`workflow_failed`, `workflow_paused`, `workflow_cancelled`, `run_settled`,
+and `run_sealed`. A
 `nika serve` job streams `execution.started`, `execution.settled`,
 `execution.cancelled`, `execution.refused`, and `execution.interrupted` (a
 resident that restarts marks an orphaned running job `interrupted`). Kinds

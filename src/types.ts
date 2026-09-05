@@ -72,7 +72,12 @@ export type NikaRunStatus =
   | 'cancelled'
   | (string & {});
 
-/** A machine check report. Unknown engine fields deliberately ride through. */
+/**
+ * A machine check report. Unknown engine fields deliberately ride through.
+ * A served name checked by name over HTTP (ADR-131) carries the resident's
+ * acknowledgement (`status`, `snapshot_digest`, `root`, `units`) with
+ * `clean: true`, or `clean: false` with the `error` the resident typed.
+ */
 export interface NikaCheckResult {
   report_version?: number;
   clean?: boolean;
@@ -184,11 +189,13 @@ export interface NikaExecutionSettledEvent<
   status?: NikaRunStatus;
   outputs?: Outputs;
   receipt?: NikaReceipt;
+  settlement?: NikaSettlement;
 }
 
-/** An accepted cancellation ended the execution before it settled. */
+/** Runtime cancellation, or queued cancellation without a runtime settlement. */
 export interface NikaExecutionCancelledEvent extends NikaEventFields {
   kind: 'execution.cancelled';
+  settlement?: NikaSettlement;
 }
 
 /** The server refused the execution. */
@@ -305,10 +312,13 @@ export interface NikaSpend {
  * Absent on engines before 0.118; never derived from an exit code.
  */
 export interface NikaSettlement {
+  /** Engine-owned status on nested or flat settlement projections. */
+  status?: NikaRunStatus;
   cause?: NikaRunCause;
   elapsed_ms?: number;
   tasks?: NikaTaskTally;
   spend?: NikaSpend;
+  error?: NikaMachineError;
   [key: string]: unknown;
 }
 

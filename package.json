@@ -1,6 +1,6 @@
 {
   "name": "@supernovae-st/nika-client",
-  "version": "0.116.2",
+  "version": "0.118.2",
   "description": "One TypeScript SDK for local and remote Nika execution",
   "repository": {
     "type": "git",
@@ -60,6 +60,7 @@
     "gauntlet:projects": "node scripts/run-mini-saas-gauntlet.mjs",
     "gauntlet:depth": "node scripts/run-depth-projects.mjs",
     "gauntlet:recovery": "node scripts/run-recovery-e2e.mjs",
+    "gauntlet:one-door": "node scripts/run-one-door-e2e.mjs",
     "gauntlet:hostile": "node scripts/run-hostile-gauntlet.mjs",
     "generate:types": "node scripts/generate-types.js",
     "sync:native-versions": "node scripts/sync-native-versions.mjs",
@@ -67,10 +68,10 @@
     "prepublishOnly": "npm run build"
   },
   "optionalDependencies": {
-    "@supernovae-st/nika-darwin-arm64": "0.116.2",
-    "@supernovae-st/nika-darwin-x64": "0.116.2",
-    "@supernovae-st/nika-linux-arm64": "0.116.2",
-    "@supernovae-st/nika-linux-x64": "0.116.2"
+    "@supernovae-st/nika-darwin-arm64": "0.118.2",
+    "@supernovae-st/nika-darwin-x64": "0.118.2",
+    "@supernovae-st/nika-linux-arm64": "0.118.2",
+    "@supernovae-st/nika-linux-x64": "0.118.2"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",

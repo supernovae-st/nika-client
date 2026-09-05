@@ -1,48 +1,18 @@
-import { spawnSync } from "node:child_process";
-import { readFileSync, readdirSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import assert from 'node:assert/strict';
+import path from 'node:path';
+import { supervisedGauntlet } from './gauntlet.mjs';
+import { stageCorpus } from './corpus-project.mjs';
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const corpusRoot = join(root, "gauntlet", "corpus");
-const workflowsRoot = join(corpusRoot, "workflows");
-const inventory = JSON.parse(readFileSync(join(corpusRoot, "use-cases.json"), "utf8"));
-const workflowFiles = readdirSync(workflowsRoot).filter((name) => name.endsWith(".nika.yaml")).sort();
-const requiredUniqueFields = ["id", "actor", "trigger", "failure_oracle", "business_outcome", "workflow"];
-
-if (inventory.length !== 100 || workflowFiles.length !== 100) {
-  throw new Error(`expected 100 inventory rows and workflows; got ${inventory.length} and ${workflowFiles.length}`);
-}
-for (const field of requiredUniqueFields) {
-  const count = new Set(inventory.map((entry) => entry[field])).size;
-  if (count !== 100) throw new Error(`${field} is not unique: ${count}/100`);
-}
-if (new Set(inventory.map((entry) => entry.domain)).size !== 20) {
-  throw new Error("expected 20 distinct domains");
-}
-
-const nikaBin = process.env.NIKA_BIN || process.env.NIKA_GAUNTLET_BIN || "nika";
-const failures = [];
-for (const [index, file] of workflowFiles.entries()) {
-  const path = join(workflowsRoot, file);
-  const check = spawnSync(nikaBin, ["check", "--json", "--native-strict", path], {
-    encoding: "utf8",
-    maxBuffer: 8 * 1024 * 1024,
+const root = path.resolve(import.meta.dirname, '..');
+await supervisedGauntlet({ name: 'corpus-check', root, persistReport: false },
+  async ({ scratch, nikaBin, env, run }) => {
+    const { project, engineEnv, workflowFiles } = stageCorpus(root, scratch, env);
+    for (const [index, file] of workflowFiles.entries()) {
+      const stdout = await run(nikaBin, ['check', '--json', '--native-strict', path.join(project, 'workflows', file)],
+        { cwd: project, env: engineEnv, timeoutMs: 30_000, maxBuffer: 8 * 1024 * 1024 });
+      const report = JSON.parse(stdout);
+      assert(report?.clean === true && report?.paid_ready === true, `${file}: check is not clean and paid-ready`);
+      if ((index + 1) % 10 === 0) process.stdout.write(`checked ${index + 1}/100\n`);
+    }
+    return { checked: workflowFiles.length, domains: 20, unique_identity_fields: 6 };
   });
-  if (check.status !== 0) {
-    failures.push({ file, stage: "check", status: check.status, stderr: check.stderr, stdout: check.stdout });
-    continue;
-  }
-  const report = JSON.parse(check.stdout);
-  if (report.clean !== true || report.paid_ready !== true) {
-    failures.push({ file, stage: "readiness", clean: report.clean, paid_ready: report.paid_ready, next: report.next });
-  }
-  if ((index + 1) % 10 === 0) process.stdout.write(`checked ${index + 1}/100\n`);
-}
-
-if (failures.length > 0) {
-  console.error(JSON.stringify(failures.slice(0, 10), null, 2));
-  throw new Error(`${failures.length} workflows failed corpus verification`);
-}
-
-console.log("100/100 workflows clean, native-strict, paid-ready; 20 domains and six semantic identity fields unique");

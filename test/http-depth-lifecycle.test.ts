@@ -26,6 +26,13 @@ const RECEIPT = Object.freeze({
   origin: { kind: 'manual' },
 });
 
+const SETTLEMENT = Object.freeze({
+  cause: 'normal',
+  elapsed_ms: 12,
+  tasks: { total: 1, ok: 1 },
+  spend: { qualifier: 'unmetered' },
+});
+
 const SCHEDULE_ORIGIN = Object.freeze({
   kind: 'schedule',
   schedule_origin: 'api',
@@ -164,6 +171,25 @@ describe('independent event observers', () => {
 });
 
 describe('SSE replay, reconnect, and terminal authority', () => {
+  it.each([{ status: 'failed' }, { error: 'invalid' }, { tasks: [] }])(
+    'refuses malformed durable settlement %j before reattachment', async (settlement) => {
+      const fetch = vi.fn().mockResolvedValueOnce(healthResponse()).mockResolvedValueOnce(jsonResponse({
+        id: 'job-1', status: 'succeeded', settlement,
+      }));
+      await expect(client(fetch as typeof globalThis.fetch).attachRun('job-1'))
+        .rejects.toBeInstanceOf(NikaProtocolError);
+    },
+  );
+
+  it('a human pause settles this observation leg without answering the gate', async () => {
+    const settlement = { ...SETTLEMENT, status: 'paused', cause: 'human_gate' };
+    const fetch = admissionThen(sseResponse([{
+      sequence: 1, kind: 'execution.settled', status: 'paused', settlement, receipt: RECEIPT,
+    }]));
+    const nika = client(fetch as typeof globalThis.fetch);
+    const run = await nika.run('gate.nika.yaml');
+    await expect(run.done).resolves.toMatchObject({ status: 'paused', settlement });
+  });
   it('drops an exact duplicate replay and reconnects from the last accepted sequence', async () => {
     const running = { sequence: 1, kind: 'running', status: 'running' } as const;
     const fetch = admissionThen(
@@ -242,6 +268,27 @@ describe('SSE replay, reconnect, and terminal authority', () => {
     });
   });
 
+  it('preserves the runtime settlement when SSE ends before the terminal frame', async () => {
+    const fetch = admissionThen(sseText(''), jsonResponse({
+      id: 'job-1', status: 'succeeded', receipt: RECEIPT, settlement: SETTLEMENT,
+    }));
+    const source = await transport(fetch as typeof globalThis.fetch).startRun('flow.nika.yaml', {});
+    await expect(collect(source.events)).resolves.toEqual([]);
+    await expect(source.done).resolves.toMatchObject({ settlement: SETTLEMENT });
+  });
+
+  it('reattaches past the terminal cursor without losing the stored settlement', async () => {
+    const fetch = vi.fn()
+      .mockResolvedValueOnce(healthResponse())
+      .mockResolvedValueOnce(jsonResponse({
+        id: 'job-1', status: 'succeeded', receipt: RECEIPT, settlement: SETTLEMENT,
+      }))
+      .mockResolvedValueOnce(sseText(''));
+    const nika = client(fetch as typeof globalThis.fetch);
+    const run = await nika.attachRun('job-1', { lastEventId: 2 });
+    await expect(run.done).resolves.toMatchObject({ settlement: SETTLEMENT });
+  });
+
   it('bounds durable JSON inspected during reconnect', async () => {
     const fetch = admissionThen(
       sseText(''),
@@ -268,6 +315,60 @@ describe('SSE replay, reconnect, and terminal authority', () => {
 });
 
 describe('cancellation and terminal identity', () => {
+  it('allows retry after a refused cancel without abandoning observation', async () => {
+    const stream = controlledByteStream();
+    let cancellations = 0;
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const path = new URL(String(input)).pathname;
+      if (path === '/health') return healthResponse();
+      if (path === '/v1/jobs') return jsonResponse({ id: 'job-1', status: 'queued' }, 202);
+      if (path.endsWith('/events')) return stream.response;
+      if (path.endsWith('/cancel')) {
+        cancellations += 1;
+        return cancellations === 1
+          ? jsonResponse({ error: { code: 'store_busy', message: 'retry the action' } }, 503)
+          : jsonResponse({ id: 'job-1', status: 'running' }, 202);
+      }
+      throw new Error(`unexpected ${path}`);
+    });
+    const nika = client(fetch as typeof globalThis.fetch);
+    const run = await nika.run('flow.nika.yaml');
+    await expect(nika.cancel(run)).rejects.toThrow();
+    try {
+      await expect(nika.cancel(run)).resolves.toMatchObject({ status: 'cancellation_requested' });
+      expect(cancellations).toBe(2);
+    } finally {
+      stream.enqueue(sseFrame({ sequence: 1, kind: 'execution.settled', status: 'succeeded', receipt: RECEIPT }));
+      stream.close();
+      await expect(run.done).resolves.toMatchObject({ status: 'succeeded' });
+    }
+  });
+
+  it.each(['succeeded', 'failed', 'cancelled', 'interrupted'] as const)(
+    'an accepted cancel request waits for the actual %s result', async (status) => {
+      const stream = controlledByteStream();
+      const fetch = vi.fn(async (input: string | URL | Request) => {
+        const path = new URL(String(input)).pathname;
+        if (path === '/health') return healthResponse();
+        if (path === '/v1/jobs') return jsonResponse({ id: 'job-1', status: 'queued' }, 202);
+        if (path.endsWith('/events')) return stream.response;
+        if (path.endsWith('/cancel')) return jsonResponse({ id: 'job-1', status: 'running' }, 202);
+        throw new Error(`unexpected ${path}`);
+      });
+      const nika = client(fetch as typeof globalThis.fetch);
+      const run = await nika.run('flow.nika.yaml');
+      let settled = false;
+      void run.done.then(() => { settled = true; });
+      await expect(nika.cancel(run)).resolves.toMatchObject({
+        accepted: true, status: 'cancellation_requested', transport: 'http',
+      });
+      expect(settled).toBe(false);
+      stream.enqueue(sseFrame({ sequence: 1, kind: 'execution.settled', status, receipt: RECEIPT }));
+      stream.close();
+      await expect(run.done).resolves.toMatchObject({ status, receipt: RECEIPT });
+    },
+  );
+
   it('delivers one terminal cancellation event before closing active observers', async () => {
     const stream = controlledByteStream();
     const terminal = {
@@ -349,6 +450,7 @@ describe('cancellation and terminal identity', () => {
       status: 'succeeded',
       receipt: RECEIPT,
       outputs: { replayed: true },
+      settlement: SETTLEMENT,
     } as const;
     const fetch = vi.fn(async (input: string | URL | Request) => {
       const path = new URL(String(input)).pathname;
@@ -360,6 +462,7 @@ describe('cancellation and terminal identity', () => {
           execution_id: 'execution-1',
           trace_id: 'trace-1',
           outputs: { replayed: true },
+          settlement: SETTLEMENT,
           receipt: RECEIPT,
         });
       }
@@ -373,6 +476,7 @@ describe('cancellation and terminal identity', () => {
       id: 'job-1',
       status: 'succeeded',
       outputs: { replayed: true },
+      settlement: SETTLEMENT,
       receipt: RECEIPT,
     });
     await expect(collect(nika.events(run))).resolves.toEqual([terminal]);
@@ -580,7 +684,8 @@ describe('cancellation and terminal identity', () => {
       receipt: { ...RECEIPT, snapshot_digest: 'b'.repeat(64) },
     }]));
     const nika = client(fetch as typeof globalThis.fetch);
-    const run = await nika.run('flow.nika.yaml');
+    // A local path is captured here, so the admission digest is known and bound.
+    const run = await nika.run('./flow.nika.yaml');
     await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);
   });
 

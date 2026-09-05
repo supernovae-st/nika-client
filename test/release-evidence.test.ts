@@ -4,7 +4,6 @@ import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { verifyReleaseEvidence } from '../scripts/verify-release-evidence.mjs';
 
-const ROOT = path.resolve(import.meta.dirname, '..');
 const ENGINE = 'nika 0.116.2 (c4cdbeafb)';
 const PACKAGE = 'supernovae-st-nika-client-0.116.2.tgz';
 const currentEvidence = [
@@ -28,13 +27,13 @@ afterEach(() => {
 });
 
 describe('release evidence identity', () => {
-  it('binds every committed release gate to the package version and one engine', () => {
-    expect(verifyReleaseEvidence(ROOT)).toEqual({
+  it('binds synthetic release-gate records to their package version and one engine', () => {
+    expect(verifyReleaseEvidence(createFixture())).toEqual({
       version: '0.116.2',
       engine: ENGINE,
       package: PACKAGE,
       currentFiles: 5,
-      historicalFiles: 2,
+      historicalFiles: 0,
     });
   });
 

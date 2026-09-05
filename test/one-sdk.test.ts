@@ -665,7 +665,7 @@ describe('HTTP transport', () => {
         { sequence: 3, kind: 'settled', status: 'succeeded' },
       ]));
     const client = remote(fetch as typeof globalThis.fetch);
-    const run = await client.run('nested/flow.nika.yaml', { idempotencyKey: 'stable-key' });
+    const run = await client.run('./nested/flow.nika.yaml', { idempotencyKey: 'stable-key' });
     await expect(run.done).resolves.toEqual({
       id: 'remote-1',
       status: 'succeeded',
@@ -755,7 +755,7 @@ describe('HTTP transport', () => {
         root: 'other.nika.yaml',
         units: 1,
       }));
-    await expect(remote(fetch as typeof globalThis.fetch).check('flow.nika.yaml'))
+    await expect(remote(fetch as typeof globalThis.fetch).check('./flow.nika.yaml'))
       .rejects.toMatchObject({ name: 'NikaProtocolError', transport: 'http' });
   });
 
@@ -788,7 +788,7 @@ describe('HTTP transport', () => {
   });
 
   it('refuses dirty or tampered local capture before network admission', async () => {
-    for (const workflow of ['dirty.nika.yaml', 'tampered.nika.yaml']) {
+    for (const workflow of ['./dirty.nika.yaml', './tampered.nika.yaml']) {
       const fetch = vi.fn().mockResolvedValueOnce(healthResponse());
       await expect(remote(fetch as typeof globalThis.fetch).run(workflow))
         .rejects.toBeInstanceOf(NikaCompatibilityError);
@@ -799,7 +799,7 @@ describe('HTTP transport', () => {
 
   it('returns a parse-fatal remote check report without misclassifying identity', async () => {
     const fetch = vi.fn().mockResolvedValueOnce(healthResponse());
-    const report = await remote(fetch as typeof globalThis.fetch).check('parse-fatal.nika.yaml');
+    const report = await remote(fetch as typeof globalThis.fetch).check('./parse-fatal.nika.yaml');
     expect(report).toMatchObject({
       clean: false,
       parse_fatal: true,
@@ -1029,11 +1029,11 @@ describe('remote observation without a local engine', () => {
       bin: '/nonexistent/nika-engine',
       fetch: fetch as typeof globalThis.fetch,
     });
-    await expect(client.check('flow.nika.yaml')).rejects.toMatchObject({
+    await expect(client.check('./flow.nika.yaml')).rejects.toMatchObject({
       name: 'NikaCompatibilityError',
       capability: 'engineIdentity',
     });
-    await expect(client.run('flow.nika.yaml')).rejects.toMatchObject({
+    await expect(client.run('./flow.nika.yaml')).rejects.toMatchObject({
       name: 'NikaCompatibilityError',
       capability: 'engineIdentity',
     });
@@ -1052,11 +1052,11 @@ describe('remote observation without a local engine', () => {
           token: SERVER_TOKEN,
           fetch: fetch as typeof globalThis.fetch,
         });
-        await expect(client.check('flow.nika.yaml')).rejects.toMatchObject({
+        await expect(client.check('./flow.nika.yaml')).rejects.toMatchObject({
           name: 'NikaEngineUnavailable',
           code: 'NIKA_ENGINE_UNAVAILABLE',
         });
-        await expect(client.run('flow.nika.yaml')).rejects.toMatchObject({
+        await expect(client.run('./flow.nika.yaml')).rejects.toMatchObject({
           name: 'NikaEngineUnavailable',
           code: 'NIKA_ENGINE_UNAVAILABLE',
         });

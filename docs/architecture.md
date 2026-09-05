@@ -49,9 +49,11 @@ Some operations deliberately have one authority:
 - resident workflow discovery, durable status, and schedules require HTTP;
 - a direct native process refuses those operations with
   `NikaCompatibilityError`;
-- remote execution still needs a compatible local engine to capture an
-  immutable snapshot before any network admission;
-- when that capture is red the HTTP adapter returns the local engine's plain
+- a contained served name submits directly to the resident, which captures
+  its own immutable world; no local engine or workflow source is needed;
+- an explicit local path (`./flow.nika.yaml` or an absolute path) needs a
+  compatible local engine to capture the snapshot before HTTP admission;
+- when that local capture is red the HTTP adapter returns the engine's plain
   `nika check --json` report, so `findings[]` stays canonical and no workflow
   bytes are sent;
 - HTTP observation (attach, durable status, events, cancel, workflow catalog,
@@ -63,7 +65,9 @@ Some operations deliberately have one authority:
 
 1. `run()` resolves only after stable admission and returns an immutable
    `{ id, done }` handle.
-2. `run.done` is the only terminal promise. Workflow failure is result data;
+2. `run.done` settles the current execution leg, including a human-gate pause.
+   A completed-job read/replay carries the engine's stored settlement unchanged.
+   Workflow failure is result data;
    configuration, transport, protocol, and compatibility failures throw.
 3. `events(run)` creates an independent bounded observer. Aborting an observer
    never cancels the run.

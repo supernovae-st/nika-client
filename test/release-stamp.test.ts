@@ -94,7 +94,8 @@ describe('release commit stamping', () => {
 
     expect(workflow).toContain('cargo test --manifest-path nika-source/Cargo.toml');
     expect(workflow).toContain('npm run check:coverage');
-    expect(workflow).toContain('gh attestation verify "$asset" --repo supernovae-st/nika');
+    expect(workflow).toContain('scripts/verify-engine-archive.mjs');
+    expect(workflow).not.toContain('gh attestation verify "$asset" --repo supernovae-st/nika');
     expect(workflow).toContain('engine_commit=$(git -C nika-source rev-parse HEAD)');
     expect(workflow).toContain('"$engine_commit" engine-assets/SHA256SUMS');
     expect(workflow).toContain('scripts/verify-packed-install.mjs');

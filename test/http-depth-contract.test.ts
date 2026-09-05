@@ -341,14 +341,15 @@ describe('cross-client concurrency contracts', () => {
       const firstClient = client(fetch as typeof globalThis.fetch, TOKEN_A, fixtureA.bin);
       const replayClient = client(fetch as typeof globalThis.fetch, TOKEN_A, fixtureA.bin);
       const conflictClient = client(fetch as typeof globalThis.fetch, TOKEN_A, fixtureB.bin);
-      const first = await firstClient.run('flow.nika.yaml', { idempotencyKey: 'shared-key' });
-      const replay = await replayClient.run('flow.nika.yaml', { idempotencyKey: 'shared-key' });
+      // Local paths: each client captures its own snapshot bytes, which the key binds.
+      const first = await firstClient.run('./flow.nika.yaml', { idempotencyKey: 'shared-key' });
+      const replay = await replayClient.run('./flow.nika.yaml', { idempotencyKey: 'shared-key' });
       expect(first.id).toBe(replay.id);
       await expect(Promise.all([first.done, replay.done])).resolves.toEqual([
         expect.objectContaining({ id: 'job-shared', status: 'succeeded' }),
         expect.objectContaining({ id: 'job-shared', status: 'succeeded' }),
       ]);
-      await expect(conflictClient.run('flow.nika.yaml', {
+      await expect(conflictClient.run('./flow.nika.yaml', {
         idempotencyKey: 'shared-key',
       })).rejects.toMatchObject({
         name: 'NikaOperationError',

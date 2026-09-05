@@ -5,12 +5,13 @@ import type {
   NikaRunSettledEvent,
 } from './types.js';
 
-/** The statuses after which the engine sends no further frame for a run. */
+/** The statuses that settle this execution/observation leg (a pause can resume). */
 const TERMINAL_STATUSES: ReadonlySet<string> = new Set([
   'succeeded',
   'failed',
   'interrupted',
   'cancelled',
+  'paused',
 ]);
 
 /**
@@ -42,7 +43,7 @@ export function isNikaTerminalEvent<
 >(
   event: NikaEvent<Outputs>,
 ): event is NikaEvent<Outputs> & {
-  status: 'succeeded' | 'failed' | 'interrupted' | 'cancelled';
+  status: 'succeeded' | 'failed' | 'interrupted' | 'cancelled' | 'paused';
 } {
   return typeof event.status === 'string' && TERMINAL_STATUSES.has(event.status);
 }

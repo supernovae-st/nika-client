@@ -73,7 +73,7 @@
     "@supernovae-st/nika-linux-x64": "0.116.2"
   },
   "devDependencies": {
-    "@types/node": "^26.4.0",
+    "@types/node": "^26.4.1",
     "openapi-typescript": "^7.13.0",
     "tsup": "^8.0",
     "typescript": "^5.5",

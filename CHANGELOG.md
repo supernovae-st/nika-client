@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The HTTP transport accepts the `nika serve` wire of engine 0.118, measured
+  against a 0.118.7 `nika serve --bind`. The SSE frame allow-list and the
+  durable job allow-list learn `settlement`, the object the resident nests
+  whole on `execution.settled` and on `GET /v1/jobs/{id}`; before, a 0.118
+  door was refused at its first terminal frame (`SSE data contained fields
+  outside the public projection`) and at every durable read (`Durable job
+  response contained unknown fields`). The nested settlement is validated
+  (typed known facts, additive fields kept, a `status` that contradicts its
+  record refused) and rides `run.done` as `settlement`, its `status` and
+  named `error` included, on the SSE path and on the attach and cancel paths
+  that settle from the durable job; a failed run's `error` names its task
+  from the settlement.
+- `cancel(run)` accepts the resident's 202 (`Cancellation requested;
+  execution has not yet settled`) with the still-running job and returns
+  `{ accepted: true, status: 'cancellation_requested' }` without settling:
+  the open observation then settles `run.done` on the terminal the execution
+  owner records (`interrupted` once the resident's grace expires, as
+  measured; `cancelled`, `succeeded` or `failed` otherwise). Before, the 202
+  was `non-contract status 202`. A 202 that carries a terminal job is a
+  protocol fault; 200 keeps its meaning, a settled job (`cancelled` or
+  `already_settled`).
+- `traceVerify(receipt)` over HTTP no longer demands `reason`: a verdict that
+  holds carries none. `verified` is true on `verified` and on the CLI's
+  positive tiers (`OK`, `SEALED`, `ANCHORED`, `REPLAYED`, case-insensitive)
+  when the trace matches; `unavailable`, `INCOMPLETE`, `TAMPERED` and
+  `invalid` stay false. The 0.118 door still answers only the typed
+  `unavailable` refusal, which is kept as is.
+
+### Changed
+
+- `openapi.json` and `src/generated/openapi.d.ts` are pinned to the engine
+  0.118.7 contract: `RunSettlement`, `settlement` on `JobEvent` and `Job`,
+  the 202 on cancel, and the by-name `JobByName` admission form this SDK
+  does not use yet. `JobEvent` stays closed. `NikaSettlement` gains `status`
+  and `error`, `NikaSpend` gains `by_source`, `NikaExecutionSettledEvent` and
+  `NikaExecutionCancelledEvent` gain `settlement`, `NikaCancelResult.status`
+  documents its three words, and `NikaTraceVerifyResult.verdict` lists the
+  CLI tiers. The package version stays on the release train.
+
 ### Added
 
 - `NikaRunSettledEvent.error`: engine 0.117+ repeats the first failed task's

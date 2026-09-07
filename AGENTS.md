@@ -15,6 +15,7 @@ Its root module talks to live `nika serve` HTTP (`--bind` + `--workflows` +
 1. The remote wire types mirror live `nika serve` OpenAPI (`openapi.json`) —
    never invent fields; check the owning contract and engine source when in
    doubt. Bare `nika serve` is the resident cadence firer; HTTP is the
-   `--bind` door. Cancel and artifacts stay absent.
+   `--bind` door. Artifacts stay absent; cancel answers 200 (a settled job)
+   or 202 (the request accepted on a running job, engine 0.118).
 2. 4 verbs only: `infer` · `exec` · `invoke` · `agent`.
 3. Commit trailer: `Co-Authored-By: Nika 🦋 <nika@supernovae.studio>`.

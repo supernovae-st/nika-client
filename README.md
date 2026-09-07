@@ -160,6 +160,9 @@ authority; the typed verdict is preserved instead of being hidden as a 404.
 `/health.supportedCapabilities` names authorities that can currently complete
 their operation. It therefore does not advertise remote trace verification
 while this diagnostic route can only return the typed unavailable verdict.
+A resident with journal authority will answer the CLI's tiers (`OK`, `SEALED`,
+`ANCHORED`, `REPLAYED` hold; `INCOMPLETE`, `TAMPERED` do not), with no
+`reason` on a verdict that holds; `verified` reads them the same way.
 
 Run-signing keys remain engine-owned. `nika key init`, `nika key trust`, and
 `nika key rotate` manage their lifecycle. Nika prefers the OS keychain and uses
@@ -181,6 +184,13 @@ console.log(cancellation.accepted, result.status);
 Cancellation is idempotent per `NikaRun`. An `AbortSignal` passed to `check`,
 `events`, or `traceVerify` only stops that request or observer; it never stands
 in for `cancel(run)`.
+
+Over HTTP a running job answers the request with 202: `cancellation` reads
+`{ accepted: true, status: 'cancellation_requested' }` and `run.done` settles
+on the terminal the resident records, `cancelled`, `succeeded`, `failed`, or
+`interrupted` once its grace expired. A job that already ended replays its
+result with `accepted: false` and `status: 'already_settled'`. The native
+transport signals its process the same way and settles `interrupted`.
 
 ## Connect to `nika serve`
 
@@ -339,8 +349,8 @@ it; a scheduled budget is always a real number.
 | `attachRun` | typed refusal | reattach to a durable job with an optional SSE cursor |
 | `status` | typed refusal; await `run.done` | durable status projection |
 | `events` | raw engine lifecycle frames | sequenced SSE frames with bounded replay |
-| `cancel` | signal-backed, idempotent | durable server cancellation |
-| `traceVerify` | engine verification + signed receipt binding | typed unavailable verdict until remote journal authority exists |
+| `cancel` | signal-backed, idempotent | 200 settles the job; 202 accepts the request and `run.done` settles on the resident's terminal |
+| `traceVerify` | engine verification + signed receipt binding | typed verdict: `unavailable` until remote journal authority exists, then the CLI's tiers |
 | `schedule` / `scheduleStatus` | typed refusal | resident schedule authority |
 | `listWorkflows` / `workflow` | typed refusal | contained path-free workflow catalog |
 

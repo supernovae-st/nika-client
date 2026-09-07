@@ -259,7 +259,7 @@ export class NativeProcessTransport implements Transport {
               receipt = eventReceipt(event) ?? receipt;
               outputs = eventOutputs(event) ?? outputs;
               machineError = eventError(event) ?? machineError;
-              settlement = eventSettlement(event) ?? settlement;
+              settlement = eventSettlement(event, kind) ?? settlement;
               yield event;
             }
             if (Buffer.byteLength(buffer) > machineBufferBytes) {
@@ -277,7 +277,7 @@ export class NativeProcessTransport implements Transport {
               receipt = eventReceipt(event) ?? receipt;
               outputs = eventOutputs(event) ?? outputs;
               machineError = eventError(event) ?? machineError;
-              settlement = eventSettlement(event) ?? settlement;
+              settlement = eventSettlement(event, kind) ?? settlement;
               yield event;
             }
           }

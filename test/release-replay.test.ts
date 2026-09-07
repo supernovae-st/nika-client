@@ -283,7 +283,7 @@ describe('public release evidence replay', () => {
     }],
     ['event kinds that name two cancellation terminals', {
       ...depthInterrupted(),
-      sse_event_kinds: ['execution.cancelled', 'execution.interrupted', 'execution.started'],
+      sse_event_kinds: ['execution.interrupted', 'execution.settled', 'execution.started'],
     }],
     ['a non-idempotent cancellation', { ...depthInterrupted(), cancellation_idempotent: false }],
     ['a cancel reply that is not a cancellation', {

@@ -220,6 +220,10 @@ describe('release evidence identity', () => {
       ...INTERRUPTED_IN_FLIGHT,
       sse_event_kinds: ['execution.cancelled', 'execution.started'],
     }],
+    ['event kinds that name two cancellation terminals', {
+      ...INTERRUPTED_IN_FLIGHT,
+      sse_event_kinds: ['execution.interrupted', 'execution.settled', 'execution.started'],
+    }],
     ['a cancel reply that is not a cancellation', {
       ...INTERRUPTED_IN_FLIGHT,
       cancellation_status: 'already_settled',
@@ -285,6 +289,8 @@ function evidenceFor(relativePath: string): object {
 }
 
 function depthEvidence(incident: Record<string, unknown>): object {
+  // A deep copy: a test that edits the returned evidence must never reach the
+  // shared shape constants, or every later row would refuse for its reason.
   const projects = packedProjects([
     'deployment-gate',
     'evidence-provenance-pipeline',
@@ -292,7 +298,7 @@ function depthEvidence(incident: Record<string, unknown>): object {
     'multi-tenant-webhook-router',
     'scheduled-research-monitor',
   ]).map((project: any) => project.project === 'incident-response-controller'
-    ? { ...project, ...incident }
+    ? { ...project, ...structuredClone(incident) }
     : project);
   return {
     schema_version: 1,

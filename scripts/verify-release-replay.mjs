@@ -15,7 +15,8 @@ import { pathToFileURL } from "node:url";
 // records the terminal it reaches first: `cancelled` (one of the two writer
 // kinds) with a settlement whose `cause` is `operator` when the run reaches a
 // task boundary before the grace expires, or `execution.interrupted` with
-// status `interrupted` and no settlement once the grace expires inside a task.
+// status `interrupted` and no settlement once the grace expires inside a task
+// (an interrupted terminal carrying a settlement cause is refused).
 // Any other terminal after a cancel reply is refused.
 const CANCELLED_TERMINAL_KINDS = new Set([
   "execution.cancelled",
@@ -50,11 +51,16 @@ export function isDurableCancellationTerminal(event) {
     && event.status === "cancelled";
 }
 
+// No settlement rides an interrupted terminal (the contract's RunSettlement has
+// no `interrupted` status): one that carries a settlement cause, or a settlement
+// object, is not the shape the door records and is refused.
 export function isInterruptedCancellationTerminal(event) {
   return event !== null
     && typeof event === "object"
     && event.kind === INTERRUPTED_TERMINAL_KIND
-    && event.status === "interrupted";
+    && event.status === "interrupted"
+    && event.settlement_cause === undefined
+    && event.settlement === undefined;
 }
 
 export function isCancellationTerminalKind(kind) {

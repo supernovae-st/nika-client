@@ -206,6 +206,10 @@ describe('release evidence identity', () => {
       ...CANCELLED_AT_BOUNDARY,
       sse_terminal: { kind: 'execution.cancelled', status: 'cancelled', settlement_cause: 'budget' },
     }],
+    ['a 202 whose interrupted terminal carries a settlement cause', {
+      ...INTERRUPTED_IN_FLIGHT,
+      sse_terminal: { kind: 'execution.interrupted', status: 'interrupted', settlement_cause: 'budget' },
+    }],
     ['a 200 whose terminal reads interrupted', {
       ...CANCELLED_BEFORE_EXECUTION,
       cancelled_run_status: 'interrupted',

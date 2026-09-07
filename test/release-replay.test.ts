@@ -106,6 +106,19 @@ describe('public release evidence replay', () => {
     expect(isInterruptedCancellationTerminal({ kind, status })).toBe(false);
   });
 
+  it('rejects an interrupted terminal that carries a settlement', () => {
+    expect(isInterruptedCancellationTerminal({
+      kind: 'execution.interrupted',
+      status: 'interrupted',
+      settlement_cause: 'budget',
+    })).toBe(false);
+    expect(isInterruptedCancellationTerminal({
+      kind: 'execution.interrupted',
+      status: 'interrupted',
+      settlement: { cause: 'operator' },
+    })).toBe(false);
+  });
+
   it.each([
     ['execution.cancelled', 'cancelled', 'operator', true],
     ['execution.settled', 'cancelled', 'operator', true],
@@ -141,6 +154,7 @@ describe('public release evidence replay', () => {
     ['cancellation_requested', { kind: 'execution.settled', status: 'cancelled', settlement_cause: 'normal' }],
     ['cancellation_requested', { kind: 'execution.settled', status: 'succeeded', settlement_cause: 'operator' }],
     ['cancellation_requested', { kind: 'execution.interrupted', status: 'failed' }],
+    ['cancellation_requested', { kind: 'execution.interrupted', status: 'interrupted', settlement_cause: 'budget' }],
     ['cancelled', { kind: 'execution.interrupted', status: 'interrupted' }],
     ['cancelled', { kind: 'execution.cancelled', status: 'interrupted' }],
     ['already_settled', { kind: 'execution.cancelled', status: 'cancelled' }],
@@ -200,6 +214,13 @@ describe('public release evidence replay', () => {
       events: [
         { kind: 'execution.started', status: 'running' },
         { kind: 'execution.settled', status: 'cancelled', settlement_cause: 'budget' },
+      ],
+    }],
+    ['a 202 whose interrupted terminal carries a settlement cause', {
+      ...INTERRUPTED_IN_FLIGHT,
+      events: [
+        { kind: 'execution.started', status: 'running' },
+        { kind: 'execution.interrupted', status: 'interrupted', settlement_cause: 'budget' },
       ],
     }],
     ['a 200 whose terminal reads interrupted', {
@@ -272,6 +293,10 @@ describe('public release evidence replay', () => {
     ['a 202 whose cancelled terminal carries no operator cause', {
       ...depthCancelledAtBoundary(),
       sse_terminal: { kind: 'execution.cancelled', status: 'cancelled' },
+    }],
+    ['a 202 whose interrupted terminal carries a settlement cause', {
+      ...depthInterrupted(),
+      sse_terminal: { kind: 'execution.interrupted', status: 'interrupted', settlement_cause: 'budget' },
     }],
     ['a run status that contradicts its terminal', {
       ...depthInterrupted(),

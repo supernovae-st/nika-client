@@ -198,6 +198,19 @@ describe('the settlement the resident nests on the wire (engine 0.118)', () => {
     await expect(client(contradicting as typeof globalThis.fetch).attachRun('job-1'))
       .rejects.toThrow(/status failed contradicts the record's succeeded/);
   });
+
+  it('still refuses a durable job carrying a field outside the projection', async () => {
+    // The canary for the durable allow-list: a path or a token the resident
+    // never projects must keep dying here, as it does on the SSE frame.
+    for (const stray of [{ path: '/srv/jobs/job-1' }, { token: 'x'.repeat(32) }]) {
+      const fetch = resident({
+        '/v1/jobs/job-1': () => jsonResponse({ id: 'job-1', status: 'succeeded', ...stray }),
+      });
+      const refused = client(fetch as typeof globalThis.fetch).attachRun('job-1');
+      await expect(refused).rejects.toBeInstanceOf(NikaProtocolError);
+      await expect(refused).rejects.toThrow('Durable job response contained unknown fields');
+    }
+  });
 });
 
 describe('cancellation on the 0.118 wire', () => {
@@ -333,6 +346,11 @@ describe('the trace verdict the door answers', () => {
   it('never holds a verdict bound to another trace', async () => {
     await expect(verify({ verdict: 'SEALED', trace_id: 'trace-other' }))
       .resolves.toMatchObject({ verified: false, verdict: 'SEALED' });
+  });
+
+  it('never holds a verdict the door did not bind to a trace', async () => {
+    await expect(verify({ verdict: 'SEALED' }))
+      .resolves.toEqual({ verified: false, verdict: 'SEALED' });
   });
 
   it('refuses a verdict or a reason that is not a string', async () => {

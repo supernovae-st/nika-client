@@ -29,13 +29,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   measured; `cancelled`, `succeeded` or `failed` otherwise). Before, the 202
   was `non-contract status 202`. A 202 that carries a terminal job is a
   protocol fault; 200 keeps its meaning, a settled job (`cancelled` or
-  `already_settled`).
+  `already_settled`). Known gap: a 200 reply carrying a `paused` job, which
+  the contract allows (a paused observation returns its result unchanged),
+  is still refused as `Cancellation did not return a terminal job`; a
+  follow-up will read it.
 - `traceVerify(receipt)` over HTTP no longer demands `reason`: a verdict that
   holds carries none. `verified` is true on `verified` and on the CLI's
   positive tiers (`OK`, `SEALED`, `ANCHORED`, `REPLAYED`, case-insensitive)
-  when the trace matches; `unavailable`, `INCOMPLETE`, `TAMPERED` and
-  `invalid` stay false. The 0.118 door still answers only the typed
-  `unavailable` refusal, which is kept as is.
+  only when the door binds the verdict to the receipt's trace (`trace_id`
+  present and equal); `unavailable`, `INCOMPLETE`, `TAMPERED` and `invalid`
+  stay false. The 0.118 door still answers only the typed `unavailable`
+  refusal, which is kept as is.
 
 ### Changed
 

@@ -307,12 +307,14 @@ export class HttpTransport implements Transport {
     ) {
       throw new NikaProtocolError(this.kind, 'Trace verification verdict was malformed');
     }
-    const traceMatches = object.trace_id === undefined
-      || receipt.trace_id === undefined
-      || object.trace_id === receipt.trace_id;
+    // A verdict holds only when the door binds it to this receipt's trace: a
+    // positive tier with no trace_id, or with another trace, never reads
+    // verified, whatever its word.
+    const traceBound = typeof object.trace_id === 'string'
+      && object.trace_id === receipt.trace_id;
     return {
       ...object,
-      verified: POSITIVE_TRACE_VERDICTS.has(object.verdict.toUpperCase()) && traceMatches,
+      verified: POSITIVE_TRACE_VERDICTS.has(object.verdict.toUpperCase()) && traceBound,
     } as NikaTraceVerifyResult;
   }
 

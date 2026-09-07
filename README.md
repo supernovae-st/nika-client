@@ -43,11 +43,11 @@ not parse YAML or reconstruct proof in TypeScript.
 ## Install
 
 ```sh
-npm view @supernovae-st/nika-client@0.116.2 version  # must report 0.116.2
-npm install @supernovae-st/nika-client@0.116.2
+npm view @supernovae-st/nika-client@0.118.7 version  # must report 0.118.7
+npm install @supernovae-st/nika-client@0.118.7
 ```
 
-If the registry reports any other version, the 0.116.2 release train is not
+If the registry reports any other version, the 0.118.7 release train is not
 complete. Earlier packages expose the retired `LocalNika`/HTTP split and do
 not implement the root facade documented below. The publication is complete
 only when the four matching native payload packages and this root client are
@@ -517,7 +517,7 @@ The repository also carries 100 distinct use-case workflows and provider proof
 under `gauntlet/`.
 
 <!-- engine hero pinned to the release tag it demonstrates · re-pin on lockstep bumps -->
-![nika check audits the workflow, then runs and seals its trace](https://raw.githubusercontent.com/supernovae-st/nika/v0.116.2/media/nika-hero.gif)
+![nika check audits the workflow, then runs and seals its trace](https://raw.githubusercontent.com/supernovae-st/nika/v0.118.7/media/nika-hero.gif)
 
 ## Keeping it fresh
 

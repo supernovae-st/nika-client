@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.118.7] - 2026-09-07
+
+Lockstep release for engine v0.118.7: the SDK accepts the 0.118 `nika serve`
+wire, pins its contract, and its release evidence is regenerated on the public
+v0.118.7 asset. Publication still requires the exact public engine tag, assets,
+attestations, and prepared SDK commit.
+
 ### Fixed
 
 - The HTTP transport accepts the `nika serve` wire of engine 0.118, measured
@@ -50,7 +57,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and `error`, `NikaSpend` gains `by_source`, `NikaExecutionSettledEvent` and
   `NikaExecutionCancelledEvent` gain `settlement`, `NikaCancelResult.status`
   documents its three words, and `NikaTraceVerifyResult.verdict` lists the
-  CLI tiers. The package version stays on the release train.
+  CLI tiers.
+- The root client, the four native payload manifests, the optional
+  dependencies and the lockfile move to 0.118.7 through the canonical release
+  synchronization script.
+- The release gauntlet and its verifiers read the 0.118 cancellation
+  semantics, measured on the public asset. The hostile and depth cancellation
+  fixtures cancel an execution that is observably inside its 10 s `nika:wait`
+  (the durable status reads `running`, no longer `queued`, and a further
+  250 ms or 1 s has passed) and record the resident's 202
+  `cancellation_requested` together with the `execution.interrupted` terminal
+  its execution owner records once the grace expires; the native race records
+  the `cancelled` settlement with `cause: operator` and exit 130 once the
+  in-flight wait runs out. `verify-release-evidence` and
+  `verify-release-replay` bind each cancel reply to the terminals it may lead
+  to and refuse any other pairing: a 200 `cancelled` to
+  `execution.cancelled|execution.settled` with status `cancelled`; a 202
+  `cancellation_requested` to `execution.interrupted` with status
+  `interrupted` (the grace expired inside a task, no settlement) or to one of
+  the two writer kinds with status `cancelled` only when the terminal's
+  settlement cause is `operator` (the request landed at a task boundary); the
+  run status equals the terminal status. Only the two ratified writer kinds
+  of a cancelled terminal are still canonicalized for the replay comparison.
+  The five current evidence files are regenerated on the public asset
+  `nika 0.118.7 (f3a31a6ee)`.
 
 ### Added
 

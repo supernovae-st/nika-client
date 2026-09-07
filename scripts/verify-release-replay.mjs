@@ -3,10 +3,30 @@ import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { pathToFileURL } from "node:url";
 
-const CANCELLATION_TERMINAL_KINDS = new Set([
+// A cancel reply and the terminals it may lead to, measured on engine 0.118.7.
+//
+// 200 `cancelled`: the resident cancelled the job before its execution started
+// (or replayed an observation that had already ended). The durable terminal is
+// `execution.cancelled` (the cancel_job writer) or `execution.settled` (the
+// racing settlement writer), both only with status `cancelled`; the two writers
+// the 0.116 resident ratified.
+//
+// 202 `cancellation_requested`: the execution was in flight, and its owner
+// records the terminal it reaches first: `cancelled` (one of the two writer
+// kinds) with a settlement whose `cause` is `operator` when the run reaches a
+// task boundary before the grace expires, or `execution.interrupted` with
+// status `interrupted` and no settlement once the grace expires inside a task.
+// Any other terminal after a cancel reply is refused.
+const CANCELLED_TERMINAL_KINDS = new Set([
   "execution.cancelled",
   "execution.settled",
 ]);
+const INTERRUPTED_TERMINAL_KIND = "execution.interrupted";
+const CANCELLATION_TERMINAL_KINDS = new Set([
+  ...CANCELLED_TERMINAL_KINDS,
+  INTERRUPTED_TERMINAL_KIND,
+]);
+const STABLE_CANCELLED_TERMINAL_KIND = "execution.cancelled|execution.settled";
 
 function readJson(directory, name) {
   return JSON.parse(readFileSync(path.join(directory, name), "utf8"));
@@ -26,8 +46,35 @@ export function stableHostileEvidence(report) {
 export function isDurableCancellationTerminal(event) {
   return event !== null
     && typeof event === "object"
-    && CANCELLATION_TERMINAL_KINDS.has(event.kind)
+    && CANCELLED_TERMINAL_KINDS.has(event.kind)
     && event.status === "cancelled";
+}
+
+export function isInterruptedCancellationTerminal(event) {
+  return event !== null
+    && typeof event === "object"
+    && event.kind === INTERRUPTED_TERMINAL_KIND
+    && event.status === "interrupted";
+}
+
+export function isCancellationTerminalKind(kind) {
+  return CANCELLATION_TERMINAL_KINDS.has(kind);
+}
+
+export function isOperatorCancelledTerminal(event) {
+  return isDurableCancellationTerminal(event) && event.settlement_cause === "operator";
+}
+
+export function cancellationTerminalMatches(cancelStatus, event) {
+  if (cancelStatus === "cancelled") return isDurableCancellationTerminal(event);
+  if (cancelStatus === "cancellation_requested") {
+    return isInterruptedCancellationTerminal(event) || isOperatorCancelledTerminal(event);
+  }
+  return false;
+}
+
+export function stableCancellationTerminalKind(kind) {
+  return CANCELLED_TERMINAL_KINDS.has(kind) ? STABLE_CANCELLED_TERMINAL_KIND : kind;
 }
 
 export function stableDepthEvidence(report) {
@@ -36,25 +83,23 @@ export function stableDepthEvidence(report) {
     projects: report.projects.map((project) => {
       if (project.project !== "incident-response-controller") return project;
       const kinds = project.sse_event_kinds;
-      const terminalKinds = Array.isArray(kinds)
-        ? kinds.filter((kind) => CANCELLATION_TERMINAL_KINDS.has(kind))
-        : [];
-      if (project.cancelled_run_status !== "cancelled"
-        || project.cancellation_status !== "cancelled"
-        || project.cancellation_idempotent !== true
+      const terminal = project.sse_terminal;
+      const terminalKinds = Array.isArray(kinds) ? kinds.filter(isCancellationTerminalKind) : [];
+      if (project.cancellation_idempotent !== true
+        || !cancellationTerminalMatches(project.cancellation_status, terminal)
+        || project.cancelled_run_status !== terminal.status
         || terminalKinds.length !== 1
-        || !isDurableCancellationTerminal(project.sse_terminal)
-        || !kinds.includes(project.sse_terminal.kind)) {
-        throw new Error("depth cancellation project lacks an exact cancelled terminal result");
+        || terminalKinds[0] !== terminal.kind) {
+        throw new Error(
+          "depth cancellation project lacks the exact cancellation terminal its cancel reply leads to",
+        );
       }
       return {
         ...project,
-        sse_event_kinds: kinds.map((kind) => CANCELLATION_TERMINAL_KINDS.has(kind)
-          ? "execution.cancelled|execution.settled"
-          : kind),
+        sse_event_kinds: kinds.map(stableCancellationTerminalKind),
         sse_terminal: {
-          ...project.sse_terminal,
-          kind: "execution.cancelled|execution.settled",
+          ...terminal,
+          kind: stableCancellationTerminalKind(terminal.kind),
         },
       };
     }),
@@ -73,18 +118,22 @@ function stableHostileScenario(scenario) {
   if (scenario.name !== "remote-durable-cancellation" || scenario.result !== "green") {
     return scenario;
   }
-  const events = scenario.evidence?.events;
+  const evidence = scenario.evidence ?? {};
+  const events = evidence.events;
   const terminal = Array.isArray(events) ? events.at(-1) : undefined;
-  if (!isDurableCancellationTerminal(terminal)) {
-    throw new Error("remote cancellation replay lacks an exact cancelled terminal frame");
+  if (!cancellationTerminalMatches(evidence.cancel_status, terminal)
+    || evidence.run_status !== terminal.status) {
+    throw new Error(
+      "remote cancellation replay lacks the exact terminal frame its cancel reply leads to",
+    );
   }
   return {
     ...scenario,
     evidence: {
-      ...scenario.evidence,
+      ...evidence,
       events: [
         ...events.slice(0, -1),
-        { ...terminal, kind: "execution.cancelled|execution.settled" },
+        { ...terminal, kind: stableCancellationTerminalKind(terminal.kind) },
       ],
     },
   };

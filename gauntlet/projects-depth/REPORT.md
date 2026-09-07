@@ -21,11 +21,22 @@ All workflows use the public envelope and task-map form, the canonical `invoke` 
 - `node --check` — all five consumer entry points and the runner passed.
 - `git diff --check` — passed.
 
-The final release-candidate replay used the clean engine `nika 0.116.2 (c4cdbeafb)`
-with `supernovae-st-nika-client-0.116.2.tgz`; all five projects
+The final release-candidate replay used the public release engine `nika 0.118.7 (f3a31a6ee)`
+with `supernovae-st-nika-client-0.118.7.tgz`; all five projects
 remained green. The generated JSON records installed-from-pack proof, stable
 scenario facts, typed error names/codes, receipt verdicts, event observations,
 concurrency, cancellation, CAS, and restart evidence.
+
+The incident-response controller cancels its run one second after the durable
+status reads `running`, inside its 10 s stabilization wait. Engine 0.118
+answers 202 `cancellation_requested` and its execution owner records
+`execution.interrupted` once the grace expires; the evidence and its verifier
+bind that terminal to that reply. The same reply binds to an
+`execution.cancelled` or `execution.settled` terminal with status `cancelled`
+only when its settlement cause is `operator` (the request landed at a task
+boundary), and a 200 `cancelled` reply, which the resident gives a job
+cancelled before its execution starts, binds to one of those two writer kinds
+with status `cancelled`.
 
 An additional packed two-process recovery project runs through
 `npm run gauntlet:recovery`. Process A admits the job, persists sequence 1 and
@@ -35,7 +46,7 @@ Its machine evidence is `gauntlet/results/recovery-e2e.json`.
 
 The historical paid-provider and three-pass trace ledgers remain useful prior
 evidence, but are explicitly labelled as historical 0.115 observations and are
-not release gates for this 0.116 candidate.
+not release gates for this 0.118 candidate.
 
 ## Finding
 

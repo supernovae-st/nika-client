@@ -1,6 +1,10 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import {
+  cancellationTerminalMatches,
+  isCancellationTerminalKind,
+} from "./verify-release-replay.mjs";
 
 const CURRENT_EVIDENCE = new Set([
   "gauntlet/projects-depth/results.json",
@@ -31,10 +35,6 @@ const DEPTH_PROJECTS = new Set([
   "incident-response-controller",
   "multi-tenant-webhook-router",
   "scheduled-research-monitor",
-]);
-const CANCELLATION_TERMINAL_KINDS = new Set([
-  "execution.cancelled",
-  "execution.settled",
 ]);
 const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 
@@ -131,11 +131,16 @@ function verifyBehavior(relativePath, evidence) {
     );
     const kinds = incident?.sse_event_kinds;
     const terminal = incident?.sse_terminal;
-    if (!Array.isArray(kinds)
-      || kinds.filter((kind) => CANCELLATION_TERMINAL_KINDS.has(kind)).length !== 1
-      || !CANCELLATION_TERMINAL_KINDS.has(terminal?.kind)
-      || terminal?.status !== "cancelled"
-      || !kinds.includes(terminal.kind)) {
+    const terminalKinds = Array.isArray(kinds) ? kinds.filter(isCancellationTerminalKind) : [];
+    // The cancel reply names the one terminal it may lead to (200 `cancelled` →
+    // `execution.cancelled|execution.settled`/`cancelled`; 202
+    // `cancellation_requested` → `execution.interrupted`/`interrupted`), the run
+    // status is the terminal's, and the observed event kinds hold that terminal
+    // kind once and no other cancellation terminal kind.
+    if (!cancellationTerminalMatches(incident?.cancellation_status, terminal)
+      || incident?.cancelled_run_status !== terminal.status
+      || terminalKinds.length !== 1
+      || terminalKinds[0] !== terminal.kind) {
       throw new Error(`${relativePath} has contradictory cancellation event evidence`);
     }
   }

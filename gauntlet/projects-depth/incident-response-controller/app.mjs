@@ -25,23 +25,40 @@ try {
   const nika = new Nika({ url, token, allowInsecureHttp: true, bin: engine, cwd: process.cwd(), eventBufferSize: 128 });
   assert.equal((await nika.check('workflow.nika.yaml')).clean, true);
   const run = await nika.run('workflow.nika.yaml', { idempotencyKey: 'incident-inc-2042-controller-1' });
-  await new Promise((resolve) => setTimeout(resolve, 250));
+  // Cancel the controller inside its stabilization window: the durable status
+  // reads `queued` at admission and `running` once the resident owns the
+  // execution, and one second later the run is inside its 10 s `nika:wait`.
+  // On engine 0.118 a cancel that lands on `running` is a 202
+  // `cancellation_requested`; the execution owner then records
+  // `execution.interrupted` once its grace expires inside the task, or
+  // `cancelled` with `cause: operator` at a task boundary. A cancel that lands
+  // on `queued` is a 200 `cancelled` with an `execution.cancelled` terminal.
+  // This consumer records the interrupted shape.
+  await untilRunning(nika, run);
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  const statusBeforeCancellation = await nika.status(run);
+  assert.equal(statusBeforeCancellation, 'running');
   const firstCancel = nika.cancel(run);
   assert.equal(nika.cancel(run), firstCancel);
   const [cancellation, result] = await Promise.all([firstCancel, run.done]);
   assert.equal(cancellation.accepted, true);
-  assert.equal(result.status, 'cancelled');
+  assert.equal(cancellation.status, 'cancellation_requested');
+  assert.equal(result.status, 'interrupted');
   assert(result.receipt);
   const recovered = await nika.attachRun(run.id);
   const events = [];
   for await (const event of nika.events(recovered)) {
-    events.push({ kind: event.kind ?? 'unknown', status: event.status });
+    events.push({
+      kind: event.kind ?? 'unknown',
+      status: event.status,
+      ...(event.settlement ? { settlement_cause: event.settlement.cause } : {}),
+    });
   }
   await recovered.done;
   const terminal = events.at(-1);
   assert(terminal);
-  assert(['execution.cancelled', 'execution.settled'].includes(terminal.kind));
-  assert.equal(terminal.status, 'cancelled');
+  assert.equal(terminal.kind, 'execution.interrupted');
+  assert.equal(terminal.status, result.status);
   const remoteProof = await nika.traceVerify(result.receipt);
   assert.equal(remoteProof.verified, false);
   assert.equal(remoteProof.verdict, 'unavailable');
@@ -50,6 +67,7 @@ try {
   console.log(JSON.stringify({
     project: 'incident-response-controller',
     status: 'succeeded',
+    status_before_cancellation: statusBeforeCancellation,
     cancelled_run_status: result.status,
     cancellation_idempotent: true,
     cancellation_status: cancellation.status,
@@ -79,4 +97,13 @@ async function waitForHealth(base) {
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   throw new Error('nika serve did not become healthy');
+}
+
+async function untilRunning(client, run) {
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    const status = await client.status(run);
+    if (status !== 'queued') return status;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  throw new Error('the resident never took ownership of the execution');
 }

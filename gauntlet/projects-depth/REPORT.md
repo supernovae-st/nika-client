@@ -53,3 +53,9 @@ The live owning contract and engine validation define `pauseUntil` as an ISO
 calendar date (`format: date`, for example `2026-09-01`). The gauntlet exposed
 that the old README constructed a refused timestamp; the 0.116 documentation
 and exported type comment now teach the owning date contract.
+
+The committed depth baseline uses the complete Linux replay record from
+GitHub Actions run 34260625242 (candidate b688b8b7). macOS reproduced every
+behavioral field identically; its locally packed archive had a different
+SHA-256. Both original records are retained in the integration evidence.
+CI compares the exact Linux package digest as well as all behavioral fields.

@@ -147,6 +147,12 @@ if (command === 'run' && argv.includes('--json')) {
       emit({ kind: 'task_completed', sequence: index + 1, value: index });
     }
     if (workflow.includes('settled')) {
+      if (workflow.includes('recovered')) {
+        emit({ kind: 'task_failed', fields: [
+          { key: 'task', value: 'recovered' },
+          { key: 'detail', value: 'NIKA-EXEC-001 · recovered by the workflow' },
+        ] });
+      }
       // The 0.118 engine's terminal shape (ADR-128): the settlement rides
       // run_settled flattened · status · cause · elapsed_ms · tasks · spend.
       emit({

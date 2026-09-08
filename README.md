@@ -22,7 +22,7 @@ not parse YAML or reconstruct proof in TypeScript.
 
 - Node.js 22 or newer (the tested floor; an older major is unsupported, not
   refused, and `npm install` does not warn about it)
-- a compatible `nika` engine, resolved from `config.bin`, then `NIKA_BIN`
+- for native execution or local snapshot capture, a compatible `nika` engine, resolved from `config.bin`, then `NIKA_BIN`
   (absolute paths only), then the exact optional platform package; a bare
   name or a relative path is refused because the operating system would
   resolve it through `PATH` or the working directory, and a `nika` found on
@@ -123,9 +123,10 @@ Expected output: `workflow_started`, `task_scheduled`, `task_started`,
 `task_completed`, `workflow_completed`, then `run_settled succeeded`, then the
 terminal `succeeded` line with the outputs and the receipt.
 
-A red `check()` report carries the engine's `findings[]` on both transports, so
-the check → teach → re-draft loop reads one shape whether the engine runs
-locally or behind `nika serve`.
+Native checks and explicit local snapshot checks preserve the engine's
+`findings[]` and `exitCode`. A check by served name returns the resident's
+compact acknowledgement with `clean: true`, or its typed workflow refusal
+with `clean: false`; it does not invent local findings or an exit code.
 
 `run()` returns after stable admission. `run.done` is the sole terminal result.
 An admitted workflow failure is result data with `status: "failed"` and, when
@@ -194,14 +195,16 @@ transport signals its process the same way and settles `interrupted`.
 
 ## Connect to `nika serve`
 
-Remote admission is bytes-first: the local compatible engine captures an
-immutable execution snapshot, then the SDK sends those exact bytes to the
-authenticated server. Capturing those snapshots for `check` and `run`
-therefore still needs a local `nika` binary through `bin`, `NIKA_BIN`, or the
-exact optional platform package, resolved lazily at capture time.
-Observation-only clients need no local engine: `attachRun`, `status`,
-`events`, `cancel`, `schedule`, `scheduleStatus`, `listWorkflows`, `workflow`,
-and `traceVerify` run against the advertised server identity alone.
+A contained workflow name such as `hello.nika.yaml` or
+`daily/report.nika.yaml` is resolved by the resident registry. `check()` and
+`run()` send that name without a local engine or a local workflow file.
+Use `listWorkflows()` to discover the served names.
+
+To capture your local file instead, pass an explicit path such as
+`./hello.nika.yaml`. The compatible local engine captures an immutable
+snapshot, and the SDK sends its exact bytes and verifies the acknowledgement.
+Only this path needs `bin`, `NIKA_BIN`, or the exact optional native package.
+Observation and scheduling also use the server identity alone.
 
 The current persistent server requires a project file. If you ran
 `nika init --project-file` above you already have one (it carries a default
@@ -380,7 +383,7 @@ Remote-only options:
 
 | Method | Result |
 |---|---|
-| `check(workflow, options?)` | engine check report, including `clean` and `exitCode` |
+| `check(workflow, options?)` | `clean` plus the native check report or resident acknowledgement/refusal |
 | `run(workflow, options?)` | admitted `NikaRun` |
 | `attachRun(id, options?)` | reattached durable HTTP `NikaRun` |
 | `status(run)` | current durable HTTP status |

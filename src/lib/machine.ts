@@ -45,8 +45,8 @@ export function eventStatus(event: NikaEvent | undefined): NikaRunStatus | undef
  * The settlement a terminal frame carries (engine 0.118+ · ADR-128): the
  * native `run_settled` flattens it (`cause` · `elapsed_ms` · `tasks` ·
  * `spend`), the resident's `execution.settled` nests it whole under
- * `settlement`, `status` and the named `error` included. A nested settlement
- * is read through `readSettlement`, so a malformed known fact is a protocol
+ * `settlement`, `status` and the named `error` included. Both projections
+ * are read through `readSettlement`, so a malformed known fact is a protocol
  * fault and an additive field rides through. Absent on older engines; never
  * invented from an exit code.
  */
@@ -59,18 +59,11 @@ export function eventSettlement(
   if (record.settlement !== undefined) {
     return readSettlement(record.settlement, transport, eventStatus(event));
   }
-  const source = record;
-  const cause = typeof source.cause === 'string' ? source.cause : undefined;
-  const elapsed = typeof source.elapsed_ms === 'number' ? source.elapsed_ms : undefined;
-  const tasks = machineObject(source.tasks);
-  const spend = machineObject(source.spend);
-  if (cause === undefined && elapsed === undefined && !tasks && !spend) return undefined;
-  return {
-    ...(cause !== undefined ? { cause } : {}),
-    ...(elapsed !== undefined ? { elapsed_ms: elapsed } : {}),
-    ...(tasks ? { tasks } : {}),
-    ...(spend ? { spend } : {}),
-  };
+  if (['cause', 'elapsed_ms', 'tasks', 'spend'].every((key) => record[key] === undefined)) return undefined;
+  const fields = ['status', 'cause', 'elapsed_ms', 'tasks', 'spend', 'error'];
+  return readSettlement(Object.fromEntries(fields
+    .filter((key) => record[key] !== undefined)
+    .map((key) => [key, record[key]])), transport, eventStatus(event));
 }
 
 export function eventReceipt(event: NikaEvent | undefined): NikaReceipt | undefined {

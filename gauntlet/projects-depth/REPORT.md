@@ -27,16 +27,15 @@ remained green. The generated JSON records installed-from-pack proof, stable
 scenario facts, typed error names/codes, receipt verdicts, event observations,
 concurrency, cancellation, CAS, and restart evidence.
 
-The incident-response controller cancels its run one second after the durable
-status reads `running`, inside its 10 s stabilization wait. Engine 0.118
-answers 202 `cancellation_requested` and its execution owner records
-`execution.interrupted` once the grace expires; the evidence and its verifier
-bind that terminal to that reply. The same reply binds to an
-`execution.cancelled` or `execution.settled` terminal with status `cancelled`
-only when its settlement cause is `operator` (the request landed at a task
-boundary), and a 200 `cancelled` reply, which the resident gives a job
-cancelled before its execution starts, binds to one of those two writer kinds
-with status `cancelled`.
+The incident-response controller first executes its original workflow and
+verifies the incident plan. A separate controlled loopback fixture holds a
+task until the cancellation request is acknowledged, then releases it. The
+public 0.118.7 replay records `cancelled` with cause `operator`, one completed
+task and one dependent task that never starts. SSE, terminal result and replay
+agree; the resident shuts down without a forced kill. The ledger includes
+byte-identical source/executed app hashes and the packed SDK SHA-256.
+The hostile suite separately retains the `nika:wait` grace-expiry scenario;
+`interrupted` remains a distinct result without a fabricated settlement.
 
 An additional packed two-process recovery project runs through
 `npm run gauntlet:recovery`. Process A admits the job, persists sequence 1 and

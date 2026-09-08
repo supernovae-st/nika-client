@@ -36,14 +36,23 @@ and the two-process recovery scenario from a freshly packed SDK. The runner
 mints an ephemeral run-signing key. Its
 cancellation fixtures use the engine's in-process `nika:wait` primitive, so the
 replay needs no shell command, platform sandbox, or sandbox waiver. Cancellation
-and sealed-trace claims are exercised against the public binary. The attached
-cancellation replay records both event kind and status: Nika 0.116.2 ratifies
-the `cancel_job` writer (`execution.cancelled`) and the racing worker settlement
-writer (`execution.settled`), but either is accepted only with `status=cancelled`.
-The parsed deterministic and packed-project results must match exactly except
-for the recovery job UUID. The hostile comparison excludes `generated_at` and
-per-scenario duration and canonicalizes only those two ratified cancellation
-writer kinds after checking the exact cancelled status. This proves that the
+and sealed-trace claims are exercised against the public binary. The
+cancellation fixtures cancel an execution that is observably inside its 10 s
+`nika:wait` (the durable status reads `running`, no longer `queued`, and a
+further delay has passed) and record both the cancel reply and the terminal it
+leads to. On engine 0.118 the resident answers 202 `cancellation_requested`;
+its execution owner then records `execution.interrupted` with
+`status=interrupted` once the grace expires inside a task, or, when the request
+lands at a task boundary, `execution.cancelled` (the `cancel_job` writer) or
+`execution.settled` (the racing settlement writer) with `status=cancelled` and a
+settlement whose cause is `operator`. A cancel that lands before the execution
+starts is a 200 `cancelled` whose terminal is one of those two writer kinds,
+only with `status=cancelled`. The verifiers bind each cancel reply to the
+terminals it may lead to, demand the run status of that terminal, and refuse any
+other pairing. The parsed deterministic and packed-project results must match
+exactly except for the recovery job UUID. The hostile comparison excludes
+`generated_at` and per-scenario duration and canonicalizes only the two ratified
+writer kinds of a cancelled terminal after checking the exact pairing. This proves that the
 attested public release currently reproduces the committed behavioral claims.
 It does not claim cryptographic proof of when the committed JSON file itself
 was originally written.

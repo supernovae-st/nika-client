@@ -827,7 +827,17 @@ describe('HTTP transport', () => {
       reason: 'trace_journal_unavailable',
     });
     expectTypeOf(verdict.verdict).toEqualTypeOf<
-      'verified' | 'invalid' | 'unavailable' | (string & {}) | undefined
+      | 'verified'
+      | 'invalid'
+      | 'unavailable'
+      | 'OK'
+      | 'SEALED'
+      | 'ANCHORED'
+      | 'REPLAYED'
+      | 'INCOMPLETE'
+      | 'TAMPERED'
+      | (string & {})
+      | undefined
     >();
     expectTypeOf(verdict.reason).toEqualTypeOf<
       | 'trace_invalid'

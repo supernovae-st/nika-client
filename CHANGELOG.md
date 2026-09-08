@@ -7,22 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [0.118.7] - 2026-09-07
 
-- `NikaRunSettledEvent.error`: engine 0.117+ repeats the first failed task's
-  code, message and task id on the terminal `run_settled` frame; `eventError`
-  already read an `error` object first, so `run.done` carries it on both
-  engines without a code change (the frame is typed and the reader is pinned).
-
-### Security
-
-- `bin` and `NIKA_BIN` must be absolute paths. A bare name such as `nika`
-  reached `spawn()`, where the operating system resolved it through `PATH`,
-  the implicit lookup the README promises never happens; a relative path was
-  resolved against the working directory the same way. Both now refuse with
-  a message that names the value and the rule.
+Lockstep release for engine v0.118.7: the SDK accepts the 0.118 `nika serve`
+wire, pins its contract, and its release evidence is regenerated on the public
+v0.118.7 asset. Publication still requires the exact public engine tag, assets,
+attestations, and prepared SDK commit.
 
 ### Fixed
+
+- The HTTP transport accepts the `nika serve` wire of engine 0.118, measured
+  against a 0.118.7 `nika serve --bind`. The SSE frame allow-list and the
+  durable job allow-list learn `settlement`, the object the resident nests
+  whole on `execution.settled` and on `GET /v1/jobs/{id}`; before, a 0.118
+  door was refused at its first terminal frame (`SSE data contained fields
+  outside the public projection`) and at every durable read (`Durable job
+  response contained unknown fields`). The nested settlement is validated
+  (typed known facts, additive fields kept, a `status` that contradicts its
+  record refused) and rides `run.done` as `settlement`, its `status` and
+  named `error` included, on the SSE path and on the attach and cancel paths
+  that settle from the durable job; a failed run's `error` names its task
+  from the settlement.
+- `cancel(run)` accepts the resident's 202 (`Cancellation requested;
+  execution has not yet settled`) with the still-running job and returns
+  `{ accepted: true, status: 'cancellation_requested' }` without settling:
+  the open observation then settles `run.done` on the terminal the execution
+  owner records (`interrupted` once the resident's grace expires, as
+  measured; `cancelled`, `succeeded` or `failed` otherwise). Before, the 202
+  was `non-contract status 202`. A 202 that carries a terminal job is a
+  protocol fault; 200 keeps its meaning, a settled job (`cancelled` or
+  `already_settled`). Known gap: a 200 reply carrying a `paused` job, which
+  the contract allows (a paused observation returns its result unchanged),
+  is still refused as `Cancellation did not return a terminal job`; a
+  follow-up will read it.
+- `traceVerify(receipt)` over HTTP no longer demands `reason`: a verdict that
+  holds carries none. `verified` is true on `verified` and on the CLI's
+  positive tiers (`OK`, `SEALED`, `ANCHORED`, `REPLAYED`, case-insensitive)
+  only when the door binds the verdict to the receipt's trace (`trace_id`
+  present and equal); `unavailable`, `INCOMPLETE`, `TAMPERED` and `invalid`
+  stay false. The 0.118 door still answers only the typed `unavailable`
+  refusal, which is kept as is.
+
 
 - Engine identity probe refusals name the executable path and, when it did
   not answer like an engine, the one command that settles it
@@ -50,7 +75,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `reason: receipt_mismatch` when the evidence does not bind the receipt),
   the vocabulary the HTTP verdict already speaks.
 
+
+- `isNikaRunSettledEvent` now narrows the HTTP settlement frame
+  (`execution.settled`) as well as the native `run_settled` one. It
+  previously never returned true on a `nika serve` stream, so the documented
+  way to read status, outputs, and receipt together was dead on that
+  transport.
+
+
+- HTTP `check()` of a red workflow now returns the engine's plain teaching
+  report with `findings[]`; the snapshot capture refuses such a workflow with
+  one error line, which is preserved as `snapshot_error`. No workflow bytes
+  are sent on that path.
+- Native `check()` now reads the check report the engine routes to stderr
+  behind its `nika: ` prefix instead of reporting an engine incompatibility;
+  when neither stream carries a report, the typed error appends a bounded
+  single-line excerpt of stderr.
+- A pre-run engine refusal printed as a plain `NIKA-…` line under `--json`
+  now settles `run.done` with `NikaOperationError` (`operation: 'run'`, the
+  engine code, the full refusal line) instead of a protocol error; any other
+  unreadable machine line keeps `NikaProtocolError` and now quotes a bounded
+  excerpt of the offending line. `NikaOperation` gains `'run'`, additively.
+- Engine spawn failures name the engine path and the underlying errno, so a
+  wrong `bin`/`NIKA_BIN` reads as `spawn /path/to/nika ENOENT`.
+
+### Changed
+
+- `openapi.json` and `src/generated/openapi.d.ts` are pinned to the engine
+  0.118.7 contract: `RunSettlement`, `settlement` on `JobEvent` and `Job`,
+  the 202 on cancel, and the by-name `JobByName` admission form this SDK
+  does not use yet. `JobEvent` stays closed. `NikaSettlement` gains `status`
+  and `error`, `NikaSpend` gains `by_source`, `NikaExecutionSettledEvent` and
+  `NikaExecutionCancelledEvent` gain `settlement`, `NikaCancelResult.status`
+  documents its three words, and `NikaTraceVerifyResult.verdict` lists the
+  CLI tiers.
+- The root client, the four native payload manifests, the optional
+  dependencies and the lockfile move to 0.118.7 through the canonical release
+  synchronization script.
+- The release gauntlet and its verifiers read the 0.118 cancellation
+  semantics, measured on the public asset. The hostile and depth cancellation
+  fixtures cancel an execution that is observably inside its 10 s `nika:wait`
+  (the durable status reads `running`, no longer `queued`, and a further
+  250 ms or 1 s has passed) and record the resident's 202
+  `cancellation_requested` together with the `execution.interrupted` terminal
+  its execution owner records once the grace expires; the native race records
+  the `cancelled` settlement with `cause: operator` and exit 130 once the
+  in-flight wait runs out. `verify-release-evidence` and
+  `verify-release-replay` bind each cancel reply to the terminals it may lead
+  to and refuse any other pairing: a 200 `cancelled` to
+  `execution.cancelled|execution.settled` with status `cancelled`; a 202
+  `cancellation_requested` to `execution.interrupted` with status
+  `interrupted` (the grace expired inside a task, no settlement) or to one of
+  the two writer kinds with status `cancelled` only when the terminal's
+  settlement cause is `operator` (the request landed at a task boundary); the
+  run status equals the terminal status. Only the two ratified writer kinds
+  of a cancelled terminal are still canonicalized for the replay comparison.
+  The five current evidence files are regenerated on the public asset
+  `nika 0.118.7 (f3a31a6ee)`.
+
 ### Added
+
+- `NikaRunSettledEvent.error`: engine 0.117+ repeats the first failed task's
+  code, message and task id on the terminal `run_settled` frame; `eventError`
+  already read an `error` object first, so `run.done` carries it on both
+  engines without a code change (the frame is typed and the reader is pinned).
+
 
 - Discriminated `NikaEvent` union over the known lifecycle kinds with an
   intentional `NikaUnknownEvent` fallback, typed `status`/`outputs`/`receipt`
@@ -68,38 +157,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `isNikaTerminalEvent` guard, which narrows any frame the engine reported
   with a terminal status rather than matching on its kind.
 
-### Fixed
-
-- `isNikaRunSettledEvent` now narrows the HTTP settlement frame
-  (`execution.settled`) as well as the native `run_settled` one. It
-  previously never returned true on a `nika serve` stream, so the documented
-  way to read status, outputs, and receipt together was dead on that
-  transport.
-
 ### Security
+
+- `bin` and `NIKA_BIN` must be absolute paths. A bare name such as `nika`
+  reached `spawn()`, where the operating system resolved it through `PATH`,
+  the implicit lookup the README promises never happens; a relative path was
+  resolved against the working directory the same way. Both now refuse with
+  a message that names the value and the rule.
+
 
 - `allowInsecureHttp: true` now admits plaintext HTTP only for a loopback host
   (`localhost`, `127.0.0.0/8`, `[::1]`); any other host over `http:` is a
   `NikaConfigurationError`, so the opt-in can no longer send a bearer token in
   clear text to a routable address.
-
-### Fixed
-
-- HTTP `check()` of a red workflow now returns the engine's plain teaching
-  report with `findings[]`; the snapshot capture refuses such a workflow with
-  one error line, which is preserved as `snapshot_error`. No workflow bytes
-  are sent on that path.
-- Native `check()` now reads the check report the engine routes to stderr
-  behind its `nika: ` prefix instead of reporting an engine incompatibility;
-  when neither stream carries a report, the typed error appends a bounded
-  single-line excerpt of stderr.
-- A pre-run engine refusal printed as a plain `NIKA-…` line under `--json`
-  now settles `run.done` with `NikaOperationError` (`operation: 'run'`, the
-  engine code, the full refusal line) instead of a protocol error; any other
-  unreadable machine line keeps `NikaProtocolError` and now quotes a bounded
-  excerpt of the offending line. `NikaOperation` gains `'run'`, additively.
-- Engine spawn failures name the engine path and the underlying errno, so a
-  wrong `bin`/`NIKA_BIN` reads as `spawn /path/to/nika ENOENT`.
 
 ## [0.116.2] - 2026-08-31
 

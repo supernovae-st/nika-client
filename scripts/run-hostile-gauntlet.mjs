@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import { createServer } from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isDurableCancellationTerminal } from './verify-release-replay.mjs';
+import { cancellationTerminalMatches } from './verify-release-replay.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const resultsRoot = process.env.NIKA_GAUNTLET_RESULTS_DIR
@@ -91,6 +91,16 @@ async function waitForHealth(url) {
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   throw new Error(`server did not become healthy at ${url}`);
+}
+
+// The durable status reads `queued` at admission and `running` once the resident
+// owns the execution; the first status that is not `queued` is returned.
+async function untilRunning(client, run) {
+  for (;;) {
+    const status = await client.status(run);
+    if (status !== 'queued') return status;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 }
 
 const deterministic = writeWorkflow('deterministic.nika.yaml', `
@@ -270,16 +280,26 @@ await scenario('real-cancellation-race', async () => {
   const requestedAt = performance.now();
   const first = client.cancel(run);
   assert.equal(client.cancel(run), first);
-  const [cancelled, result] = await bounded(Promise.all([first, run.done]), 4_000, 'cancellation');
+  // The native engine lets the in-flight `nika:wait` run out before it settles
+  // the cancelled run with `cause: operator` and exit 130 (measured on 0.118.7:
+  // ~10 s for this fixture), so the bound covers the whole wait.
+  const [cancelled, result] = await bounded(Promise.all([first, run.done]), 20_000, 'cancellation');
   assert.equal(cancelled.accepted, true, JSON.stringify({
     cancelled,
     terminal_before_request: terminalAt !== undefined && terminalAt <= requestedAt,
     terminal: terminalBeforeRequest,
     result,
   }));
-  assert.equal(result.status, 'interrupted');
+  assert.equal(cancelled.status, 'cancellation_requested', JSON.stringify(cancelled));
+  assert.equal(result.status, 'cancelled', JSON.stringify({ cancelled, result }));
+  assert.equal(result.settlement?.cause, 'operator', JSON.stringify(result.settlement ?? null));
   realEngineRuns += 1;
-  return { cancel_status: cancelled.status, run_status: result.status, exit_code: result.exitCode };
+  return {
+    cancel_status: cancelled.status,
+    run_status: result.status,
+    exit_code: result.exitCode,
+    settlement_cause: result.settlement.cause,
+  };
 });
 
 await scenario('remote-durable-cancellation', async () => {
@@ -314,30 +334,48 @@ await scenario('remote-durable-cancellation', async () => {
     assert.equal(parseFatal.clean, false);
     assert.notEqual(parseFatal.exitCode, 0);
     const run = await client.run('slow.nika.yaml', { idempotencyKey: 'hostile-cancel-1' });
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // Cancel an execution that is observably inside its only task, the 10 s
+    // wait. On engine 0.118 a cancel that lands on a `running` job is a 202
+    // `cancellation_requested`; the execution owner then records
+    // `execution.interrupted` once its grace expires inside the task (~5 s,
+    // measured), or `cancelled` with `cause: operator` at a task boundary. A
+    // cancel that lands on `queued` is a 200 `cancelled` before execution.
+    // This fixture records the interrupted shape: it waits for `running`, then
+    // a further 250 ms, so the request lands inside the wait, never at its
+    // boundary and never before execution.
+    await bounded(untilRunning(client, run), 5_000, 'execution start');
+    await new Promise((resolve) => setTimeout(resolve, 250));
     const statusBeforeCancellation = await client.status(run);
+    assert.equal(statusBeforeCancellation, 'running');
     const cancellation = await client.cancel(run);
-    const result = await bounded(run.done, 5_000, 'remote cancellation');
+    const result = await bounded(run.done, 15_000, 'remote cancellation');
     assert.equal(cancellation.accepted, true, JSON.stringify({
       cancellation,
       status_before_cancellation: statusBeforeCancellation,
       result,
     }));
-    assert.equal(result.status, 'cancelled');
+    assert.equal(cancellation.status, 'cancellation_requested', JSON.stringify(cancellation));
+    assert.equal(result.status, 'interrupted', JSON.stringify({ cancellation, result }));
     realEngineRuns += 1;
     assert(result.receipt);
     const recovered = await client.attachRun(run.id);
     const events = [];
     for await (const event of client.events(recovered)) {
-      events.push({ kind: event.kind, status: event.status });
+      events.push({
+        kind: event.kind,
+        status: event.status,
+        ...(event.settlement ? { settlement_cause: event.settlement.cause } : {}),
+      });
     }
     await bounded(recovered.done, 5_000, 'cancel replay settlement');
-    // Nika v0.116.2 has two explicitly ratified race winners:
-    // crates/nika-serve/src/server/route.rs::cancel_job persists
-    // execution.cancelled, while server/mod.rs::settle_disposition persists
-    // execution.settled. Both are valid only with terminal status cancelled.
+    // The durable replay ends on a terminal the cancel reply may lead to: after
+    // a 202 `cancellation_requested`, `execution.interrupted`/`interrupted`
+    // (grace expired inside a task, no settlement) or `execution.cancelled` /
+    // `execution.settled` with status `cancelled` and `cause: operator` (a task
+    // boundary); after a 200 `cancelled`, one of those two writer kinds with
+    // status `cancelled`. The verifier refuses every other pairing.
     assert.equal(
-      isDurableCancellationTerminal(events.at(-1)),
+      cancellationTerminalMatches(cancellation.status, events.at(-1)),
       true,
       `cancel replay events: ${JSON.stringify(events)}`,
     );
@@ -346,6 +384,7 @@ await scenario('remote-durable-cancellation', async () => {
     assert.equal(trace.verdict, 'unavailable');
     assert.equal(trace.reason, 'trace_journal_unavailable');
     return {
+      status_before_cancellation: statusBeforeCancellation,
       cancel_status: cancellation.status,
       run_status: result.status,
       events,

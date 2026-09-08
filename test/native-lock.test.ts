@@ -96,8 +96,8 @@ describe('native package lock coverage', () => {
     expect(() => assertNativeManifest(
       { ...nativeManifest, version: '0.115.0' },
       target,
-      '0.116.2',
-    )).toThrow('native manifest version 0.115.0 does not match root 0.116.2');
+      '0.118.7',
+    )).toThrow('native manifest version 0.115.0 does not match root 0.118.7');
   });
 
   it('refuses native package metadata that would omit the executable', () => {
@@ -121,7 +121,7 @@ describe('native package lock coverage', () => {
     expect(() => assertLockEntry(
       { ...entry, libc: ['musl'] },
       target,
-      '0.116.2',
+      '0.118.7',
     )).toThrow();
   });
 

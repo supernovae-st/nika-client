@@ -184,11 +184,18 @@ export interface NikaExecutionSettledEvent<
   status?: NikaRunStatus;
   outputs?: Outputs;
   receipt?: NikaReceipt;
+  /** The settlement the resident nests whole on this frame (engine 0.118+ · ADR-128). */
+  settlement?: NikaSettlement;
 }
 
-/** An accepted cancellation ended the execution before it settled. */
+/**
+ * The resident cancelled the execution: a queued job cancelled before it was
+ * claimed, or a running one whose owner settled the request as a
+ * cancellation. It carries the settlement when the runtime built one.
+ */
 export interface NikaExecutionCancelledEvent extends NikaEventFields {
   kind: 'execution.cancelled';
+  settlement?: NikaSettlement;
 }
 
 /** The server refused the execution. */
@@ -291,11 +298,14 @@ export interface NikaTaskTally {
 
 /** What the run spent and how much of it is priced (engine 0.118+). */
 export interface NikaSpend {
+  /** Present only when at least one call metered real spend; unknown cost is never zero. */
   total_cost_usd?: number | null;
   priced_calls?: number;
   unpriced_calls?: number;
   qualifier?: NikaCostQualifier;
   pricing_as_of?: string | null;
+  /** Spend per pricing source, when the engine broke it down. */
+  by_source?: Record<string, number>;
   [key: string]: unknown;
 }
 
@@ -305,10 +315,18 @@ export interface NikaSpend {
  * Absent on engines before 0.118; never derived from an exit code.
  */
 export interface NikaSettlement {
+  /**
+   * The state word the settlement itself carries (`succeeded` · `failed` ·
+   * `paused` · `cancelled`) on the resident's nested projection; the native
+   * `run_settled` frame states it on the frame instead.
+   */
+  status?: NikaRunStatus;
   cause?: NikaRunCause;
   elapsed_ms?: number;
   tasks?: NikaTaskTally;
   spend?: NikaSpend;
+  /** The failure named on a `failed` settlement: code, message and the task, when one failed. */
+  error?: NikaMachineError;
   [key: string]: unknown;
 }
 
@@ -341,7 +359,16 @@ export interface NikaRun<
 export interface NikaCancelResult {
   runId: NikaRunId;
   accepted: boolean;
-  status: string;
+  /**
+   * `cancelled`: the job settled cancelled on the cancel reply itself.
+   * `already_settled`: the run had already ended, nothing was cancelled.
+   * `cancellation_requested`: the request was accepted while the execution
+   * owner had not settled yet (a native SIGTERM, or the resident's 202); the
+   * run then settles on its own terminal, read from `run.done`, which may be
+   * `cancelled`, `succeeded`, `failed`, or `interrupted` once the resident's
+   * grace expired. Open to the engine's future words.
+   */
+  status: 'cancelled' | 'already_settled' | 'cancellation_requested' | (string & {});
   transport: NikaTransportKind;
   [key: string]: unknown;
 }
@@ -354,9 +381,25 @@ export interface NikaWorkflowMetadata {
 
 export interface NikaTraceVerifyResult {
   verified: boolean;
-  /** Engine-owned trace verdict. Open to additive future vocabulary. */
-  verdict?: 'verified' | 'invalid' | 'unavailable' | (string & {});
-  /** Engine-owned explanation for a negative or unavailable verdict. */
+  /**
+   * Engine-owned trace verdict. The native path answers `verified` or
+   * `invalid`; the resident's door answers `unavailable` while it has no
+   * trace-journal authority (engine 0.118), and will speak the CLI's tiers
+   * (`OK` · `SEALED` · `ANCHORED` · `REPLAYED` hold · `INCOMPLETE` ·
+   * `TAMPERED` do not) once it does. Open to additive future vocabulary.
+   */
+  verdict?:
+    | 'verified'
+    | 'invalid'
+    | 'unavailable'
+    | 'OK'
+    | 'SEALED'
+    | 'ANCHORED'
+    | 'REPLAYED'
+    | 'INCOMPLETE'
+    | 'TAMPERED'
+    | (string & {});
+  /** Engine-owned explanation for a negative or unavailable verdict; a verdict that holds carries none. */
   reason?:
     | 'trace_invalid'
     | 'receipt_mismatch'

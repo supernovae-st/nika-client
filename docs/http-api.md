@@ -15,11 +15,11 @@ any other non-2xx body is discarded and reported as a redacted
 | `GET /v1/workflows/{name}` | `workflow(name)` | path-free metadata, never source bytes |
 | `POST /v1/check` | `check()` | validates immutable snapshot bytes without a job |
 | `POST /v1/jobs` | `run()` | admits exact snapshot bytes with an idempotency key |
-| `GET /v1/jobs/{id}` | internal settlement | durable job identity, outputs, receipt, or redacted error |
+| `GET /v1/jobs/{id}` | internal settlement | durable job identity, outputs, receipt, settlement, or redacted error |
 | `GET /v1/jobs/{id}/status` | `status(run)` | current status only |
 | `GET /v1/jobs/{id}/events` | `events(run)` / `attachRun()` | bounded, sequenced SSE with replay |
-| `POST /v1/jobs/{id}/cancel` | `cancel(run)` | idempotent cancellation or terminal replay |
-| `GET /v1/jobs/{id}/trace/verify` | `traceVerify(receipt)` | engine-owned typed trace verdict |
+| `POST /v1/jobs/{id}/cancel` | `cancel(run)` | 200 a settled job or its terminal replay; 202 the request accepted on a running job, settled later by observation |
+| `GET /v1/jobs/{id}/trace/verify` | `traceVerify(receipt)` | engine-owned typed trace verdict; `reason` only on a verdict that does not hold |
 | `GET/PUT /v1/schedules/{id}` | `scheduleStatus()` / `schedule()` | resident schedule projection and CAS mutation |
 
 ## Connection rules
@@ -37,6 +37,16 @@ any other non-2xx body is discarded and reported as a redacted
 - Caller-provided workflow catalog names must be contained slash-separated
   paths. Absolute paths, backslashes, empty segments, `.` and `..` are
   rejected before network I/O.
+
+## Settlement
+
+The terminal `execution.settled` frame and the durable job nest the run's
+`settlement` whole (engine 0.118, ADR-128): its `status` and `cause`, the
+elapsed time, the task tally, the spend with its qualifier, and the failure
+named with its task. The SDK types every known field, refuses a settlement
+whose `status` contradicts the record carrying it, keeps fields it does not
+know, and never derives a settlement from an exit code; a job the resident
+lost (`interrupted`) carries none.
 
 ## SSE recovery
 

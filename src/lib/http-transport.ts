@@ -23,6 +23,7 @@ import type {
   NikaScheduleApplyResult,
   NikaScheduleOptions,
   NikaScheduleStatus,
+  NikaSettlement,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
   NikaWorkflowMetadata,
@@ -34,6 +35,7 @@ import {
   type NikaEngineIdentity,
 } from './engine-identity.js';
 import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
+import { readSettlement } from './settlement.js';
 import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
 import type { Transport, TransportRun } from './transport.js';
 
@@ -76,6 +78,7 @@ interface DurableJob {
   outputs?: Record<string, unknown>;
   receipt?: NikaReceipt;
   error?: { code: string; message: string };
+  settlement?: NikaSettlement;
 }
 
 interface RetryObservation {
@@ -99,6 +102,15 @@ const JOB_STATUSES = new Set([
   'cancelled',
 ]);
 const MAX_OBSERVATION_RETRIES = 5;
+/**
+ * The trace verdicts that say the evidence holds. The resident's contract
+ * (engine 0.118) still answers only `unavailable`; the CLI's tiers (`nika
+ * trace verify`: OK → SEALED → ANCHORED → REPLAYED hold, INCOMPLETE and
+ * TAMPERED do not) are the vocabulary a door with journal authority will
+ * speak, so they are read here rather than refused. The comparison ignores
+ * case: the CLI prints its tiers in upper case, the door's enum is lower case.
+ */
+const POSITIVE_TRACE_VERDICTS = new Set(['VERIFIED', 'OK', 'SEALED', 'ANCHORED', 'REPLAYED']);
 const RETRY_BASE_MILLISECONDS = 100;
 const RETRY_MIN_MILLISECONDS = 25;
 const RETRY_MAX_MILLISECONDS = 5_000;
@@ -286,19 +298,23 @@ export class HttpTransport implements Transport {
       [200],
       'traceVerify',
     );
+    // A verdict that holds carries no reason; `unavailable` and the negative
+    // tiers name theirs. Either is typed when present, neither is demanded.
     if (
       typeof object.verdict !== 'string'
-      || typeof object.reason !== 'string'
+      || (object.reason !== undefined && typeof object.reason !== 'string')
       || (object.trace_id !== undefined && typeof object.trace_id !== 'string')
     ) {
       throw new NikaProtocolError(this.kind, 'Trace verification verdict was malformed');
     }
-    const traceMatches = object.trace_id === undefined
-      || receipt.trace_id === undefined
-      || object.trace_id === receipt.trace_id;
+    // A verdict holds only when the door binds it to this receipt's trace: a
+    // positive tier with no trace_id, or with another trace, never reads
+    // verified, whatever its word.
+    const traceBound = typeof object.trace_id === 'string'
+      && object.trace_id === receipt.trace_id;
     return {
       ...object,
-      verified: object.verdict === 'verified' && traceMatches,
+      verified: POSITIVE_TRACE_VERDICTS.has(object.verdict.toUpperCase()) && traceBound,
     } as NikaTraceVerifyResult;
   }
 
@@ -360,8 +376,10 @@ export class HttpTransport implements Transport {
         ?? (typeof receipt?.trace_id === 'string' ? receipt.trace_id : undefined);
       terminalObserved = true;
       const outputs = event ? eventOutputs(event) : durable?.outputs;
-      const error = event ? eventError(event) : durable?.error;
-      const settlement = event ? eventSettlement(event) : undefined;
+      // The durable job's settlement names the failure with its task; the
+      // job's own error is the same failure without it.
+      const error = event ? eventError(event) : durable?.settlement?.error ?? durable?.error;
+      const settlement = event ? eventSettlement(event, this.kind) : durable?.settlement;
       resolveDone({
         id,
         status: source.status!,
@@ -413,10 +431,32 @@ export class HttpTransport implements Transport {
         return object.status;
       },
       cancel: async (): Promise<NikaCancelResult> => {
-        const object = await this.json(`/v1/jobs/${encodeURIComponent(id)}/cancel`, {
-          method: 'POST',
-        }, true, [200], 'cancel');
+        // The resident (engine 0.118): 200 carries the job's existing result,
+        // a queued job cancelled before execution claimed it or an observation
+        // that already ended; 202 acknowledges the request on a job whose
+        // execution owner has not settled. Acceptance is not a settlement:
+        // the observation stays open, and the terminal frame or the final
+        // durable read settles run.done with what the owner recorded
+        // (cancelled, succeeded, failed, or interrupted once the grace expired).
+        const { object, status } = await this.jsonWithStatus(
+          `/v1/jobs/${encodeURIComponent(id)}/cancel`,
+          { method: 'POST' },
+          true,
+          [200, 202],
+          'cancel',
+        );
         const durable = durableJob(object, id, this.kind);
+        if (status === 202) {
+          if (isTerminal(durable.status)) {
+            throw new NikaProtocolError(this.kind, 'Pending cancellation returned a terminal job');
+          }
+          return {
+            runId: id,
+            accepted: true,
+            status: 'cancellation_requested',
+            transport: this.kind,
+          };
+        }
         if (!isTerminal(durable.status)) {
           throw new NikaProtocolError(this.kind, 'Cancellation did not return a terminal job');
         }
@@ -573,8 +613,11 @@ export class HttpTransport implements Transport {
     }
     const event = machineObject(value);
     if (!event) throw new NikaProtocolError(this.kind, 'SSE data was not an object');
+    // The resident's projection (`JobEvent`, closed): the frame identity, the
+    // terminal outputs and receipt, and the settlement it nests whole on the
+    // terminal frame (engine 0.118 · ADR-128).
     const allowed = new Set([
-      'sequence', 'kind', 'status', 'code', 'message', 'outputs', 'receipt',
+      'sequence', 'kind', 'status', 'code', 'message', 'outputs', 'receipt', 'settlement',
     ]);
     if (Object.keys(event).some((key) => !allowed.has(key))) {
       throw new NikaProtocolError(this.kind, 'SSE data contained fields outside the public projection');
@@ -603,6 +646,13 @@ export class HttpTransport implements Transport {
     }
     if (event.outputs !== undefined && !machineObject(event.outputs)) {
       throw new NikaProtocolError(this.kind, 'SSE data.outputs was not an object');
+    }
+    if (event.settlement !== undefined) {
+      readSettlement(
+        event.settlement,
+        this.kind,
+        typeof event.status === 'string' ? event.status : undefined,
+      );
     }
     if (event.receipt !== undefined) {
       const receipt = machineObject(event.receipt);
@@ -995,6 +1045,28 @@ export class HttpTransport implements Transport {
     acceptedStatuses: readonly number[] = [200],
     operation?: NikaOperation,
   ): Promise<Record<string, unknown>> {
+    const { object } = await this.jsonWithStatus(
+      path,
+      init,
+      authenticated,
+      acceptedStatuses,
+      operation,
+    );
+    return object;
+  }
+
+  /**
+   * The JSON object an accepted status carries, with that status, for the
+   * routes whose accepted statuses mean different things (cancel: 200 is a
+   * settled job, 202 an accepted request).
+   */
+  private async jsonWithStatus(
+    path: string,
+    init: RequestInit,
+    authenticated: boolean,
+    acceptedStatuses: readonly number[],
+    operation: NikaOperation | undefined,
+  ): Promise<{ object: Record<string, unknown>; status: number }> {
     const response = await this.fetchResponse(path, init, true, authenticated, false);
     if (!acceptedStatuses.includes(response.status)) {
       if (response.ok) {
@@ -1035,7 +1107,10 @@ export class HttpTransport implements Transport {
       await discardResponse(response);
       throw new NikaProtocolError(this.kind, `HTTP ${path} returned an invalid content-type`);
     }
-    return this.readObservationObject(response, path, init.signal ?? undefined);
+    return {
+      object: await this.readObservationObject(response, path, init.signal ?? undefined),
+      status: response.status,
+    };
   }
 
   /**
@@ -1380,8 +1455,10 @@ function durableJob(
   expectedId: string,
   transport: 'http',
 ): DurableJob {
+  // The resident's durable projection (`Job`, closed), the nested settlement
+  // included (engine 0.118 · ADR-128).
   const allowed = new Set([
-    'id', 'status', 'execution_id', 'trace_id', 'outputs', 'receipt', 'error',
+    'id', 'status', 'execution_id', 'trace_id', 'outputs', 'receipt', 'error', 'settlement',
   ]);
   if (Object.keys(value).some((key) => !allowed.has(key))) {
     throw new NikaProtocolError(transport, 'Durable job response contained unknown fields');
@@ -1409,6 +1486,9 @@ function durableJob(
   }
   const outputs = value.outputs === undefined ? undefined : machineObject(value.outputs);
   const receipt = value.receipt === undefined ? undefined : machineObject(value.receipt);
+  const settlement = value.settlement === undefined
+    ? undefined
+    : readSettlement(value.settlement, transport, value.status);
   if (value.outputs !== undefined && !outputs) {
     throw new NikaProtocolError(transport, 'Durable job response outputs were malformed');
   }
@@ -1434,6 +1514,7 @@ function durableJob(
     ...(outputs ? { outputs } : {}),
     ...(receipt ? { receipt: Object.freeze(receipt) } : {}),
     ...(error ? { error } : {}),
+    ...(settlement ? { settlement } : {}),
   };
 }
 

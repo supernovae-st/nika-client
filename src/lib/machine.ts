@@ -1,4 +1,5 @@
 import { NikaProtocolError } from '../errors.js';
+import { readSettlement } from './settlement.js';
 import type {
   NikaEvent,
   NikaMachineError,
@@ -43,13 +44,22 @@ export function eventStatus(event: NikaEvent | undefined): NikaRunStatus | undef
 /**
  * The settlement a terminal frame carries (engine 0.118+ · ADR-128): the
  * native `run_settled` flattens it (`cause` · `elapsed_ms` · `tasks` ·
- * `spend`), the resident's `execution.settled` may nest it under
- * `settlement`. Absent on older engines; never invented from an exit code.
+ * `spend`), the resident's `execution.settled` nests it whole under
+ * `settlement`, `status` and the named `error` included. A nested settlement
+ * is read through `readSettlement`, so a malformed known fact is a protocol
+ * fault and an additive field rides through. Absent on older engines; never
+ * invented from an exit code.
  */
-export function eventSettlement(event: NikaEvent | undefined): NikaSettlement | undefined {
+export function eventSettlement(
+  event: NikaEvent | undefined,
+  transport: NikaTransportKind = 'http',
+): NikaSettlement | undefined {
   if (!event) return undefined;
   const record = event as Record<string, unknown>;
-  const source = machineObject(record.settlement) ?? record;
+  if (record.settlement !== undefined) {
+    return readSettlement(record.settlement, transport, eventStatus(event));
+  }
+  const source = record;
   const cause = typeof source.cause === 'string' ? source.cause : undefined;
   const elapsed = typeof source.elapsed_ms === 'number' ? source.elapsed_ms : undefined;
   const tasks = machineObject(source.tasks);
@@ -89,6 +99,11 @@ export function eventOutputs(event: NikaEvent | undefined): Record<string, unkno
 }
 
 export function eventError(event: NikaEvent | undefined): NikaMachineError | undefined {
+  // The resident's nested settlement names the failure with its task (engine
+  // 0.118); the frame's own `error` comes next, then `code` and `message`,
+  // then the native field rows.
+  const settled = machineObject(machineObject(event?.settlement)?.error);
+  if (settled) return settled as NikaMachineError;
   const direct = machineObject(event?.error);
   if (direct) return direct as NikaMachineError;
   if (typeof event?.code === 'string' || typeof event?.message === 'string') {

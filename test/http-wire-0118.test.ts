@@ -262,18 +262,107 @@ describe('cancellation on the 0.118 wire', () => {
     await expect(observer.next()).resolves.toEqual({ done: true, value: undefined });
   });
 
-  it('refuses a 202 that carries a terminal job', async () => {
+  it.each(['succeeded', 'failed', 'interrupted', 'cancelled'] as const)(
+    'refuses a 202 that carries a %s job',
+    async (status) => {
+      const stream = controlledByteStream();
+      const fetch = resident({
+        '/v1/jobs/job-1': () => jsonResponse({ id: 'job-1', status: 'interrupted', receipt: RECEIPT }),
+        '/v1/jobs/job-1/events': () => stream.response,
+        '/v1/jobs/job-1/cancel': () => jsonResponse({ id: 'job-1', status }, 202),
+      });
+      const nika = client(fetch as typeof globalThis.fetch);
+      const run = await nika.run('flow.nika.yaml');
+
+      await expect(nika.cancel(run)).rejects.toThrow(/Pending cancellation returned a terminal job/);
+      stream.close();
+      await expect(run.done).resolves.toMatchObject({ status: 'interrupted' });
+    },
+  );
+
+  // Synthetic regressions for the pinned 0.118.7 cancel contract and the
+  // engine's pause_boundary test; these fixtures are not live run evidence.
+  it.each([
+    ['minimal', {}],
+    ['with its settled evidence', {
+      execution_id: 'exe-1',
+      trace_id: 'trace-1',
+      outputs: { draft: 'ready' },
+      receipt: RECEIPT,
+      settlement: {
+        status: 'paused',
+        cause: 'human_gate',
+        elapsed_ms: 93,
+        spend: { total_cost_usd: 0.03, priced_calls: 1, unpriced_calls: 0, qualifier: 'priced' },
+      },
+    }],
+  ] as const)('replays a paused 200 %s without claiming cancellation', async (_label, evidence) => {
     const stream = controlledByteStream();
     const fetch = resident({
-      '/v1/jobs/job-1': () => jsonResponse({ id: 'job-1', status: 'interrupted', receipt: RECEIPT }),
       '/v1/jobs/job-1/events': () => stream.response,
-      '/v1/jobs/job-1/cancel': () => jsonResponse({ id: 'job-1', status: 'cancelled' }, 202),
+      '/v1/jobs/job-1/cancel': () => jsonResponse({ id: 'job-1', status: 'paused', ...evidence }),
     });
     const nika = client(fetch as typeof globalThis.fetch);
     const run = await nika.run('flow.nika.yaml');
 
-    await expect(nika.cancel(run)).rejects.toThrow(/Pending cancellation returned a terminal job/);
+    await expect(nika.cancel(run)).resolves.toEqual({
+      runId: 'job-1',
+      accepted: false,
+      status: 'already_settled',
+      transport: 'http',
+    });
+    await expect(run.done).resolves.toEqual({
+      id: 'job-1', status: 'paused', transport: 'http', ...evidence,
+    });
+  });
+
+  it.each([
+    ['queued', { id: 'job-1', status: 'queued' }],
+    ['running', { id: 'job-1', status: 'running' }],
+    ['missing status', { id: 'job-1' }],
+    ['non-string status', { id: 'job-1', status: 200 }],
+    ['unknown status', { id: 'job-1', status: 'unknown_status' }],
+    ['wrong job', { id: 'job-other', status: 'paused' }],
+    ['unknown field', { id: 'job-1', status: 'paused', path: 'not-a-wire-field' }],
+    ['contradicting settlement', { id: 'job-1', status: 'paused', settlement: SETTLED }],
+    ['wrong receipt', { id: 'job-1', status: 'paused', receipt: { ...RECEIPT, job_id: 'job-other' } }],
+  ])('refuses a 200 cancel response with %s', async (_label, body) => {
+    const stream = controlledByteStream();
+    const fetch = resident({
+      '/v1/jobs/job-1': () => jsonResponse({ id: 'job-1', status: 'interrupted', receipt: RECEIPT }),
+      '/v1/jobs/job-1/events': () => stream.response,
+      '/v1/jobs/job-1/cancel': () => jsonResponse(body),
+    });
+    const nika = client(fetch as typeof globalThis.fetch);
+    const run = await nika.run('flow.nika.yaml');
+
+    await expect(nika.cancel(run)).rejects.toBeInstanceOf(NikaProtocolError);
     stream.close();
+    await expect(run.done).resolves.toMatchObject({ status: 'interrupted' });
+  });
+
+  it('keeps a paused attachment open for the observation after its cursor', async () => {
+    const stream = controlledByteStream();
+    const fetch = resident({
+      '/v1/jobs/job-1': () => jsonResponse({ id: 'job-1', status: 'paused' }),
+      '/v1/jobs/job-1/events': () => stream.response,
+    });
+    const nika = client(fetch as typeof globalThis.fetch);
+    const run = await nika.attachRun('job-1', { lastEventId: 1 });
+
+    await expect(Promise.race([
+      run.done,
+      new Promise<'pending'>((resolve) => setTimeout(() => resolve('pending'), 50)),
+    ])).resolves.toBe('pending');
+    const resumed = { ...STARTED, sequence: 2 };
+    const terminal = { ...SETTLED_FRAME, sequence: 3 };
+    stream.enqueue(sseFrame(resumed));
+    stream.enqueue(sseFrame(terminal));
+    stream.close();
+    await expect(collect(nika.events(run))).resolves.toEqual([resumed, terminal]);
+    await expect(run.done).resolves.toMatchObject({ status: 'succeeded', settlement: SETTLED });
+    const observation = fetch.mock.calls.find(([url]) => String(url).endsWith('/events'));
+    expect(new Headers(observation?.[1]?.headers).get('Last-Event-ID')).toBe('1');
   });
 
   it('replays an ended observation with 200 and reports nothing cancelled', async () => {

@@ -1,17 +1,5 @@
 # Changelog
 
-## Unreleased
-
-- Resolve HTTP workflow names at the resident without a local engine; explicit
-  local paths retain snapshot capture and digest verification.
-- Preserve pending cancellation, paused observation and recovered native
-  settlement facts across transports.
-- Add six-door runtime parity and bounded, owned process supervision for the
-  corpus and packed application harnesses.
-- Verify exact engine release provenance and prepared npm tarball integrity
-  before release operations; type drift fails when its promised engine is absent.
-
-
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
@@ -19,8 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add six-door runtime parity and bounded, owned process supervision for the
+  corpus and packed application harnesses.
+
 ### Fixed
 
+- Resolve HTTP workflow names at the resident without a local engine; explicit
+  local paths retain snapshot capture and digest verification.
+- Preserve pending cancellation, paused observation and recovered native
+  settlement facts across transports.
+- Verify exact engine release provenance and prepared npm tarball integrity
+  before release operations; type drift fails when its promised engine is absent.
 - `cancel(run)` accepts an HTTP 200 response carrying a `paused` job and
   returns `already_settled` with `accepted: false`, preserving the existing
   observation's result and evidence. This closes the pause-response gap

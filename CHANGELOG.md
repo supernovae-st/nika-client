@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `cancel(run)` accepts an HTTP 200 response carrying a `paused` job and
+  returns `already_settled` with `accepted: false`, preserving the existing
+  observation's result and evidence. This closes the pause-response gap
+  recorded in 0.118.7. HTTP 202 remains a pending cancellation, and attaching
+  to a paused job after an event cursor still waits for the next observation.
+
 ## [0.118.7] - 2026-09-07
 
 Lockstep release for engine v0.118.7: the SDK accepts the 0.118 `nika serve`

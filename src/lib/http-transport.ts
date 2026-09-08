@@ -457,8 +457,9 @@ export class HttpTransport implements Transport {
             transport: this.kind,
           };
         }
-        if (!isTerminal(durable.status)) {
-          throw new NikaProtocolError(this.kind, 'Cancellation did not return a terminal job');
+        // A pause ends this observation while leaving the job resumable.
+        if (durable.status !== 'paused' && !isTerminal(durable.status)) {
+          throw new NikaProtocolError(this.kind, 'Cancellation did not return an ended observation');
         }
         settle(durable);
         const accepted = durable.status === 'cancelled';

@@ -61,7 +61,12 @@ export class RunSession {
   }
 
   cancel(): Promise<NikaCancelResult> {
-    this.cancelPromise ??= this.cancelAndSettle();
+    this.cancelPromise ??= this.requestCancel().catch((error) => {
+      // A refused or lost action response is retryable. Only an accepted
+      // request is memoized; observation and its actual result stay alive.
+      this.cancelPromise = undefined;
+      throw error;
+    });
     return this.cancelPromise;
   }
 
@@ -69,8 +74,11 @@ export class RunSession {
     return this.source.status();
   }
 
-  private async cancelAndSettle(): Promise<NikaCancelResult> {
+  private async requestCancel(): Promise<NikaCancelResult> {
     const cancellation = await this.source.cancel();
+    // An accepted signal is not an execution result. Observation continues
+    // independently; callers await run.done for the engine's actual verdict.
+    if (cancellation.status === 'cancellation_requested') return cancellation;
     const result = await this.source.done;
     // An active observer owns the terminal event boundary. Let the transport
     // pump deliver that persisted frame before it closes the subscription.

@@ -1,5 +1,4 @@
 {
-  "schema_version": 1,
   "engine": "nika 0.118.7 (f3a31a6ee)",
   "package": "supernovae-st-nika-client-0.118.7.tgz",
   "install_mode": "npm pack + npm install --omit=optional + explicit NIKA_BIN",
@@ -67,5 +66,6 @@
       "installed_from_pack": true
     }
   ],
+  "schema_version": 1,
   "result": "green"
 }

@@ -49,8 +49,8 @@ Some operations deliberately have one authority:
 - resident workflow discovery, durable status, and schedules require HTTP;
 - a direct native process refuses those operations with
   `NikaCompatibilityError`;
-- remote execution still needs a compatible local engine to capture an
-  immutable snapshot before any network admission;
+- remote execution by contained workflow name uses the resident registry;
+  explicit local paths need a compatible local engine to capture a snapshot;
 - when that capture is red the HTTP adapter returns the local engine's plain
   `nika check --json` report, so `findings[]` stays canonical and no workflow
   bytes are sent;

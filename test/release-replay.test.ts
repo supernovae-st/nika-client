@@ -63,7 +63,7 @@ describe('public release evidence replay', () => {
     expect(hostileRunner).toContain('tools: ["nika:wait"]');
     expect(hostileRunner).toContain('args: { duration: "10s" }');
     expect(hostileRunner).toContain("assert.equal(statusBeforeCancellation, 'running')");
-    expect(hostileRunner).toContain('cancellationTerminalMatches(cancellation.status, events.at(-1))');
+    expect(hostileRunner).toContain('cancellationTerminalMatches(waitCancellation.status, waitTerminal)');
     expect(hostileRunner).not.toContain("events.includes('execution.cancelled')");
     expect(hostileRunner).not.toContain("events.includes('execution.interrupted')");
     expect(hostileRunner).not.toContain('command: ["sleep"');
@@ -332,7 +332,7 @@ describe('public release evidence replay', () => {
       engine: ENGINE,
       workflows: 100,
       hostileScenarios: 14,
-      realEngineRuns: 70,
+      realEngineRuns: 72,
     });
   });
 

@@ -47,7 +47,7 @@ describe('the engine teaching report survives every transport', () => {
   it('falls back to the plain check report when snapshot capture is red', async () => {
     const fetch = vi.fn().mockResolvedValueOnce(healthResponse());
     const report = await remote(fetch as typeof globalThis.fetch)
-      .check('red-snapshot.nika.yaml');
+      .check('./red-snapshot.nika.yaml');
 
     expect(report).toMatchObject({ clean: false, exitCode: 2, report_version: 1 });
     expect(findings(report)[0]).toMatchObject({
@@ -74,7 +74,7 @@ describe('the engine teaching report survives every transport', () => {
         root: 'fixture.nika.yaml',
         units: 1,
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-    const report = await remote(fetch as typeof globalThis.fetch).check('flow.nika.yaml');
+    const report = await remote(fetch as typeof globalThis.fetch).check('./flow.nika.yaml');
 
     expect(report).toMatchObject({ clean: true, exitCode: 0 });
     expect(report).not.toHaveProperty('snapshot_error');

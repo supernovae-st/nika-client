@@ -16,6 +16,7 @@ NIKA_BIN=/path/to/nika npm run gauntlet:projects
 NIKA_BIN=/path/to/nika npm run gauntlet:depth
 NIKA_BIN=/path/to/nika npm run gauntlet:hostile
 NIKA_BIN=/path/to/nika npm run gauntlet:recovery
+NIKA_BIN=/path/to/nika npm run gauntlet:one-door
 npm audit
 npm pack --dry-run
 ```
@@ -30,12 +31,13 @@ must remain labelled as non-gating evidence.
 
 CI adds a behavioral provenance replay. It downloads the Linux x64 asset for
 the exact root package version, verifies its GitHub attestation and published
-`SHA256SUMS` entry, then reruns all 100 deterministic workflows, the full
-14-scenario hostile suite, all five mini-SaaS projects, all five depth projects,
-and the two-process recovery scenario from a freshly packed SDK. The runner
+`SHA256SUMS` entry, then reruns all 100 deterministic workflows, the hostile suite, all five mini-SaaS projects, all five depth projects,
+the two-process recovery scenario, and five scenarios through six execution
+doors from a freshly packed SDK. The runner
 mints an ephemeral run-signing key. Its
-cancellation fixtures use the engine's in-process `nika:wait` primitive, so the
-replay needs no shell command, platform sandbox, or sandbox waiver. Cancellation
+cancellation fixtures retain the in-process `nika:wait` cases and add an
+owned loopback rendezvous for controlled task-boundary cancellation. They
+need no shell command, platform sandbox, or sandbox waiver. Cancellation
 and sealed-trace claims are exercised against the public binary. The
 cancellation fixtures cancel an execution that is observably inside its 10 s
 `nika:wait` (the durable status reads `running`, no longer `queued`, and a
@@ -123,7 +125,24 @@ tagged engine assets, starts the released Linux binary, proves the live
 OpenAPI/types pin, embeds the exact prepared commit and release version in all
 five package manifests before packing, and publishes four payloads plus the SDK
 with the repository's npm token and a Sigstore provenance attestation bound to
-the workflow identity (a version already on the registry is skipped, never
-re-published). `release-finalize.yml` refuses to create the SDK tag and GitHub
+the workflow identity. An occupied version is accepted only after its exact
+prepared tarball integrity and fetched registry bytes match; errors other than
+an explicit registry 404 refuse publication. `release-finalize.yml` refuses to create the SDK tag and GitHub
 Release until all five exact versions are publicly observable on npm and every
 published manifest carries the same prepared commit and version.
+
+## One-door parity and process supervision
+
+`gauntlet:one-door` compares CLI, raw HTTP by name and snapshot, and packed SDK
+native, by-name and snapshot execution. It checks success, failure, recovery,
+paused observation and controlled cancellation. `NIKA_ONE_DOOR_REPORT` names
+its output file; CI retains it alongside the replay results. Development mode
+uses an offline installation of the freshly packed SDK with the explicit
+`NIKA_BIN`. Public npm parity requires `NIKA_PUBLIC_SDK_VERSION` and an outer
+artifact-provenance gate; runtime agreement alone is not an attestation.
+
+All harnesses own their child processes, impose finite deadlines and await
+cleanup before emitting green evidence. The corpus runs in a fresh project and
+HOME. Changed fixtures require new measured results: old committed ledgers
+remain historical observations until a successful exact-version replay replaces
+them. Never relabel an old binary or weaken the replay comparison.

@@ -28,6 +28,8 @@ process transport; supplying `url` and `token` selects HTTP. Remote `check()`
 and `run()` also need a local Nika binary (`bin`, `NIKA_BIN`, or the exact
 optional host payload package) because
 the SDK captures and validates immutable snapshot bytes before admission.
+The current by-name HTTP path also accepts contained workflow names without a
+local engine; prefix a local file with `./` to retain snapshot capture.
 
 ```ts
 // 0.115

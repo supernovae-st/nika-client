@@ -1,6 +1,8 @@
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { createReadStream } from 'node:fs';
-import { open, readFile } from 'node:fs/promises';
+import { lstat, open, readFile } from 'node:fs/promises';
+import path from 'node:path';
 
 const TARGETS = new Map([
   ['@supernovae-st/nika-darwin-arm64', {
@@ -133,6 +135,52 @@ export function checksumForAsset(contents, asset) {
     throw new Error(`Expected exactly one SHA256SUMS entry for ${asset}, found ${matches.length}`);
   }
   return matches[0];
+}
+
+// One archive admission for CI replay, type drift and native packaging. This
+// verifies provenance, not producer honesty; callers may extract only on success.
+export async function verifyEngineArchive(archive, sums, version, expectedCommit, run = execFileSync) {
+  if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)
+    || (expectedCommit !== undefined && !isCommit(expectedCommit))) {
+    throw new Error('archive proof requires a stable version and an exact source commit');
+  }
+  const tag = `v${version}`;
+  const asset = path.basename(archive);
+  if (![...TARGETS.keys()].some((name) => nativeTarget(name, version).asset === asset)) {
+    throw new Error('archive name is not a native release target for this version');
+  }
+  const archiveStat = await lstat(archive);
+  const sumsStat = await lstat(sums);
+  if (!archiveStat.isFile() || archiveStat.size < 1 || archiveStat.size > 128 * 1024 * 1024
+    || !sumsStat.isFile() || sumsStat.size < 1 || sumsStat.size > 1024 * 1024) {
+    throw new Error('archive proof requires bounded regular archive and checksum files');
+  }
+  const indexed = checksumForAsset(await readFile(sums, 'utf8'), asset);
+  const sha256 = await sha256File(archive);
+  if (sha256 !== indexed) throw new Error(`archive digest mismatch for ${asset}`);
+  const invoke = (args) => run('gh', args, { encoding: 'utf8', timeout: 90_000,
+    killSignal: 'SIGKILL', maxBuffer: 4 * 1024 * 1024 });
+  const release = JSON.parse(invoke(['api', `repos/supernovae-st/nika/releases/tags/${tag}`]));
+  if (release.tag_name !== tag || release.draft !== false || release.prerelease !== false
+    || typeof release.published_at !== 'string' || !Number.isFinite(Date.parse(release.published_at))) {
+    throw new Error('archive proof requires the exact published stable release');
+  }
+  const assets = release.assets?.filter((entry) => entry.name === asset);
+  if (assets?.length !== 1 || assets[0].state !== 'uploaded' || assets[0].size !== archiveStat.size
+    || assets[0].browser_download_url !== `https://github.com/supernovae-st/nika/releases/download/${tag}/${asset}`) {
+    throw new Error('archive metadata is missing, ambiguous or differs from the downloaded file');
+  }
+  const { sha: commit } = JSON.parse(invoke(['api', `repos/supernovae-st/nika/commits/${tag}`]));
+  if (!isCommit(commit) || (expectedCommit !== undefined && commit !== expectedCommit)) {
+    throw new Error('released tag differs from the expected source commit');
+  }
+  invoke(['attestation', 'verify', path.resolve(archive),
+    '--repo', 'supernovae-st/nika', '--cert-identity',
+    `https://github.com/supernovae-st/nika/.github/workflows/release.yml@refs/tags/${tag}`,
+    '--source-ref', `refs/tags/${tag}`, '--source-digest', commit,
+    '--predicate-type', 'https://slsa.dev/provenance/v1', '--deny-self-hosted-runners']);
+  if (await sha256File(archive) !== sha256) throw new Error('archive changed during provenance verification');
+  return { tag, commit, asset, sha256 };
 }
 
 export function isSha256(value) {

@@ -4,7 +4,9 @@
 route except public `GET /health`; bearer tokens are redacted from failures.
 A non-2xx answer typed as `{ error: { code, message } }` becomes a
 `NikaOperationError` carrying `status`, `code`, and the refused `operation`;
-any other non-2xx body is discarded and reported as a redacted
+For a check by served name, a typed 404 or 422 instead returns
+`{ clean: false, error }`; authentication and transport failures still throw.
+Any other non-2xx body is discarded and reported as a redacted
 `NikaTransportError`.
 
 | HTTP route | SDK surface | Contract |
@@ -13,8 +15,8 @@ any other non-2xx body is discarded and reported as a redacted
 | `GET /v1/openapi.json` | generation only | authenticated OpenAPI 3.1 document |
 | `GET /v1/workflows` | `listWorkflows()` | contained relative workflow names |
 | `GET /v1/workflows/{name}` | `workflow(name)` | path-free metadata, never source bytes |
-| `POST /v1/check` | `check()` | validates immutable snapshot bytes without a job |
-| `POST /v1/jobs` | `run()` | admits exact snapshot bytes with an idempotency key |
+| `POST /v1/check` | `check()` | validates a served name or immutable snapshot bytes without a job |
+| `POST /v1/jobs` | `run()` | admits a served name or exact snapshot bytes with an idempotency key |
 | `GET /v1/jobs/{id}` | internal settlement | durable job identity, outputs, receipt, settlement, or redacted error |
 | `GET /v1/jobs/{id}/status` | `status(run)` | current status only |
 | `GET /v1/jobs/{id}/events` | `events(run)` / `attachRun()` | bounded, sequenced SSE with replay |
@@ -37,6 +39,11 @@ any other non-2xx body is discarded and reported as a redacted
 - Caller-provided workflow catalog names must be contained slash-separated
   paths. Absolute paths, backslashes, empty segments, `.` and `..` are
   rejected before network I/O.
+
+A contained `.nika.yaml` name uses the resident registry without a local
+engine. Prefix a local file with `./` to capture and submit its snapshot.
+A successful by-name check returns `clean: true` and the compact resident
+acknowledgement; no local check report or exit code is fabricated.
 
 ## Settlement
 

@@ -2,6 +2,7 @@
   "schema_version": 1,
   "engine": "nika 0.118.7 (f3a31a6ee)",
   "package": "supernovae-st-nika-client-0.118.7.tgz",
+  "package_sha256": "f5e8c0cbc7475a944f06ec7e75ecf18a5f225e666a1a71af5a1bcfa4f23acbc4",
   "install_mode": "npm pack + isolated npm install --omit=optional + explicit NIKA_BIN",
   "projects": [
     {
@@ -29,7 +30,12 @@
       ],
       "receipt_verified": true,
       "deterministic_cost_cap_usd": 0,
-      "installed_from_pack": true
+      "installed_from_pack": true,
+      "app_identity": {
+        "source_sha256": "6f4d68c35a397b829b92e27e3016d9b96650747a7b93540e9aa3658fe5849efb",
+        "executed_sha256": "6f4d68c35a397b829b92e27e3016d9b96650747a7b93540e9aa3658fe5849efb",
+        "byte_identical": true
+      }
     },
     {
       "project": "evidence-provenance-pipeline",
@@ -48,29 +54,79 @@
         "workflow_started"
       ],
       "deterministic_cost_cap_usd": 0,
-      "installed_from_pack": true
+      "installed_from_pack": true,
+      "app_identity": {
+        "source_sha256": "f0c75462e0bf03cbde94df62cf8870ef05f238aa560b07d3d81d13a80d57d912",
+        "executed_sha256": "f0c75462e0bf03cbde94df62cf8870ef05f238aa560b07d3d81d13a80d57d912",
+        "byte_identical": true
+      }
     },
     {
       "project": "incident-response-controller",
       "status": "succeeded",
-      "status_before_cancellation": "running",
-      "cancelled_run_status": "interrupted",
+      "project_workflow_status": "succeeded",
+      "incident_plan_verified": true,
+      "cancelled_run_status": "cancelled",
       "cancellation_idempotent": true,
       "cancellation_status": "cancellation_requested",
       "sse_event_kinds": [
-        "execution.interrupted",
+        "execution.cancelled",
         "execution.started"
       ],
       "sse_terminal": {
-        "kind": "execution.interrupted",
-        "status": "interrupted"
+        "kind": "execution.cancelled",
+        "status": "cancelled",
+        "settlement_cause": "operator"
+      },
+      "settlement": {
+        "status": "cancelled",
+        "cause": "operator",
+        "tasks": {
+          "cancelled": 1,
+          "failed": 0,
+          "never_started": 1,
+          "ok": 1,
+          "recovered": 0,
+          "skipped": 0,
+          "total": 2
+        },
+        "spend": {
+          "priced_calls": 0,
+          "qualifier": "unmetered",
+          "unpriced_calls": 0
+        },
+        "error_code": null,
+        "error_task": null
+      },
+      "same_job_terminal_and_replay_matched": true,
+      "cancellation_rendezvous": {
+        "cancel_point": "loopback fetch held before response",
+        "release": "after cancellation request acknowledgement",
+        "requests": {
+          "hold": 1,
+          "dependent": 0
+        },
+        "dependent_unstarted": true
       },
       "remote_receipt_verdict": {
         "verdict": "unavailable",
         "reason": "trace_journal_unavailable"
       },
       "deterministic_cost_cap_usd": 0,
-      "installed_from_pack": true
+      "server_cleanup": {
+        "exit_code": 0,
+        "signal": null,
+        "forced": false,
+        "reaped": true
+      },
+      "executed_app_sha256": "91740d8068f15e7432e6750bb419be0fbfd2772962dee19ab4a650a2729b4380",
+      "sdk_entry": "node_modules/@supernovae-st/nika-client/dist/index.js",
+      "installed_from_pack": true,
+      "app_identity": {
+        "source_sha256": "91740d8068f15e7432e6750bb419be0fbfd2772962dee19ab4a650a2729b4380",
+        "executed_sha256": "91740d8068f15e7432e6750bb419be0fbfd2772962dee19ab4a650a2729b4380",
+        "byte_identical": true
+      }
     },
     {
       "project": "multi-tenant-webhook-router",
@@ -85,7 +141,12 @@
         "execution.started"
       ],
       "deterministic_cost_cap_usd": 0,
-      "installed_from_pack": true
+      "installed_from_pack": true,
+      "app_identity": {
+        "source_sha256": "141d4b3b3d32e160aed3e7872cb21beb2389221d99ed28804e11015f2439092c",
+        "executed_sha256": "141d4b3b3d32e160aed3e7872cb21beb2389221d99ed28804e11015f2439092c",
+        "byte_identical": true
+      }
     },
     {
       "project": "scheduled-research-monitor",
@@ -102,7 +163,12 @@
         2
       ],
       "deterministic_cost_cap_usd": 0,
-      "installed_from_pack": true
+      "installed_from_pack": true,
+      "app_identity": {
+        "source_sha256": "de35e211fef5f7999f8420affe598e864136b3a50ff4dcd218a11e406393d348",
+        "executed_sha256": "de35e211fef5f7999f8420affe598e864136b3a50ff4dcd218a11e406393d348",
+        "byte_identical": true
+      }
     }
   ],
   "summary": {

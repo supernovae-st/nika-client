@@ -446,7 +446,8 @@ describe('HTTP engine resolution boundary', () => {
     const transport = lazyTransport(fetch, resolveEngine);
     await expect(transport.listWorkflows()).resolves.toEqual(['flow.nika.yaml']);
     expect(resolveEngine).not.toHaveBeenCalled();
-    await expect(transport.check('flow.nika.yaml', {}))
+    // A local path is caller-owned source: only that capture resolves the engine.
+    await expect(transport.check('./flow.nika.yaml', {}))
       .resolves.toMatchObject({ clean: true });
     expect(resolveEngine).toHaveBeenCalledTimes(1);
   });
@@ -456,9 +457,9 @@ describe('HTTP engine resolution boundary', () => {
     const transport = lazyTransport(fetch, () => {
       throw new NikaEngineUnavailable('darwin', 'arm64', '@supernovae-st/nika-darwin-arm64');
     });
-    await expect(transport.check('flow.nika.yaml', {}))
+    await expect(transport.check('./flow.nika.yaml', {}))
       .rejects.toBeInstanceOf(NikaEngineUnavailable);
-    await expect(transport.startRun('flow.nika.yaml', {}))
+    await expect(transport.startRun('./flow.nika.yaml', {}))
       .rejects.toBeInstanceOf(NikaEngineUnavailable);
     expect(fetch).not.toHaveBeenCalled();
   });

@@ -1,16 +1,16 @@
 name: release-finalize
 
-# Staged npm packages require a maintainer's 2FA approval. This second,
+# Publication and repository tagging are separate receipts. This second,
 # explicit ceremony creates the repository tag and GitHub Release only after
 # all five packages are publicly observable at the exact prepared version.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Approved SDK release version (e.g. 0.116.0)'
+        description: 'Published SDK release version (e.g. 0.116.0)'
         required: true
       prepared_sha:
-        description: 'Exact 40-hex commit printed by the staging job'
+        description: 'Exact 40-hex commit printed by the publishing job'
         required: true
 
 concurrency:
@@ -67,7 +67,7 @@ jobs:
           for package_name in "${packages[@]}"; do
             published="$(npm view "$package_name@$VERSION" version)"
             if [ "$published" != "$VERSION" ]; then
-              echo "::error::$package_name@$VERSION is not public after staged approval"
+              echo "::error::$package_name@$VERSION is not publicly observable"
               exit 1
             fi
             release_commit="$(npm view "$package_name@$VERSION" nikaRelease.preparedCommit)"

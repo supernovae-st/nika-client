@@ -124,8 +124,16 @@ The release ceremony is deliberately two-step. `release.yml` validates the
 tagged engine assets, starts the released Linux binary, proves the live
 OpenAPI/types pin, embeds the exact prepared commit and release version in all
 five package manifests before packing, and publishes four payloads plus the SDK
-with the repository's npm token and a Sigstore provenance attestation bound to
-the workflow identity. An occupied version is accepted only after its exact
+through npm trusted publishing with GitHub OIDC and Sigstore provenance bound
+to the workflow identity. Every package registers organization `supernovae-st`,
+repository `nika-client`, workflow filename `release.yml`, and environment
+`npm-publish`, with direct `npm publish` enabled. The GitHub-hosted publish job
+uses Node 24, npm 11.19.1 and `id-token: write`; it receives no npm write token.
+`release-heal.yml` dispatches that same file on `main`; it does not publish or
+exchange an OIDC token itself. All five package manifests identify the SDK
+repository; native `SOURCE.json` still identifies the separate engine source.
+See [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/).
+An occupied version is accepted only after its exact
 prepared tarball integrity and fetched registry bytes match; errors other than
 an explicit registry 404 refuse publication. `release-finalize.yml` refuses to create the SDK tag and GitHub
 Release until all five exact versions are publicly observable on npm and every

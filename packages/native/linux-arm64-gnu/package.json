@@ -24,5 +24,10 @@
   "preferUnplugged": true,
   "publishConfig": {
     "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/supernovae-st/nika-client.git",
+    "directory": "packages/native/linux-arm64-gnu"
   }
 }

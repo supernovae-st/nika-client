@@ -38,5 +38,5 @@ jobs:
             echo "::warning::engine is $ver but the prepared SDK train is $repo_v; waiting for its version PR"
             exit 0
           fi
-          gh workflow run Release --repo "$GITHUB_REPOSITORY" -f version="$ver"
+          gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref main -f version="$ver"
           echo "dispatched Release $ver (npm was $npm_v)"

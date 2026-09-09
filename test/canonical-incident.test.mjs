@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -22,7 +23,7 @@ test('a failed depth invocation invalidates its previous green report', async ()
     writeFileSync(report, JSON.stringify({ summary: { result: 'green' } }));
     writeFileSync(path.join(scratch, 'npm'), `#!${process.execPath}\nprocess.exitCode = 13;\n`, { mode: 0o755 });
     const result = await owned.start(process.execPath,
-      [new URL('../scripts/run-depth-projects.mjs', import.meta.url).pathname],
+      [fileURLToPath(new URL('../scripts/run-depth-projects.mjs', import.meta.url))],
       { timeoutMs: 3000, env: { PATH: scratch, HOME: scratch, NIKA_KEYCHAIN: 'off',
         NIKA_BIN: process.execPath, NIKA_GAUNTLET_RESULTS_DIR: scratch } }).done;
     assert.equal(result.code, 1);

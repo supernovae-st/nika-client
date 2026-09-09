@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -5,8 +6,8 @@ import path from 'node:path';
 import { test } from 'vitest';
 import { OwnedProcesses } from '../scripts/one-door/process.mjs';
 
-const runner = new URL('../scripts/verify-gauntlet-corpus.mjs', import.meta.url).pathname;
-const repo = path.resolve(new URL('..', import.meta.url).pathname);
+const runner = fileURLToPath(new URL('../scripts/verify-gauntlet-corpus.mjs', import.meta.url));
+const repo = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 
 for (const mode of ['success', 'invalid-json', 'not-ready', 'interrupted']) {
   test(`corpus check is an isolated, supervised observation: ${mode}`, { timeout: 15_000 }, async () => {

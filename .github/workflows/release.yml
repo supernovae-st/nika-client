@@ -1,10 +1,10 @@
 name: Release
 
 # SECURITY: no github.event text is interpolated directly into shell source.
-# npm publishes with the repository's NPM_TOKEN and a Sigstore provenance
-# attestation bound to this workflow identity (id-token). npm trusted
-# publishing (OIDC, no write token) replaces the token the day a trusted
-# publisher is registered for all five packages on npmjs.com.
+# npm trusted publishing exchanges this GitHub-hosted job's OIDC identity.
+# Register all five packages for supernovae-st/nika-client, release.yml,
+# environment npm-publish, with direct npm publish allowed. No npm write
+# token is supplied. Sigstore provenance remains bound to this workflow.
 on:
   workflow_dispatch:
     inputs:
@@ -408,8 +408,6 @@ jobs:
         run: npm install --global npm@11.19.1
 
       - name: Publish payloads, then the SDK, with provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           set -euo pipefail
           prepared_sha="$(jq -r .prepared_sha release-candidate/release-metadata.json)"
@@ -417,8 +415,8 @@ jobs:
             echo "::error::artifact commit and checked-out publishing commit differ"
             exit 1
           fi
-          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
-            echo "::error::NPM_TOKEN is not set on this repository · nothing can publish"
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo "::error::GitHub OIDC is unavailable · id-token: write is required before publication"
             exit 1
           fi
           # A partial-publish replay accepts occupied coordinates only after
@@ -441,7 +439,7 @@ jobs:
             echo "### Nika client release published"
             echo "- Version: $VERSION"
             echo "- Order: four native payloads, then root SDK"
-            echo "- Authentication: repository NPM_TOKEN · Sigstore provenance attested through this workflow identity"
+            echo "- Authentication: npm trusted publishing (GitHub OIDC) · release.yml / npm-publish · Sigstore provenance"
             echo "- Prepared commit: $(jq -r .prepared_sha release-candidate/release-metadata.json)"
             echo "- Next: release-finalize.yml tags the SDK once all five versions are observable on npm"
           } >> "$GITHUB_STEP_SUMMARY"

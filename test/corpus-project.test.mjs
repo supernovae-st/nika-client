@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -5,7 +6,7 @@ import path from 'node:path';
 import { test } from 'vitest';
 import { stageCorpus } from '../scripts/corpus-project.mjs';
 
-const repo = path.resolve(new URL('..', import.meta.url).pathname);
+const repo = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 
 for (const mode of ['clean', 'undeclared-file', 'symlink-workflow']) {
   test(`corpus staging admits only the declared regular workflows: ${mode}`, () => {

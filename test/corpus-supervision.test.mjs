@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -5,8 +6,8 @@ import path from 'node:path';
 import { test } from 'vitest';
 import { OwnedProcesses } from '../scripts/one-door/process.mjs';
 
-const runner = new URL('../scripts/execute-gauntlet-corpus.mjs', import.meta.url).pathname;
-const repo = path.resolve(new URL('..', import.meta.url).pathname);
+const runner = fileURLToPath(new URL('../scripts/execute-gauntlet-corpus.mjs', import.meta.url));
+const repo = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 
 for (const mode of ['missing', 'version-failed', 'run-failed', 'invalid-json', 'success', 'interrupted']) {
   test(`corpus owns its isolated execution and replaces stale evidence: ${mode}`, { timeout: 20_000 }, async () => {

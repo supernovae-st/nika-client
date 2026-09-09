@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
@@ -171,7 +172,7 @@ test('runner interruption reaps an uncooperative build and replaces stale green 
   writeFileSync(path.join(scratch, 'package.json'), '{"type":"module"}');
   let retained;
   try {
-    const handle = owned.start(process.execPath, [new URL('../scripts/run-hostile-gauntlet.mjs', import.meta.url).pathname],
+    const handle = owned.start(process.execPath, [fileURLToPath(new URL('../scripts/run-hostile-gauntlet.mjs', import.meta.url))],
       { timeoutMs: 7000, graceMs: 2500, env: { PATH: scratch, HOME: path.join(scratch, 'home'),
         NIKA_BIN: process.execPath, NIKA_KEYCHAIN: 'off', NIKA_GAUNTLET_RESULTS_DIR: scratch } });
     await bounded((async () => {

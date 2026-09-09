@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -26,7 +27,7 @@ for (const [name, script] of runners) {
         const env = { PATH: scratch, HOME: scratch, NIKA_KEYCHAIN: 'off', NIKA_GAUNTLET_RESULTS_DIR: scratch };
         if (selection === 'relative') env.NIKA_BIN = 'nika';
         if (selection === 'legacy') env.NIKA_GAUNTLET_BIN = process.execPath;
-        const result = await owned.start(process.execPath, [new URL(`../scripts/${script}`, import.meta.url).pathname],
+        const result = await owned.start(process.execPath, [fileURLToPath(new URL(`../scripts/${script}`, import.meta.url))],
           { env, timeoutMs: 3000 }).done;
         assert.equal(result.code, 1);
         assert.equal(result.signal, null);
@@ -54,7 +55,7 @@ for (const [name, script] of runners) {
       setInterval(() => {}, 1000);
     `, { mode: 0o755 });
     try {
-      const handle = owned.start(process.execPath, [new URL(`../scripts/${script}`, import.meta.url).pathname],
+      const handle = owned.start(process.execPath, [fileURLToPath(new URL(`../scripts/${script}`, import.meta.url))],
         { timeoutMs: 7000, graceMs: 2500, env: { PATH: scratch, HOME: path.join(scratch, 'home'),
           NIKA_BIN: process.execPath, NIKA_KEYCHAIN: 'off', NIKA_GAUNTLET_RESULTS_DIR: scratch } });
       await bounded((async () => {

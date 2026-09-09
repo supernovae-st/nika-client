@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -401,7 +402,7 @@ test('a failed invocation invalidates a prior green report before engine validat
   const owned = new OwnedProcesses();
   try {
     const result = await owned.start(process.execPath,
-      [new URL('../scripts/run-one-door-e2e.mjs', import.meta.url).pathname],
+      [fileURLToPath(new URL('../scripts/run-one-door-e2e.mjs', import.meta.url))],
       { env: { ...process.env, NIKA_BIN: 'relative-is-invalid', NIKA_ONE_DOOR_REPORT: report }, timeoutMs: 2000 }).done;
     assert.notEqual(result.code, 0);
     assert.equal(JSON.parse(readFileSync(report, 'utf8')).result, 'incomplete');

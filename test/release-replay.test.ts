@@ -502,7 +502,7 @@ function depthReport(incident: Record<string, unknown>): any {
   return {
     schema_version: 1,
     engine: ENGINE,
-    package: 'supernovae-st-nika-client-0.118.7.tgz',
+    package: 'supernovae-st-nika-0.118.7.tgz',
     projects: [{
       project: 'incident-response-controller',
       status: 'succeeded',

@@ -22,7 +22,7 @@ export function stageDepthProject(source, project, tarball) {
   cpSync(source, project, { recursive: true });
   const manifestPath = path.join(project, 'package.json');
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-  manifest.dependencies = { '@supernovae-st/nika-client': `file:${tarball}` };
+  manifest.dependencies = { '@supernovae-st/nika': `file:${tarball}` };
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   return assertAppIdentity(source, project);
 }

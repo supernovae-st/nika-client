@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { chmod, mkdir, writeFile } from 'node:fs/promises';
 import { createServer as createNetServer } from 'node:net';
 import path from 'node:path';
-import { Nika, NikaOperationError } from '@supernovae-st/nika-client';
+import { Nika, NikaOperationError } from '@supernovae-st/nika';
 
 const engine = process.env.NIKA_BIN;
 assert(engine, 'NIKA_BIN is required');

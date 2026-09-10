@@ -1,5 +1,5 @@
 {
-  "name": "@supernovae-st/nika-client",
+  "name": "@supernovae-st/nika",
   "version": "0.118.7",
   "description": "One TypeScript SDK for local and remote Nika execution",
   "repository": {

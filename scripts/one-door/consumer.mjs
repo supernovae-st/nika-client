@@ -1,14 +1,14 @@
 // This file is COPIED into a fresh npm consumer before execution. The bare
 // import must resolve its public exports; importing a repository dist path
 // would conceal broken package metadata and is deliberately not supported.
-import { Nika } from '@supernovae-st/nika-client';
+import { Nika } from '@supernovae-st/nika';
 import assert from 'node:assert/strict';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { compareResult, compareSameJobResult, compareControlledCancellation, identity, verdict } from './contract.mjs';
 
 const config = JSON.parse(readFileSync(process.argv[2], 'utf8'));
-const installed = createRequire(import.meta.url)('@supernovae-st/nika-client/package.json');
+const installed = createRequire(import.meta.url)('@supernovae-st/nika/package.json');
 assert.equal(installed.version, config.version, 'installed SDK version');
 assert.equal(process.env.NIKA_BIN, undefined, 'consumer must not inherit NIKA_BIN');
 const remote = new Nika({ url: config.url, token: config.token, allowInsecureHttp: true,

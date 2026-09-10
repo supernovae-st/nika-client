@@ -46,7 +46,7 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
   it('loads the supported host payload from an ESM import', () => {
     const project = stageProject(HOST_PACKAGE);
     const result = runNode(project, 'esm.mjs', `
-      import { Nika } from '@supernovae-st/nika-client';
+      import { Nika } from '@supernovae-st/nika';
       const report = await new Nika().check('esm-packed.nika.yaml');
       console.log(JSON.stringify(report.argv));
     `);
@@ -57,7 +57,7 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
   it('loads the supported host payload from a CJS require', () => {
     const project = stageProject(HOST_PACKAGE);
     const result = runNode(project, 'cjs.cjs', `
-      const { Nika } = require('@supernovae-st/nika-client');
+      const { Nika } = require('@supernovae-st/nika');
       new Nika().check('cjs-packed.nika.yaml').then((report) => {
         console.log(JSON.stringify(report.argv));
       });
@@ -69,7 +69,7 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
   it('lets the Node process exit immediately after a durable schedule apply', () => {
     const project = stageProject(HOST_PACKAGE);
     const result = runNode(project, 'schedule-exit.mjs', `
-      import { Nika } from '@supernovae-st/nika-client';
+      import { Nika } from '@supernovae-st/nika';
       const identity = {
         status: 'ok',
         service: 'nika-serve',
@@ -147,7 +147,7 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
       'nika',
     ), '\n// tampered\n');
     const result = runNode(project, 'tampered.mjs', `
-      import { Nika } from '@supernovae-st/nika-client';
+      import { Nika } from '@supernovae-st/nika';
       try { await new Nika().check('must-not-run.nika.yaml'); } catch (error) {
         console.log(JSON.stringify({ name: error.name, capability: error.capability }));
       }
@@ -165,7 +165,7 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
       project,
       'node_modules',
       '@supernovae-st',
-      'nika-client',
+      'nika',
       'dist',
       'bin',
       'nika.js',
@@ -185,7 +185,7 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
       project,
       'node_modules',
       '@supernovae-st',
-      'nika-client',
+      'nika',
       'dist',
       'bin',
       'nika.js',
@@ -212,7 +212,7 @@ function stageProject(payloadPackage?: string): string {
   const project = mkdtempSync(path.join(SCRATCH, 'project-'));
   const scope = path.join(project, 'node_modules', '@supernovae-st');
   mkdirSync(scope, { recursive: true });
-  cpSync(PACKED_CLIENT, path.join(scope, 'nika-client'), { recursive: true });
+  cpSync(PACKED_CLIENT, path.join(scope, 'nika'), { recursive: true });
   if (payloadPackage) installFixturePayload(scope, payloadPackage);
   return project;
 }
@@ -247,7 +247,7 @@ function installFixturePayload(scope: string, packageName: string): void {
 
 function runUnavailable(project: string) {
   return runNode(project, 'missing.mjs', `
-    import { Nika } from '@supernovae-st/nika-client';
+    import { Nika } from '@supernovae-st/nika';
     try { new Nika(); } catch (error) {
       console.log(JSON.stringify({
         name: error.name,

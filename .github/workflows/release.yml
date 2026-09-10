@@ -156,6 +156,11 @@ jobs:
           token="nika-release-openapi-probe-token-0116"
           printf '%s\n' "$token" > "$token_file"
           chmod 600 "$token_file"
+          # The log exists before the resident is launched: the discovery loop
+          # below reads it at once, and a background subshell that has not yet
+          # opened its redirection would otherwise leave nothing to read (the
+          # race that failed the prepare job on 2026-09-10).
+          : >"$probe_root/server.log"
           (
             cd "$project_dir"
             exec "$probe_root/nika" serve \
@@ -293,7 +298,7 @@ jobs:
             @supernovae-st/nika-darwin-x64
             @supernovae-st/nika-linux-arm64
             @supernovae-st/nika-linux-x64
-            @supernovae-st/nika-client
+            @supernovae-st/nika
           )
           for package_name in "${packages[@]}"; do
             node scripts/npm-publication.mjs assert-absent "$package_name" "$VERSION"
@@ -372,7 +377,7 @@ jobs:
         run: |
           npm install --global npm@11.19.1
           node scripts/verify-packed-install.mjs \
-            "release-candidate/release-tarballs/supernovae-st-nika-client-$VERSION.tgz" \
+            "release-candidate/release-tarballs/supernovae-st-nika-$VERSION.tgz" \
             "release-candidate/release-tarballs/$NATIVE_TARBALL-$VERSION.tgz" \
             "$VERSION" "$PREPARED_SHA" "$NATIVE_PACKAGE"
 
@@ -431,7 +436,7 @@ jobs:
           publish_once "@supernovae-st/nika-darwin-x64" "$tarballs/supernovae-st-nika-darwin-x64-$VERSION.tgz"
           publish_once "@supernovae-st/nika-linux-arm64" "$tarballs/supernovae-st-nika-linux-arm64-$VERSION.tgz"
           publish_once "@supernovae-st/nika-linux-x64" "$tarballs/supernovae-st-nika-linux-x64-$VERSION.tgz"
-          publish_once "@supernovae-st/nika-client" "$tarballs/supernovae-st-nika-client-$VERSION.tgz"
+          publish_once "@supernovae-st/nika" "$tarballs/supernovae-st-nika-$VERSION.tgz"
 
       - name: Release summary
         run: |

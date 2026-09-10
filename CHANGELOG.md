@@ -12,8 +12,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add six-door runtime parity and bounded, owned process supervision for the
   corpus and packed application harnesses.
 
+### Changed
+
+- The package is published as `@supernovae-st/nika`, the product's name: one
+  namespace for the owner, one artifact name per registry. The native payloads
+  were already `@supernovae-st/nika-<os>-<arch>`; the repository keeps its
+  name. Release evidence, packed-install checks and the publication gates
+  follow the new tarball name `supernovae-st-nika-<version>.tgz`.
+
+### Deprecated
+
+- `@supernovae-st/nika-client` receives no further versions. The name stays
+  installable for the versions it already holds and is marked deprecated on
+  npm after the first `@supernovae-st/nika` publication.
+
 ### Fixed
 
+- The release preparation and the CI type-drift probes create the resident's
+  `server.log` before launching it; the discovery loop no longer races a
+  background subshell that has not opened its redirection yet, the failure
+  that stopped the 2026-09-10 release preparation.
 - Resolve HTTP workflow names at the resident without a local engine; explicit
   local paths retain snapshot capture and digest verification.
 - Preserve pending cancellation, paused observation and recovered native

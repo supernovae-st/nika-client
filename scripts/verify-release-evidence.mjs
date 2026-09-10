@@ -57,7 +57,7 @@ export function verifyReleaseEvidence(root = path.resolve(import.meta.dirname, "
     throw new Error(`missing current release evidence: ${missing.join(", ")}`);
   }
 
-  const expectedPackage = `supernovae-st-nika-client-${version}.tgz`;
+  const expectedPackage = `supernovae-st-nika-${version}.tgz`;
   const currentIdentities = new Set();
   let currentFiles = 0;
   let historicalFiles = 0;

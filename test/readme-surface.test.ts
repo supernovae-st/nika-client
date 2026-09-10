@@ -28,12 +28,12 @@ describe('packed public documentation', () => {
 
   it('exports package metadata so consumers can prove the installed pin', () => {
     expect(manifest.exports?.['./package.json']).toBe('./package.json');
-    expect(readme).toContain("require('@supernovae-st/nika-client/package.json').version");
+    expect(readme).toContain("require('@supernovae-st/nika/package.json').version");
   });
 
   it('does not regress to removed APIs or claim a webhook verifier', () => {
     for (const publicSurface of [readme, mediaScript]) {
-      expect(publicSurface).not.toContain("from '@supernovae-st/nika-client/local'");
+      expect(publicSurface).not.toContain("from '@supernovae-st/nika/local'");
       expect(publicSurface).not.toContain('new LocalNika');
       expect(publicSurface).not.toContain('runToEnd(');
     }

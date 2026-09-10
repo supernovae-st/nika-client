@@ -22,7 +22,7 @@ All workflows use the public envelope and task-map form, the canonical `invoke` 
 - `git diff --check` — passed.
 
 The final release-candidate replay used the public release engine `nika 0.118.7 (f3a31a6ee)`
-with `supernovae-st-nika-client-0.118.7.tgz`; all five projects
+with `supernovae-st-nika-0.118.7.tgz`; all five projects
 remained green. The generated JSON records installed-from-pack proof, stable
 scenario facts, typed error names/codes, receipt verdicts, event observations,
 concurrency, cancellation, CAS, and restart evidence.

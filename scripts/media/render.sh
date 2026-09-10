@@ -34,7 +34,7 @@ outputs:
   brief: ${{ tasks.brief.output }}
 EOF
 cat > /tmp/sdk-demo/demo.mjs <<'EOF'
-import { Nika } from '@supernovae-st/nika-client';
+import { Nika } from '@supernovae-st/nika';
 
 const nika = new Nika({ cwd: process.cwd() });
 const report = await nika.check('flow.nika.yaml');

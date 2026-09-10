@@ -83,13 +83,13 @@ test('same-job comparison rejects fabricated cancellation and preserves a racing
 
 test('consumer cancellation lane rejects fabricated cancellation and lost actual settlement', { timeout: 10000 }, async () => {
   const scratch = mkdtempSync(path.join(tmpdir(), 'one-door-cancellation-mutation-'));
-  const packageRoot = path.join(scratch, 'node_modules/@supernovae-st/nika-client');
+  const packageRoot = path.join(scratch, 'node_modules/@supernovae-st/nika');
   const owned = new OwnedProcesses();
   const env = { ...process.env };
   delete env.NIKA_BIN;
   try {
     mkdirSync(packageRoot, { recursive: true });
-    writeFileSync(path.join(packageRoot, 'package.json'), JSON.stringify({ name: '@supernovae-st/nika-client',
+    writeFileSync(path.join(packageRoot, 'package.json'), JSON.stringify({ name: '@supernovae-st/nika',
       version: '0.118.1', type: 'module', exports: { '.': './index.js', './package.json': './package.json' } }));
     // Test double for both the SDK and gate control: release is an explicit
     // promise rendezvous, with no engine, installation, network, or sleep.
@@ -248,13 +248,13 @@ test('same-job comparator checks the separate error copy and all additive diagno
 
 test.each(['event', 'attach', 'replay'])('consumer rejects same-job settlement loss at %s', { timeout: 10000 }, async (boundary) => {
   const scratch = mkdtempSync(path.join(tmpdir(), 'one-door-settlement-test-'));
-  const packageRoot = path.join(scratch, 'node_modules/@supernovae-st/nika-client');
+  const packageRoot = path.join(scratch, 'node_modules/@supernovae-st/nika');
   const owned = new OwnedProcesses();
   const env = { ...process.env };
   delete env.NIKA_BIN;
   try {
     mkdirSync(packageRoot, { recursive: true });
-    writeFileSync(path.join(packageRoot, 'package.json'), JSON.stringify({ name: '@supernovae-st/nika-client',
+    writeFileSync(path.join(packageRoot, 'package.json'), JSON.stringify({ name: '@supernovae-st/nika',
       version: '0.118.1', type: 'module', exports: { '.': './index.js', './package.json': './package.json' } }));
     // A transport double only: no engine, build, npm install, or network.
     writeFileSync(path.join(packageRoot, 'index.js'), `
@@ -367,7 +367,7 @@ test('supervisor bounds output and preserves unrelated owned groups until explic
 
 test('consumer uses installed bare exports and rejects a malformed export despite valid dist code', { timeout: 6000 }, async () => {
   const scratch = mkdtempSync(path.join(tmpdir(), 'one-door-export-test-'));
-  const packageRoot = path.join(scratch, 'node_modules/@supernovae-st/nika-client');
+  const packageRoot = path.join(scratch, 'node_modules/@supernovae-st/nika');
   const owned = new OwnedProcesses();
   const env = { ...process.env };
   delete env.NIKA_BIN;
@@ -377,7 +377,7 @@ test('consumer uses installed bare exports and rejects a malformed export despit
     for (const file of ['consumer.mjs', 'contract.mjs']) {
       copyFileSync(new URL(`../scripts/one-door/${file}`, import.meta.url), path.join(scratch, file));
     }
-    const manifest = { name: '@supernovae-st/nika-client', version: '0.118.1', type: 'module',
+    const manifest = { name: '@supernovae-st/nika', version: '0.118.1', type: 'module',
       exports: { '.': './dist/index.js', './package.json': './package.json' } };
     const config = path.join(scratch, 'request.json');
     writeFileSync(config, JSON.stringify({ action: 'catalog', names: [], door: 'sdk-name', version: manifest.version,

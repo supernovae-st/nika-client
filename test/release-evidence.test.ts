@@ -7,7 +7,7 @@ import { verifyReleaseEvidence } from '../scripts/verify-release-evidence.mjs';
 const ROOT = path.resolve(import.meta.dirname, '..');
 const VERSION = '0.118.7';
 const ENGINE = 'nika 0.118.7 (f3a31a6ee)';
-const PACKAGE = 'supernovae-st-nika-client-0.118.7.tgz';
+const PACKAGE = 'supernovae-st-nika-0.118.7.tgz';
 const currentEvidence = [
   'gauntlet/projects-depth/results.json',
   'gauntlet/results/hostile.json',
@@ -94,11 +94,11 @@ describe('release evidence identity', () => {
     writeJson(fixture, 'gauntlet/results/mini-saas.json', {
       schema_version: 1,
       engine: ENGINE,
-      package: 'supernovae-st-nika-client-0.116.0.tgz',
+      package: 'supernovae-st-nika-0.116.0.tgz',
     });
 
     expect(() => verifyReleaseEvidence(fixture)).toThrow(
-      `records package supernovae-st-nika-client-0.116.0.tgz, expected ${PACKAGE}`,
+      `records package supernovae-st-nika-0.116.0.tgz, expected ${PACKAGE}`,
     );
   });
 

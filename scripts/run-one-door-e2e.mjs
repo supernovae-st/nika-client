@@ -66,7 +66,7 @@ try {
     assert.equal(publicVersion, version, 'public SDK and repository release train');
     assert.match(engine.version, new RegExp(`^nika ${version.replaceAll('.', '\\.')} \\([0-9a-f]+\\)$`));
   }
-  let dependency = `@supernovae-st/nika-client@${publicVersion}`;
+  let dependency = `@supernovae-st/nika@${publicVersion}`;
   if (!publicVersion) {
     await owned.run('npm', ['run', 'build'], { cwd: root, env, timeoutMs: 60_000 });
     const [packed] = JSON.parse(await owned.run('npm', [

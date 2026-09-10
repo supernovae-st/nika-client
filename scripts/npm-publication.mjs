@@ -77,15 +77,33 @@ async function localIntegrity(file) {
   return `sha512-${hash.digest('base64')}`;
 }
 
-async function verifyBytes(value, name, version, integrity, fetch) {
+// A publication becomes visible in two steps: the version's metadata first, its
+// archive on the registry's CDN later. Measured 2026-09-10: the darwin-arm64
+// payload answered `+ @supernovae-st/nika-darwin-arm64@0.118.7`, its metadata
+// was readable at once, and its tarball URL kept answering 404 for minutes. Both
+// post-publish reads therefore wait, bounded and loud: a 404 or a 5xx on the
+// archive is « not served yet », never « different bytes »; the failure keeps its
+// original words once the window closes.
+const REGISTRY_WAIT = Object.freeze({ attempts: 60, waitMs: 15_000 }); // fifteen minutes
+
+function defaultSleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
+
+async function verifyBytes(value, name, version, integrity, fetch, wait = REGISTRY_WAIT, sleep = defaultSleep) {
   const leaf = name.split('/')[1];
   const expectedUrl = `${REGISTRY}/${name}/-/${leaf}-${version}.tgz`;
   if (value.dist?.integrity !== integrity || value.dist?.tarball !== expectedUrl) {
     throw new Error('occupied npm version differs from prepared integrity or canonical URL');
   }
-  const reply = await response(expectedUrl, fetch);
-  if (reply.status !== 200) {
+  let reply;
+  for (let attempt = 1; ; attempt += 1) {
+    reply = await response(expectedUrl, fetch);
+    if (reply.status === 200) break;
     await reply.body?.cancel();
+    if ((reply.status === 404 || reply.status >= 500) && attempt < wait.attempts) {
+      console.error(`npm archive HTTP ${reply.status} · not served yet · attempt ${attempt}/${wait.attempts} · waiting ${wait.waitMs} ms`);
+      await sleep(wait.waitMs);
+      continue;
+    }
     throw new Error(`npm archive HTTP ${reply.status}`);
   }
   const hash = createHash('sha512');
@@ -98,7 +116,9 @@ async function verifyBytes(value, name, version, integrity, fetch) {
 // The prepared artifact is already pack-inspected and platform-tested upstream.
 // This boundary proves immutable byte convergence, not cross-package atomicity
 // or provenance on replay. It never adopts a version merely because it exists.
-export async function publishExact(name, version, file, { fetch = globalThis.fetch, run = execFileSync } = {}) {
+export async function publishExact(name, version, file, {
+  fetch = globalThis.fetch, run = execFileSync, wait = REGISTRY_WAIT, sleep = defaultSleep,
+} = {}) {
   coordinate(name, version);
   file = path.resolve(file);
   const integrity = await localIntegrity(file);
@@ -110,9 +130,14 @@ export async function publishExact(name, version, file, { fetch = globalThis.fet
       stdio: 'inherit', timeout: 180_000, killSignal: 'SIGKILL',
     });
     value = await published(name, version, fetch);
+    for (let attempt = 1; value === null && attempt < wait.attempts; attempt += 1) {
+      console.error(`published npm version not observable yet · attempt ${attempt}/${wait.attempts} · waiting ${wait.waitMs} ms`);
+      await sleep(wait.waitMs);
+      value = await published(name, version, fetch);
+    }
     if (value === null) throw new Error('published npm version is not observable');
   }
-  await verifyBytes(value, name, version, integrity, fetch);
+  await verifyBytes(value, name, version, integrity, fetch, wait, sleep);
   if (await localIntegrity(file) !== integrity) throw new Error('prepared npm bytes changed during publication');
   return { published: didPublish, integrity };
 }

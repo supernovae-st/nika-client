@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The publication proof waits for the registry: after `npm publish` the
+  version's metadata and its archive become visible in two steps, and the
+  darwin-arm64 payload's tarball answered 404 for minutes on 2026-09-10 while
+  its metadata was already served. Both post-publish reads now retry a 404 or
+  a 5xx for a bounded window (sixty attempts, fifteen seconds apart) and keep
+  their original failure words when it closes; a 4xx other than 404 still
+  refuses at once.
 - The release preparation and the CI type-drift probes create the resident's
   `server.log` before launching it; the discovery loop no longer races a
   background subshell that has not opened its redirection yet, the failure

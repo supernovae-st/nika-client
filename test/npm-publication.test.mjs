@@ -82,7 +82,45 @@ test('publication refusal is not followed by a success claim', async () => {
 });
 
 test('success exit with absent public bytes is still a failed release', async () => {
-  await expect(publishExact(name, version, await fixture(), { fetch: registry(absent(), absent()), run: vi.fn() })).rejects.toThrow('not observable');
+  const wait = { attempts: 1, waitMs: 0 };
+  await expect(publishExact(name, version, await fixture(), { fetch: registry(absent(), absent()), run: vi.fn(), wait })).rejects.toThrow('not observable');
+});
+
+// Measured 2026-09-10 on @supernovae-st/nika-darwin-arm64@0.118.7: `npm publish`
+// answered `+ …@0.118.7`, the metadata was readable at once, and the tarball URL
+// kept answering 404 for minutes. The registry serves a publication in two steps.
+test('a freshly published archive that lags its metadata is re-read until served', async () => {
+  const file = await fixture();
+  const notYet = () => new Response('later', { status: 404 });
+  const outage = () => new Response('later', { status: 503 });
+  const fetch = registry(absent(), metadata(), notYet(), outage(), new Response(bytes));
+  const sleep = vi.fn(async () => {});
+  await expect(publishExact(name, version, file, { fetch, run: vi.fn(), wait: { attempts: 5, waitMs: 7 }, sleep })).resolves.toEqual({ published: true, integrity });
+  expect(fetch).toHaveBeenCalledTimes(5);
+  expect(sleep).toHaveBeenCalledTimes(2);
+  expect(sleep).toHaveBeenCalledWith(7);
+});
+
+test('metadata that lags a publish is re-read before the archive', async () => {
+  const fetch = registry(absent(), absent(), metadata(), new Response(bytes));
+  await expect(publishExact(name, version, await fixture(), { fetch, run: vi.fn(), wait: { attempts: 3, waitMs: 0 } })).resolves.toEqual({ published: true, integrity });
+  expect(fetch).toHaveBeenCalledTimes(4);
+});
+
+test('the archive wait is bounded and keeps its words', async () => {
+  const notYet = () => new Response('later', { status: 404 });
+  const fetch = registry(absent(), metadata(), notYet(), notYet());
+  const run = vi.fn();
+  await expect(publishExact(name, version, await fixture(), { fetch, run, wait: { attempts: 2, waitMs: 0 } })).rejects.toThrow('npm archive HTTP 404');
+  expect(run).toHaveBeenCalledTimes(1);
+  expect(fetch).toHaveBeenCalledTimes(4);
+});
+
+test('an occupied version whose archive is not served yet waits too, and a 4xx other than 404 still refuses', async () => {
+  const fetch = registry(metadata(), new Response('later', { status: 404 }), new Response(bytes));
+  await expect(publishExact(name, version, await fixture(), { fetch, run: vi.fn(), wait: { attempts: 3, waitMs: 0 } })).resolves.toEqual({ published: false, integrity });
+  const forbidden = registry(metadata(), new Response('no', { status: 403 }));
+  await expect(publishExact(name, version, await fixture(), { fetch: forbidden, run: vi.fn(), wait: { attempts: 3, waitMs: 0 } })).rejects.toThrow('npm archive HTTP 403');
 });
 
 test('prepared bytes changing during publication cannot be accepted', async () => {

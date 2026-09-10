@@ -34,7 +34,7 @@ try {
 
   const expectedVersion = packed[0]?.version;
   if (typeof expectedVersion !== 'string') throw new Error('npm pack returned no version');
-  const packageName = '@supernovae-st/nika-client';
+  const packageName = '@supernovae-st/nika';
   const commonJs = [
     `const sdk = require('${packageName}');`,
     `const manifest = require('${packageName}/package.json');`,

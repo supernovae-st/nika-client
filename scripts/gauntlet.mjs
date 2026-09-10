@@ -87,7 +87,7 @@ export async function installProject(source, project, tarball, run) {
   cpSync(source, project, { recursive: true });
   const manifestPath = path.join(project, 'package.json');
   const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-  manifest.dependencies = { '@supernovae-st/nika-client': `file:${tarball}` };
+  manifest.dependencies = { '@supernovae-st/nika': `file:${tarball}` };
   writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   await run('npm', ['install', '--ignore-scripts', '--omit=optional', '--no-audit', '--no-fund'],
     { cwd: project, timeoutMs: 60_000 });

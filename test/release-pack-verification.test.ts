@@ -27,7 +27,7 @@ function fixture(
   mkdirSync(packageRoot);
   mkdirSync(tarballs);
   writeFileSync(path.join(packageRoot, 'package.json'), JSON.stringify({
-    name: '@supernovae-st/nika-client',
+    name: '@supernovae-st/nika',
     version,
     type: 'module',
     exports: {
@@ -44,11 +44,11 @@ function fixture(
     nikaRelease: { preparedCommit, version },
     ...manifestOverrides,
   }));
-  const filename = 'supernovae-st-nika-client-0.116.0.tgz';
+  const filename = 'supernovae-st-nika-0.116.0.tgz';
   execFileSync('tar', ['-czf', path.join(tarballs, filename), '-C', root, 'package']);
   const report = path.join(root, 'pack.json');
   writeFileSync(report, JSON.stringify([{
-    name: '@supernovae-st/nika-client',
+    name: '@supernovae-st/nika',
     version,
     filename,
     files: [

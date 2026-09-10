@@ -215,6 +215,10 @@ jobs:
           umask 077
           printf '%s' "$NIKA_SERVE_TOKEN" > "$token_file"
           chmod 600 "$token_file"
+          # The log exists before the resident is launched: the discovery loop
+          # reads it at once, and a background subshell that has not yet opened
+          # its redirection would otherwise leave nothing to read.
+          : >"$probe_root/server.log"
           (
             cd "$project_dir"
             exec nika serve \

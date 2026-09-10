@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { Nika } from '@supernovae-st/nika-client';
+import { Nika } from '@supernovae-st/nika';
 
 const mode = process.argv[2];
 const config = {

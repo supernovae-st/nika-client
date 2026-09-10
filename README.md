@@ -7,7 +7,7 @@
   </a>
 </p>
 
-<h1 align="center">@supernovae-st/nika-client</h1>
+<h1 align="center">@supernovae-st/nika</h1>
 
 <p align="center"><strong>One TypeScript surface for local Nika processes and authenticated Nika servers.</strong></p>
 
@@ -43,8 +43,8 @@ not parse YAML or reconstruct proof in TypeScript.
 ## Install
 
 ```sh
-npm view @supernovae-st/nika-client@0.118.7 version  # must report 0.118.7
-npm install @supernovae-st/nika-client@0.118.7
+npm view @supernovae-st/nika@0.118.7 version  # must report 0.118.7
+npm install @supernovae-st/nika@0.118.7
 ```
 
 If the registry reports any other version, the 0.118.7 release train is not
@@ -53,10 +53,16 @@ not implement the root facade documented below. The publication is complete
 only when the four matching native payload packages and this root client are
 all visible on npm.
 
+This package carries the product's name. Up to 0.115.0 it was published as
+`@supernovae-st/nika-client`; that name is deprecated on npm, stays installable
+for the versions it already holds, and receives no further releases. The
+native payloads were already `@supernovae-st/nika-<os>-<arch>`, and the
+repository keeps its name (`supernovae-st/nika-client`).
+
 Verify the package that the current project actually resolved:
 
 ```sh
-node -p "require('@supernovae-st/nika-client/package.json').version"
+node -p "require('@supernovae-st/nika/package.json').version"
 ```
 
 This package metadata subpath is exported for CommonJS, ESM build tools and CI
@@ -94,7 +100,7 @@ outputs:
 Then drive the installed engine:
 
 ```ts
-import { Nika } from '@supernovae-st/nika-client';
+import { Nika } from '@supernovae-st/nika';
 
 const nika = new Nika({
   cwd: process.cwd(),
@@ -233,7 +239,7 @@ Connect from Node:
 
 ```ts
 import { readFile } from 'node:fs/promises';
-import { Nika } from '@supernovae-st/nika-client';
+import { Nika } from '@supernovae-st/nika';
 
 const token = (await readFile('.nika/serve.token', 'utf8')).trim();
 const nika = new Nika({
@@ -530,7 +536,7 @@ drift without treating it as a workflow failure.
 ```sh
 nika doctor
 brew upgrade nika
-npm update @supernovae-st/nika-client
+npm update @supernovae-st/nika
 ```
 
 <!-- city:map -->

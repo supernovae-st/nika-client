@@ -4,7 +4,7 @@ import { chmod, mkdir, writeFile } from 'node:fs/promises';
 import { createServer as createHttpServer } from 'node:http';
 import { createServer as createNetServer } from 'node:net';
 import path from 'node:path';
-import { Nika } from '@supernovae-st/nika-client';
+import { Nika } from '@supernovae-st/nika';
 
 const engine = process.env.NIKA_BIN;
 assert(engine, 'NIKA_BIN is required');

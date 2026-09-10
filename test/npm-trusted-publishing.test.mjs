@@ -45,7 +45,7 @@ test('the publishing shell accepts GitHub OIDC without an npm write token', asyn
   expect(result.calls.map((call) => call.split(' ')[2])).toEqual([
     '@supernovae-st/nika-darwin-arm64', '@supernovae-st/nika-darwin-x64',
     '@supernovae-st/nika-linux-arm64', '@supernovae-st/nika-linux-x64',
-    '@supernovae-st/nika-client',
+    '@supernovae-st/nika',
   ]);
   expect(publishStep).not.toContain('secrets.NPM_TOKEN');
 });

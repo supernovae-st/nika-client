@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { Nika } from '@supernovae-st/nika-client';
+import { Nika } from '@supernovae-st/nika';
 
 const engine = process.env.NIKA_BIN;
 assert(engine, 'NIKA_BIN is required');

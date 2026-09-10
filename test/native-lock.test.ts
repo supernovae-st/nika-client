@@ -151,7 +151,7 @@ describe('native package lock coverage', () => {
 
 function assertRootManifest(manifest: RootManifest): void {
   expect(manifest).toMatchObject({
-    name: '@supernovae-st/nika-client',
+    name: '@supernovae-st/nika',
     type: 'module',
     exports: {
       '.': {

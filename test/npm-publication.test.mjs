@@ -5,11 +5,11 @@ import path from 'node:path';
 import { afterEach, expect, test, vi } from 'vitest';
 import { assertAbsent, publishExact } from '../scripts/npm-publication.mjs';
 
-const name = '@supernovae-st/nika-client';
+const name = '@supernovae-st/nika';
 const version = '0.118.7';
 const bytes = Buffer.from('prepared immutable tarball');
 const integrity = `sha512-${createHash('sha512').update(bytes).digest('base64')}`;
-const tarball = 'https://registry.npmjs.org/@supernovae-st/nika-client/-/nika-client-0.118.7.tgz';
+const tarball = 'https://registry.npmjs.org/@supernovae-st/nika/-/nika-0.118.7.tgz';
 const directories = [];
 afterEach(async () => { await Promise.all(directories.splice(0).map((dir) => rm(dir, { recursive: true, force: true }))); });
 

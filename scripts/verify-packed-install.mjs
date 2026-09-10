@@ -54,7 +54,7 @@ try {
   ]);
 
   const clientManifest = await readJson(
-    path.join(project, 'node_modules/@supernovae-st/nika-client/package.json'),
+    path.join(project, 'node_modules/@supernovae-st/nika/package.json'),
   );
   const nativeManifest = await readJson(
     path.join(project, 'node_modules', ...nativePackageName.split('/'), 'package.json'),
@@ -79,7 +79,7 @@ try {
     '',
   ].join('\n'));
   run(process.execPath, ['--input-type=module', '--eval', [
-    "import { Nika } from '@supernovae-st/nika-client';",
+    "import { Nika } from '@supernovae-st/nika';",
     'const nika = new Nika({ cwd: process.cwd() });',
     "if (nika.transportKind !== 'native-process') process.exit(1);",
     "const report = await nika.check('packed-release-smoke.nika.yaml');",

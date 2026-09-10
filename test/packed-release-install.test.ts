@@ -57,7 +57,7 @@ function packedFixture(engineVersion: string): { client: string; native: string 
   mkdirSync(tarballs);
 
   writeFileSync(path.join(clientRoot, 'package.json'), JSON.stringify({
-    name: '@supernovae-st/nika-client',
+    name: '@supernovae-st/nika',
     version: VERSION,
     type: 'module',
     exports: './dist/index.js',

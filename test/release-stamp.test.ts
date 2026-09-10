@@ -139,7 +139,7 @@ function createFixture(version: string): string {
   scratch.push(fixture);
   for (const [index, relativePath] of manifestPaths.entries()) {
     writeManifest(fixture, relativePath, {
-      name: index === 0 ? '@supernovae-st/nika-client' : `@supernovae-st/native-${index}`,
+      name: index === 0 ? '@supernovae-st/nika' : `@supernovae-st/native-${index}`,
       version,
     });
   }

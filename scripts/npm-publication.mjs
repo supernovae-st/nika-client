@@ -13,7 +13,7 @@ function coordinate(name, version) {
   if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
     throw new Error('invalid stable npm coordinate');
   }
-  if (name !== '@supernovae-st/nika-client') {
+  if (name !== '@supernovae-st/nika') {
     try { nativeTarget(name, version); } catch { throw new Error('invalid npm package coordinate'); }
   }
   return `${REGISTRY}/${encodeURIComponent(name)}/${version}`;

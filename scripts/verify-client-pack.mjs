@@ -52,7 +52,7 @@ const expectedExports = {
   './package.json': './package.json',
 };
 if (
-  manifest.name !== '@supernovae-st/nika-client'
+  manifest.name !== '@supernovae-st/nika'
   || manifest.type !== 'module'
   || manifest.main !== './dist/index.cjs'
   || manifest.module !== './dist/index.js'

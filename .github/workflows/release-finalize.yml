@@ -62,7 +62,7 @@ jobs:
             @supernovae-st/nika-darwin-x64
             @supernovae-st/nika-linux-arm64
             @supernovae-st/nika-linux-x64
-            @supernovae-st/nika-client
+            @supernovae-st/nika
           )
           for package_name in "${packages[@]}"; do
             published="$(npm view "$package_name@$VERSION" version)"

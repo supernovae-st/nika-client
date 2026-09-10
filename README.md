@@ -9,83 +9,45 @@
 
 <h1 align="center">@supernovae-st/nika</h1>
 
-<p align="center"><strong>One TypeScript surface for local Nika processes and authenticated Nika servers.</strong></p>
+<p align="center">
+  <strong>The TypeScript door to Nika: audit a workflow, run it, watch it, prove it.</strong><br>
+  Locally through the released engine, or against an authenticated <code>nika serve</code>.
+</p>
 
-`Nika` exposes one lifecycle vocabulary: `check`, `run`, `attachRun`, `status`, `events`,
-`cancel`, `traceVerify`, `listWorkflows`, `workflow`, `schedule`, and
-`scheduleStatus`.
-The engine remains authoritative for parsing, admission, execution, receipts,
-traces, permits, scheduling, and cost. The SDK transports those facts; it does
-not parse YAML or reconstruct proof in TypeScript.
+<p align="center">
+  <a href="https://www.npmjs.com/package/@supernovae-st/nika"><img src="https://img.shields.io/npm/v/@supernovae-st/nika?label=npm" alt="npm version"></a>
+  <a href="https://github.com/supernovae-st/nika-client/actions/workflows/ci.yml"><img src="https://github.com/supernovae-st/nika-client/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
+  <a href="https://github.com/supernovae-st/nika/releases/latest"><img src="https://img.shields.io/github/v/release/supernovae-st/nika?label=engine" alt="Engine release"></a>
+  <a href="https://docs.nika.sh"><img src="https://img.shields.io/badge/docs-docs.nika.sh-8b8cf8.svg" alt="Documentation"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="Apache-2.0"></a>
+</p>
 
-## Requirements
+<p align="center">
+  <a href="https://scorecard.dev/viewer/?uri=github.com/supernovae-st/nika-client"><img src="https://api.scorecard.dev/projects/github.com/supernovae-st/nika-client/badge" alt="OpenSSF Scorecard"></a>
+  <a href="https://www.npmjs.com/package/@supernovae-st/nika"><img src="https://img.shields.io/badge/npm-provenance-2ea44f.svg" alt="Published with provenance through GitHub Actions trusted publishing"></a>
+  <a href="https://www.npmjs.com/package/@supernovae-st/nika"><img src="https://img.shields.io/npm/dm/@supernovae-st/nika?label=downloads" alt="npm downloads"></a>
+  <a href="https://archive.softwareheritage.org/browse/origin/?origin_url=https://github.com/supernovae-st/nika-client"><img src="https://archive.softwareheritage.org/badge/origin/https://github.com/supernovae-st/nika-client/" alt="Archived by Software Heritage"></a>
+</p>
 
-- Node.js 22 or newer (the tested floor; an older major is unsupported, not
-  refused, and `npm install` does not warn about it)
-- for native execution or local snapshot capture, a compatible `nika` engine, resolved from `config.bin`, then `NIKA_BIN`
-  (absolute paths only), then the exact optional platform package; a bare
-  name or a relative path is refused because the operating system would
-  resolve it through `PATH` or the working directory, and a `nika` found on
-  `PATH` is deliberately never used
-- a `.nika.yaml` workflow
+## Thirty seconds, no API key
 
-## Documentation
-
-- [Architecture](docs/architecture.md) — Modules, Interface, Seam, Adapters,
-  lifecycle, and authority boundaries
-- [HTTP contract](docs/http-api.md) — every live route, recovery, security,
-  idempotency, and schedule CAS
-- [Testing and release evidence](docs/testing.md) — layered gauntlets and the
-  Socratic risk matrix
-- [Migrating to 0.116](docs/migrating-to-0.116.md) — intentional breaking
-  migration to the smaller durable client surface
-
-## Install
+One package installs the client, the `nika` command and the engine payload for
+your platform (macOS and Linux, arm64 and x64):
 
 ```sh
-npm view @supernovae-st/nika@0.118.7 version  # must report 0.118.7
 npm install @supernovae-st/nika@0.118.7
+./node_modules/.bin/nika --version
 ```
 
-If the registry reports any other version, the 0.118.7 release train is not
-complete. Earlier packages expose the retired `LocalNika`/HTTP split and do
-not implement the root facade documented below. The publication is complete
-only when the four matching native payload packages and this root client are
-all visible on npm.
-
-This package carries the product's name. Up to 0.115.0 it was published as
-`@supernovae-st/nika-client`; that name is deprecated on npm, stays installable
-for the versions it already holds, and receives no further releases. The
-native payloads were already `@supernovae-st/nika-<os>-<arch>`, and the
-repository keeps its name (`supernovae-st/nika-client`).
-
-Verify the package that the current project actually resolved:
-
-```sh
-node -p "require('@supernovae-st/nika/package.json').version"
+```
+nika 0.118.7 (f3a31a6ee)
 ```
 
-This package metadata subpath is exported for CommonJS, ESM build tools and CI
-pin checks. It reports the installed dependency, not a moving registry tag.
-
-## First local run
-
-The lowest-friction creation door is the engine-owned scaffold:
-
-```sh
-./node_modules/.bin/nika init --project-file
-./node_modules/.bin/nika new 01-hello hello.nika.yaml
-```
-
-`nika.yaml` is the project control plane. `hello.nika.yaml` is executable
-workflow intent and is the file passed to `check()` and `run()`. The scaffold
-writes the engine's own annotated `01-hello` example (its task is named
-`greet` and its prompt asks for French); the contract this README relies on is
-the `outputs.greeting` key and the `mock/echo` model, and the same file can be
-written by hand with this public envelope:
+Write `hello.nika.yaml`. The `mock/echo` model rehearses with no key and no
+network:
 
 ```yaml
-nika: sdk-hello
+nika: hello
 model: mock/echo
 permits: {}
 tasks:
@@ -97,7 +59,22 @@ outputs:
   greeting: ${{ tasks.greeting.output }}
 ```
 
-Then drive the installed engine:
+Audit it before anything runs:
+
+```sh
+./node_modules/.bin/nika check hello.nika.yaml
+```
+
+```
+ ✔ ORDER    no exec: sits downstream of a net-effecting task · unauthored content never reaches a shell
+ ✔ PERMITS  literal + const: args fit the boundary · computed paths + symlinks are the RUN's verdict
+ ✔ TRIFECTA no lethal trifecta over the declared permits: without a human gate
+ ✔ JOURNEY internal · 0 sources · 0 destinations · 1 model endpoint · no secret reaches an external destination
+ ✔ audited · 1 task · 1 wave · permits {} · est out ≤$0.0000 · 0 hints · risk low
+ layers · valid ✔ · access ready ✔ · capacity fit ✔ · run ready ✔
+```
+
+Now drive the same engine from TypeScript:
 
 ```ts
 import { Nika } from '@supernovae-st/nika';
@@ -129,6 +106,13 @@ Expected output: `workflow_started`, `task_scheduled`, `task_started`,
 `task_completed`, `workflow_completed`, then `run_settled succeeded`, then the
 terminal `succeeded` line with the outputs and the receipt.
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/supernovae-st/nika-client/main/media/local-driver.gif" alt="The typed driver over the released binary: check the workflow, gate on the report, run it to the end under a cost ceiling, count the events" width="960">
+</p>
+
+*Recorded by `scripts/media/render.sh` against this package and the released
+engine; every line on screen is the SDK's own output.*
+
 Native checks and explicit local snapshot checks preserve the engine's
 `findings[]` and `exitCode`. A check by served name returns the resident's
 compact acknowledgement with `clean: true`, or its typed workflow refusal
@@ -141,6 +125,93 @@ protocol, configuration, and compatibility failures throw typed SDK errors.
 A `try { await run.done } catch {}` alone therefore never catches a failed
 workflow: a CI job or an application must read `result.status` and treat
 anything but `succeeded` as its own failure, or a red run passes silently.
+
+## Why this door
+
+- **Audited before it runs.** `check()` returns the engine's verdict on the
+  order of effects, the permits, the lethal trifecta, the journey of every
+  secret and the cost floor. A red check never becomes a run.
+- **Sovereign by default.** The same file runs on local models (Ollama,
+  llama.cpp, vLLM), on Mistral, Hugging Face, OpenAI, xAI, Anthropic and the
+  rest of the engine's catalog; `mock/echo` rehearses with no key and no
+  network.
+- **Traced after.** Every native run leaves a hash-chained journal and hands
+  back a receipt; `traceVerify()` asks the engine to verify it. The SDK never
+  re-implements the proof.
+- **One vocabulary, two transports.** `check`, `run`, `events`, `cancel`,
+  `traceVerify` and `schedule` read the same against a local process and an
+  authenticated `nika serve`; only the constructor changes.
+
+## One vocabulary
+
+`Nika` exposes one lifecycle vocabulary: `check`, `run`, `attachRun`, `status`, `events`,
+`cancel`, `traceVerify`, `listWorkflows`, `workflow`, `schedule`, and
+`scheduleStatus`.
+The engine remains authoritative for parsing, admission, execution, receipts,
+traces, permits, scheduling, and cost. The SDK transports those facts; it does
+not parse YAML or reconstruct proof in TypeScript.
+
+## Requirements
+
+- Node.js 22 or newer (the tested floor; an older major is unsupported, not
+  refused, and `npm install` does not warn about it)
+- for native execution or local snapshot capture, a compatible `nika` engine, resolved from `config.bin`, then `NIKA_BIN`
+  (absolute paths only), then the exact optional platform package; a bare
+  name or a relative path is refused because the operating system would
+  resolve it through `PATH` or the working directory, and a `nika` found on
+  `PATH` is deliberately never used
+- a `.nika.yaml` workflow
+
+## Documentation
+
+- [Architecture](docs/architecture.md) · Modules, Interface, Seam, Adapters,
+  lifecycle, and authority boundaries
+- [HTTP contract](docs/http-api.md) · every live route, recovery, security,
+  idempotency, and schedule CAS
+- [Testing and release evidence](docs/testing.md) · layered gauntlets and the
+  Socratic risk matrix
+- [Migrating to 0.116](docs/migrating-to-0.116.md) · the intentional breaking
+  migration to the smaller durable client surface
+- [docs.nika.sh](https://docs.nika.sh) · the language, the engine and the
+  other doors
+
+## Install
+
+Pin the version you tested, then verify the package the project actually
+resolved:
+
+```sh
+npm install @supernovae-st/nika@0.118.7
+node -p "require('@supernovae-st/nika/package.json').version"
+```
+
+This package metadata subpath is exported for CommonJS, ESM build tools and CI
+pin checks. It reports the installed dependency, not a moving registry tag.
+The native payloads `@supernovae-st/nika-<os>-<arch>` are optional
+dependencies; npm installs the one that matches your platform.
+
+Earlier packages expose the retired `LocalNika`/HTTP split and do not
+implement the root facade documented here. This package carries the product's
+name: up to 0.115.0 it was published as `@supernovae-st/nika-client`, a name
+that is deprecated on npm, stays installable for the versions it already holds
+and receives no further releases. The repository keeps its name
+(`supernovae-st/nika-client`).
+
+## Scaffold with the engine
+
+The lowest-friction creation door is the engine-owned scaffold:
+
+```sh
+./node_modules/.bin/nika init --project-file
+./node_modules/.bin/nika new 01-hello hello.nika.yaml
+```
+
+`nika.yaml` is the project control plane. `hello.nika.yaml` is executable
+workflow intent and is the file passed to `check()` and `run()`. The scaffold
+writes the engine's own annotated `01-hello` example (its task is named
+`greet` and its prompt asks for French); the contract this README relies on is
+the `outputs.greeting` key and the `mock/echo` model, which the hand-written
+file above satisfies too.
 
 ## Verify a local trace
 
@@ -549,7 +620,7 @@ npm update @supernovae-st/nika
 ⚙️ nika ───────── engine, admission, execution, receipts and schedules
     │
     ▼
-🔌 nika-client ── this TypeScript door: native process or authenticated HTTP
+🔌 nika-client ── this door, published as @supernovae-st/nika: native process or authenticated HTTP
     │
     ▼
 🧩 Node.js applications

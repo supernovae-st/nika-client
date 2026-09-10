@@ -2,7 +2,7 @@
   "schema_version": 1,
   "engine": "nika 0.118.7 (f3a31a6ee)",
   "package": "supernovae-st-nika-0.118.7.tgz",
-  "package_sha256": "690b4ff8a45058a74db8cb0798f001f1c324aa66b55a470889a398c5c787d77a",
+  "package_sha256": "152d15ef0ae4b9a7952bd095b59a19fbea8a8b86ba822f45db502647406769a5",
   "install_mode": "npm pack + isolated npm install --omit=optional + explicit NIKA_BIN",
   "projects": [
     {

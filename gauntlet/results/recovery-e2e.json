@@ -5,7 +5,7 @@
   "installed_from_pack": true,
   "project": "two-process-durable-recovery",
   "status": "succeeded",
-  "job_id": "faf03085-945d-433a-9140-1433f787127c",
+  "job_id": "93c4de9e-8ce8-4978-9c98-00dac58e5e06",
   "producer_last_event_id": 1,
   "resumed_sequences": [
     2

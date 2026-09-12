@@ -41,9 +41,12 @@ export async function exerciseIncident(nika, gate, signal) {
     await bounded(observation.catch(() => {}), 2_000, 'incident replay observer cleanup');
   }
   const remoteProof = await step(nika.traceVerify(result.receipt), 5_000, 'remote receipt verdict');
-  assert.equal(remoteProof.verified, false);
-  assert.equal(remoteProof.verdict, 'unavailable');
-  assert.equal(remoteProof.reason, 'trace_journal_unavailable');
+  assert.equal(remoteProof.verified, true);
+  assert.equal(remoteProof.verdict, 'sealed');
+  assert.equal(remoteProof.reason, 'sealed');
+  assert.equal(remoteProof.trace_id, result.receipt.trace_id);
+  assert.equal(remoteProof.exit, 0);
+  assert.equal(remoteProof.chain.headline, 'intact');
   return {
     project: 'incident-response-controller', status: 'succeeded',
     project_workflow_status: projectResult.status,
@@ -57,7 +60,9 @@ export async function exerciseIncident(nika, gate, signal) {
     settlement: settlementFacts(result),
     same_job_terminal_and_replay_matched: true,
     cancellation_rendezvous: rendezvous,
-    remote_receipt_verdict: { verdict: remoteProof.verdict, reason: remoteProof.reason },
+    remote_receipt_verdict: { verdict: remoteProof.verdict, reason: remoteProof.reason,
+      verified: remoteProof.verified, exit: remoteProof.exit,
+      chain_headline: remoteProof.chain.headline },
     deterministic_cost_cap_usd: 0,
   };
 }

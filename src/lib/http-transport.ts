@@ -349,8 +349,8 @@ export class HttpTransport implements Transport {
       [200],
       'traceVerify',
     );
-    // A verdict that holds carries no reason; `unavailable` and the negative
-    // tiers name theirs. Either is typed when present, neither is demanded.
+    // The engine may attach a machine reason to any verdict, including a
+    // positive ladder verdict's seal tier. Preserve it when present.
     if (
       typeof object.verdict !== 'string'
       || (object.reason !== undefined && typeof object.reason !== 'string')

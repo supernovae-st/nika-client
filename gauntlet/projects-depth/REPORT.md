@@ -46,7 +46,7 @@ Its machine evidence is `gauntlet/results/recovery-e2e.json`.
 
 The historical paid-provider and three-pass trace ledgers remain useful prior
 evidence, but are explicitly labelled as historical 0.115 observations and are
-not release gates for this 0.118 candidate.
+not release gates for this 0.119 candidate.
 
 ## Finding
 
@@ -55,8 +55,12 @@ calendar date (`format: date`, for example `2026-09-01`). The gauntlet exposed
 that the old README constructed a refused timestamp; the 0.116 documentation
 and exported type comment now teach the owning date contract.
 
-The committed depth baseline uses the complete Linux replay record from
-GitHub Actions run 34260625242 (candidate b688b8b7). macOS reproduced every
-behavioral field identically; its locally packed archive had a different
-SHA-256. Both original records are retained in the integration evidence.
-CI compares the exact Linux package digest as well as all behavioral fields.
+The previous 0.118.7 baseline used Linux GitHub Actions run 34260625242
+(candidate b688b8b7). Its macOS comparison and retained records are historical.
+
+The current 0.119.0 baseline was measured on macOS arm64 on September 12
+with the checksum-verified engine asset and isolated packed SDK consumers.
+A matching Linux replay is still required before merging this candidate.
+CI compares the package digest as well as all behavioral fields; a differing
+Linux archive must be investigated and its authentic replay recorded, not
+removed from the comparison.

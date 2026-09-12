@@ -8,7 +8,7 @@ import path from 'node:path';
 import { test } from 'vitest';
 import { OwnedProcesses, runOwnedProcess } from '../scripts/one-door/process.mjs';
 import { bounded } from '../scripts/gauntlet-cancellation.mjs';
-import { observeHostileReplay } from '../scripts/run-hostile-gauntlet.mjs';
+import { observeHostileReplay, waitForScheduledTask } from '../scripts/run-hostile-gauntlet.mjs';
 import { stopResident, waitForHealth } from '../scripts/one-door/resident.mjs';
 
 const never = () => new Promise(() => {});
@@ -28,6 +28,28 @@ function replay({ events = [], done = Promise.resolve({ status: 'cancelled' }), 
   };
   return { client, run: { done }, get closed() { return closed; }, get signal() { return observedSignal; } };
 }
+
+test('native cancellation waits for its task admission and closes the observer', async () => {
+  const f = replay({ events: [
+    { kind: 'workflow_started' },
+    { kind: 'task_scheduled', fields: [{ key: 'task', value: 'other' }] },
+    { kind: 'task_scheduled', fields: [{ key: 'task', value: 'wait' }] },
+  ] });
+  await waitForScheduledTask(f.client, f.run, 'wait');
+  assert(f.closed && f.signal.aborted);
+});
+
+test('native cancellation refuses an ended stream without its task admission', async () => {
+  const f = replay({ events: [{ kind: 'workflow_started' }] });
+  await assert.rejects(waitForScheduledTask(f.client, f.run, 'wait'), /ended before task wait/);
+  assert(f.closed && f.signal.aborted);
+});
+
+test('native cancellation admission deadline aborts and awaits the observer', async () => {
+  const f = replay({ hang: true });
+  await assert.rejects(waitForScheduledTask(f.client, f.run, 'wait', 30), /native task admission exceeded/);
+  assert(f.closed && f.signal.aborted);
+});
 
 test('hostile replay drains and clones bounded events on success', async () => {
   const event = { kind: 'execution.settled', settlement: { status: 'cancelled' } };

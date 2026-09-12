@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "engine": "nika 0.118.7 (f3a31a6ee)",
-  "package": "supernovae-st-nika-0.118.7.tgz",
-  "package_sha256": "1a4ccc14b7a089aabc1b3931a335f93369553638c458309c7a8f22ab7bc8ae81",
+  "engine": "nika 0.119.0 (d2f89bedd)",
+  "package": "supernovae-st-nika-0.119.0.tgz",
+  "package_sha256": "19a8a2eb92acab962004b217a97dc0cd50773197599ad9b4ee61443f1bea2db8",
   "install_mode": "npm pack + isolated npm install --omit=optional + explicit NIKA_BIN",
   "projects": [
     {
@@ -109,8 +109,11 @@
         "dependent_unstarted": true
       },
       "remote_receipt_verdict": {
-        "verdict": "unavailable",
-        "reason": "trace_journal_unavailable"
+        "verdict": "sealed",
+        "reason": "sealed",
+        "verified": true,
+        "exit": 0,
+        "chain_headline": "intact"
       },
       "deterministic_cost_cap_usd": 0,
       "server_cleanup": {
@@ -119,12 +122,12 @@
         "forced": false,
         "reaped": true
       },
-      "executed_app_sha256": "d246f9b3bc670a8c63f9b3118388885db9df97b9a026312814c4f167daaa5fbb",
+      "executed_app_sha256": "1aae48a6bc80e9c4bb8d2bafabb41775d3860563514002c05c5c77344072c605",
       "sdk_entry": "node_modules/@supernovae-st/nika/dist/index.js",
       "installed_from_pack": true,
       "app_identity": {
-        "source_sha256": "d246f9b3bc670a8c63f9b3118388885db9df97b9a026312814c4f167daaa5fbb",
-        "executed_sha256": "d246f9b3bc670a8c63f9b3118388885db9df97b9a026312814c4f167daaa5fbb",
+        "source_sha256": "1aae48a6bc80e9c4bb8d2bafabb41775d3860563514002c05c5c77344072c605",
+        "executed_sha256": "1aae48a6bc80e9c4bb8d2bafabb41775d3860563514002c05c5c77344072c605",
         "byte_identical": true
       }
     },

@@ -1,3 +1,5 @@
+import type { components } from './generated/openapi.js';
+
 interface NikaSharedConfig {
   /** Bound for each event subscriber. Default: 256 events. */
   eventBufferSize?: number;
@@ -383,12 +385,12 @@ export interface NikaTraceVerifyResult {
   verified: boolean;
   /**
    * Engine-owned trace verdict. The native path answers `verified` or
-   * `invalid`; the resident's door answers `unavailable` while it has no
-   * trace-journal authority (engine 0.118), and will speak the CLI's tiers
-   * (`OK` · `SEALED` · `ANCHORED` · `REPLAYED` hold · `INCOMPLETE` ·
-   * `TAMPERED` do not) once it does. Open to additive future vocabulary.
+   * `invalid`; the resident verifies its journal with the engine's CLI
+   * verifier (0.119). It answers `unavailable` when no journal exists.
+   * Open to additive future vocabulary.
    */
   verdict?:
+    | components['schemas']['TraceVerification']['verdict']
     | 'verified'
     | 'invalid'
     | 'unavailable'
@@ -399,14 +401,22 @@ export interface NikaTraceVerifyResult {
     | 'INCOMPLETE'
     | 'TAMPERED'
     | (string & {});
-  /** Engine-owned explanation for a negative or unavailable verdict; a verdict that holds carries none. */
+  /** Engine-owned machine class, including the seal tier of a positive ladder verdict. */
   reason?:
+    | components['schemas']['TraceVerification']['reason']
     | 'trace_invalid'
     | 'receipt_mismatch'
     | 'run_not_terminal'
     | 'trace_journal_unavailable'
     | (string & {});
   trace_id?: string;
+  verify_version?: components['schemas']['TraceVerification']['verify_version'];
+  exit?: components['schemas']['TraceVerification']['exit'];
+  chain?: components['schemas']['TraceVerification']['chain'];
+  seal?: components['schemas']['TraceVerification']['seal'];
+  anchor?: components['schemas']['TraceVerification']['anchor'];
+  replay?: components['schemas']['TraceVerification']['replay'];
+  lines?: components['schemas']['TraceVerification']['lines'];
   exitCode?: number;
   output?: string;
   [key: string]: unknown;

@@ -14,7 +14,7 @@ import {
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const committedResults = path.join(ROOT, 'gauntlet', 'results');
-const ENGINE = 'nika 0.118.7 (f3a31a6ee)';
+const ENGINE = 'nika 0.119.0 (d2f89bedd)';
 const STABLE_CANCELLED_KIND = 'execution.cancelled|execution.settled';
 // The 200 shape: the resident cancelled the job before its execution started.
 const CANCELLED_BEFORE_EXECUTION = {
@@ -502,7 +502,7 @@ function depthReport(incident: Record<string, unknown>): any {
   return {
     schema_version: 1,
     engine: ENGINE,
-    package: 'supernovae-st-nika-0.118.7.tgz',
+    package: 'supernovae-st-nika-0.119.0.tgz',
     projects: [{
       project: 'incident-response-controller',
       status: 'succeeded',

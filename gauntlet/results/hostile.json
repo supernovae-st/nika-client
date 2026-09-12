@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-08T17:59:23.386Z",
-  "engine": "nika 0.118.7 (f3a31a6ee)",
+  "generated_at": "2026-09-12T12:22:31.075Z",
+  "engine": "nika 0.119.0 (d2f89bedd)",
   "scenarios": [
     {
       "name": "unsafe-http-refusal",
       "result": "green",
-      "duration_ms": 47,
+      "duration_ms": 96,
       "evidence": {
         "refusal": "NikaConfigurationError",
         "network_requests": 0
@@ -15,7 +15,7 @@
     {
       "name": "missing-engine-refusal",
       "result": "green",
-      "duration_ms": 43,
+      "duration_ms": 107,
       "evidence": {
         "error": "NikaCompatibilityError",
         "bounded": true
@@ -24,7 +24,7 @@
     {
       "name": "oversize-machine-line",
       "result": "green",
-      "duration_ms": 939,
+      "duration_ms": 630,
       "evidence": {
         "error": "NikaProtocolError",
         "limit_bytes": 1024
@@ -33,7 +33,7 @@
     {
       "name": "malformed-machine-frame",
       "result": "green",
-      "duration_ms": 108,
+      "duration_ms": 296,
       "evidence": {
         "error": "NikaProtocolError"
       }
@@ -41,7 +41,7 @@
     {
       "name": "child-crash-settlement",
       "result": "green",
-      "duration_ms": 102,
+      "duration_ms": 305,
       "evidence": {
         "status": "failed",
         "exit_code": 23
@@ -50,7 +50,7 @@
     {
       "name": "malformed-workflow-domain-report",
       "result": "green",
-      "duration_ms": 52,
+      "duration_ms": 275,
       "evidence": {
         "clean": false,
         "exit_code": 2
@@ -59,7 +59,7 @@
     {
       "name": "explicit-bin-empty-path",
       "result": "green",
-      "duration_ms": 110,
+      "duration_ms": 596,
       "evidence": {
         "check": "clean",
         "status": "succeeded"
@@ -68,7 +68,7 @@
     {
       "name": "parallel-run-load",
       "result": "green",
-      "duration_ms": 265,
+      "duration_ms": 2516,
       "evidence": {
         "runs": 24,
         "succeeded": 24,
@@ -78,7 +78,7 @@
     {
       "name": "real-cancellation-race",
       "result": "green",
-      "duration_ms": 10209,
+      "duration_ms": 11485,
       "evidence": {
         "cancel_status": "cancellation_requested",
         "run_status": "cancelled",
@@ -128,7 +128,7 @@
     {
       "name": "remote-durable-cancellation",
       "result": "green",
-      "duration_ms": 5552,
+      "duration_ms": 9680,
       "evidence": {
         "status_before_cancellation": "running",
         "cancel_status": "cancellation_requested",
@@ -144,7 +144,9 @@
           }
         ],
         "durable_receipt": true,
-        "trace_verdict": "unavailable",
+        "trace_verdict": "ok",
+        "trace_reason": "unsealed",
+        "trace_seal_tier": "unsealed",
         "parse_fatal_clean": false,
         "controlled_cancellation": {
           "cancel_status": "cancellation_requested",
@@ -191,7 +193,7 @@
             }
           ],
           "durable_receipt": true,
-          "trace_verdict": "unavailable",
+          "trace_verdict": "sealed",
           "parse_fatal_clean": false
         }
       }
@@ -199,7 +201,7 @@
     {
       "name": "trace-corruption-detection",
       "result": "green",
-      "duration_ms": 147,
+      "duration_ms": 581,
       "evidence": {
         "intact": true,
         "forged_receipt": false,
@@ -209,7 +211,7 @@
     {
       "name": "secret-canary-redaction",
       "result": "green",
-      "duration_ms": 101,
+      "duration_ms": 1761,
       "evidence": {
         "result_redacted": true,
         "trace_redacted": true
@@ -218,7 +220,7 @@
     {
       "name": "slow-subscriber-overflow-isolation",
       "result": "green",
-      "duration_ms": 101,
+      "duration_ms": 1471,
       "evidence": {
         "run_status": "succeeded",
         "subscriber_error": "NikaEventBufferOverflowError",
@@ -228,7 +230,7 @@
     {
       "name": "sequential-soak",
       "result": "green",
-      "duration_ms": 2412,
+      "duration_ms": 14958,
       "evidence": {
         "runs": 40,
         "succeeded": 40

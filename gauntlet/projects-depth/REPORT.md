@@ -2,7 +2,7 @@
 
 ## Outcome
 
-Five isolated Node consumers install `@supernovae-st/nika-client` from the tarball produced by `npm pack`; none imports repository source or build output. The runner executes every consumer against an explicit compatible `NIKA_BIN` and writes the machine-readable evidence to `gauntlet/projects-depth/results.json`.
+Five isolated Node consumers install `@supernovae-st/nika` from the tarball produced by `npm pack`; none imports repository source or build output. The runner executes every consumer against an explicit compatible `NIKA_BIN` and writes the machine-readable evidence to `gauntlet/projects-depth/results.json`.
 
 | Consumer | Depth exercised |
 |---|---|
@@ -21,8 +21,8 @@ All workflows use the public envelope and task-map form, the canonical `invoke` 
 - `node --check` — all five consumer entry points and the runner passed.
 - `git diff --check` — passed.
 
-The final release-candidate replay used the public release engine `nika 0.118.7 (f3a31a6ee)`
-with `supernovae-st-nika-0.118.7.tgz`; all five projects
+The final release-candidate replay used the checksum-verified release-candidate engine `nika 0.119.0 (d2f89bedd)`
+with `supernovae-st-nika-0.119.0.tgz`; all five projects
 remained green. The generated JSON records installed-from-pack proof, stable
 scenario facts, typed error names/codes, receipt verdicts, event observations,
 concurrency, cancellation, CAS, and restart evidence.
@@ -30,10 +30,11 @@ concurrency, cancellation, CAS, and restart evidence.
 The incident-response controller first executes its original workflow and
 verifies the incident plan. A separate controlled loopback fixture holds a
 task until the cancellation request is acknowledged, then releases it. The
-public 0.118.7 replay records `cancelled` with cause `operator`, one completed
+0.119.0 replay records `cancelled` with cause `operator`, one completed
 task and one dependent task that never starts. SSE, terminal result and replay
 agree; the resident shuts down without a forced kill. The ledger includes
 byte-identical source/executed app hashes and the packed SDK SHA-256.
+The resident verifies the cancelled run's journal as `sealed`, bound to its trace ID with verifier exit 0. Journal integrity does not change the cancelled job status.
 The hostile suite separately retains the `nika:wait` grace-expiry scenario;
 `interrupted` remains a distinct result without a fabricated settlement.
 
@@ -45,7 +46,7 @@ Its machine evidence is `gauntlet/results/recovery-e2e.json`.
 
 The historical paid-provider and three-pass trace ledgers remain useful prior
 evidence, but are explicitly labelled as historical 0.115 observations and are
-not release gates for this 0.118 candidate.
+not release gates for this 0.119 candidate.
 
 ## Finding
 
@@ -54,8 +55,12 @@ calendar date (`format: date`, for example `2026-09-01`). The gauntlet exposed
 that the old README constructed a refused timestamp; the 0.116 documentation
 and exported type comment now teach the owning date contract.
 
-The committed depth baseline uses the complete Linux replay record from
-GitHub Actions run 34260625242 (candidate b688b8b7). macOS reproduced every
-behavioral field identically; its locally packed archive had a different
-SHA-256. Both original records are retained in the integration evidence.
-CI compares the exact Linux package digest as well as all behavioral fields.
+The previous 0.118.7 baseline used Linux GitHub Actions run 34260625242
+(candidate b688b8b7). Its macOS comparison and retained records are historical.
+
+The current 0.119.0 baseline was measured on macOS arm64 on September 12
+with the checksum-verified engine asset and isolated packed SDK consumers.
+A matching Linux replay is still required before merging this candidate.
+CI compares the package digest as well as all behavioral fields; a differing
+Linux archive must be investigated and its authentic replay recorded, not
+removed from the comparison.

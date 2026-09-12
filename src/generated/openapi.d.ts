@@ -139,7 +139,7 @@ export interface paths {
         put?: never;
         /**
          * Admit a workflow as a durable job — by served name, or as immutable snapshot bytes
-         * @description Two forms, one admission (ADR-131). `{"workflow": "<name>"}` names a workflow the served registry lists: the resident captures its world through ExecutionService, exactly as a schedule does. A snapshot body is the world `nika check <file> --json --sdk-snapshot` prints, decoded and readmitted through the same ExecutionService; its digests are optional caller-supplied integrity digests (a content assertion, never a signature). The server never interprets a caller filesystem path. Idempotency binds to the exact request bytes.
+         * @description Two forms, one admission (ADR-131). `{"workflow": "<name>"}` names a workflow the served registry lists: the resident captures its world through ExecutionService, exactly as a schedule does. Optional `access` on that form is CLI `--access` for this job only. A snapshot body is the world `nika check <file> --json --sdk-snapshot` prints, decoded and readmitted through the same ExecutionService; its digests are optional caller-supplied integrity digests (a content assertion, never a signature). Snapshot jobs inherit the resident's unpinned plan. The server never interprets a caller filesystem path. Idempotency binds to the exact request bytes.
          */
         post: {
             parameters: {
@@ -527,8 +527,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Return the run-scoped trace verification verdict
-         * @description Returns a typed honest refusal while no remote trace-journal authority exists. It never scans a trace directory or exposes a filesystem path.
+         * Verify the job's trace journal
+         * @description Locates the journal the resident wrote for this job under the project it serves (by the job's execution and trace identity) and verifies it through the same verifier `nika trace verify` runs; the vocabulary is the CLI's. `unavailable` is the honest refusal when no journal exists. The response never exposes a filesystem path.
          */
         get: {
             parameters: {
@@ -928,8 +928,10 @@ export interface components {
             status: components["schemas"]["JobStatus"];
             trace_id?: string;
         };
-        /** @description The by-name form (ADR-131): a workflow the served registry lists (GET /v1/workflows · project-root-relative, `.nika.yaml`). The resident captures its world exactly as a schedule does — the one owner of the snapshot and its digest domain. Idempotency binds to these request bytes. */
+        /** @description The by-name form (ADR-131): a workflow the served registry lists (GET /v1/workflows · project-root-relative, `.nika.yaml`). The resident captures its world exactly as a schedule does — the one owner of the snapshot and its digest domain. Idempotency binds to these request bytes. Optional `access` is the same pin as CLI `--access` (a pin is a pin). Absent: the resident's unpinned plan. Snapshot bodies do not carry this field. */
         JobByName: {
+            /** @description Access pin, same vocabulary as `--access` (class or harness id). A pin never silently substitutes a metered seat. */
+            access?: string;
             workflow: string;
         };
         JobEvent: {
@@ -1066,13 +1068,35 @@ export interface components {
             status: "accepted";
             units: number;
         };
-        /** @description Run-scoped typed verdict. Unavailable is an honest refusal: this server has no remote trace-journal authority and never scans or returns filesystem paths. */
+        /** @description Run-scoped verdict on the journal the resident wrote for the job, through the ONE verifier `nika trace verify --json` runs. `verdict` is the CLI's headline word: the attained tier (ok · sealed · anchored · replayed), incomplete for a journal with no terminal frame (the writer's liveness rides `reason`), tampered for a buried seal, broken for an edited chain, and the CLI's refusal classes; `unavailable` only when no journal exists for the job (refused before its first event · queued · a backend keeping none). `reason` is the machine class beside it (the seal tier under a ladder verdict). The CLI's own document rides verbatim (exit · chain · seal · anchor · replay · lines); a filesystem path is never returned. */
         TraceVerification: {
+            anchor?: {
+                [key: string]: unknown;
+            };
+            /** @description events · head · headline (intact · torn · incomplete) · liveness (alive · dead · unknown · null) */
+            chain?: {
+                [key: string]: unknown;
+            };
+            /**
+             * @description The CLI's exit class: 0 the reported tier holds · 2 a forged or edited journal · 3 the environment (unchained · unreadable · a missing input) · 5 incomplete lifecycle evidence
+             * @enum {integer}
+             */
+            exit?: 0 | 2 | 3 | 5;
+            /** @description The CLI's ladder lines, the journal path replaced by <journal> */
+            lines?: string[];
             /** @enum {string} */
-            reason: "run_not_terminal" | "trace_journal_unavailable";
+            reason: "run_not_terminal" | "trace_journal_unavailable" | "sealed" | "unsealed" | "forged" | "buried" | "unattributable" | "writer_alive" | "writer_dead" | "writer_unknown" | "buried_seal" | "broken" | "unchained" | "empty" | "unreadable" | "refused" | "line_over_long" | "unknown";
+            replay?: {
+                [key: string]: unknown;
+            };
+            /** @description tier (unsealed · sealed · forged · buried · unattributable) and the tier's facts */
+            seal?: {
+                [key: string]: unknown;
+            };
             trace_id?: string;
             /** @enum {string} */
-            verdict: "unavailable";
+            verdict: "unavailable" | "ok" | "sealed" | "anchored" | "replayed" | "incomplete" | "tampered" | "broken" | "unchained" | "empty" | "unreadable" | "refused" | "line-over-long" | "unknown";
+            verify_version?: number;
         };
         WorkflowList: {
             workflows: string[];

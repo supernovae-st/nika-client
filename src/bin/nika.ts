@@ -1,4 +1,7 @@
 import { spawn } from 'node:child_process';
+import { realpath } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { NikaConfigurationError } from '../errors.js';
 import {
   NikaEngineUnavailable,
   resolveNikaEngine,
@@ -12,6 +15,13 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   let engine: ResolvedNikaEngine;
   try {
     engine = resolveNikaEngine();
+    const selected = await realpath(engine.bin).catch(() => undefined);
+    if (selected === await realpath(fileURLToPath(import.meta.url))) {
+      throw new NikaConfigurationError(
+        'NIKA_BIN points to the npm launcher; unset NIKA_BIN to use the packaged engine, '
+        + 'or set it to an absolute path to the native nika executable',
+      );
+    }
     await verifyNikaEngine(engine);
   } catch (cause) {
     const message = cause instanceof NikaEngineUnavailable || cause instanceof Error

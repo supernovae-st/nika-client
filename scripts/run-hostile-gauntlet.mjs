@@ -41,6 +41,22 @@ export async function observeHostileReplay(client, run, signal,
   }
 }
 
+export async function waitForScheduledTask(client, run, task, timeoutMs = 5_000) {
+  const observer = new AbortController();
+  const observation = (async () => {
+    for await (const event of client.events(run, { signal: observer.signal })) {
+      if (event.kind === 'task_scheduled'
+        && event.fields?.some(({ key, value }) => key === 'task' && value === task)) return;
+    }
+    throw new Error(`run ended before task ${task} was scheduled`);
+  })();
+  try { await bounded(observation, timeoutMs, 'native task admission'); }
+  finally {
+    observer.abort();
+    await bounded(observation.catch(() => {}), 2_000, 'native admission observer cleanup');
+  }
+}
+
 async function exerciseScenarios({ scratch, nikaBin, scenario, start, signal }) {
   const { Nika, NikaError } = await import('../dist/index.js');
   let realEngineRuns = 0;
@@ -257,7 +273,8 @@ if (process.argv.includes('--sdk-identity')) {
       terminalBeforeRequest = result;
       terminalAt = performance.now();
     });
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    // Observe admission before signalling: process startup is not a cancellation point.
+    await waitForScheduledTask(client, run, 'wait');
     const requestedAt = performance.now();
     const first = client.cancel(run);
     assert.equal(client.cancel(run), first);
@@ -339,9 +356,11 @@ if (process.argv.includes('--sdk-identity')) {
       );
       const trace = await bounded(client.traceVerify(result.receipt, { signal: remoteSignal }),
         5_000, 'remote trace verification', remoteSignal);
-      assert.equal(trace.verified, false);
-      assert.equal(trace.verdict, 'unavailable');
-      assert.equal(trace.reason, 'trace_journal_unavailable');
+      assert.equal(trace.verified, true, JSON.stringify(trace));
+      assert.equal(trace.verdict, 'sealed');
+      assert.equal(trace.reason, 'sealed');
+      assert.equal(trace.trace_id, result.receipt.trace_id);
+      assert.equal(trace.exit, 0);
       const controlled = {
         cancel_status: cancellation.status,
         run_status: result.status,
@@ -384,15 +403,21 @@ if (process.argv.includes('--sdk-identity')) {
       assert.equal(cancellationTerminalMatches(waitCancellation.status, waitTerminal), true);
       const waitTrace = await bounded(client.traceVerify(waitResult.receipt, { signal: remoteSignal }),
         5_000, 'wait receipt verdict', remoteSignal);
-      assert.equal(waitTrace.verified, false);
-      assert.equal(waitTrace.verdict, 'unavailable');
-      assert.equal(waitTrace.reason, 'trace_journal_unavailable');
+      // An interrupted job can retain an intact chain without a terminal seal.
+      // The CLI's ok/unsealed tier is not signed completion evidence.
+      assert.equal(waitTrace.verified, true, JSON.stringify(waitTrace));
+      assert.equal(waitTrace.verdict, 'ok', JSON.stringify(waitTrace));
+      assert.equal(waitTrace.reason, 'unsealed', JSON.stringify(waitTrace));
+      assert.equal(waitTrace.chain.headline, 'intact');
+      assert.equal(waitTrace.trace_id, waitResult.receipt.trace_id);
+      assert.equal(waitTrace.exit, 0);
       return {
         status_before_cancellation: statusBeforeCancellation,
         cancel_status: waitCancellation.status, run_status: waitResult.status,
         events: waitEvents.map(({ kind, status, settlement }) => ({ kind, status,
           ...(settlement ? { settlement_cause: settlement.cause } : {}) })),
-        durable_receipt: true, trace_verdict: waitTrace.verdict, parse_fatal_clean: parseFatal.clean,
+        durable_receipt: true, trace_verdict: waitTrace.verdict, trace_reason: waitTrace.reason,
+        trace_seal_tier: waitTrace.seal.tier, parse_fatal_clean: parseFatal.clean,
         controlled_cancellation: controlled,
       };
     } finally {

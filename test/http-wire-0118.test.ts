@@ -403,6 +403,13 @@ describe('the trace verdict the door answers', () => {
   }
 
   it.each([
+    ['sealed', true],
+    ['ok', true],
+    ['anchored', true],
+    ['replayed', true],
+    ['incomplete', false],
+    ['tampered', false],
+    ['broken', false],
     ['SEALED', true],
     ['OK', true],
     ['ANCHORED', true],
@@ -417,6 +424,16 @@ describe('the trace verdict the door answers', () => {
       verdict,
       trace_id: 'trace-1',
     });
+  });
+
+  it('preserves the 0.119 verifier document and positive seal reason', async () => {
+    const verdict = {
+      verdict: 'anchored', reason: 'sealed', trace_id: 'trace-1',
+      verify_version: 1, exit: 0, chain: { headline: 'intact', events: 4 },
+      seal: { tier: 'sealed' }, anchor: { verified: true },
+      lines: ['<journal>: anchored'],
+    };
+    await expect(verify(verdict)).resolves.toEqual({ ...verdict, verified: true });
   });
 
   it('keeps the typed unavailable refusal the 0.118 door still answers', async () => {

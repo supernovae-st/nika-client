@@ -5,11 +5,13 @@ import {
   chmodSync,
   copyFileSync,
   cpSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   renameSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -177,6 +179,34 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
     );
     expect(result.status).toBe(2);
     expect(result.stdout).toContain('dirty-shim.nika.yaml');
+  });
+
+  it('refuses NIKA_BIN pointing to its own launcher before any child spawn', () => {
+    const project = stageProject(HOST_PACKAGE);
+    const shim = path.join(project, 'node_modules', '@supernovae-st', 'nika', 'dist', 'bin', 'nika.js');
+    const alias = path.join(project, 'nika-alias');
+    symlinkSync(shim, alias);
+    const marker = path.join(project, 'spawn-attempted');
+    const preload = path.join(project, 'refuse-child.cjs');
+    // This negative control also prevents a regression from recursively
+    // launching children in the test process tree.
+    writeFileSync(preload, `
+      require('node:child_process').spawn = () => {
+        require('node:fs').writeFileSync(${JSON.stringify(marker)}, 'attempted');
+        throw new Error('unexpected launcher child');
+      };
+      require('node:module').syncBuiltinESMExports();
+    `);
+    for (const selected of [shim, alias]) {
+      const result = spawnSync(process.execPath, ['--require', preload, shim, '--version'], {
+        cwd: project, env: { ...cleanEnv(), NIKA_BIN: selected }, encoding: 'utf8', timeout: 5000,
+      });
+      expect(result.error).toBeUndefined();
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('NIKA_BIN points to the npm launcher');
+      expect(result.stderr).toContain('unset NIKA_BIN');
+      expect(existsSync(marker)).toBe(false);
+    }
   });
 
   it('forwards signals to the payload and mirrors signal termination', async () => {

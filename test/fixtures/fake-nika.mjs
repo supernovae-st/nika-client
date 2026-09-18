@@ -181,6 +181,44 @@ if (command === 'run' && argv.includes('--json')) {
     return;
   }
 
+  // GENERATED cardinality (issue #122). `wide<N>` writes the frame count and
+  // order measured on the released 0.118.7 payload for N independent
+  // mock/echo infer tasks: workflow_started, the whole wave scheduled first
+  // (N task_scheduled), then task_started and task_completed alternating per
+  // task, then workflow_completed and run_settled: 3N + 3 frames. The frames
+  // themselves are minimal; only their number, kinds and order are measured.
+  const wide = workflow.match(/wide(\d+)\./);
+  if (wide) {
+    const tasks = Number(wide[1]);
+    const name = (index) => `t${String(index).padStart(4, '0')}`;
+    const task = (kind, index) => ({ kind, fields: [{ key: 'task', value: name(index) }] });
+    const lines = [{ kind: 'workflow_started' }];
+    for (let index = 1; index <= tasks; index += 1) lines.push(task('task_scheduled', index));
+    for (let index = 1; index <= tasks; index += 1) {
+      lines.push(task('task_started', index), task('task_completed', index));
+    }
+    lines.push(
+      { kind: 'workflow_completed', fields: [{ key: 'status', value: 'succeeded' }] },
+      { kind: 'run_settled', status: 'succeeded', cause: 'normal', outputs: { tasks } },
+    );
+    emitThenExit({ stdout: `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`, exitCode: 0 });
+    return;
+  }
+  // SYNTHETIC exact cardinality: `frames<K>` writes exactly K frames, so a
+  // capacity boundary can be tested to the frame. No engine shape is claimed.
+  const exact = workflow.match(/frames(\d+)\./);
+  if (exact) {
+    const total = Number(exact[1]);
+    const lines = [{ kind: 'workflow_started' }];
+    for (let index = 1; index <= total - 3; index += 1) lines.push({ kind: 'task_completed', index });
+    lines.push(
+      { kind: 'workflow_completed' },
+      { kind: 'run_settled', status: 'succeeded', cause: 'normal', outputs: { frames: total } },
+    );
+    emitThenExit({ stdout: `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`, exitCode: 0 });
+    return;
+  }
+
   // SYNTHETIC hostile shapes: no engine was observed writing these. They
   // exist to pin how the SDK fails, never to describe an engine.
   if (workflow.includes('synthetic-truncated-pretty')) {

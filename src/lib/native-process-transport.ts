@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import type { Readable } from 'node:stream';
+import type { Readable, Writable } from 'node:stream';
 import {
   NikaCompatibilityError,
   NikaProtocolError,
@@ -36,7 +36,12 @@ import {
   parseMachineObject,
   receiptTraceLocator,
 } from './machine.js';
-import { verifyNikaEngine, type ResolvedNikaEngine } from './binary/index.js';
+import {
+  verifyNikaEngine,
+  type NikaEngineIdentity,
+  type ResolvedNikaEngine,
+} from './binary/index.js';
+import { literalInputs } from './literal-inputs.js';
 import {
   legacyPrettyReport,
   legacyStderrRefusal,
@@ -56,9 +61,12 @@ interface Captured {
   stderr: string;
 }
 
+/** stdin is a pipe only for a run that carries literal inputs; otherwise it is ignored. */
+type EngineChild = ChildProcessByStdio<Writable | null, Readable, Readable>;
+
 /** One spawned `nika run --json`, shared by admission and the admitted run. */
 interface NativeProcess {
-  readonly child: ChildProcessByStdio<null, Readable, Readable>;
+  readonly child: EngineChild;
   /** Trimmed, non-empty stdout lines, each under the machine bound. */
   readonly lines: AsyncGenerator<string, void, undefined>;
   /** The exit status once the process closed; rejects when it never spawned. */
@@ -77,7 +85,7 @@ export interface NativeProcessTransportOptions {
 
 export class NativeProcessTransport implements Transport {
   readonly kind = 'native-process' as const;
-  private ready?: Promise<void>;
+  private ready?: Promise<NikaEngineIdentity>;
 
   constructor(private readonly options: NativeProcessTransportOptions) {}
 
@@ -105,7 +113,9 @@ export class NativeProcessTransport implements Transport {
   }
 
   async startRun(workflow: string, options: NikaRunOptions): Promise<TransportRun> {
-    await this.ensureReady();
+    // A map the SDK cannot send is the caller's mistake: it needs no engine.
+    const inputs = literalInputs(options);
+    const identity = await this.ensureReady();
     if (options.idempotencyKey !== undefined) {
       throw new NikaCompatibilityError(
         'idempotencyKey',
@@ -113,12 +123,26 @@ export class NativeProcessTransport implements Transport {
         'idempotencyKey is an HTTP admission option',
       );
     }
-    const args = ['run', workflow, '--json', ...runFlags(options)];
-    const child = spawn(this.options.engine.bin, args, {
-      cwd: this.options.cwd,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: false,
-    });
+    if (inputs && !identity.supportedCapabilities.includes(INPUTS_LITERAL)) {
+      // An engine from before the channel is refused here, before any run is
+      // spawned. `--var` is not a fallback: it reads `@env:NAME` and coerces
+      // text by declared type, so it cannot carry literal values.
+      throw new NikaCompatibilityError(
+        INPUTS_LITERAL,
+        this.kind,
+        `Engine ${identity.engineVersion} at ${this.options.engine.bin} does not advertise `
+        + `${INPUTS_LITERAL} (advertised: ${identity.supportedCapabilities.join(', ')}); `
+        + 'run({ inputs }) needs the literal input channel `nika run --inputs-json -`. '
+        + 'The SDK never falls back to --var, which reads @env: and coerces by declared type',
+      );
+    }
+    const args = ['run', workflow, '--json', ...runFlags(options, inputs !== undefined)];
+    const spawnOptions = { cwd: this.options.cwd, shell: false } as const;
+    const child: EngineChild = inputs
+      ? spawn(this.options.engine.bin, args, { ...spawnOptions, stdio: ['pipe', 'pipe', 'pipe'] })
+      : spawn(this.options.engine.bin, args, { ...spawnOptions, stdio: ['ignore', 'pipe', 'pipe'] });
+    // stdin is absent only when the spawn itself failed, which `closed` reports.
+    if (inputs && child.stdin) writeLiteralInputs(child.stdin, inputs.json);
     // The spawn that executes the workflow is the one that judges it: the
     // engine re-checks on run, so no preflight check and no second spawn.
     const engine = this.nativeProcess(child);
@@ -224,7 +248,7 @@ export class NativeProcessTransport implements Transport {
     };
   }
 
-  private nativeProcess(child: ChildProcessByStdio<null, Readable, Readable>): NativeProcess {
+  private nativeProcess(child: EngineChild): NativeProcess {
     let settled = false;
     let stderr = '';
     child.stderr.setEncoding('utf8');
@@ -257,6 +281,8 @@ export class NativeProcessTransport implements Transport {
       stop: async () => {
         // Releasing the reader destroys stdout; the process exit is the wait.
         void lines.return(undefined).catch(() => {});
+        // A map the engine never read must not outlive the run in the writer.
+        child.stdin?.destroy();
         if (settled) return;
         // Ask first so a live engine can settle its journal, then insist: an
         // engine that ignores SIGTERM must never hold a caller's rejection.
@@ -492,10 +518,26 @@ export class NativeProcessTransport implements Transport {
     });
   }
 
-  private ensureReady(): Promise<void> {
-    this.ready ??= verifyNikaEngine(this.options.engine).then(() => undefined);
+  /** The verified engine's identity is kept: its capabilities gate what a run may ask. */
+  private ensureReady(): Promise<NikaEngineIdentity> {
+    this.ready ??= verifyNikaEngine(this.options.engine);
     return this.ready;
   }
+}
+
+/** The capability an engine advertises for `nika run --inputs-json -` (nika#1683). */
+const INPUTS_LITERAL = 'inputsLiteral';
+
+/**
+ * Hand the map to the engine's stdin and close it. The engine's frames and its
+ * exit status stay the only verdict: an engine that exits, refuses or is
+ * cancelled with the map unread breaks this pipe, and that error is expected,
+ * not a fault. A strict prefix of a JSON object is never a JSON object, so a
+ * broken write can never be admitted as different values.
+ */
+function writeLiteralInputs(stdin: Writable, json: string): void {
+  stdin.on('error', () => {});
+  stdin.end(json);
 }
 
 /** The engine prefixes a stream-routed report with its own name. */
@@ -605,8 +647,11 @@ function quoted(verdict: string, text: string): string {
   return excerpt ? `${verdict}: ${excerpt}` : verdict;
 }
 
-function runFlags(options: NikaRunOptions): string[] {
+function runFlags(options: NikaRunOptions, literal: boolean): string[] {
   const flags: string[] = [];
+  // The flag only names the channel: the map rides stdin, never argv.
+  if (literal) flags.push('--inputs-json', '-');
+  // Deprecated operator channel; never combined with the literal one.
   for (const [key, value] of Object.entries(options.vars ?? {})) {
     flags.push('--var', `${key}=${String(value)}`);
   }

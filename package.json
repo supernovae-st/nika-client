@@ -61,6 +61,7 @@
     "gauntlet:depth": "node scripts/run-depth-projects.mjs",
     "gauntlet:recovery": "node scripts/run-recovery-e2e.mjs",
     "gauntlet:one-door": "node scripts/run-one-door-e2e.mjs",
+    "gauntlet:inputs": "node scripts/run-input-parity-e2e.mjs",
     "gauntlet:hostile": "node scripts/run-hostile-gauntlet.mjs",
     "generate:types": "node scripts/generate-types.js",
     "sync:native-versions": "node scripts/sync-native-versions.mjs",

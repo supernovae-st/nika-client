@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `run(workflow, { inputs })` (#116): literal values for the workflow's
+  declared `inputs:`, with the same meaning on both transports. Values are
+  strict JSON and stay literal: a string is never read as `@env:NAME`, an
+  expression or a number, and nothing is coerced to the declared type. The
+  engine validates the map and refuses before any run exists (`unknown_input`,
+  `input_type_mismatch`, `NIKA-1708`), surfaced as `NikaOperationError` with
+  the same code natively (`status: 3`) and over HTTP (`status: 422`).
+  - Native: the map rides the engine's stdin (`nika run --inputs-json -`,
+    nika#1683), never argv, and needs an engine that advertises
+    `inputsLiteral`.
+  - HTTP: the same bytes ride `JobByName.inputs` (nika#1642) for a workflow run
+    by its served name, and need a resident that advertises `jobInputs`. An
+    execution snapshot takes no overlay: a local path with `inputs` is refused
+    before any capture or request, an empty map included.
+  - An engine without the capability rejects with `NikaCompatibilityError`
+    before admission. There is no `--var` fallback, and a 202 negotiates
+    nothing: a resident from before the envelope accepts the field and ignores
+    its values.
+  - A value JSON would silently lose (`undefined`, a function, a symbol, a
+    bigint, a non-finite number, a cycle, a class instance, an array hole, an
+    accessor, a lone surrogate) rejects `run()` with `NikaConfigurationError`
+    naming the path and never the value. The serialized map is bounded at
+    1 MiB on both transports.
+  - The engine payload pinned by this package advertises neither capability
+    yet: `inputs` is refused on it until the pin reaches an engine that does.
+    The pinned `openapi.json` is unchanged for the same reason.
+- Add `npm run gauntlet:inputs`: the packed SDK drives one explicit engine as a
+  native process and as a resident, from ESM and CommonJS, and the transports
+  must agree on outputs, refusal codes and `api-caller` provenance.
+
 - Add `isNikaRunSucceeded(result)` to narrow the engine's successful result
   while preserving typed, optional outputs. Admitted failures still resolve;
   paused, cancelled, interrupted, and unknown results do not pass the guard.
@@ -76,6 +106,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
+- `run()`'s `vars` option is deprecated in favour of `inputs` (#116). It stays
+  the native `--var` operator channel with unchanged behaviour (`@env:NAME` is
+  read, text is coerced to the declared type) and has no HTTP form. `inputs`
+  beside `vars` rejects `run()` with `NikaConfigurationError`; the two are
+  never merged.
 - `@supernovae-st/nika-client` receives no further versions. The name stays
   installable for the versions it already holds and is marked deprecated on
   npm after the first `@supernovae-st/nika` publication.

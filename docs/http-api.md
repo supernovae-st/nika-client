@@ -35,7 +35,20 @@ Any other non-2xx body is discarded and reported as a redacted
 - Each request has a bounded timeout and each JSON/SSE machine frame has a
   byte ceiling.
 - Remote `check()` refuses `model` and `nativeStrict`; remote `run()` refuses
-  `vars`, `model`, and `maxCostUsd` until the request envelope owns them.
+  `model`, `maxCostUsd` and the deprecated `vars` until a request envelope
+  owns them.
+- Remote `run()` sends `inputs` as `JobByName.inputs` only for a served name
+  and only when `GET /health` advertises `jobInputs`. That capability, not a
+  202, is the negotiation: a resident from before the envelope accepts the
+  extra field and ignores its values, so the SDK refuses it after `/health`
+  alone with `NikaCompatibilityError` (`capability: 'jobInputs'`). The
+  `inputs` envelope is engine-owned (nika#1642) and lands in the pinned
+  `openapi.json` when the engine pin reaches a release that serves it.
+- A snapshot body takes no `inputs` overlay, an empty map included: `run()` of
+  a local path with `inputs` is refused before any capture or request.
+- The serialized `inputs` map is bounded at 1 MiB by the SDK, the bound the
+  native channel reads. The resident's whole-request ceiling is its own and may
+  be lower.
 - Caller-provided workflow catalog names must be contained slash-separated
   paths. Absolute paths, backslashes, empty segments, `.` and `..` are
   rejected before network I/O.

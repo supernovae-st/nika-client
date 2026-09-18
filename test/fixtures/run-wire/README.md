@@ -24,3 +24,26 @@ key whose base URL pointed at a local canary socket (0 connections observed).
 | `*-input1708.*` | a required input not supplied (`NIKA-1708`); 0.119.0 writes stderr only | 3 |
 | `0.119.0-hello.ndjson.stdout` | admitted `mock/echo` hello: six lifecycle frames | 0 |
 | `0.119.0-admitted-failure.ndjson.stdout` | admitted run whose `nika:assert` fails: seven frames | 1 |
+
+## Literal input channel (`c1683-*` · issue #116)
+
+Replayed by `fake-nika-inputs.mjs`. Captured 2026-09-18 on macos/aarch64 with
+the SDK's own argv (`run <file> --json --inputs-json - --max-cost-usd 0`, the
+map on stdin), a cleared environment, a throwaway `HOME`, `NIKA_KEYCHAIN=off`
+and a pure `nika:jq` workflow (no model seat, no network).
+
+| Prefix | Engine | Dialect |
+|---|---|---|
+| `c1683-*` | CANDIDATE build for engine #1683, `nika 0.120.0-dev (c6e1c35a1-dirty)`, binary sha256 `7f6394fcda269356ca9cc795fc702058aa7a3a4adb1966b6be90db1e71851306`; unmerged, not a release | one compact `{"error":{"code","message"}}` per pre-run refusal, prose on stderr |
+
+These are the bytes of a candidate, so they pin how the SDK decodes that
+envelope, not what a released engine writes: recapture them from the release
+that ships the channel.
+
+| File | Stdin map | Exit |
+|---|---|---|
+| `c1683-unknown-input.*` | a key the workflow does not declare (`unknown_input`) | 3 |
+| `c1683-type-mismatch.*` | the string `"42"` for a declared `integer` (`input_type_mismatch`) | 3 |
+| `c1683-missing-required.*` | `{}` against four required inputs (`NIKA-1708`) | 3 |
+| `c1683-duplicate-key.*` | `{"ticket":"a","ticket":"b",…}` (`invalid_inputs_json`) | 3 |
+| `c1683-literal.ndjson.stdout` | admitted: `ticket` is the text `@env:NIKA_TEST_LITERAL`, kept literal; `workflow_started` names `api-caller` for supplied inputs and `file` for the default: seven frames | 0 |

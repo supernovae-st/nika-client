@@ -26,6 +26,22 @@ describe('packed public documentation', () => {
     expect(readme).toContain('pauseUntil:');
   });
 
+  it('teaches literal inputs without promising an engine that lacks the channel', () => {
+    // Issue #116: the public word is `inputs`, with the same meaning on both
+    // transports, and it is honest about what the connected engine must advertise.
+    expect(readme).toContain("inputs: { ticketId: '42' }");
+    expect(readme).toContain('`inputsLiteral`');
+    expect(readme).toContain('`jobInputs`');
+    expect(readme).toContain('never falls back to `--var`');
+    expect(readme).toMatch(/`vars`[^.]*deprecated/);
+    // The two sentences that described the world before the envelope.
+    expect(readme).not.toContain('request envelopes for per-call `vars`');
+    expect(readme).not.toContain('yes; `vars`, `model`, `maxCostUsd` allowed');
+    const httpApi = readFileSync(new URL('../docs/http-api.md', import.meta.url), 'utf8');
+    expect(httpApi).toContain('`jobInputs`');
+    expect(httpApi).not.toContain('remote `run()` refuses\n  `vars`, `model`, and `maxCostUsd` until');
+  });
+
   it('exports package metadata so consumers can prove the installed pin', () => {
     expect(manifest.exports?.['./package.json']).toBe('./package.json');
     expect(readme).toContain("require('@supernovae-st/nika/package.json').version");

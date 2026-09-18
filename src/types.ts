@@ -426,6 +426,30 @@ export interface NikaCheckOptions {
 }
 
 export interface NikaRunOptions {
+  /**
+   * Literal values for the workflow's declared `inputs:`, by name, with the
+   * same meaning on both transports. Values are strict JSON and stay literal:
+   * a string is never read as `@env:NAME`, an expression or a number, and
+   * nothing is coerced to the declared type. The engine validates the map
+   * (unknown key, type mismatch, missing required input) and refuses before
+   * any run exists. A value JSON cannot carry (`undefined`, a function, a
+   * symbol, a bigint, a non-finite number, a cycle, a class instance, an
+   * array hole, an accessor) rejects `run()` with `NikaConfigurationError`
+   * instead of being dropped, and the serialized map is bounded at 1 MiB.
+   *
+   * Needs an engine that advertises the literal channel: `inputsLiteral`
+   * natively (values ride stdin, never argv), `jobInputs` over HTTP by served
+   * name. An engine without it rejects with `NikaCompatibilityError`; the SDK
+   * never falls back to `--var`. An execution snapshot freezes its inputs, so
+   * an HTTP run of a local path refuses `inputs`. Never put a secret here.
+   */
+  inputs?: Record<string, unknown>;
+  /**
+   * @deprecated Use `inputs`. `vars` is the native `--var KEY=VALUE` operator
+   * channel: the engine reads `@env:NAME` from its environment and coerces
+   * text to the declared type, so it cannot carry literal API values and has
+   * no HTTP form. Combining it with `inputs` rejects `run()`.
+   */
   vars?: Record<string, string | number | boolean>;
   model?: string;
   maxCostUsd?: number;

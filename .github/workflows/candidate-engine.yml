@@ -74,10 +74,10 @@ jobs:
             exit 1
           fi
           test "$(git rev-parse HEAD)" = "$ENGINE_SHA"
-          cargo build --locked -p nika-cli --bin nika
-          chmod +x target/debug/nika
+          cargo build --release --locked -p nika-cli --bin nika
+          chmod +x target/release/nika
           mkdir -p "$RUNNER_TEMP/nika-candidate"
-          cp target/debug/nika "$RUNNER_TEMP/nika-candidate/nika"
+          cp target/release/nika "$RUNNER_TEMP/nika-candidate/nika"
           {
             echo "kind: candidate-engine-qualification"
             echo "engine_sha: $ENGINE_SHA"

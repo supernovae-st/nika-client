@@ -7,7 +7,7 @@ test('controlled incident output satisfies the current replay judge without chan
   const settlement = { status: 'cancelled', cause: 'operator', elapsed_ms: 9,
     tasks: { total: 2, ok: 1, failed: 0, recovered: 0, skipped: 0, cancelled: 1, never_started: 1 },
     spend: { pricing_as_of: null, total_cost_usd: null, qualifier: 'unmetered' } };
-  const result = { id: 'controlled-job', status: 'cancelled', settlement, receipt: { trace_id: 'controlled-trace' } };
+  const result = { id: 'controlled-job', status: 'cancelled', settlement, receipt: { trace_id: '1234567890abcdef1234567890abcdef' } };
   const event = { kind: 'execution.settled', status: 'cancelled', settlement, receipt: result.receipt };
   const action = Promise.resolve({ accepted: true, status: 'cancellation_requested' });
   let release;
@@ -30,7 +30,7 @@ test('controlled incident output satisfies the current replay judge without chan
     attachRun: async (id) => { assert.equal(id, result.id); return controlled; },
     traceVerify: async (receipt) => {
       if (receipt?.trace_id === '0'.repeat(32)) {
-        return { verified: false, verdict: 'SEALED', trace_id: 'controlled-trace' };
+        return { verified: false, verdict: 'SEALED', trace_id: '1234567890abcdef1234567890abcdef' };
       }
       return { verified: true, verdict: 'SEALED', trace_id: receipt.trace_id };
     },

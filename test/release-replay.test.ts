@@ -14,7 +14,7 @@ import {
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const committedResults = path.join(ROOT, 'gauntlet', 'results');
-const ENGINE = 'nika 0.118.7 (f3a31a6ee)';
+const ENGINE = 'nika 0.120.0 (f6155d1be)';
 const STABLE_CANCELLED_KIND = 'execution.cancelled|execution.settled';
 // The 200 shape: the resident cancelled the job before its execution started.
 const CANCELLED_BEFORE_EXECUTION = {
@@ -419,6 +419,48 @@ describe('public release evidence replay', () => {
     const replay = createReplay();
     const depth = readJson(replay, 'depth-projects.json');
     depth.summary = { total: 5, succeeded: 0, result: 'red' };
+    writeJson(replay, 'depth-projects.json', depth);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'depth-project replay does not match committed stable behavioral evidence',
+    );
+  });
+
+  it('compares fresh verified trace identities without changing the raw ledger', () => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    const incident = depth.projects.find((project: any) => project.project === 'incident-response-controller');
+    incident.remote_receipt_verdict.trace_id = '1234567890abcdef1234567890abcdef';
+    writeJson(replay, 'depth-projects.json', depth);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).not.toThrow();
+    expect(incident.remote_receipt_verdict.trace_id).toBe('1234567890abcdef1234567890abcdef');
+  });
+
+  it.each([
+    ['missing trace', { trace_id: undefined }, true],
+    ['malformed trace', { trace_id: 'not-a-trace' }, true],
+    ['substituted zero trace', { trace_id: '0'.repeat(32) }, true],
+    ['unverified trace', { verified: false }, true],
+    ['missing substitution refusal', {}, false],
+  ])('refuses depth receipt evidence with %s', (_label, changes, rejected) => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    const incident = depth.projects.find((project: any) => project.project === 'incident-response-controller');
+    Object.assign(incident.remote_receipt_verdict, changes);
+    incident.mismatched_trace_rejected = rejected;
+    writeJson(replay, 'depth-projects.json', depth);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'depth receipt evidence lacks a verified trace identity and substitution refusal',
+    );
+  });
+
+  it('still refuses changed depth receipt verdicts', () => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    const incident = depth.projects.find((project: any) => project.project === 'incident-response-controller');
+    incident.remote_receipt_verdict.reason = 'changed';
     writeJson(replay, 'depth-projects.json', depth);
 
     expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(

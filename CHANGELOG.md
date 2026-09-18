@@ -7,13 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.120.0]
+
 ### Changed
 
 - Canonical live workflow files are lowercase `.nika`. HTTP by-name
   admission (`isContainedWorkflowName`) keeps contained-relative shape and
   refuses retired `.nika.yaml` / `.nika.yml` names instead of falling back
   to local capture. Project `nika.yaml` and runtime `.nika/` are unchanged.
-  Generated OpenAPI was regenerated from the engine Serve schema.
+  Generated OpenAPI was regenerated from the engine Serve schema (`info.version`
+  0.120.0). Lockstep with public engine `v0.120.0`.
 
 ### Added
 

@@ -21,7 +21,7 @@ All workflows use the public envelope and task-map form, the canonical `invoke` 
 - `node --check` — all five consumer entry points and the runner passed.
 - `git diff --check` — passed.
 
-The final release-candidate replay used the public release engine `nika 0.118.7 (f3a31a6ee)`
+The previous release-candidate replay used the public release engine `nika 0.118.7 (f3a31a6ee)`
 with `supernovae-st-nika-0.118.7.tgz`; all five projects
 remained green. The generated JSON records installed-from-pack proof, stable
 scenario facts, typed error names/codes, receipt verdicts, event observations,
@@ -45,7 +45,17 @@ Its machine evidence is `gauntlet/results/recovery-e2e.json`.
 
 The historical paid-provider and three-pass trace ledgers remain useful prior
 evidence, but are explicitly labelled as historical 0.115 observations and are
-not release gates for this 0.118 candidate.
+not release gates for the current candidate.
+
+## Public 0.120.0 replay
+
+The current replay uses public release engine `nika 0.120.0 (f6155d1be)`
+with `supernovae-st-nika-0.120.0.tgz`. All five projects passed with canonical
+`.nika` files, including the incident controller's HTTP check and run, sealed
+journal verification, substituted-trace refusal, controlled cancellation, and
+graceful resident shutdown. Raw trace identifiers remain in the ledger; replay
+comparison validates their shape and compares the behavioral verdicts because
+each execution creates a fresh identity.
 
 ## Finding
 
@@ -54,7 +64,7 @@ calendar date (`format: date`, for example `2026-09-01`). The gauntlet exposed
 that the old README constructed a refused timestamp; the 0.116 documentation
 and exported type comment now teach the owning date contract.
 
-The committed depth baseline uses the complete Linux replay record from
+The previous depth baseline used the complete Linux replay record from
 GitHub Actions run 34260625242 (candidate b688b8b7). macOS reproduced every
 behavioral field identically; its locally packed archive had a different
 SHA-256. Both original records are retained in the integration evidence.

@@ -1,73 +1,95 @@
 [
   {
-    "path": "gauntlet/personas/REPORT.md",
-    "category": "historical",
-    "reason": "Frozen persona gauntlet findings that recorded the real old executable spelling.",
-    "owner": "nika-client"
-  },
-  {
     "path": "CHANGELOG.md",
     "category": "historical",
+    "count": 1,
+    "lines_sha256": "sha256:b3df4871381d201720ffc8143e4a28525fe3a08cc7af7aa30bc438f73695cf48",
     "reason": "Unreleased notes name the retired suffixes being cut; older entries stay authentic.",
     "owner": "nika-client"
   },
   {
+    "path": "gauntlet/personas/REPORT.md",
+    "category": "historical",
+    "count": 2,
+    "lines_sha256": "sha256:e29a170199add0613b819ae74318bd16148a848a3614720b557d701869f1877c",
+    "reason": "Frozen persona gauntlet findings that recorded the real old executable spelling.",
+    "owner": "nika-client"
+  },
+  {
     "path": "openapi.json",
-    "category": "generated",
-    "reason": "Engine-owned Serve schema pin; regenerate from the migrated engine, never hand-edit.",
+    "category": "historical",
+    "count": 1,
+    "lines_sha256": "sha256:8b4565b31521cf3c670148fc0f4a746281f8baddba3319c3f69ee6886ce4b766",
+    "reason": "Engine-owned Serve schema; descriptions still say .nika.yaml until a validated generator receipt.",
     "owner": "nika-client"
   },
   {
     "path": "src/generated/openapi.d.ts",
-    "category": "generated",
+    "category": "historical",
+    "count": 2,
+    "lines_sha256": "sha256:ec9ccee8ba71d2a3bb00641b257b6ca99ebd8ed435cc3458c394f69f313a3275",
     "reason": "Generated from openapi.json; waits on the engine OpenAPI pin.",
     "owner": "nika-client"
   },
   {
     "path": "src/lib/workflow-name.ts",
     "category": "negative",
+    "count": 3,
+    "lines_sha256": "sha256:91152e49f8b536f2ef47b76d64d4d56bc8f48607ba2e1f80ae6648060394a859",
     "reason": "Lexical owner names retired suffixes so HTTP can refuse them.",
     "owner": "nika-client"
   },
   {
     "path": "test/workflow-name.test.ts",
     "category": "negative",
+    "count": 8,
+    "lines_sha256": "sha256:3fe10dc49c2a936c8ce18c346bd68e71e95f11a17fd5b65a386d93783620e25d",
     "reason": "Positive/negative filename and contained-name matrix.",
     "owner": "nika-client"
   },
   {
     "path": "test/native-run-admission.test.ts",
     "category": "historical",
-    "reason": "Asserts frozen engine missing-file stdout that still names missing.nika.yaml.",
+    "count": 3,
+    "lines_sha256": "sha256:c6e44da64ef1595ca1f0564fbaa75745595e38cc6822ff92bc00a547e1a24d2e",
+    "reason": "Decodes frozen 0.119.0/PR1679 missing-file stdout; not a live engine probe.",
     "owner": "nika-client"
   },
   {
     "path": "test/http-by-name.test.ts",
     "category": "negative",
+    "count": 1,
+    "lines_sha256": "sha256:878d899ce7832a11020e1311dcf5a44c90c927a3f5da6cef3a83eda572886b9a",
     "reason": "HTTP by-name path refuses .nika.yaml / .nika.yml without local capture fallback.",
     "owner": "nika-client"
   },
   {
     "path": "test/fixtures/run-wire/0.119.0-missing-file.pretty.stdout",
-    "category": "historical",
-    "reason": "Frozen engine stdout for a missing-file teaching line; bytes stay authentic.",
+    "category": "frozen",
+    "digest": "sha256:1d9dc9e72c82c252bfdc9b22cb9c3c913cc68dd168f0ec89801ca4857a51eff9",
+    "reason": "Byte-for-byte 0.119.0 missing-file CheckReport; immutable historical engine capture.",
     "owner": "nika-client"
   },
   {
     "path": "test/fixtures/run-wire/pr1679-missing-file.compact.stdout",
-    "category": "historical",
-    "reason": "Frozen compact engine stdout for the same missing-file family.",
+    "category": "frozen",
+    "digest": "sha256:f4885f6eba2987331ce4473be06c7b0a675c41707c8610085ce8a35aa4aadf11",
+    "reason": "Byte-for-byte PR1679 compact missing-file CheckReport; immutable historical engine capture.",
     "owner": "nika-client"
   },
   {
     "path": "scripts/file-identity-ratchet.mjs",
-    "category": "negative",
+    "category": "ratchet",
+    "count": 18,
+    "lines_sha256": "sha256:efcca1972086d3df76304124171022c4502349aa0bfa3e2d77f322e40aed751d",
     "reason": "Scanner's own forbidden-pattern data.",
     "owner": "nika-client"
   },
   {
     "path": "scripts/file-identity-allowlist.json",
-    "category": "negative",
+    "category": "ratchet",
+    "count": 2,
+    "lines_sha256": "sha256:4a28b1829cc17a273f3bbb01599ca62d506200d340a61eb8b7cc0d717e3b7672",
     "reason": "Allowlist names the retired suffixes in its reason strings.",
     "owner": "nika-client"
   }

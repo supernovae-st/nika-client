@@ -144,6 +144,8 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
       ['released 0.119.0 · pretty CheckReport', 'wire-0119-missing-file.nika'],
       ['engine PR #1679 · one compact object', 'wire-pr1679-missing-file.nika'],
     ])('%s · a finding without a code is never given one', async (_dialect, workflow) => {
+      // Historical decode only: fake-nika replays frozen 0.119.0 / PR1679
+      // stdout that named missing.nika.yaml. Not a live engine probe.
       const failure = await refusedRun(workflow);
 
       expect(failure).toBeInstanceOf(NikaOperationError);

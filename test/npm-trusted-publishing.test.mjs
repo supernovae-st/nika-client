@@ -36,7 +36,8 @@ async function execute(oidc) {
   return { ...result, calls: (await readFile(log, 'utf8')).trim().split('\n').filter(Boolean) };
 }
 
-test('the publishing shell accepts GitHub OIDC without an npm write token', async () => {
+// The shell keeps its own 5s deadline; allow fixture file I/O and cleanup too.
+test('the publishing shell accepts GitHub OIDC without an npm write token', { timeout: 15_000 }, async () => {
   const result = await execute({
     ACTIONS_ID_TOKEN_REQUEST_URL: 'https://example.invalid/oidc',
     ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'fixture-only',
@@ -54,7 +55,7 @@ test.each([
   {},
   { ACTIONS_ID_TOKEN_REQUEST_URL: 'https://example.invalid/oidc' },
   { ACTIONS_ID_TOKEN_REQUEST_TOKEN: 'fixture-only' },
-])('the publishing shell refuses incomplete OIDC before invoking publication', async (oidc) => {
+])('the publishing shell refuses incomplete OIDC before invoking publication', { timeout: 15_000 }, async (oidc) => {
   const result = await execute(oidc);
   expect(result.status).not.toBe(0);
   expect(result.stdout + result.stderr).toContain('GitHub OIDC');

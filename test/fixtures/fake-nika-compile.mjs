@@ -15,11 +15,13 @@ import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
  */
 
 const argv = process.argv.slice(2);
-if (process.env.NIKA_FAKE_ARGV_LOG) {
-  appendFileSync(process.env.NIKA_FAKE_ARGV_LOG, `${JSON.stringify(argv)}\n`);
-}
-if (process.env.NIKA_FAKE_PID_FILE) {
-  writeFileSync(process.env.NIKA_FAKE_PID_FILE, String(process.pid));
+function logInvocation() {
+  if (process.env.NIKA_FAKE_PID_FILE) {
+    writeFileSync(process.env.NIKA_FAKE_PID_FILE, String(process.pid));
+  }
+  if (process.env.NIKA_FAKE_ARGV_LOG) {
+    appendFileSync(process.env.NIKA_FAKE_ARGV_LOG, `${JSON.stringify(argv)}\n`);
+  }
 }
 
 const IDENTITY = {
@@ -113,14 +115,17 @@ async function compile() {
 
   const key = change !== undefined ? change : (intent ?? '');
 
+  if (key === 'hostile-wedged') process.on('SIGTERM', () => {});
+  if (key === 'hostile-slow') process.on('SIGTERM', () => process.exit(130));
+  // The log is the test's readiness handshake: PID and signal handlers exist.
+  logInvocation();
+
   if (key === 'hostile-wedged') {
     // Ignores SIGTERM: only SIGKILL ends it. Pins the kill-grace escalation.
-    process.on('SIGTERM', () => {});
     sleepForever();
     return;
   }
   if (key === 'hostile-slow') {
-    process.on('SIGTERM', () => process.exit(130));
     sleepForever();
     return;
   }
@@ -239,7 +244,9 @@ async function compile() {
 }
 
 if (argv[0] === '--sdk-identity') {
-  process.stdout.write(`${JSON.stringify(IDENTITY)}\n`);
+  logInvocation();
+  if (process.env.NIKA_FAKE_COMPILE_PROBE === 'slow') sleepForever();
+  else process.stdout.write(`${JSON.stringify(IDENTITY)}\n`);
 } else if (argv[0] === 'compile' && argv.includes('--json')) {
   await compile();
 } else {

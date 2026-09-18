@@ -132,9 +132,9 @@ export class Nika {
    *
    * The candidate is ordinary `.nika.yaml` SOURCE. `run()` consumes a path,
    * so the caller materializes the candidate and `run(path)` re-admits it —
-   * the compile preview is a review, never admission. Over `{ url }` this is
-   * a typed refusal until nika serve grows its authoring door (engine
-   * nika#1670); the SDK never compiles in TypeScript as a fallback.
+   * the compile preview is a review, never admission. Over `{ url }` this calls
+   * the authenticated Serve compile door, gated by its advertised capability;
+   * the SDK never compiles locally as a fallback.
    */
   async compile(
     request: string | NikaCompileRequest,
@@ -387,6 +387,7 @@ export type {
   NikaCompileQuestion,
   NikaCompileRequest,
   NikaCompileStatus,
+  NikaCompileSetConstant,
   NikaConfig,
   NikaLocalConfig,
   NikaRemoteConfig,

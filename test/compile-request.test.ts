@@ -23,6 +23,19 @@ async function refusal(promise: Promise<unknown>): Promise<unknown> {
 }
 
 describe('compile request validation (no engine involved)', () => {
+  it.each([
+    { set_constant: { name: 'request', value: undefined } },
+    { set_constant: { name: 'request', value: NaN } },
+    { set_constant: { name: 'request', value: 1n } },
+    { set_constant: { name: 'const.request', value: 1 } },
+    { set_constant: { name: 'x to 1', value: 2 } },
+    { set_constant: { name: 'request', value: 1 }, text: 'ignored' },
+    { set_constant: { name: 'request', value: 1, extra: true } },
+  ])('refuses malformed structured edits before engine discovery: %#', async (change) => {
+    const error = await refusal(client().compile({ workflow: 'source', change } as NikaCompileRequest));
+    expect(error).toBeInstanceOf(NikaConfigurationError);
+  });
+
   it('accepts the bare-string shorthand as a create intent', async () => {
     // Reaches the transport (and fails there on the absent binary), proving
     // validation passed.

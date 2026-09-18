@@ -70,7 +70,7 @@ const PATH_LIMIT = 240;
 
 export function encodeLiteralInputs(
   inputs: unknown,
-  label: 'run({ inputs })' | 'compile({ answers })' = 'run({ inputs })',
+  label: 'run({ inputs })' | 'compile({ answers })' | 'compile({ change })' = 'run({ inputs })',
 ): LiteralInputs {
   if (containerKind(inputs) !== 'object') {
     const subject = label === 'run({ inputs })'
@@ -197,7 +197,12 @@ export function encodeLiteralInputs(
   return { json: parts.join(''), bytes };
 }
 
-function tooLarge(label: 'run({ inputs })' | 'compile({ answers })'): NikaConfigurationError {
+function tooLarge(label: 'run({ inputs })' | 'compile({ answers })' | 'compile({ change })'): NikaConfigurationError {
+  if (label === 'compile({ change })') {
+    return new NikaConfigurationError(
+      `compile({ change }): the serialized literal exceeds ${LITERAL_INPUTS_MAX_BYTES} bytes (1 MiB)`,
+    );
+  }
   if (label === 'compile({ answers })') {
     return new NikaConfigurationError(
       `compile({ answers }): the serialized answers exceed ${LITERAL_INPUTS_MAX_BYTES} bytes (1 MiB); `

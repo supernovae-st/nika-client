@@ -332,6 +332,44 @@ writes the engine's own annotated `01-hello` example (its task is named
 the `outputs.greeting` key and the `mock/echo` model, which the hand-written
 file above satisfies too.
 
+## Compile a candidate without running it
+
+`compile()` requires an engine that advertises the `compile` capability. The
+0.118.7 bundled engine predates this door; use an explicit compatible engine
+binary or a compatible authenticated Serve connection. This foundation resolves
+exact embedded skeleton names (including `hello`) and edits existing constants;
+unsupported intent remains `incomplete`.
+
+```ts
+const candidate = await nika.compile({
+  intent: 'classify-and-route',
+  answers: { 'const.request': 'An outage affects support customers.' },
+}, { timeoutMs: 15_000 });
+
+// The outcome is source and review data. Incomplete/refused are also outcomes.
+console.log(candidate.status, candidate.questions, candidate.diagnostics);
+if (candidate.ready && candidate.candidate !== null) {
+  const edited = await nika.compile({
+    workflow: candidate.candidate,
+    change: { set_constant: { name: 'request', value: 'One customer is affected.' } },
+  });
+  console.log(edited.candidate);
+}
+```
+
+Edits also accept a string such as `Set const.request to "One customer"`.
+Answers and structured values are strict JSON values, preserving numbers,
+booleans, null, strings, arrays and objects. The native adapter uses the engine's
+CLI; the HTTP adapter sends authenticated `POST /v1/compile`. An unavailable
+remote capability raises `NikaCompatibilityError` without local fallback.
+
+`candidate` is `.nika.yaml` source, distinct from the path accepted by `run()`.
+The caller reviews and materializes it before calling `run(path)`, which performs
+normal admission. `requested_boundary` and the source-only `check_preview` grant
+no execution authority. Compile creates no Run, job, approval or Proof, and the
+SDK writes no persistent candidate file. `signal`/`timeoutMs` stop only the
+compile request. The common outcome has no `exitCode` or `written` field.
+
 ## Verify a local trace
 
 Local terminal results carry an engine-issued receipt when tracing is enabled.

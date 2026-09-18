@@ -23,13 +23,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   older engines are refused before any compile spawn. CREATE takes an intent
   (or exact skeleton name) plus `answers` — strict JSON values serialized
   once onto argv as `KEY=JSON`; EDIT takes the accepted source plus a change
+  (text or explicit `set_constant`)
   and lends the base through a 0700 scratch dir with a 0600 file, removed on
   every path. `signal`/`timeoutMs` stop only this child (SIGTERM, then
   SIGKILL inside a kill grace); no Run exists to cancel. The candidate is
   source: `run()` still takes a path, and the caller owns materialization —
-  this slice ships no `dest`/`force`. Over `{ url }` the method typed-refuses
-  until nika serve exposes its authoring door (engine nika#1670); the SDK
-  never compiles in TypeScript as a fallback.
+  this slice ships no `dest`/`force`. Over `{ url }` the method consumes
+  authenticated `POST /v1/compile` when Serve advertises `compile`, using the
+  same outcome without process-only `exitCode`/`written` fields. HTTP cancellation,
+  timeouts and bounded response parsing never fall back to local compilation.
 
 - The Run owns its lifecycle (#120). `NikaRun` now carries `events()`,
   `result()`, `status()` and `cancel()` next to `id`; `run.result()` is the

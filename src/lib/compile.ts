@@ -18,6 +18,7 @@ import type {
   NikaCompileQuestion,
   NikaCompileRequest,
   NikaCompileStatus,
+  NikaCompileSetConstant,
   NikaTransportKind,
 } from '../types.js';
 import type { EngineCapture } from './engine-capture.js';
@@ -120,12 +121,30 @@ export function normalizeCompileRequest(
       'compile: an edit needs the accepted workflow source as a non-empty string',
     );
   }
-  if (typeof change !== 'string' || change.length === 0) {
+  const normalizedChange = normalizeChange(change);
+  return answers === undefined
+    ? { workflow, change: normalizedChange }
+    : { workflow, change: normalizedChange, answers: answers as Record<string, unknown> };
+}
+
+function normalizeChange(change: unknown): string | NikaCompileSetConstant {
+  if (typeof change === 'string' && change.length > 0) return change;
+  if (change === undefined || change === '') {
     throw new NikaConfigurationError('compile: an edit needs a non-empty change request');
   }
-  return answers === undefined
-    ? { workflow, change }
-    : { workflow, change, answers: answers as Record<string, unknown> };
+  // The strict encoder refuses accessors, proxies and non-JSON literals before
+  // inspecting the structured edit. Clone so later caller mutation cannot alter it.
+  const encoded = encodeLiteralInputs({ change }, 'compile({ change })');
+  const object = machineObject(JSON.parse(encoded.json).change);
+  const constant = machineObject(object?.set_constant);
+  if (!object || Object.keys(object).length !== 1 || !constant
+    || Object.keys(constant).length !== 2 || !('value' in constant)
+    || typeof constant.name !== 'string' || !/^[A-Za-z0-9_]+$/.test(constant.name)) {
+    throw new NikaConfigurationError(
+      'compile: an edit needs a non-empty change string or set_constant with a bare name and JSON value',
+    );
+  }
+  return object as unknown as NikaCompileSetConstant;
 }
 
 /** Caller-facing options validation: a bad timeout is a configuration error. */
@@ -136,10 +155,13 @@ export function normalizeCompileOptions(options: NikaCompileOptions): NikaCompil
     }
   }
   const timeoutMs = options.timeoutMs;
-  if (timeoutMs !== undefined && (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1)) {
+  if (timeoutMs !== undefined && (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 0x7fffffff)) {
     throw new NikaConfigurationError(
       `compile: timeoutMs must be a positive safe integer of milliseconds, got ${String(timeoutMs)}`,
     );
+  }
+  if (options.signal !== undefined && !(options.signal instanceof AbortSignal)) {
+    throw new NikaConfigurationError('compile: signal must be an AbortSignal');
   }
   return options;
 }
@@ -182,16 +204,29 @@ export async function compileArgv(request: NikaCompileRequest): Promise<CompileI
     args.push(`--answer=${answer}`);
   }
   if (request.intent !== undefined) {
+    refuseNul(request.intent);
     args.push('--', request.intent);
     return { args };
   }
+  const change = typeof request.change === 'string' ? request.change
+    : `Set const.${request.change.set_constant.name} to ${literalJson(request.change.set_constant.value)}`;
+  refuseNul(change);
   // The CLI's EDIT reads the accepted base from a path (`--base`). The engine
   // core owns source selection; the SDK lends a scratch file outside the
   // caller's workspace rather than ever writing near it.
   const scratchDir = await mkdtemp(path.join(tmpdir(), 'nika-sdk-compile-'));
   const base = path.join(scratchDir, 'base.nika.yaml');
-  await writeFile(base, request.workflow, { encoding: 'utf8', mode: 0o600 });
-  args.push('--base', base, `--change=${request.change}`);
+  try {
+    await writeFile(base, request.workflow, { encoding: 'utf8', mode: 0o600 });
+  } catch (cause) {
+    // No invocation handle exists yet: this function still owns the directory,
+    // including any partially written file after EIO/ENOSPC.
+    await rm(scratchDir, { recursive: true, force: true });
+    throw new NikaTransportError('native-process', 'compile could not write its temporary base source', {
+      cause: cause instanceof Error ? cause : undefined,
+    });
+  }
+  args.push('--base', base, `--change=${change}`);
   return { args, scratchDir };
 }
 
@@ -214,14 +249,38 @@ function compileAnswers(answers: Record<string, unknown> | undefined): string[] 
   encodeLiteralInputs(answers, 'compile({ answers })');
   return Reflect.ownKeys(answers).map((key) => {
     const name = String(key);
-    if (name.length === 0 || name.includes('=')) {
+    if (name.length === 0 || name.includes('=') || name.includes('\0')) {
       throw new NikaConfigurationError(
         'compile({ answers }): a question key must be non-empty and cannot carry '
         + "'='; the engine splits KEY=JSON on its first equals sign",
       );
     }
-    return `${name}=${JSON.stringify(answers[name])}`;
+    return `${name}=${literalJson(answers[name])}`;
   });
+}
+
+function literalJson(value: unknown): string {
+  return encodeLiteralInputs({ value }, 'compile({ change })').json.slice('{"value":'.length, -1);
+}
+
+function refuseNul(value: string): void {
+  if (value.includes('\0')) throw new NikaConfigurationError('compile: text cannot contain a NUL byte');
+}
+
+/** Exact accepted Serve v1 envelope; no local capture or compiler is involved. */
+export function compileBody(request: NikaCompileRequest): string {
+  compileAnswers(request.answers); // Keep the literal/key law identical across doors.
+  const answers = request.answers === undefined ? ''
+    : `,"answers":${encodeLiteralInputs(request.answers, 'compile({ answers })').json}`;
+  if (request.intent !== undefined) {
+    refuseNul(request.intent);
+    return `{"compile_version":1,"mode":"create","intent":${JSON.stringify(request.intent)}${answers}}`;
+  }
+  if (typeof request.change === 'string') refuseNul(request.change);
+  const change = typeof request.change === 'string'
+    ? `{"text":${JSON.stringify(request.change)}}`
+    : `{"set_constant":{"name":${JSON.stringify(request.change.set_constant.name)},"value":${literalJson(request.change.set_constant.value)}}}`;
+  return `{"compile_version":1,"mode":"edit","source":${JSON.stringify(request.workflow)},"change":${change}${answers}}`;
 }
 
 /**
@@ -287,6 +346,27 @@ export function compileOutcomeFrom(
       `status ${JSON.stringify(status)} contradicts exit ${captured.exitCode}`,
     );
   }
+  writtenFrom(payload.written, protocol);
+  return compilePayloadFrom(payload, transport, engine);
+}
+
+/** Shared authoring fields only: native exit/written evidence stays in its adapter. */
+export function compilePayloadFrom(
+  payload: Record<string, unknown>,
+  transport: NikaTransportKind,
+  engine: string,
+): NikaCompileOutcome {
+  const protocol = (message: string) => new NikaProtocolError(transport, `compile at ${engine}: ${message}`);
+  if (payload.compile_version !== COMPILE_WIRE_VERSION) {
+    throw new NikaCompatibilityError(COMPILE_CAPABILITY, transport,
+      `Engine at ${engine} speaks compile wire ${String(payload.compile_version)}; expected ${COMPILE_WIRE_VERSION}`);
+  }
+  if ('error' in payload) throw protocol('the payload carries an error instead of an outcome');
+  if (transport === 'http' && 'written' in payload) throw protocol('HTTP outcome claims a written destination');
+  const status = payload.status;
+  if (typeof status !== 'string' || !STATUSES.includes(status as NikaCompileStatus)) {
+    throw protocol('unknown compile status');
+  }
   const candidate = payload.candidate;
   if (candidate !== null && typeof candidate !== 'string') {
     throw protocol('candidate is neither source text nor null');
@@ -304,8 +384,6 @@ export function compileOutcomeFrom(
     requested_boundary: nullableObject(payload.requested_boundary, 'requested_boundary', protocol),
     check_preview: previewFrom(payload.check_preview, protocol),
     provenance: provenanceFrom(payload.provenance, protocol),
-    written: writtenFrom(payload.written, protocol),
-    exitCode: captured.exitCode,
   };
   return outcome;
 }

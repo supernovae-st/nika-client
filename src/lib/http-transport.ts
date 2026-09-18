@@ -39,7 +39,7 @@ import {
   type NikaEngineIdentity,
 } from './engine-identity.js';
 import { literalInputs } from './literal-inputs.js';
-import { COMPILE_CAPABILITY } from './compile.js';
+import { COMPILE_CAPABILITY, COMPILE_RESPONSE_MAX_BYTES, compileBody, compilePayloadFrom, compileSignal } from './compile.js';
 import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
 import { readSettlement } from './settlement.js';
 import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
@@ -182,22 +182,59 @@ export class HttpTransport implements Transport {
   }
 
   /**
-   * Authoring over HTTP (issue #128): nika serve has no authoring door yet
-   * (engine nika#1670), so this refuses typed after the identity probe alone.
+   * Stateless authoring through the authenticated Serve compile door.
    * A remote connection never falls back to a local compile — the candidate
    * must come from the server the caller connected to, or not exist.
    */
   async compile(
-    _request: NikaCompileRequest,
-    _options: NikaCompileOptions,
+    request: NikaCompileRequest,
+    options: NikaCompileOptions,
   ): Promise<NikaCompileOutcome> {
-    await this.ensureServerIdentity();
-    throw this.gap(
-      COMPILE_CAPABILITY,
-      'The connected nika serve does not expose an authoring door (engine nika#1670 '
-      + 'is still open). No request was sent, and the SDK never compiles locally '
-      + 'as a substitute for the connected engine',
-    );
+    const body = compileBody(request);
+    const timeoutMs = options.timeoutMs ?? this.options.requestTimeout;
+    const composed = compileSignal({ ...options, timeoutMs });
+    const signal = composed.signal!;
+    try {
+      if (signal.aborted) throw new NikaTransportError(this.kind, 'compile aborted');
+      const identity = this.remoteIdentity ?? await this.probeServerIdentity(signal);
+      if (!identity.supportedCapabilities.includes(COMPILE_CAPABILITY)) {
+        throw this.gap(COMPILE_CAPABILITY,
+          'The connected engine does not advertise compile; the SDK never compiles locally as a substitute');
+      }
+      const path = '/v1/compile';
+      const response = await this.fetchResponse(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body,
+        signal,
+      }, false, true, false);
+      if (response.headers.get('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json') {
+        await discardResponse(response);
+        throw new NikaProtocolError(this.kind, 'HTTP compile returned an invalid content-type');
+      }
+      const object = await this.readObservationObject(response, path, signal,
+        Math.min(this.options.machineBufferBytes, COMPILE_RESPONSE_MAX_BYTES));
+      if (signal.aborted) throw new NikaTransportError(this.kind, 'compile aborted');
+      if (response.status !== 200) {
+        const error = machineObject(object.error);
+        if (response.ok || !error || typeof error.code !== 'string'
+          || !/^[A-Za-z][A-Za-z0-9_.:-]{0,63}$/.test(error.code)
+          || error.code.includes(this.options.token) || typeof error.message !== 'string'
+          || Object.keys(object).some((key) => key !== 'error')) {
+          throw new NikaProtocolError(this.kind, 'HTTP compile returned a malformed refusal or non-contract status');
+        }
+        throw this.refused(path, { operation: 'compile', status: response.status,
+          refusal: { code: error.code, message: this.redact(error.message) } });
+      }
+      return compilePayloadFrom(object, this.kind, this.options.url);
+    } catch (cause) {
+      if (signal.aborted) {
+        throw new NikaTransportError(this.kind, composed.timedOut()
+          ? `compile timed out after ${timeoutMs} ms` : 'compile aborted by caller',
+        { cause: cause instanceof Error ? cause : undefined });
+      }
+      throw cause;
+    }
   }
 
   async startRun(workflow: string, options: NikaRunOptions): Promise<TransportRun> {
@@ -846,6 +883,7 @@ export class HttpTransport implements Transport {
     response: Response,
     path: string,
     signal?: AbortSignal,
+    maxBytes = this.options.machineBufferBytes,
   ): Promise<Record<string, unknown>> {
     if (!response.body) {
       throw new NikaProtocolError(this.kind, `HTTP ${path} omitted its JSON body`);
@@ -875,10 +913,10 @@ export class HttpTransport implements Transport {
         const { done, value } = await Promise.race([reader.read(), boundary]);
         if (done) break;
         bytes += value.byteLength;
-        if (bytes > this.options.machineBufferBytes) {
+        if (bytes > maxBytes) {
           throw new NikaProtocolError(
             this.kind,
-            `HTTP ${path} JSON exceeded ${this.options.machineBufferBytes} bytes`,
+            `HTTP ${path} JSON exceeded ${maxBytes} bytes`,
           );
         }
         chunks.push(value);
@@ -1008,8 +1046,8 @@ export class HttpTransport implements Transport {
     return this.serverIdentity;
   }
 
-  private async probeServerIdentity(): Promise<NikaEngineIdentity> {
-    const health = await this.json('/health', { method: 'GET' }, false);
+  private async probeServerIdentity(signal?: AbortSignal): Promise<NikaEngineIdentity> {
+    const health = await this.json('/health', { method: 'GET', signal }, false);
     if (health.status !== 'ok' || health.service !== 'nika-serve') {
       throw new NikaCompatibilityError(
         'engineIdentity',
@@ -1403,6 +1441,7 @@ export class HttpTransport implements Transport {
     const callerSignal = init.signal;
     const abort = () => controller?.abort(callerSignal?.reason);
     callerSignal?.addEventListener('abort', abort, { once: true });
+    if (callerSignal?.aborted) abort();
     const headers = new Headers(init.headers);
     if (authenticated) headers.set('Authorization', `Bearer ${this.options.token}`);
     try {

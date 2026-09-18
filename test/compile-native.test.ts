@@ -128,8 +128,8 @@ describe.skipIf(!posix)('native compile (issue #128 · engine #1663)', () => {
       expect(result.compile_version).toBe(1);
       expect(result.status).toBe('ready');
       expect(result.ready).toBe(true);
-      expect(result.exitCode).toBe(0);
-      expect(result.written).toBeNull();
+      expect(result).not.toHaveProperty('exitCode');
+      expect(result).not.toHaveProperty('written');
       expect(result.candidate).toContain('const: { request: "Réparez la 雪 \\"quoted\\" <tag>" }');
       expect(result.questions).toEqual([]);
       expect(result.provenance.cognition).toBe('deterministicOnly');
@@ -176,7 +176,7 @@ describe.skipIf(!posix)('native compile (issue #128 · engine #1663)', () => {
       const { result } = await spawned(() => client().compile('classify-and-route'));
       expect(result.status).toBe('incomplete');
       expect(result.ready).toBe(false);
-      expect(result.exitCode).toBe(2);
+      expect(result).not.toHaveProperty('exitCode');
       expect(result.questions).toEqual([{
         key: 'const.request',
         label: 'What request should this workflow classify?',
@@ -307,6 +307,16 @@ describe.skipIf(!posix)('native compile (issue #128 · engine #1663)', () => {
   });
 
   describe('cancellation and timeout (no Run exists)', () => {
+    it('bounds a stalled identity probe before the compile child starts', async () => {
+      process.env.NIKA_FAKE_COMPILE_PROBE = 'slow';
+      try {
+        const { result, argvs } = await spawned(() => failure(client().compile('hello', { timeoutMs: 150 })));
+        expect(result).toBeInstanceOf(NikaTransportError);
+        expect((result as Error).message).toMatch(/timed out/);
+        expect(argvs.every((argv) => argv[0] === '--sdk-identity')).toBe(true);
+      } finally { delete process.env.NIKA_FAKE_COMPILE_PROBE; }
+    });
+
     it('abort before spawn starts zero compile processes', async () => {
       const controller = new AbortController();
       controller.abort();
@@ -370,6 +380,16 @@ describe.skipIf(!posix)('native compile (issue #128 · engine #1663)', () => {
   });
 
   describe('edit', () => {
+    it.each([null, true, 1.2345678901234567, '雪 \"quoted\"', { nested: ['é', false, null] }])(
+      'maps a structured constant literal exactly onto the CLI grammar: %j', async (value) => {
+        const { argvs } = await spawned(() => client().compile({
+          workflow: 'nika: base\nconst: { request: "a" }\n',
+          change: { set_constant: { name: 'request', value } },
+        }));
+        expect(argvs[1]).toContain(`--change=Set const.request to ${JSON.stringify(value)}`);
+      },
+    );
+
     const BASE = '# accepted base\nnika: base\nconst: { request: "雪 é" }\n';
 
     it('lends the base as exact bytes in a scratch file, then removes it', async () => {

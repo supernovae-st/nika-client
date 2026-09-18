@@ -869,10 +869,25 @@ export interface NikaCompileCreateRequest {
 export interface NikaCompileEditRequest {
   /** The accepted workflow's exact source bytes (as a string). */
   workflow: string;
-  /** The requested change, in the engine's supported edit vocabulary. */
-  change: string;
+  /**
+   * The requested change: free text in the engine's supported edit
+   * vocabulary, or one structured constant edit mirroring the engine's
+   * `set_constant` operation. The value is a strict JSON value, judged by
+   * the same law as `answers`.
+   */
+  change: string | NikaCompileSetConstant;
   answers?: Record<string, unknown>;
   intent?: never;
+}
+
+/** One structured constant edit, mirroring the engine's `set_constant`. */
+export interface NikaCompileSetConstant {
+  set_constant: {
+    /** Bare constant name (no `const.` prefix, no path). */
+    name: string;
+    /** The new literal, as a strict JSON value. */
+    value: unknown;
+  };
 }
 
 export interface NikaCompileOptions {
@@ -882,7 +897,7 @@ export interface NikaCompileOptions {
    * exists to interrupt.
    */
   signal?: AbortSignal;
-  /** Positive integer milliseconds before the bounded child is stopped. */
+  /** Positive integer milliseconds before the compile child or HTTP request is stopped. */
   timeoutMs?: number;
 }
 
@@ -949,8 +964,4 @@ export interface NikaCompileOutcome {
   requested_boundary: Record<string, unknown> | null;
   check_preview: NikaCompilePreview | null;
   provenance: NikaCompileProvenance;
-  /** Engine-materialized destination. Always null here: the SDK passes no dest. */
-  written: null;
-  /** The compile child's exit code (0 ready · 2 incomplete/refused). */
-  exitCode: number;
 }

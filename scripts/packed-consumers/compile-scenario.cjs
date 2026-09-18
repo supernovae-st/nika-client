@@ -34,11 +34,15 @@ async function refusal(sdk, action) {
 }
 
 /** A resident that records every request; it has no authoring door. */
-function resident() {
+function resident(candidate) {
   const requests = [];
   const fetch = async (url, init = {}) => {
     const { pathname } = new URL(String(url));
     requests.push({ path: pathname, method: init.method ?? 'GET', body: init.body ?? null });
+    if (pathname === '/v1/compile' && candidate) {
+      if (init.headers.get('Authorization') !== `Bearer ${TOKEN}`) throw new Error('compile lacked bearer');
+      return Response.json(candidate);
+    }
     if (pathname === '/health') {
       return new Response(JSON.stringify({
         status: 'ok',
@@ -49,7 +53,7 @@ function resident() {
         checkReportVersion: 1,
         eventFormatVersion: 1,
         traceFormatVersion: 2,
-        supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'trace'],
+        supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'trace', ...(candidate ? ['compile'] : [])],
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     throw new Error(`unexpected request ${pathname}`);
@@ -72,8 +76,7 @@ module.exports = async function compileScenario(sdk, engines) {
     report.ready = {
       status: ready.status,
       ready: ready.ready,
-      exitCode: ready.exitCode,
-      written: ready.written,
+      processFieldsAbsent: !('exitCode' in ready) && !('written' in ready),
       cognition: ready.provenance.cognition,
       candidateHasAnswer: typeof ready.candidate === 'string'
         && ready.candidate.includes('const: { request: "Reroute 雪 \\"quoted\\" tickets" }'),
@@ -85,7 +88,6 @@ module.exports = async function compileScenario(sdk, engines) {
     report.incomplete = {
       status: incomplete.status,
       ready: incomplete.ready,
-      exitCode: incomplete.exitCode,
       questionKey: incomplete.questions[0]?.key,
       mandatory: incomplete.questions[0]?.mandatory,
     };
@@ -134,6 +136,12 @@ module.exports = async function compileScenario(sdk, engines) {
     }).compile('classify-and-route'));
     report.http.requests = remote.requests;
     report.http.argv = argvLog(remoteLog);
+    const capable = resident(ready);
+    const result = await new sdk.Nika({ url: 'https://nika.example', token: TOKEN,
+      bin: engines.compile, fetch: capable.fetch }).compile({ workflow: base,
+      change: { set_constant: { name: 'request', value: ['雪', null, true, 1.25] } } });
+    report.httpSuccess = { sameOutcome: JSON.stringify(result) === JSON.stringify(ready),
+      request: JSON.parse(capable.requests[1].body), argv: argvLog(remoteLog) };
     return report;
   } finally {
     delete process.env.NIKA_FAKE_ARGV_LOG;

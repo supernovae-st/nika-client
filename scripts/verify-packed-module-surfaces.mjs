@@ -207,7 +207,7 @@ try {
     assertCompile(report, moduleSystem);
     process.stdout.write(
       `Packed ${packageName}@${expectedVersion} compiles from ${moduleSystem} `
-      + 'over the native compile wire; HTTP refuses typed\n',
+      + 'over native and authenticated HTTP compile; old doors refuse typed\n',
     );
   }
 
@@ -289,11 +289,15 @@ try {
     'declare const compileOutcome: NikaCompileOutcome;',
     'const compileReady: boolean = compileOutcome.ready;',
     'const compileSource: string | null = compileOutcome.candidate;',
-    'const compileWritten: null = compileOutcome.written;',
-    'void compileReady; void compileSource; void compileWritten;',
+    '// @ts-expect-error compile has no process-only fields',
+    'compileOutcome.written;',
+    '// @ts-expect-error compile has no process-only fields',
+    'compileOutcome.exitCode;',
+    'void compileReady; void compileSource;',
     `const compileCreate: NikaCompileRequest = { intent: 'x', answers: { 'const.request': 42 } };`,
     `const compileEdit: NikaCompileRequest = { workflow: 'src', change: 'c' };`,
-    'void compileCreate; void compileEdit;',
+    `const compileConstant: NikaCompileRequest = { workflow: 'src', change: { set_constant: { name: 'request', value: null } } };`,
+    'void compileCreate; void compileEdit; void compileConstant;',
     '// @ts-expect-error create and edit never mix in one request',
     `const compileMixed: NikaCompileRequest = { intent: 'x', workflow: 'w', change: 'c' };`,
     'void compileMixed;',
@@ -443,8 +447,7 @@ function assertCompile(report, moduleSystem) {
   assert.deepEqual(report.ready, {
     status: 'ready',
     ready: true,
-    exitCode: 0,
-    written: null,
+    processFieldsAbsent: true,
     cognition: 'deterministicOnly',
     candidateHasAnswer: true,
     argv: [
@@ -456,7 +459,6 @@ function assertCompile(report, moduleSystem) {
   assert.deepEqual(report.incomplete, {
     status: 'incomplete',
     ready: false,
-    exitCode: 2,
     questionKey: 'const.request',
     mandatory: true,
   }, say('incomplete is data: the question rides the outcome, exit 2'));
@@ -501,4 +503,11 @@ function assertCompile(report, moduleSystem) {
     argv: [],
   }, say('HTTP compile typed-refuses after /health alone: nothing posted, nothing local'));
   assert.match(httpMessage, /never compiles locally/, say('no local fallback is promised'));
+  assert.equal(report.httpSuccess.sameOutcome, true, say('HTTP and native share the authoring outcome'));
+  assert.deepEqual(report.httpSuccess.argv, [], say('HTTP success spawns no local engine'));
+  assert.deepEqual(report.httpSuccess.request, { compile_version: 1, mode: 'edit',
+    source: 'nika: packed\nconst: { request: "é" }\n',
+    change: { set_constant: { name: 'request', value: ['雪', null, true, 1.25] } } },
+  say('HTTP structured edits use the accepted wire'));
+
 }

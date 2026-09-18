@@ -15,6 +15,7 @@ Any other non-2xx body is discarded and reported as a redacted
 | `GET /v1/openapi.json` | generation only | authenticated OpenAPI 3.1 document |
 | `GET /v1/workflows` | `listWorkflows()` | contained relative workflow names |
 | `GET /v1/workflows/{name}` | `workflow(name)` | path-free metadata, never source bytes |
+| `POST /v1/compile` | `compile()` | capability-gated stateless source authoring; 200 ready/incomplete/refused, no job |
 | `POST /v1/check` | `check()` | validates a served name or immutable snapshot bytes without a job |
 | `POST /v1/jobs` | `run()` | admits a served name or exact snapshot bytes with an idempotency key |
 | `GET /v1/jobs/{id}` | internal settlement | durable job identity, outputs, receipt, settlement, or redacted error |
@@ -57,6 +58,26 @@ A contained `.nika.yaml` name uses the resident registry without a local
 engine. Prefix a local file with `./` to capture and submit its snapshot.
 A successful by-name check returns `clean: true` and the compact resident
 acknowledgement; no local check report or exit code is fabricated.
+
+## Compile foundation
+
+Serve must advertise `compile` in `/health`. The SDK then posts a v1 create
+intent or inline edit source to `/v1/compile`, with bearer authentication and
+JSON content type. A string change becomes `{text: change}`; a structured change
+preserves `{set_constant: {name, value}}`. Literal answers retain their JSON
+types. There is no path, destination, idempotency key or local fallback.
+
+Every core outcome uses HTTP 200. `incomplete` and `refused` remain reviewable
+data; non-200 error envelopes raise `NikaOperationError` with the HTTP status
+and engine code. Bad versions, malformed outcomes, overflow, cancellation and
+timeout fail typed. The response is bounded by the smaller of
+`machineBufferBytes` and 8 MiB. Compile's timeout covers health negotiation,
+response headers and the complete body.
+
+The shared outcome contains candidate source, questions, diagnostics, requested
+boundary, source-only Check preview and provenance. It carries no process exit
+code or materialized destination. A candidate and its requested boundary grant
+nothing: execution needs a separate caller decision and normal `run` admission.
 
 ## Settlement
 

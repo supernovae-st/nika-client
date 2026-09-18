@@ -150,7 +150,11 @@ export class NativeProcessTransport implements Transport {
     }
     const invocation = await compileArgv(request);
     try {
-      const identity = await this.ensureReady();
+      // Compile's cancellation also bounds negotiation; an aborted probe is
+      // never cached as this client's permanent engine identity.
+      const identity = composed.signal ? await verifyNikaEngine(this.options.engine, {
+        signal: composed.signal, killGraceMs: COMPILE_KILL_GRACE_MS,
+      }) : await this.ensureReady();
       if (!identity.supportedCapabilities.includes(COMPILE_CAPABILITY)) {
         throw new NikaCompatibilityError(
           COMPILE_CAPABILITY,

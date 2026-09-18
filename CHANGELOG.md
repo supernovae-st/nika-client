@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   admission (`isContainedWorkflowName`) keeps contained-relative shape and
   refuses retired `.nika.yaml` / `.nika.yml` names instead of falling back
   to local capture. Project `nika.yaml` and runtime `.nika/` are unchanged.
-  Generated OpenAPI descriptions still wait on the engine schema pin.
+  Generated OpenAPI was regenerated from the engine Serve schema.
 
 ### Added
 

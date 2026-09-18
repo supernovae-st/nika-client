@@ -16,22 +16,6 @@
     "owner": "nika-client"
   },
   {
-    "path": "openapi.json",
-    "category": "historical",
-    "count": 1,
-    "lines_sha256": "sha256:8b4565b31521cf3c670148fc0f4a746281f8baddba3319c3f69ee6886ce4b766",
-    "reason": "Engine-owned Serve schema; descriptions still say .nika.yaml until a validated generator receipt.",
-    "owner": "nika-client"
-  },
-  {
-    "path": "src/generated/openapi.d.ts",
-    "category": "historical",
-    "count": 2,
-    "lines_sha256": "sha256:ec9ccee8ba71d2a3bb00641b257b6ca99ebd8ed435cc3458c394f69f313a3275",
-    "reason": "Generated from openapi.json; waits on the engine OpenAPI pin.",
-    "owner": "nika-client"
-  },
-  {
     "path": "src/lib/workflow-name.ts",
     "category": "negative",
     "count": 3,
@@ -88,8 +72,8 @@
   {
     "path": "scripts/file-identity-allowlist.json",
     "category": "ratchet",
-    "count": 2,
-    "lines_sha256": "sha256:4a28b1829cc17a273f3bbb01599ca62d506200d340a61eb8b7cc0d717e3b7672",
+    "count": 1,
+    "lines_sha256": "sha256:af5268cb76236b44f5676c77cb9147d79029873273c273acfa2eb4f866400cb8",
     "reason": "Allowlist names the retired suffixes in its reason strings.",
     "owner": "nika-client"
   }

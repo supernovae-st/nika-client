@@ -107,10 +107,11 @@ and the receipt. The `engine.event` is the native journal's own
 `workflow_completed` frame: the SDK gives it no lifecycle name and no state,
 drops nothing, and shows it on `event.raw.kind`.
 
-That is six frames for one task. A clean native run writes `3N + 3` frames for
-N tasks, and a session retains the most recent 4096 by default, so
-`run.events()` also works after `run.result()` for a run of hundreds of tasks;
-see [Observing a run after the fact](#observing-a-run-after-the-fact).
+That is six frames for one task; the same shape with 90 tasks was measured at
+273 (`3N + 3`). A session retains the most recent 4096 frames by default, so
+`run.events()` opened after `run.result()` replays them all, and is refused,
+never shortened, past that bound; see
+[Observing a run after the fact](#observing-a-run-after-the-fact).
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/supernovae-st/nika-client/main/media/local-driver.gif" alt="The typed driver over the released binary: check the workflow, gate on the report, run it to the end under a cost ceiling, count the events" width="960">
@@ -588,31 +589,33 @@ A view opened late is seeded with every frame the session observed, or it is
 refused. It is never handed a shortened replay. How many frames a session
 retains is `eventBufferSize`, **4096 by default**.
 
-**The native frame formula.** A clean native run of N tasks writes `3N + 3`
-frames: `workflow_started`, then `task_scheduled`, `task_started` and
-`task_completed` for each task, then `workflow_completed` and `run_settled`.
-Measured on the released 0.118.7 engine: 1 task is 6 frames, 90 tasks are 273.
-A task that invokes a tool was measured to add one `permit_checked` frame
-(`4N + 3`), and a failed task writes `task_failed` in place of
-`task_completed`. A `nika serve` job was measured at two frames, so this bound
-matters on a native process.
+**The measured frame count: `3N + 3`, for one shape.** On the released 0.118.7
+engine, a clean run of N independent `mock/echo` `infer` tasks wrote
+`workflow_started`, then `task_scheduled`, `task_started` and `task_completed`
+per task, then `workflow_completed` and `run_settled`. Two points were
+measured: 1 task is 6 frames, 90 tasks are 273. That is this fixture, not a
+law of N-task workflows. Other shapes write more: a `nika:wait` task and a
+`nika:assert` task each showed one extra `permit_checked` frame, a failed task
+writes `task_failed`, and retries, agents and `for_each` were not measured.
+Count your own run rather than deriving it: `error.observed` below is the
+number. A `nika serve` job was measured at two frames, so the bound matters on
+a native process.
 
-| `eventBufferSize` | clean tasks replayable (`3N + 3`) | tool-calling tasks (`4N + 3`) |
+| `eventBufferSize` | frames retained | in the measured shape only |
 |---|---|---|
-| 256, the default up to 0.118.7 | 84 | 63 |
-| 4096, the default | 1364 | 1023 |
+| 256, the default up to 0.118.7 | 256 | below the 273 frames of the 90-task run |
+| 4096, the default | 4096 | 15 times those 273 frames |
 
-**The memory ceiling.** The bound is finite on purpose and is never `Infinity`.
-Every frame is bounded by `machineBufferBytes` (64 KiB), so one session retains
-at most `eventBufferSize × machineBufferBytes` of frame text: 4096 × 64 KiB =
-256 MiB per run at both defaults, where 256 frames gave 16 MiB. That ceiling is
-arithmetic, not a measurement, and no measured run approaches it: the 273
-frames of the 90-task run total 0.15 MiB (mean 571 bytes, largest 1501), a size
-at which a full 4096-frame history is about 2.2 MiB. These are bytes of frame
-text as the engine wrote them; nothing here is a claim about heap or process
-memory. Views hold references to the retained frames, not copies. A process
-that keeps many long runs alive at once and cannot afford the ceiling sets
-`eventBufferSize` itself. An explicit value is kept exactly as given, so
+**What the bound costs.** It is finite on purpose and is never `Infinity`.
+Every frame is bounded by `machineBufferBytes` (64 KiB), so the retained
+**history** holds at most `eventBufferSize × machineBufferBytes` of frame text:
+4096 × 64 KiB = 256 MiB per run at both defaults, where 256 frames gave
+16 MiB. That is arithmetic, not a measurement: the 273 measured frames total
+0.15 MiB (mean 571 bytes, largest 1501). It bounds the history only, not the
+session or the process: a frame already handed to your code lives as long as
+you keep it, and every open view and every concurrent run adds its own. Nothing
+here is a claim about heap or process memory. If that ceiling matters to you,
+set `eventBufferSize` yourself: an explicit value is kept exactly as given, so
 `eventBufferSize: 256` behaves as it always did.
 
 **Past the bound.** A run that writes more frames than the bound still runs and

@@ -103,9 +103,9 @@ both versions.
 
 `runToEnd()` returned `{ ok, exitCode, events[] }` with every event buffered.
 `run.done` returns the terminal result only; the events ride `events(run)`
-as a bounded iterator. In 0.116 a session retained 256 frames, below a clean
-native run of 85 tasks (`3N + 3` frames), so a longer run had to be observed
-concurrently or its prefix was gone. The default is now 4096 and a view opened
+as a bounded iterator. In 0.116 a session retained 256 frames, below the 273 a
+measured clean native run of 90 `mock/echo` tasks writes, so such a run had to
+be observed concurrently or its prefix was gone. The default is now 4096 and a view opened
 after the result replays every retained frame; past the bound it is refused
 with `reason: 'replay_truncated'`, never shortened, and the result is
 unaffected. An explicit `eventBufferSize` keeps its cap. The removed methods (`version()`, `dryRunPlan()`, path-based

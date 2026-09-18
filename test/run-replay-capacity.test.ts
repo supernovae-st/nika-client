@@ -13,10 +13,12 @@ import {
 
 // Issue #122 · a run that succeeded must stay observable after the fact.
 //
-// A clean native run writes 3 frames per task plus 3 for the workflow
-// (`3N + 3`), measured on the released 0.118.7 payload: 90 mock/echo tasks are
-// 273 frames. The old default retained 256, so `await run.result()` followed
-// by `run.events()` refused on a green run.
+// One fixture was measured on the released 0.118.7 payload: a clean run of N
+// independent mock/echo infer tasks wrote 3 frames per task plus 3 for the
+// workflow (`3N + 3`; N = 1 is 6 frames, N = 90 is 273). That is this shape,
+// not a law of N-task workflows: tools, retries, agents and failures write
+// more. The old default retained 256, below those 273, so `await run.result()`
+// followed by `run.events()` refused on a green run.
 //
 // Two different bounds can be exceeded, and they must never read alike:
 //
@@ -31,7 +33,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.join(HERE, 'fixtures', 'fake-nika.mjs');
 const posix = process.platform !== 'win32';
 
-/** The measured native cardinality of a clean run of `tasks` tasks. */
+/** Frames the measured fixture shape writes for `tasks` tasks. Only that shape. */
 const nativeFrames = (tasks: number): number => 3 * tasks + 3;
 
 const stray: unknown[] = [];
@@ -117,7 +119,7 @@ describe.skipIf(!posix)('late replay capacity (issue #122)', () => {
       expect(protocol.at(-1)?.kind).toBe('run_settled');
     });
 
-    it('replays a run of hundreds of tasks after its result', async () => {
+    it('replays the 3003 frames the same shape writes for 1000 tasks', async () => {
       const client = native();
       const run = await client.run('wide1000.nika.yaml');
       await run.result();

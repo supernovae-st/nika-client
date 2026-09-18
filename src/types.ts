@@ -2,17 +2,19 @@ interface NikaSharedConfig {
   /**
    * How many of a run's most recent frames a session retains, and therefore
    * the most a view opened after the fact can be given, and the largest
-   * `bufferSize` a view may ask for. Default: 4096 frames. A clean native run
-   * of N tasks writes `3N + 3` frames (90 tasks are 273), plus one per task
-   * that calls a tool.
+   * `bufferSize` a view may ask for. Default: 4096 frames. For scale, one
+   * measured fixture (a clean native run of 90 independent mock/echo infer
+   * tasks) wrote 273 frames; other shapes write more, so count your own.
    *
    * It is a finite bound, never a promise about the run. A run longer than it
    * still succeeds and `run.result()` still resolves; only a late view is
    * refused, with `NikaEventBufferOverflowError` whose `reason` is
    * `replay_truncated` and whose `observed` says what to set. An explicit
    * value is kept exactly as given. Each frame is bounded by
-   * `machineBufferBytes`, so a session retains at most
-   * `eventBufferSize * machineBufferBytes` of frame text per run.
+   * `machineBufferBytes`, so the retained history holds at most
+   * `eventBufferSize * machineBufferBytes` of frame text per run. That bounds
+   * the history only: frames already handed to a consumer, other views and
+   * other runs are not counted in it.
    */
   eventBufferSize?: number;
   /** Bound for buffered diagnostics and one machine frame. Default: 64 KiB. */

@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { pathToFileURL } from "node:url";
@@ -84,8 +85,11 @@ export function stableCancellationTerminalKind(kind) {
 }
 
 export function stableDepthEvidence(report) {
+  // Each source change builds a different development tarball. Its digest is
+  // verified against this replay's retained bytes, not against a previous build.
+  const { package_sha256: _artifactDigest, ...behavior } = report;
   return {
-    ...report,
+    ...behavior,
     projects: report.projects.map((project) => {
       if (project.project !== "incident-response-controller") return project;
       const kinds = project.sse_event_kinds;
@@ -110,6 +114,24 @@ export function stableDepthEvidence(report) {
       };
     }),
   };
+}
+
+function verifyDepthPackage(report, directory, repositoryRoot) {
+  if (typeof report.package !== "string" || path.basename(report.package) !== report.package
+    || !report.package.endsWith(".tgz") || !/^[a-f0-9]{64}$/.test(report.package_sha256 ?? "")) {
+    throw new Error("depth replay lacks a valid package identity");
+  }
+  const bytes = readFileSync(path.join(directory, report.package));
+  const metadata = readJson(directory, "depth-package.json");
+  const manifest = readJson(repositoryRoot, "package.json");
+  const digest = (algorithm, encoding = "hex") => createHash(algorithm).update(bytes).digest(encoding);
+  if (digest("sha256") !== report.package_sha256
+    || metadata.filename !== report.package || metadata.name !== manifest.name
+    || metadata.version !== manifest.version || metadata.size !== bytes.length
+    || metadata.shasum !== digest("sha1")
+    || metadata.integrity !== `sha512-${digest("sha512", "base64")}`) {
+    throw new Error("depth replay package bytes do not match their recorded identity");
+  }
 }
 
 export function stableRecoveryEvidence({ job_id: _jobId, ...report }) {
@@ -169,7 +191,9 @@ export function verifyReleaseReplay(repositoryRoot, replayResults) {
     path.join(repositoryRoot, "gauntlet", "projects-depth"),
     "results.json",
   ));
-  const replayedDepth = stableDepthEvidence(readJson(replayResults, "depth-projects.json"));
+  const replayedDepthReport = readJson(replayResults, "depth-projects.json");
+  verifyDepthPackage(replayedDepthReport, replayResults, repositoryRoot);
+  const replayedDepth = stableDepthEvidence(replayedDepthReport);
   if (!isDeepStrictEqual(replayedDepth, committedDepth)) {
     throw new Error("depth-project replay does not match committed stable behavioral evidence");
   }

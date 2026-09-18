@@ -1,5 +1,6 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
@@ -415,6 +416,27 @@ describe('public release evidence replay', () => {
     );
   });
 
+  it('accepts equal behavior from a different, independently verified package build', () => {
+    const replay = createReplay();
+    const committed = readJson(path.join(ROOT, 'gauntlet', 'projects-depth'), 'results.json');
+    expect(readJson(replay, 'depth-projects.json').package_sha256).not.toBe(committed.package_sha256);
+    expect(verifyReleaseReplay(ROOT, replay).depthProjects).toBe(5);
+  });
+
+  it.each(['tarball', 'digest', 'metadata', 'version'])('refuses tampered depth package %s', (field) => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    if (field === 'tarball') writeFileSync(path.join(replay, depth.package), 'tampered');
+    if (field === 'digest') { depth.package_sha256 = '0'.repeat(64); writeJson(replay, 'depth-projects.json', depth); }
+    if (field === 'metadata' || field === 'version') {
+      const meta = readJson(replay, 'depth-package.json');
+      if (field === 'metadata') meta.integrity = 'sha512-invalid';
+      else meta.version = '0.0.0';
+      writeJson(replay, 'depth-package.json', meta);
+    }
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow('depth replay package bytes do not match');
+  });
+
   it('refuses a failed depth-project replay summary', () => {
     const replay = createReplay();
     const depth = readJson(replay, 'depth-projects.json');
@@ -525,10 +547,14 @@ function createReplay(): string {
   ]) {
     writeFileSync(path.join(replay, name), readFileSync(path.join(committedResults, name)));
   }
-  writeFileSync(
-    path.join(replay, 'depth-projects.json'),
-    readFileSync(path.join(ROOT, 'gauntlet', 'projects-depth', 'results.json')),
-  );
+  const depth = readJson(path.join(ROOT, 'gauntlet', 'projects-depth'), 'results.json');
+  const bytes = Buffer.from('hermetic replay package bytes');
+  const digest = (algorithm: string, encoding: 'hex' | 'base64' = 'hex') => createHash(algorithm).update(bytes).digest(encoding);
+  depth.package_sha256 = digest('sha256');
+  writeFileSync(path.join(replay, depth.package), bytes);
+  writeJson(replay, 'depth-projects.json', depth);
+  writeJson(replay, 'depth-package.json', { filename: depth.package, name: '@supernovae-st/nika',
+    version: '0.118.7', size: bytes.length, shasum: digest('sha1'), integrity: `sha512-${digest('sha512', 'base64')}` });
   return replay;
 }
 

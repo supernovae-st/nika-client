@@ -110,6 +110,9 @@ if (config.action === 'catalog') {
     original_result: result, replayed_result: replayedResult, same_job_settlement_compared: true };
   active = undefined;
 } else {
-  report = await execute(`${config.name}.nika.yaml`, undefined, config.name === 'cancelled');
+  const options = config.door === 'sdk-native'
+    ? undefined
+    : { idempotencyKey: `one-door-${config.name}-${config.door}` };
+  report = await execute(`${config.name}.nika.yaml`, options, config.name === 'cancelled');
 }
 console.log(JSON.stringify(report));

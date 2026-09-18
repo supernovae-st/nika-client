@@ -172,7 +172,7 @@ describe('HTTP response framing, status, and deadlines', () => {
     ));
     await expect(transport(fetch as typeof globalThis.fetch, {
       requestTimeout: 5,
-    }).startRun('flow.nika.yaml', {})).rejects.toMatchObject({
+    }).startRun('flow.nika.yaml', { idempotencyKey: 'test-admission' })).rejects.toMatchObject({
       name: 'NikaTransportError',
       transport: 'http',
       message: expect.stringMatching(/timed out/),
@@ -186,7 +186,7 @@ describe('HTTP response framing, status, and deadlines', () => {
         status: 202,
         headers: { 'Content-Type': 'text/plain' },
       }));
-    await expect(transport(fetch as typeof globalThis.fetch).startRun('flow.nika.yaml', {}))
+    await expect(transport(fetch as typeof globalThis.fetch).startRun('flow.nika.yaml', { idempotencyKey: 'test-admission' }))
       .rejects.toBeInstanceOf(NikaProtocolError);
   });
 
@@ -194,7 +194,7 @@ describe('HTTP response framing, status, and deadlines', () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(jsonResponse({ id: 'job-1', status: 'queued' }, 201));
-    await expect(transport(fetch as typeof globalThis.fetch).startRun('flow.nika.yaml', {}))
+    await expect(transport(fetch as typeof globalThis.fetch).startRun('flow.nika.yaml', { idempotencyKey: 'test-admission' }))
       .rejects.toBeInstanceOf(NikaProtocolError);
   });
 
@@ -208,7 +208,7 @@ describe('HTTP response framing, status, and deadlines', () => {
       }, 202));
     await expect(transport(fetch as typeof globalThis.fetch, {
       machineBufferBytes: 1_024,
-    }).startRun('flow.nika.yaml', {})).rejects.toBeInstanceOf(NikaProtocolError);
+    }).startRun('flow.nika.yaml', { idempotencyKey: 'test-admission' })).rejects.toBeInstanceOf(NikaProtocolError);
   });
 
   it('keeps the request deadline active while the admission body is read', async () => {
@@ -219,7 +219,7 @@ describe('HTTP response framing, status, and deadlines', () => {
       ));
     await expect(transport(fetch as typeof globalThis.fetch, {
       requestTimeout: 5,
-    }).startRun('flow.nika.yaml', {})).rejects.toMatchObject({
+    }).startRun('flow.nika.yaml', { idempotencyKey: 'test-admission' })).rejects.toMatchObject({
       name: 'NikaTransportError',
       transport: 'http',
     });
@@ -281,7 +281,7 @@ describe('HTTP response framing, status, and deadlines', () => {
       .mockResolvedValueOnce(new Response(`reflected ${TOKEN_A}`, { status: 502 }));
     let failure: unknown;
     try {
-      await transport(fetch as typeof globalThis.fetch).startRun('flow.nika.yaml', {});
+      await transport(fetch as typeof globalThis.fetch).startRun('flow.nika.yaml', { idempotencyKey: 'test-admission' });
     } catch (cause) {
       failure = cause;
     }
@@ -293,6 +293,64 @@ describe('HTTP response framing, status, and deadlines', () => {
 });
 
 describe('cross-client concurrency contracts', () => {
+  it.each(['daily.nika.yaml', './flow.nika.yaml'])(
+    'retries an admitted request with a lost response using the same caller key: %s',
+    async (workflow) => {
+      const fixture = makeSnapshotFixture('a');
+      const admissions = new Map<string, { body: string; id: string }>();
+      const postedKeys: string[] = [];
+      let effectCount = 0;
+      const fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const pathname = new URL(String(input)).pathname;
+        if (pathname === '/health') return healthResponse();
+        if (pathname === '/v1/jobs') {
+          const key = new Headers(init?.headers).get('Idempotency-Key') ?? '';
+          const body = String(init?.body);
+          postedKeys.push(key);
+          const admitted = admissions.get(key);
+          if (!admitted) {
+            admissions.set(key, { body, id: 'job-response-lost' });
+            effectCount += 1;
+            // The resident admitted the request; the caller never receives its 202.
+            throw new DOMException('admission response timed out', 'TimeoutError');
+          }
+          if (admitted.body !== body) {
+            return jsonResponse({ error: {
+              code: 'idempotency_conflict', message: 'key already bound to other bytes',
+            } }, 409);
+          }
+          return jsonResponse({ id: admitted.id, status: 'queued' }, 200);
+        }
+        if (pathname === '/v1/jobs/job-response-lost/events') {
+          return sseResponse([{
+            sequence: 1, kind: 'execution.settled', status: 'succeeded',
+            receipt: {
+              job_id: 'job-response-lost', execution_id: 'execution-1', trace_id: 'trace-1',
+              snapshot_digest: 'a'.repeat(64),
+            },
+          }]);
+        }
+        throw new Error(`unexpected ${pathname}`);
+      });
+      const options = { idempotencyKey: 'support-ticket-42' };
+      try {
+        await expect(client(fetch as typeof globalThis.fetch, TOKEN_A, fixture.bin)
+          .run(workflow, options)).rejects.toBeInstanceOf(NikaTransportError);
+        expect(postedKeys).toEqual(['support-ticket-42']); // no hidden admission retry
+        const recovered = await client(fetch as typeof globalThis.fetch, TOKEN_A, fixture.bin)
+          .run(workflow, options);
+        await expect(recovered.done).resolves.toMatchObject({
+          id: 'job-response-lost', status: 'succeeded',
+        });
+        expect(postedKeys).toEqual(['support-ticket-42', 'support-ticket-42']);
+        expect(admissions.size).toBe(1);
+        expect(effectCount).toBe(1);
+      } finally {
+        fixture.cleanup();
+      }
+    },
+  );
+
   it('replays identical two-client admissions and refuses a conflicting binding', async () => {
     const fixtureA = makeSnapshotFixture('a');
     const fixtureB = makeSnapshotFixture('b');

@@ -323,13 +323,18 @@ const nika = new Nika({
 
 const report = await nika.check('hello.nika.yaml');
 const run = await nika.run('hello.nika.yaml', {
-  idempotencyKey: 'hello-2026-08-30',
+  idempotencyKey: 'hello-2026-08-30', // persist before admission; reuse on retry
 });
 for await (const event of nika.events(run)) {
   console.log(event.sequence, event.kind, event.status);
 }
 console.log(await run.done);
 ```
+
+HTTP `run()` requires a caller-owned `idempotencyKey` before it sends a request.
+Persist a unique key for each business operation. If the response is lost or times
+out, retry the same request with that key; a new key can admit a second job.
+Direct native runs omit the key and reject one if supplied.
 
 If the Node process restarts after admission, recover the durable job without
 submitting the workflow again:
@@ -425,7 +430,7 @@ it; a scheduled budget is always a real number.
 | Operation | Native process | HTTP |
 |---|---|---|
 | `check` | yes; `model` and `nativeStrict` allowed | yes; those two overrides refused |
-| `run` | yes; `vars`, `model`, `maxCostUsd` allowed | yes; `idempotencyKey` allowed |
+| `run` | yes; `vars`, `model`, `maxCostUsd` allowed | yes; `idempotencyKey` required |
 | `attachRun` | typed refusal | reattach to a durable job with an optional SSE cursor |
 | `status` | typed refusal; await `run.done` | durable status projection |
 | `events` | raw engine lifecycle frames | sequenced SSE frames with bounded replay |

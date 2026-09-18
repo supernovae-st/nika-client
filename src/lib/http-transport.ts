@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto';
 import {
   NikaCompatibilityError,
+  NikaConfigurationError,
   NikaObservationInterrupted,
   NikaOperationError,
   NikaProtocolError,
@@ -183,7 +183,13 @@ export class HttpTransport implements Transport {
         'nika serve admission has no request envelope for vars, model, or maxCostUsd',
       );
     }
-    const idempotencyKey = options.idempotencyKey ?? randomUUID();
+    const idempotencyKey = options.idempotencyKey;
+    if (idempotencyKey === undefined) {
+      throw new NikaConfigurationError(
+        'HTTP run() requires a caller-owned idempotencyKey; reuse the same key and request '
+        + 'when retrying an uncertain admission',
+      );
+    }
     if (Buffer.byteLength(idempotencyKey) < 1 || Buffer.byteLength(idempotencyKey) > 255) {
       throw new NikaTransportError(this.kind, 'Idempotency-Key must be 1-255 bytes');
     }

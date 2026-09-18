@@ -97,7 +97,7 @@ function admittedFetch(...observation: Array<Response | Error>): ReturnType<type
 
 async function startObserved(fetch: ReturnType<typeof vi.fn>, delays: number[] = []) {
   const source = await transport(fetch as typeof globalThis.fetch, delays)
-    .startRun('flow.nika.yaml', {});
+    .startRun('flow.nika.yaml', { idempotencyKey: 'test-admission' });
   const events = collect(source.events);
   return { source, events };
 }
@@ -244,7 +244,7 @@ describe('HTTP observation state machine', () => {
       bin: FIXTURE,
       fetch: fetch as typeof globalThis.fetch,
     });
-    const run = await client.run('flow.nika.yaml');
+    const run = await client.run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
     await expect(run.done).resolves.toMatchObject({
       id: 'job-1',
       status: 'failed',
@@ -382,7 +382,7 @@ describe('HTTP observation state machine', () => {
       .mockResolvedValueOnce(jsonResponse({ id: 'job-1', status: 'running' }))
       .mockResolvedValueOnce(sse(frame(two)));
     const direct = transport(fetch as typeof globalThis.fetch, delays);
-    const source = await direct.startRun('flow.nika.yaml', {});
+    const source = await direct.startRun('flow.nika.yaml', { idempotencyKey: 'test-admission' });
     const events = collect(source.events);
 
     await expect(events).rejects.toBeInstanceOf(NikaObservationInterrupted);
@@ -459,7 +459,7 @@ describe('HTTP engine resolution boundary', () => {
     });
     await expect(transport.check('./flow.nika.yaml', {}))
       .rejects.toBeInstanceOf(NikaEngineUnavailable);
-    await expect(transport.startRun('./flow.nika.yaml', {}))
+    await expect(transport.startRun('./flow.nika.yaml', { idempotencyKey: 'test-admission' }))
       .rejects.toBeInstanceOf(NikaEngineUnavailable);
     expect(fetch).not.toHaveBeenCalled();
   });

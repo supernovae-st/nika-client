@@ -283,6 +283,8 @@ export {
 
 export { NikaEngineUnavailable };
 
+export { isNikaRunSucceeded } from './results.js';
+
 export {
   isNikaRunSealedEvent,
   isNikaRunSettledEvent,

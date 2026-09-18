@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add `isNikaRunSucceeded(result)` to narrow the engine's successful result
+  while preserving typed, optional outputs. Admitted failures still resolve;
+  paused, cancelled, interrupted, and unknown results do not pass the guard.
+
 - Add six-door runtime parity and bounded, owned process supervision for the
   corpus and packed application harnesses.
 

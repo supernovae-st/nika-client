@@ -61,7 +61,12 @@ try {
   writeFileSync(path.join(scratch, 'token'), `${token}\n`, { mode: 0o600 });
   const engine = await probe(binary, env);
   engine.binary_sha256 = await sha256(binary);
-  assert.equal(engine.sdk_identity.engineVersion, version, 'CLI/resident release train');
+  // Candidate qualification uses an unreleased nika commit. Skip the
+  // package-train identity only. Cancellation and result parity still run.
+  // Release-evidence-replay does not set NIKA_ONE_DOOR_CANDIDATE.
+  if (process.env.NIKA_ONE_DOOR_CANDIDATE !== '1') {
+    assert.equal(engine.sdk_identity.engineVersion, version, 'CLI/resident release train');
+  }
   if (publicVersion) {
     assert.equal(publicVersion, version, 'public SDK and repository release train');
     assert.match(engine.version, new RegExp(`^nika ${version.replaceAll('.', '\\.')} \\([0-9a-f]+\\)$`));

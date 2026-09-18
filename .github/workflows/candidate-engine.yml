@@ -208,6 +208,7 @@ jobs:
           NIKA_BIN: ${{ runner.temp }}/nika-candidate/nika
           NIKA_GAUNTLET_RESULTS_DIR: ${{ runner.temp }}/nika-candidate-replay
           NIKA_ONE_DOOR_REPORT: ${{ runner.temp }}/nika-candidate-replay/one-door.json
+          NIKA_ONE_DOOR_CANDIDATE: "1"
         run: |
           set -euo pipefail
           mkdir -p "$NIKA_GAUNTLET_RESULTS_DIR"

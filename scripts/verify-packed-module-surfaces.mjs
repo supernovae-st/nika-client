@@ -156,7 +156,7 @@ try {
 
   const typedConsumer = [
     `import { Nika, isNikaRunSucceeded, type NikaConfig, type NikaRunOptions, type NikaRunResult } from '${packageName}';`,
-    `import type { NikaEvent, NikaRun, NikaRunEvent, NikaRunEventKind } from '${packageName}';`,
+    `import type { NikaEvent, NikaJournalEvidence, NikaRun, NikaRunEvent, NikaRunEventKind } from '${packageName}';`,
     "const config: NikaConfig = { bin: '/tmp/nika' };",
     'const client: Nika = new Nika(config);',
     'void client;',
@@ -192,6 +192,14 @@ try {
     "const nested: NikaRunOptions = { vars: { record: { name: 'x' } } };",
     'void literal; void legacy; void scalar; void absent; void nested;',
     'declare const result: NikaRunResult<{ answer: number }>;',
+    '// Journal evidence is the engine\'s closed contract, and optional on a result.',
+    'const lost: NikaJournalEvidence | undefined = result.evidence;',
+    "const known: NikaJournalEvidence = { status: 'mirror_lost', reason: 'record_refused' };",
+    '// @ts-expect-error the contract closes the vocabulary: an unknown reason is no evidence',
+    "const unknownReason: NikaJournalEvidence = { status: 'mirror_lost', reason: 'disk_full' };",
+    '// @ts-expect-error and an unknown status is none either',
+    "const unknownStatus: NikaJournalEvidence = { status: 'mirror_ok', reason: 'write_failed' };",
+    'void lost; void known; void unknownReason; void unknownStatus;',
     '// @ts-expect-error an observation is not known to have succeeded',
     "const prematureSuccess: 'succeeded' = result.status;",
     '// @ts-expect-error a run need not have any workflow outputs',

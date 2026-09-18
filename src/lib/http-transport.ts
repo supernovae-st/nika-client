@@ -13,6 +13,7 @@ import type {
   NikaCheckResult,
   NikaEvent,
   NikaExecutionId,
+  NikaJournalEvidence,
   NikaReceipt,
   NikaRunId,
   NikaRunOptions,
@@ -87,6 +88,7 @@ interface DurableJob {
   receipt?: NikaReceipt;
   error?: { code: string; message: string };
   settlement?: NikaSettlement;
+  evidence?: NikaJournalEvidence;
 }
 
 interface RetryObservation {
@@ -459,6 +461,9 @@ export class HttpTransport implements Transport {
       // job's own error is the same failure without it.
       const error = event ? eventError(event) : durable?.settlement?.error ?? durable?.error;
       const settlement = event ? eventSettlement(event, this.kind) : durable?.settlement;
+      // Copied from the frame or record that settled the run, never inferred:
+      // a loss the resident did not report stays absent, and none changes status.
+      const evidence = event ? eventEvidence(event, this.kind) : durable?.evidence;
       resolveDone({
         id,
         status: source.status!,
@@ -469,6 +474,7 @@ export class HttpTransport implements Transport {
         ...(receipt ? { receipt } : {}),
         ...(error ? { error } : {}),
         ...(settlement ? { settlement } : {}),
+        ...(evidence ? { evidence } : {}),
       });
     };
     if (attachedState && isObservationEnded(attachedState)) settle(attachedState);
@@ -695,9 +701,12 @@ export class HttpTransport implements Transport {
     if (!event) throw new NikaProtocolError(this.kind, 'SSE data was not an object');
     // The resident's projection (`JobEvent`, closed): the frame identity, the
     // terminal outputs and receipt, and the settlement it nests whole on the
-    // terminal frame (engine 0.118 · ADR-128).
+    // terminal frame (engine 0.118 · ADR-128). Engine main adds two optional
+    // fields ahead of the pinned contract: `at`, when the resident admitted the
+    // event, and `evidence`, a reported journal loss. Anything else still refuses.
     const allowed = new Set([
-      'sequence', 'kind', 'status', 'code', 'message', 'outputs', 'receipt', 'settlement',
+      'sequence', 'at', 'kind', 'status', 'code', 'message', 'outputs', 'receipt', 'settlement',
+      'evidence',
     ]);
     if (Object.keys(event).some((key) => !allowed.has(key))) {
       throw new NikaProtocolError(this.kind, 'SSE data contained fields outside the public projection');
@@ -724,6 +733,10 @@ export class HttpTransport implements Transport {
         throw new NikaProtocolError(this.kind, `SSE data.${field} was not a string`);
       }
     }
+    if (event.at !== undefined && (typeof event.at !== 'string' || !isCanonicalTimestamp(event.at))) {
+      throw new NikaProtocolError(this.kind, 'SSE data.at was not an RFC 3339 timestamp');
+    }
+    if (event.evidence !== undefined) journalEvidence(event.evidence, this.kind, 'SSE data.evidence');
     if (event.outputs !== undefined && !machineObject(event.outputs)) {
       throw new NikaProtocolError(this.kind, 'SSE data.outputs was not an object');
     }
@@ -1585,9 +1598,11 @@ function durableJob(
   transport: 'http',
 ): DurableJob {
   // The resident's durable projection (`Job`, closed), the nested settlement
-  // included (engine 0.118 · ADR-128).
+  // included (engine 0.118 · ADR-128), and the journal `evidence` engine main
+  // adds ahead of the pinned contract. `Job` declares no `at`.
   const allowed = new Set([
     'id', 'status', 'execution_id', 'trace_id', 'outputs', 'receipt', 'error', 'settlement',
+    'evidence',
   ]);
   if (Object.keys(value).some((key) => !allowed.has(key))) {
     throw new NikaProtocolError(transport, 'Durable job response contained unknown fields');
@@ -1618,6 +1633,9 @@ function durableJob(
   const settlement = value.settlement === undefined
     ? undefined
     : readSettlement(value.settlement, transport, value.status);
+  const evidence = value.evidence === undefined
+    ? undefined
+    : journalEvidence(value.evidence, transport, 'Durable job response evidence');
   if (value.outputs !== undefined && !outputs) {
     throw new NikaProtocolError(transport, 'Durable job response outputs were malformed');
   }
@@ -1644,7 +1662,46 @@ function durableJob(
     ...(receipt ? { receipt: Object.freeze(receipt) } : {}),
     ...(error ? { error } : {}),
     ...(settlement ? { settlement } : {}),
+    ...(evidence ? { evidence } : {}),
   };
+}
+
+/** The contract's whole vocabulary (engine `JournalEvidence`): one status, two reasons. */
+const JOURNAL_EVIDENCE_REASONS: ReadonlySet<string> = new Set(['write_failed', 'record_refused']);
+
+/**
+ * The resident's journal evidence, read as closed as its contract writes it:
+ * exactly `status` and `reason`, `mirror_lost`, and one of the two reasons.
+ * The engine refuses any other word itself, so an unknown one is a protocol
+ * fault here, not a future to guess at. The value is never quoted: a malformed
+ * one could carry the OS text or the path the contract exists to keep out.
+ */
+function journalEvidence(
+  value: unknown,
+  transport: 'http',
+  where: string,
+): NikaJournalEvidence {
+  const evidence = machineObject(value);
+  if (
+    !evidence
+    || Object.keys(evidence).length !== 2
+    || evidence.status !== 'mirror_lost'
+    || typeof evidence.reason !== 'string'
+    || !JOURNAL_EVIDENCE_REASONS.has(evidence.reason)
+  ) {
+    throw new NikaProtocolError(transport, `${where} was not the resident's journal evidence`);
+  }
+  return Object.freeze({
+    status: 'mirror_lost',
+    reason: evidence.reason as NikaJournalEvidence['reason'],
+  });
+}
+
+/** The evidence a frame carries; `nikaEvent()` already refused a malformed one. */
+function eventEvidence(event: NikaEvent, transport: 'http'): NikaJournalEvidence | undefined {
+  return event.evidence === undefined
+    ? undefined
+    : journalEvidence(event.evidence, transport, 'SSE data.evidence');
 }
 
 function assertReceiptIdentity(

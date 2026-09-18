@@ -42,6 +42,19 @@ describe('packed public documentation', () => {
     expect(httpApi).not.toContain('remote `run()` refuses\n  `vars`, `model`, and `maxCostUsd` until');
   });
 
+  it('documents the engine-main frame fields as ahead of the pin, and evidence as no verdict', () => {
+    const httpApi = readFileSync(new URL('../docs/http-api.md', import.meta.url), 'utf8');
+    for (const word of ['`at`', '`evidence`', '`mirror_lost`', '`write_failed`', '`record_refused`']) {
+      expect(httpApi).toContain(word);
+    }
+    // Honest about where the wire comes from: not the contract this package pins.
+    expect(httpApi).toContain('ahead of the pinned `openapi.json`');
+    expect(httpApi).toContain('no released engine');
+    // And about what it means: it reports a loss, it never judges the run.
+    expect(httpApi).toContain('never changes `result.status`');
+    expect(httpApi).toContain('absence claims nothing');
+  });
+
   it('exports package metadata so consumers can prove the installed pin', () => {
     expect(manifest.exports?.['./package.json']).toBe('./package.json');
     expect(readme).toContain("require('@supernovae-st/nika/package.json').version");

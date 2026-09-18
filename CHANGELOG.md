@@ -77,6 +77,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - The engine payload pinned by this package advertises neither capability
     yet: `inputs` is refused on it until the pin reaches an engine that does.
     The pinned `openapi.json` is unchanged for the same reason.
+- Read the two optional fields engine main adds to the resident's closed
+  projections, ahead of the pinned `openapi.json` (no released engine writes
+  them yet; against a released resident nothing changes). `JobEvent.at`, when
+  the resident admitted the event, is validated as an RFC 3339 timestamp and
+  rides `event.raw.at`. `evidence`, on the terminal frame and the durable job,
+  is read exactly as the engine closes it, `{ status: 'mirror_lost', reason:
+  'write_failed' | 'record_refused' }`, typed `NikaJournalEvidence`; any other
+  shape or word is a `NikaProtocolError` and the value is never quoted. It is
+  never a verdict: a run can settle `succeeded` with its journal mirror lost,
+  and `result.status`, the settlement and the receipt checks are unchanged.
+  `run.result()` copies it to the new optional `NikaRunResult.evidence` from
+  the frame or record that settled the run; absence claims nothing, and a
+  native run never carries it. Every other unknown field still refuses, on
+  both projections. Before this, a resident built from engine main could not
+  be observed at all: its first dated frame was a protocol fault.
 - Add `npm run gauntlet:inputs`: the packed SDK drives one explicit engine as a
   native process and as a resident, from ESM and CommonJS, and the transports
   must agree on outputs, refusal codes and `api-caller` provenance.

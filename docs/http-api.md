@@ -68,6 +68,36 @@ whose `status` contradicts the record carrying it, keeps fields it does not
 know, and never derives a settlement from an exit code; a job the resident
 lost (`interrupted`) carries none.
 
+## Frame time and journal evidence (engine main)
+
+Both resident projections are closed, and the SDK refuses any field it does
+not know. Engine main adds two optional fields that are
+ahead of the pinned `openapi.json`: no released engine writes them yet, and a
+resident that predates them never sends them, so nothing changes against a
+released resident. They are read so that a resident built from engine main can
+be observed at all; the pin itself moves only with a release.
+
+- `JobEvent.at` is when the resident admitted the event: an RFC 3339 timestamp
+  in UTC, outside the event's hash chain. It rides `event.raw.at` untouched.
+  Anything that is not such a timestamp is a `NikaProtocolError`. The durable
+  `Job` declares no `at`, so one there is still an unknown field.
+- `evidence`, on the terminal frame and on the durable `Job`, reports that the
+  run's journal mirror stopped recording. It is exactly a `status` and a
+  `reason`. The one status is `mirror_lost`. The reason is `write_failed`
+  (opening, writing or syncing the journal failed) or `record_refused` (a
+  record could not be admitted within the writer's bounds): a coarse class,
+  never OS text and never a path. Any other shape or word is a
+  `NikaProtocolError`, as the engine itself refuses one, and its value is
+  never quoted in the error.
+
+`evidence` is independent of the execution and is never a verdict: a run can
+settle `succeeded` while its mirror is lost. It never changes `result.status`,
+the settlement, or the receipt's identity checks. `run.result()` copies it to
+`result.evidence` from the frame or record that settled the run, so a caller
+who never iterates events still learns the trace may be incomplete before
+trusting `traceVerify`. Its absence claims nothing: not that a journal exists,
+only that no loss was reported. A native run never carries it.
+
 ## Lifecycle vocabulary over the resident's frames
 
 `run.events()` names the resident's closed `JobEvent` frames in the SDK's

@@ -8,6 +8,8 @@
 const { existsSync, mkdtempSync, readFileSync, rmSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
+const assert = require('node:assert/strict');
+const { inspect } = require('node:util');
 
 const TOKEN = 'p'.repeat(32);
 
@@ -27,6 +29,8 @@ async function refusal(sdk, action) {
       message: error.message,
       compatibility: error instanceof sdk.NikaCompatibilityError,
       configuration: error instanceof sdk.NikaConfigurationError,
+      protocol: error instanceof sdk.NikaProtocolError,
+      credentialVisible: inspect(error).includes(TOKEN),
       nikaError: error instanceof sdk.NikaError,
     };
   }
@@ -143,6 +147,46 @@ module.exports = async function compileScenario(sdk, engines) {
       change: { set_constant: { name: 'request', value: ['雪', null, true, 1.25] } } });
     report.httpSuccess = { sameOutcome: JSON.stringify(result) === JSON.stringify(ready),
       request: JSON.parse(capable.requests[1].body), argv: argvLog(remoteLog) };
+
+    // Independent review R1/R2: exercise the actual packed module's exported
+    // error classes and full error/cause representation on both transport doors.
+    report.hostileVersions = [];
+    for (const [intent, compile_version] of [
+      ['hostile-token-version', TOKEN], ['hostile-object-version', { toString: null }],
+    ]) {
+      const nativeError = await refusal(sdk, () => native.compile(intent));
+      const remote = resident({ ...ready, compile_version });
+      const httpError = await refusal(sdk, () => new sdk.Nika({
+        url: 'https://nika.example', token: TOKEN, bin: '/missing-packed-review-engine', fetch: remote.fetch,
+      }).compile('hello'));
+      for (const error of [nativeError, httpError]) {
+        assert.equal(error.protocol, true, `malformed ${intent} must be a typed protocol error`);
+        assert.equal(error.credentialVisible, false, 'full error representation reflects bearer token');
+      }
+      assert.deepEqual(remote.requests.map(({ path }) => path), ['/health', '/v1/compile']);
+      report.hostileVersions.push({ intent, nativeError, httpError });
+    }
+    const signalLog = path.join(scratch, 'signal.argv');
+    process.env.NIKA_FAKE_ARGV_LOG = signalLog;
+    report.signalOverrides = [];
+    for (const door of ['native', 'http']) {
+      for (const key of ['aborted', 'reason', 'addEventListener', 'removeEventListener']) {
+        let calls = 0;
+        const controller = new AbortController();
+        if (key === 'reason') controller.abort();
+        Object.defineProperty(controller.signal, key, { get() { calls++; throw new Error('caller signal getter ran'); } });
+        const remote = resident(ready);
+        const client = door === 'native' ? native : new sdk.Nika({
+          url: 'https://nika.example', token: TOKEN, bin: engines.compile, fetch: remote.fetch,
+        });
+        const error = await refusal(sdk, () => client.compile('hello', { signal: controller.signal }));
+        assert.equal(error.configuration, true, `${door} ${key} must be a configuration refusal`);
+        assert.equal(calls, 0, 'caller signal getter executed');
+        assert.equal(remote.requests.length, 0, 'signal refusal started HTTP work');
+        assert.deepEqual(argvLog(signalLog), [], 'signal refusal spawned an engine');
+        report.signalOverrides.push({ door, key, calls, error });
+      }
+    }
     return report;
   } finally {
     delete process.env.NIKA_FAKE_ARGV_LOG;

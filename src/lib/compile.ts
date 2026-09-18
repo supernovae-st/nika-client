@@ -2,6 +2,7 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { types as utilTypes } from 'node:util';
+import { addAbortListener } from 'node:events';
 import {
   NikaCompatibilityError,
   NikaConfigurationError,
@@ -64,6 +65,11 @@ export const COMPILE_RESPONSE_MAX_BYTES = 8 * 1024 * 1024;
 export const COMPILE_KILL_GRACE_MS = 2_000;
 
 const STATUSES: readonly NikaCompileStatus[] = ['ready', 'incomplete', 'refused'];
+const signalAborted = Object.getOwnPropertyDescriptor(AbortSignal.prototype, 'aborted')!.get!;
+const removeSignalListener = EventTarget.prototype.removeEventListener;
+const signalInterface = new Set([
+  'aborted', 'reason', 'throwIfAborted', 'addEventListener', 'removeEventListener', 'dispatchEvent',
+]);
 
 /** Caller-facing request validation: unknown shapes refuse, never downgrade. */
 export function normalizeCompileRequest(
@@ -177,8 +183,17 @@ export function normalizeCompileOptions(options: NikaCompileOptions): NikaCompil
     const invalidSignal = () => new NikaConfigurationError('compile: signal must be an AbortSignal');
     if (signal === null || typeof signal !== 'object' || utilTypes.isProxy(signal)
       || Object.getPrototypeOf(signal) !== AbortSignal.prototype) throw invalidSignal();
+    // A native brand does not make own interface overrides safe: Node's
+    // AbortSignal.any reads aborted/reason through ordinary property access.
+    // Inspect descriptors before even the intrinsic brand check, retaining the
+    // signal's normal internal data fields without invoking caller accessors.
+    const descriptors = Object.getOwnPropertyDescriptors(signal);
+    for (const key of Reflect.ownKeys(descriptors)) {
+      if ((typeof key === 'string' && signalInterface.has(key))
+        || !('value' in descriptors[key as string]!)) throw invalidSignal();
+    }
     try {
-      Object.getOwnPropertyDescriptor(AbortSignal.prototype, 'aborted')!.get!.call(signal);
+      signalAborted.call(signal);
     } catch { throw invalidSignal(); }
   }
   return record as NikaCompileOptions;
@@ -191,13 +206,33 @@ export function normalizeCompileOptions(options: NikaCompileOptions): NikaCompil
 export function compileSignal(options: NikaCompileOptions): {
   signal?: AbortSignal;
   timedOut(): boolean;
+  dispose(): void;
 } {
+  const caller = options.signal;
+  let bridge: AbortController | undefined;
+  let abort: (() => void) | undefined;
+  if (caller !== undefined) {
+    bridge = new AbortController();
+    // Never give a caller composite to AbortSignal.any: Node may read public
+    // fields on its source signals, which our direct validation cannot inspect.
+    // addAbortListener sees only the validated signal and resists an earlier
+    // listener's stopImmediatePropagation. Downstream code sees our own signal.
+    const controller = bridge;
+    abort = () => controller.abort();
+    if (signalAborted.call(caller)) abort();
+    else addAbortListener(caller, abort);
+  }
   let timeout: AbortSignal | undefined;
   if (options.timeoutMs !== undefined) timeout = AbortSignal.timeout(options.timeoutMs);
-  const signals = [options.signal, timeout].filter((s): s is AbortSignal => s !== undefined);
+  const signals = [bridge?.signal, timeout].filter((s): s is AbortSignal => s !== undefined);
   return {
     signal: signals.length === 0 ? undefined : AbortSignal.any(signals),
     timedOut: () => timeout?.aborted === true,
+    // Use the intrinsic even if the caller shadows removeEventListener after
+    // starting Compile. Do not retain a listener on a long-lived caller signal.
+    dispose: () => {
+      if (caller && abort) removeSignalListener.call(caller, 'abort', abort);
+    },
   };
 }
 
@@ -326,15 +361,7 @@ export function compileOutcomeFrom(
       + (detail ? `: ${detail}` : ''),
     );
   }
-  if (payload.compile_version !== COMPILE_WIRE_VERSION) {
-    throw new NikaCompatibilityError(
-      COMPILE_CAPABILITY,
-      transport,
-      `Engine at ${engine} speaks compile wire `
-      + `${String(payload.compile_version ?? '(none)')}; this SDK speaks `
-      + `compile_version ${COMPILE_WIRE_VERSION} only`,
-    );
-  }
+  validateCompileVersion(payload.compile_version, transport, engine, protocol);
   const hasError = 'error' in payload;
   const hasStatus = 'status' in payload;
   if (hasError && hasStatus) {
@@ -375,10 +402,7 @@ export function compilePayloadFrom(
   engine: string,
 ): NikaCompileOutcome {
   const protocol = (message: string) => new NikaProtocolError(transport, `compile at ${engine}: ${message}`);
-  if (payload.compile_version !== COMPILE_WIRE_VERSION) {
-    throw new NikaCompatibilityError(COMPILE_CAPABILITY, transport,
-      `Engine at ${engine} speaks compile wire ${String(payload.compile_version)}; expected ${COMPILE_WIRE_VERSION}`);
-  }
+  validateCompileVersion(payload.compile_version, transport, engine, protocol);
   if ('error' in payload) throw protocol('the payload carries an error instead of an outcome');
   if (transport === 'http' && 'written' in payload) throw protocol('HTTP outcome claims a written destination');
   const status = payload.status;
@@ -404,6 +428,23 @@ export function compilePayloadFrom(
     provenance: provenanceFrom(payload.provenance, protocol),
   };
   return outcome;
+}
+
+function validateCompileVersion(
+  version: unknown,
+  transport: NikaTransportKind,
+  engine: string,
+  protocol: (message: string) => NikaProtocolError,
+): void {
+  // Wire data is untrusted, including strings that may reflect a credential.
+  // Never coerce or echo malformed values (even in an error's cause chain).
+  if (typeof version !== 'number' || !Number.isSafeInteger(version) || version < 1) {
+    throw protocol('compile_version must be a positive safe integer');
+  }
+  if (version !== COMPILE_WIRE_VERSION) {
+    throw new NikaCompatibilityError(COMPILE_CAPABILITY, transport,
+      `Engine at ${engine} speaks compile wire ${version}; expected ${COMPILE_WIRE_VERSION}`);
+  }
 }
 
 function tryParseJson(text: string): unknown {

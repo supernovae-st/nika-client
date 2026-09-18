@@ -234,6 +234,8 @@ export class HttpTransport implements Transport {
         { cause: cause instanceof Error ? cause : undefined });
       }
       throw cause;
+    } finally {
+      composed.dispose();
     }
   }
 

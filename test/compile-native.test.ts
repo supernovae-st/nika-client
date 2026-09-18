@@ -2,6 +2,8 @@ import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getEventListeners } from 'node:events';
+import { inspect } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   Nika,
@@ -12,7 +14,7 @@ import {
   NikaTransportError,
 } from '../src/index.js';
 import type { NikaLocalConfig } from '../src/index.js';
-import { COMPILE_RESPONSE_MAX_BYTES } from '../src/lib/compile.js';
+import { COMPILE_RESPONSE_MAX_BYTES, compileOutcomeFrom } from '../src/lib/compile.js';
 
 // Issue #128 · the native half of `Nika.compile`:
 //
@@ -270,6 +272,42 @@ describe.skipIf(!posix)('native compile (issue #128 · engine #1663)', () => {
   });
 
   describe('wire law violations (typed, never data)', () => {
+    it.each(['hello', 'hostile-not-json', 'nul\0intent'])('releases the caller listener for %s', async (intent) => {
+      const controller = new AbortController();
+      const pending = client().compile(intent, { signal: controller.signal });
+      if (intent === 'hello') await expect(pending).resolves.toHaveProperty('status');
+      else await expect(pending).rejects.toBeInstanceOf(intent.includes('\0') ? NikaConfigurationError : NikaProtocolError);
+      expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
+    });
+    it.each([
+      undefined, null, false, '1', 'p'.repeat(32), { toString: null }, ['p'.repeat(32)],
+      1.5, -1, 0, Number.MAX_SAFE_INTEGER + 1,
+    ])('refuses malformed native compile_version case %# before coercion', (compile_version) => {
+      const token = 'p'.repeat(32);
+      let error: unknown;
+      try {
+        compileOutcomeFrom({
+          stdout: JSON.stringify({ compile_version, status: 'ready' }),
+          stderr: '', exitCode: 0, exitSignal: null,
+        }, 'native-process', COMPILE_ENGINE);
+      } catch (cause) { error = cause; }
+      expect(error).toBeInstanceOf(NikaProtocolError);
+      expect((error as Error).message).toMatch(/compile_version/);
+      expect((error as Error).message).not.toContain(token);
+      expect((error as Error).message).not.toMatch(/Cannot convert object/);
+      expect(inspect(error)).not.toContain(token);
+      expect(inspect(error)).not.toMatch(/toString":null|toString: null/);
+    });
+    it.each(['hostile-token-version', 'hostile-object-version'])('compile(%s) fails typed without reflecting the payload', async (intent) => {
+      const token = 'p'.repeat(32);
+      const cause = await failure(client().compile(intent));
+      expect(cause).toBeInstanceOf(NikaProtocolError);
+      expect((cause as Error).message).toMatch(/compile_version/);
+      expect((cause as Error).message).not.toContain(token);
+      expect((cause as Error).message).not.toMatch(/Cannot convert object/);
+      expect(inspect(cause)).not.toContain(token);
+      expect(inspect(cause)).not.toMatch(/toString":null|toString: null/);
+    });
     it.each([
       ['hostile-not-json', NikaProtocolError, /absent or malformed/],
       ['hostile-unknown-status', NikaProtocolError, /unknown compile status/],

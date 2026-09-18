@@ -2,6 +2,8 @@ import { existsSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { inspect } from 'node:util';
+import { getEventListeners } from 'node:events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   Nika, NikaCompatibilityError, NikaConfigurationError,
@@ -104,6 +106,18 @@ describe('authenticated HTTP compile foundation', () => {
     await expect(client(fetch).compile('hello')).rejects.toBeInstanceOf(NikaCompatibilityError);
   });
 
+  it.each([undefined, null, false, '1', TOKEN_A, { toString: null }, [TOKEN_A], 1.5, -1, 0, Number.MAX_SAFE_INTEGER + 1])('rejects malformed compile_version case %# without reflecting the value', async (compile_version) => {
+    const fetch = respond(jsonResponse(outcome({ compile_version })));
+    const error = await client(fetch).compile('hello').catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(NikaProtocolError);
+    expect((error as Error).message).toMatch(/compile_version/);
+    expect((error as Error).message).not.toContain(TOKEN_A);
+    expect((error as Error).message).not.toMatch(/Cannot convert object/);
+    expect(inspect(error)).not.toContain(TOKEN_A);
+    expect(inspect(error)).not.toMatch(/toString":null|toString: null/);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it.each([
     () => jsonResponse(outcome({ status: 'other' })),
     () => jsonResponse(outcome({ candidate: null })),
@@ -177,5 +191,15 @@ describe('authenticated HTTP compile foundation', () => {
     await expect(client(fetch).compile('hello', { signal: {} as AbortSignal })).rejects.toBeInstanceOf(NikaConfigurationError);
     await expect(client(fetch).compile({ intent: 'hello', answers: { x: BigInt(1) } })).rejects.toBeInstanceOf(NikaConfigurationError);
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(['success', 'protocol', 'timeout'])('releases the caller listener after %s', async (mode) => {
+    const controller = new AbortController();
+    const fetch = mode === 'timeout' ? vi.fn(waitForAbort)
+      : respond(jsonResponse(outcome(mode === 'protocol' ? { compile_version: null } : {})));
+    const pending = client(fetch).compile('hello', { signal: controller.signal, timeoutMs: 30 });
+    if (mode === 'success') await expect(pending).resolves.toHaveProperty('ready', true);
+    else await expect(pending).rejects.toBeInstanceOf(mode === 'protocol' ? NikaProtocolError : NikaTransportError);
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
   });
 });

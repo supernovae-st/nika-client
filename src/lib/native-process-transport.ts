@@ -138,18 +138,14 @@ export class NativeProcessTransport implements Transport {
     options: NikaCompileOptions,
   ): Promise<NikaCompileOutcome> {
     const composed = compileSignal(options);
-    // A caller mistake (or a caller who already gave up) needs zero processes:
-    // judge the request — and refuse — before even the identity probe exists.
-    if (composed.signal?.aborted) {
-      throw new NikaTransportError(
-        this.kind,
-        composed.timedOut()
-          ? `compile timed out after ${options.timeoutMs} ms`
-          : 'compile aborted by caller',
-      );
-    }
-    const invocation = await compileArgv(request);
+    let invocation: Awaited<ReturnType<typeof compileArgv>> | undefined;
     try {
+      // A caller mistake (or a caller who already gave up) needs zero processes:
+      // judge the request — and refuse — before even the identity probe exists.
+      if (composed.signal?.aborted) {
+        throw new NikaTransportError(this.kind, 'compile aborted');
+      }
+      invocation = await compileArgv(request);
       // Compile's cancellation also bounds negotiation; an aborted probe is
       // never cached as this client's permanent engine identity.
       const identity = composed.signal ? await verifyNikaEngine(this.options.engine, {
@@ -187,7 +183,8 @@ export class NativeProcessTransport implements Transport {
       }
       throw cause;
     } finally {
-      await removeCompileScratch(invocation);
+      composed.dispose();
+      if (invocation) await removeCompileScratch(invocation);
     }
   }
 

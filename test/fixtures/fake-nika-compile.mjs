@@ -143,6 +143,14 @@ async function compile() {
     process.exit(0);
     return;
   }
+  if (key === 'hostile-object-version' || key === 'hostile-token-version') {
+    process.stdout.write(JSON.stringify({
+      compile_version: key === 'hostile-object-version' ? { toString: null } : 'p'.repeat(32),
+      status: 'ready',
+    }) + '\n');
+    process.exit(0);
+    return;
+  }
   if (key === 'hostile-unknown-status') {
     outcome({ status: 'nearly' }, 2);
     return;

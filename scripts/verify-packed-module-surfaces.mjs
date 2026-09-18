@@ -38,22 +38,40 @@ try {
   const commonJs = [
     `const sdk = require('${packageName}');`,
     `const manifest = require('${packageName}/package.json');`,
-    `if (!sdk.Nika || manifest.version !== '${expectedVersion}') process.exit(1);`,
+    `if (!sdk.Nika || typeof sdk.isNikaRunSucceeded !== 'function' || manifest.version !== '${expectedVersion}') process.exit(1);`,
   ].join(' ');
   run(process.execPath, ['--eval', commonJs], { cwd: consumer });
 
   const esm = [
-    `import { Nika } from '${packageName}';`,
+    `import { Nika, isNikaRunSucceeded } from '${packageName}';`,
     `const manifest = await import('${packageName}/package.json', { with: { type: 'json' } });`,
-    `if (!Nika || manifest.default.version !== '${expectedVersion}') process.exit(1);`,
+    `if (!Nika || typeof isNikaRunSucceeded !== 'function' || manifest.default.version !== '${expectedVersion}') process.exit(1);`,
   ].join(' ');
   run(process.execPath, ['--input-type=module', '--eval', esm], { cwd: consumer });
 
   const typedConsumer = [
-    `import { Nika, type NikaConfig } from '${packageName}';`,
+    `import { Nika, isNikaRunSucceeded, type NikaConfig, type NikaRunResult } from '${packageName}';`,
     "const config: NikaConfig = { bin: '/tmp/nika' };",
     'const client: Nika = new Nika(config);',
     'void client;',
+    'declare const result: NikaRunResult<{ answer: number }>;',
+    '// @ts-expect-error an observation is not known to have succeeded',
+    "const prematureSuccess: 'succeeded' = result.status;",
+    '// @ts-expect-error a run need not have any workflow outputs',
+    'result.outputs.answer;',
+    'if (isNikaRunSucceeded(result)) {',
+    "  const status: 'succeeded' = result.status;",
+    '  const answer: number | undefined = result.outputs?.answer;',
+    '  // @ts-expect-error the guard preserves the caller output type',
+    '  const wrong: string = result.outputs?.answer;',
+    '  // @ts-expect-error success does not fabricate an output map',
+    '  result.outputs.answer;',
+    '  void status; void answer; void wrong;',
+    '}',
+    "if (result.status === 'succeeded') {",
+    '  const answer: number | undefined = result.outputs?.answer;',
+    '  void answer;',
+    '}',
     '',
   ].join('\n');
   await writeFile(path.join(consumer, 'consumer.mts'), typedConsumer);

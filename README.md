@@ -126,6 +126,29 @@ A `try { await run.done } catch {}` alone therefore never catches a failed
 workflow: a CI job or an application must read `result.status` and treat
 anything but `succeeded` as its own failure, or a red run passes silently.
 
+On the development branch, `isNikaRunSucceeded` provides that TypeScript
+narrowing. It is **unreleased** and is not exported by the published
+`0.118.7` package; that package uses `result.status === 'succeeded'` directly.
+For CI built from this branch:
+
+```ts
+import { Nika, isNikaRunSucceeded } from '@supernovae-st/nika';
+
+const run = await new Nika().run<{ answer: number }>('flow.nika.yaml');
+const result = await run.done;
+if (isNikaRunSucceeded(result)) {
+  console.log(result.outputs?.answer); // outputs stay typed and optional
+} else {
+  console.error(result.status, result.error?.code, result.error?.message);
+  process.exitCode = 1;
+}
+```
+
+A paused result is a human gate, not a successful completion. Applications
+can render that state separately; a CI job awaiting completion must not pass
+it as success. The guard reads the engine's status and never turns absent
+outputs into a fabricated output map.
+
 ## Why this door
 
 - **Audited before it runs.** `check()` returns the engine's verdict on the

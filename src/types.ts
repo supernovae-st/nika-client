@@ -330,7 +330,13 @@ export interface NikaSettlement {
   [key: string]: unknown;
 }
 
-/** The only terminal value for a run. */
+/**
+ * The engine's result of observing an admitted run, including a paused run.
+ * Admitted workflow failure resolves with `status: 'failed'`; configuration,
+ * transport, protocol, and compatibility errors reject instead. Use
+ * `isNikaRunSucceeded(result)` before treating an observation as success.
+ * Outputs are optional even on success, and status stays forward-compatible.
+ */
 export interface NikaRunResult<
   Outputs extends Record<string, unknown> = Record<string, unknown>,
 > {

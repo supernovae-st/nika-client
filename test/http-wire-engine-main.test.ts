@@ -21,6 +21,11 @@ import { TOKEN_A, healthResponse, jsonResponse, sseResponse } from './helpers/ht
 // mirror could not be written. They pin how the SDK reads that wire, not what a
 // release writes: recapture them from the release that ships these fields.
 // `record_refused` was never observed; it is the contract's other word only.
+// Revalidated live on clean integration build 21ff7d53a (2026-09-18):
+// healthy and mirror-loss wire shapes, outputs, and closed evidence are unchanged.
+// Binary sha256: 0daa94a6e13f178461b30ffa76a3090c6bbc6a88050355f71b1903fc2977e301.
+// The historical timestamps/identities below remain from their original captures;
+// the SDK also settled the new live stream and durable attach with mirror_lost.
 
 const JOB = '546eccc2-7004-486e-bd5a-675b3cbaa5f8';
 const OUTPUTS = Object.freeze({

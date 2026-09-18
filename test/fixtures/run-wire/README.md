@@ -41,7 +41,7 @@ and a pure `nika:jq` workflow (no model seat, no network).
 
 | Prefix | Engine | Dialect |
 |---|---|---|
-| `c1683-*` | CANDIDATE build for engine #1683, `nika 0.120.0-dev (c6e1c35a1-dirty)`, binary sha256 `7f6394fcda269356ca9cc795fc702058aa7a3a4adb1966b6be90db1e71851306`; unmerged, not a release | one compact `{"error":{"code","message"}}` per pre-run refusal, prose on stderr |
+| `c1683-*` | clean integration build for engine #1683, `nika 0.120.0-dev (21ff7d53a)`, binary sha256 `0daa94a6e13f178461b30ffa76a3090c6bbc6a88050355f71b1903fc2977e301`; joins Compile and build-identity main, not a release | one compact `{"error":{"code","message"}}` per pre-run refusal, prose on stderr |
 
 These are the bytes of a candidate, so they pin how the SDK decodes that
 envelope, not what a released engine writes: recapture them from the release
@@ -54,3 +54,8 @@ that ships the channel.
 | `c1683-missing-required.*` | `{}` against four required inputs (`NIKA-1708`) | 3 |
 | `c1683-duplicate-key.*` | `{"ticket":"a","ticket":"b",…}` (`invalid_inputs_json`) | 3 |
 | `c1683-literal.ndjson.stdout` | admitted: `ticket` is the text `@env:NIKA_TEST_LITERAL`, kept literal; `workflow_started` names `api-caller` for supplied inputs and `file` for the default: seven frames | 0 |
+
+Recaptured at 2026-09-18 15:01 UTC from the clean integration build above.
+All eight refusal stdout/stderr files were byte-identical. The admitted seven-frame
+trace was replaced with the new measured bytes, including Spec pin
+`be8ff017d448c4d4e413d11c40613af0afb90754`. No envelope or refusal changed.

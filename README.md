@@ -119,12 +119,39 @@ compact acknowledgement with `clean: true`, or its typed workflow refusal
 with `clean: false`; it does not invent local findings or an exit code.
 
 `run()` returns after stable admission. `run.done` is the sole terminal result.
+A workflow the engine refuses before admission never yields a run: `run()`
+itself rejects with a `NikaOperationError` that names the engine's code and,
+for a red check, carries its `findings[]` (see [Errors](#errors)). The engine
+checks on every run, so no `check()` is needed first to be protected or taught.
 An admitted workflow failure is result data with `status: "failed"` and, when
 the engine named the failing task, `error: { code, message, task }`; transport,
 protocol, configuration, and compatibility failures throw typed SDK errors.
 A `try { await run.done } catch {}` alone therefore never catches a failed
 workflow: a CI job or an application must read `result.status` and treat
 anything but `succeeded` as its own failure, or a red run passes silently.
+
+On the development branch, `isNikaRunSucceeded` provides that TypeScript
+narrowing. It is **unreleased** and is not exported by the published
+`0.118.7` package; that package uses `result.status === 'succeeded'` directly.
+For CI built from this branch:
+
+```ts
+import { Nika, isNikaRunSucceeded } from '@supernovae-st/nika';
+
+const run = await new Nika().run<{ answer: number }>('flow.nika.yaml');
+const result = await run.done;
+if (isNikaRunSucceeded(result)) {
+  console.log(result.outputs?.answer); // outputs stay typed and optional
+} else {
+  console.error(result.status, result.error?.code, result.error?.message);
+  process.exitCode = 1;
+}
+```
+
+A paused result is a human gate, not a successful completion. Applications
+can render that state separately; a CI job awaiting completion must not pass
+it as success. The guard reads the engine's status and never turns absent
+outputs into a fabricated output map.
 
 ## Why this door
 
@@ -323,13 +350,18 @@ const nika = new Nika({
 
 const report = await nika.check('hello.nika.yaml');
 const run = await nika.run('hello.nika.yaml', {
-  idempotencyKey: 'hello-2026-08-30',
+  idempotencyKey: 'hello-2026-08-30', // persist before admission; reuse on retry
 });
 for await (const event of nika.events(run)) {
   console.log(event.sequence, event.kind, event.status);
 }
 console.log(await run.done);
 ```
+
+HTTP `run()` requires a caller-owned `idempotencyKey` before it sends a request.
+Persist a unique key for each business operation. If the response is lost or times
+out, retry the same request with that key; a new key can admit a second job.
+Direct native runs omit the key and reject one if supplied.
 
 If the Node process restarts after admission, recover the durable job without
 submitting the workflow again:
@@ -425,7 +457,7 @@ it; a scheduled budget is always a real number.
 | Operation | Native process | HTTP |
 |---|---|---|
 | `check` | yes; `model` and `nativeStrict` allowed | yes; those two overrides refused |
-| `run` | yes; `vars`, `model`, `maxCostUsd` allowed | yes; `idempotencyKey` allowed |
+| `run` | yes; `vars`, `model`, `maxCostUsd` allowed | yes; `idempotencyKey` required |
 | `attachRun` | typed refusal | reattach to a durable job with an optional SSE cursor |
 | `status` | typed refusal; await `run.done` | durable status projection |
 | `events` | raw engine lifecycle frames | sequenced SSE frames with bounded replay |
@@ -563,9 +595,37 @@ Server messages are engine-owned and path-free; a reflected bearer token is
 redacted before it reaches an error message. A non-2xx answer without that
 typed body stays a `NikaTransportError` whose body is redacted entirely.
 
-An engine refusal printed before a run starts — a `NIKA-…` code line such as a
-cost-floor refusal — settles `run.done` with a `NikaOperationError` carrying
-`operation: 'run'`, the engine's code, and its full refusal line.
+A native engine refuses a workflow before admitting it: a red check, a cost
+floor above `maxCostUsd`, a required input left unset, a file it cannot read.
+`run()` then rejects, before any `NikaRun` exists, with a `NikaOperationError`
+carrying `operation: 'run'` and the engine's exit status in `status`:
+
+```ts
+try {
+  const run = await nika.run('./workflow.nika.yaml');
+  const result = await run.done; // admitted: a failure here is result data
+} catch (error) {
+  if (error instanceof NikaOperationError && error.operation === 'run') {
+    console.error(error.code); // 'NIKA-SEC-004'
+    for (const finding of error.findings ?? []) console.error(finding.message);
+  } else throw error;
+}
+```
+
+- `code` is the engine's own code: the first check finding that names one
+  (`NIKA-SEC-004`, `NIKA-PARSE-005`, `NIKA-AUTH-006`, …) or the refusal's code
+  (`NIKA-1709`, `NIKA-1708`). `machineCode` repeats it. When the engine named
+  none, as for an unreadable file, `code` is the SDK's `run_refused` and
+  `machineCode` is absent; the SDK never supplies an engine code.
+- `findings` holds the engine's check findings untouched, as
+  `NikaCheckFinding` (`code?`, `message`, `severity`, `gate`, `kind`, `task`,
+  `docs_url`). A budget or launch refusal has no findings.
+- Nothing was admitted, so nothing else exists: no run id, no events, no
+  trace, no receipt.
+
+Output that proves neither an admission nor a refusal (a line that is not
+machine output, a truncated or oversized report, an engine that exits without
+a frame) rejects `run()` with `NikaProtocolError` instead.
 
 ## Security boundaries
 

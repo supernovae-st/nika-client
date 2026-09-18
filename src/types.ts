@@ -330,7 +330,13 @@ export interface NikaSettlement {
   [key: string]: unknown;
 }
 
-/** The only terminal value for a run. */
+/**
+ * The engine's result of observing an admitted run, including a paused run.
+ * Admitted workflow failure resolves with `status: 'failed'`; configuration,
+ * transport, protocol, and compatibility errors reject instead. Use
+ * `isNikaRunSucceeded(result)` before treating an observation as success.
+ * Outputs are optional even on success, and status stays forward-compatible.
+ */
 export interface NikaRunResult<
   Outputs extends Record<string, unknown> = Record<string, unknown>,
 > {
@@ -423,7 +429,10 @@ export interface NikaRunOptions {
   vars?: Record<string, string | number | boolean>;
   model?: string;
   maxCostUsd?: number;
-  /** Retained for HTTP admission deduplication. */
+  /**
+   * Required for HTTP admission; reuse the same key and request after an
+   * uncertain response. Direct native runs reject this option.
+   */
   idempotencyKey?: string;
 }
 
@@ -465,8 +474,30 @@ export interface NikaScheduleFinding {
   [key: string]: unknown;
 }
 
-/** Findings carried by the one operation-error taxonomy. */
-export type NikaOperationFinding = NikaScheduleFinding;
+/**
+ * One engine-owned check finding, exactly as the engine's check report
+ * carries it. `code` is absent when the engine's failure class names none (an
+ * unreadable workflow file); the SDK never supplies one. The vocabulary
+ * remains additive.
+ */
+export interface NikaCheckFinding {
+  code?: string;
+  message?: string;
+  severity?: string;
+  gate?: string;
+  kind?: string;
+  /** The task the finding judges, when it judges one. */
+  task?: string;
+  docs_url?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Findings carried by the one operation-error taxonomy: a schedule refusal
+ * carries schedule findings (`detail`), a refused `run()` carries the check
+ * findings that refused it (`message`).
+ */
+export type NikaOperationFinding = NikaScheduleFinding | NikaCheckFinding;
 
 export type NikaScheduleWhen =
   | { kind: 'once'; at: string }

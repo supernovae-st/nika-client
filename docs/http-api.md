@@ -71,9 +71,13 @@ A cursor means “fully processed”, not merely “received”.
 
 ## Idempotency and schedules
 
-An omitted run idempotency key is generated once per admission. A caller key
-must be 1–255 bytes. Reusing a key with different snapshot bytes is an engine
-conflict, not a retry success.
+HTTP `run()` requires a caller-owned `idempotencyKey` of 1–255 bytes. Omitting
+it throws `NikaConfigurationError` before network I/O or local snapshot capture.
+Persist the key before admission and retry the exact request with the same key
+if the response is lost or times out. The SDK never generates a hidden key or
+retries admission automatically. Reusing a key with different request bytes
+is an engine conflict, not a retry success. Direct native runs still omit the
+key and reject it if supplied.
 
 The namespace is the whole durable job store under the server's configured
 `state-root`, across workflows, clients, schedules, and server restarts. The

@@ -143,7 +143,12 @@ if (process.argv.includes('--sdk-identity')) {
   const workflow = process.argv[3] ?? '';
   if (workflow.includes('oversize')) process.stdout.write('x'.repeat(4096));
   else if (workflow.includes('malformed-machine')) process.stdout.write('{"kind":');
-  else if (workflow.includes('crash')) process.exitCode = 23;
+  else if (workflow.includes('crash')) {
+    // This case exercises a crash AFTER admission. An empty stream instead
+    // refuses run() with a protocol error and cannot establish a Run.
+    process.stdout.write(JSON.stringify({ kind: 'workflow_started' }) + '\\n');
+    process.exitCode = 23;
+  }
   else process.stdout.write(JSON.stringify({ report_version: 4, clean: true }));
 }
 `);
@@ -169,8 +174,10 @@ if (process.argv.includes('--sdk-identity')) {
 
   await scenario('oversize-machine-line', async () => {
     const workflow = writeWorkflow('oversize.nika.yaml', 'nika: fake');
-    const run = await new Nika({ bin: fakeBin, machineBufferBytes: 1024 }).run(workflow);
-    const error = await bounded(run.done, 2_000, 'oversize refusal').then(
+    const error = await bounded(
+      new Nika({ bin: fakeBin, machineBufferBytes: 1024 }).run(workflow),
+      2_000, 'oversize admission refusal',
+    ).then(
       () => undefined,
       (cause) => cause,
     );
@@ -180,8 +187,10 @@ if (process.argv.includes('--sdk-identity')) {
 
   await scenario('malformed-machine-frame', async () => {
     const workflow = writeWorkflow('malformed-machine.nika.yaml', 'nika: fake');
-    const run = await new Nika({ bin: fakeBin }).run(workflow);
-    const error = await bounded(run.done, 2_000, 'malformed frame refusal').then(
+    const error = await bounded(
+      new Nika({ bin: fakeBin }).run(workflow),
+      2_000, 'malformed admission refusal',
+    ).then(
       () => undefined,
       (cause) => cause,
     );
@@ -191,7 +200,11 @@ if (process.argv.includes('--sdk-identity')) {
 
   await scenario('child-crash-settlement', async () => {
     const workflow = writeWorkflow('crash.nika.yaml', 'nika: fake');
-    const run = await new Nika({ bin: fakeBin }).run(workflow);
+    const client = new Nika({ bin: fakeBin });
+    const run = await client.run(workflow);
+    const events = [];
+    for await (const event of client.events(run)) events.push(event.kind);
+    assert.deepEqual(events, ['workflow_started']);
     const result = await bounded(run.done, 2_000, 'crash settlement');
     assert.equal(result.status, 'failed');
     assert.equal(result.exitCode, 23);

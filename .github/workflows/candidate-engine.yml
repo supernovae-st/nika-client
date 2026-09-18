@@ -212,6 +212,20 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$NIKA_GAUNTLET_RESULTS_DIR"
+          sha=$(grep -E '^[0-9a-f]{40}$' ENGINE_QUAL_PIN | head -1)
+          ident=$("$NIKA_BIN" --version)
+          ver=$(printf '%s\n' "$ident" | awk '{print $2}')
+          short=${sha:0:9}
+          case "$ident" in
+            *"($short"*) ;;
+            *)
+              echo "::error::built binary '$ident' does not carry ENGINE_QUAL_PIN $sha"
+              exit 1
+              ;;
+          esac
+          export NIKA_CANDIDATE_ENGINE_VERSION="$ver"
+          export NIKA_CANDIDATE_ENGINE_SHA="$sha"
+          echo "candidate provenance version=$ver sha=$sha ident=$ident"
           cp "$RUNNER_TEMP/nika-candidate/provenance.txt" "$NIKA_GAUNTLET_RESULTS_DIR/provenance.txt"
           "$NIKA_BIN" key init --plain
           npm run gauntlet:run

@@ -19,6 +19,34 @@ if (reportPath) writeFileSync(reportPath, `${JSON.stringify({ result: 'incomplet
 const binary = process.env.NIKA_BIN;
 assert(binary && path.isAbsolute(binary), 'NIKA_BIN must be an absolute CLI/resident engine path');
 const version = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')).version;
+
+function candidateIdentity() {
+  if (process.env.NIKA_ONE_DOOR_CANDIDATE !== '1') return null;
+  const engineVersion = process.env.NIKA_CANDIDATE_ENGINE_VERSION;
+  const engineSha = process.env.NIKA_CANDIDATE_ENGINE_SHA;
+  assert(typeof engineVersion === 'string' && /^[0-9A-Za-z.+-]+$/.test(engineVersion),
+    'NIKA_CANDIDATE_ENGINE_VERSION is required for candidate one-door');
+  assert(/^[0-9a-f]{40}$/.test(engineSha ?? ''),
+    'NIKA_CANDIDATE_ENGINE_SHA must be the exact 40-hex nika commit');
+  return { engineVersion, engineSha };
+}
+
+function assertEngineTrain(probed, label) {
+  const candidate = candidateIdentity();
+  if (candidate) {
+    assert.equal(probed.sdk_identity.engineVersion, candidate.engineVersion,
+      `${label} candidate engineVersion`);
+    const short = candidate.engineSha.slice(0, 9);
+    const escaped = candidate.engineVersion.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert.match(
+      probed.version,
+      new RegExp(`^nika ${escaped} \\(${short}`),
+      `${label} candidate --version must carry ENGINE_QUAL_PIN`,
+    );
+    return;
+  }
+  assert.equal(probed.sdk_identity.engineVersion, version, `${label} release train`);
+}
 const publicVersion = process.env.NIKA_PUBLIC_SDK_VERSION;
 const scratch = mkdtempSync(path.join(tmpdir(), 'nika-one-door-e2e-'));
 const project = path.join(scratch, 'project');
@@ -61,12 +89,7 @@ try {
   writeFileSync(path.join(scratch, 'token'), `${token}\n`, { mode: 0o600 });
   const engine = await probe(binary, env);
   engine.binary_sha256 = await sha256(binary);
-  // Candidate qualification uses an unreleased nika commit. Skip the
-  // package-train identity only. Cancellation and result parity still run.
-  // Release-evidence-replay does not set NIKA_ONE_DOOR_CANDIDATE.
-  if (process.env.NIKA_ONE_DOOR_CANDIDATE !== '1') {
-    assert.equal(engine.sdk_identity.engineVersion, version, 'CLI/resident release train');
-  }
+  assertEngineTrain(engine, 'CLI/resident');
   if (publicVersion) {
     assert.equal(publicVersion, version, 'public SDK and repository release train');
     assert.match(engine.version, new RegExp(`^nika ${version.replaceAll('.', '\\.')} \\([0-9a-f]+\\)$`));
@@ -98,7 +121,7 @@ try {
     nativeEngine.binary_path = nativeBinary;
     nativeEngine.binary_sha256 = await sha256(nativeBinary);
   }
-  assert.equal(nativeEngine.sdk_identity.engineVersion, version, 'native payload release train');
+  assertEngineTrain(nativeEngine, 'native payload');
   assert.deepEqual(nativeEngine.sdk_identity, engine.sdk_identity, 'native payload and CLI/resident identity vector');
   if (publicVersion) {
     assert.equal(nativeEngine.binary_sha256, engine.binary_sha256,

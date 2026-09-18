@@ -28,7 +28,12 @@ test('controlled incident output satisfies the current replay judge without chan
     cancel: () => action,
     async *events(run) { await run.done; yield structuredClone(event); },
     attachRun: async (id) => { assert.equal(id, result.id); return controlled; },
-    traceVerify: async () => ({ verified: false, verdict: 'unavailable', reason: 'trace_journal_unavailable' }),
+    traceVerify: async (receipt) => {
+      if (receipt?.trace_id === '0'.repeat(32)) {
+        return { verified: false, verdict: 'SEALED', trace_id: 'controlled-trace' };
+      }
+      return { verified: true, verdict: 'SEALED', trace_id: receipt.trace_id };
+    },
   };
   const gate = { arm() {}, arrived: Promise.resolve(), release: async () => release(),
     finish: () => ({ requests: { hold: 1, dependent: 0 } }) };

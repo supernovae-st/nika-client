@@ -352,9 +352,14 @@ if (process.argv.includes('--sdk-identity')) {
       );
       const trace = await bounded(client.traceVerify(result.receipt, { signal: remoteSignal }),
         5_000, 'remote trace verification', remoteSignal);
-      assert.equal(trace.verified, false);
-      assert.equal(trace.verdict, 'unavailable');
-      assert.equal(trace.reason, 'trace_journal_unavailable');
+      assert.equal(trace.verified, true);
+      assert.equal(trace.trace_id, result.receipt.trace_id);
+      assert.notEqual(trace.verdict, 'unavailable');
+      const mismatchedTrace = await bounded(client.traceVerify({
+        ...result.receipt,
+        trace_id: '0'.repeat(32),
+      }, { signal: remoteSignal }), 5_000, 'remote mismatched trace', remoteSignal);
+      assert.equal(mismatchedTrace.verified, false);
       const controlled = {
         cancel_status: cancellation.status,
         run_status: result.status,
@@ -397,9 +402,9 @@ if (process.argv.includes('--sdk-identity')) {
       assert.equal(cancellationTerminalMatches(waitCancellation.status, waitTerminal), true);
       const waitTrace = await bounded(client.traceVerify(waitResult.receipt, { signal: remoteSignal }),
         5_000, 'wait receipt verdict', remoteSignal);
-      assert.equal(waitTrace.verified, false);
-      assert.equal(waitTrace.verdict, 'unavailable');
-      assert.equal(waitTrace.reason, 'trace_journal_unavailable');
+      assert.equal(waitTrace.verified, true);
+      assert.equal(waitTrace.trace_id, waitResult.receipt.trace_id);
+      assert.notEqual(waitTrace.verdict, 'unavailable');
       return {
         status_before_cancellation: statusBeforeCancellation,
         cancel_status: waitCancellation.status, run_status: waitResult.status,

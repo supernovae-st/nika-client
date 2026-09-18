@@ -28,7 +28,18 @@ import type {
   NikaWorkflowMetadata,
 } from './types.js';
 
-const DEFAULT_EVENT_BUFFER_SIZE = 256;
+/**
+ * Frames a session retains for a view opened after the fact (issue #122). A
+ * clean native run writes `3N + 3` frames for N tasks, measured on the
+ * released engine (90 tasks are 273), and one more per task that calls a
+ * tool. The previous 256 was below an 85-task run. 4096 replays a clean run of
+ * up to 1364 tasks, or 1023 tool-calling ones. It stays a finite bound: with
+ * `machineBufferBytes` bounding each frame, a session retains at most
+ * `eventBufferSize * machineBufferBytes` of frame text (256 MiB at both
+ * defaults, a ceiling no measured run approaches: those 273 frames total
+ * 0.15 MiB). An explicit `eventBufferSize` is kept exactly as given.
+ */
+const DEFAULT_EVENT_BUFFER_SIZE = 4096;
 const DEFAULT_MACHINE_BUFFER_BYTES = 64 * 1024;
 const DEFAULT_REQUEST_TIMEOUT = 30_000;
 

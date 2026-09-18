@@ -1,5 +1,19 @@
 interface NikaSharedConfig {
-  /** Bound for each event subscriber. Default: 256 events. */
+  /**
+   * How many of a run's most recent frames a session retains, and therefore
+   * the most a view opened after the fact can be given, and the largest
+   * `bufferSize` a view may ask for. Default: 4096 frames. A clean native run
+   * of N tasks writes `3N + 3` frames (90 tasks are 273), plus one per task
+   * that calls a tool.
+   *
+   * It is a finite bound, never a promise about the run. A run longer than it
+   * still succeeds and `run.result()` still resolves; only a late view is
+   * refused, with `NikaEventBufferOverflowError` whose `reason` is
+   * `replay_truncated` and whose `observed` says what to set. An explicit
+   * value is kept exactly as given. Each frame is bounded by
+   * `machineBufferBytes`, so a session retains at most
+   * `eventBufferSize * machineBufferBytes` of frame text per run.
+   */
   eventBufferSize?: number;
   /** Bound for buffered diagnostics and one machine frame. Default: 64 KiB. */
   machineBufferBytes?: number;
@@ -572,7 +586,12 @@ export interface NikaAttachRunOptions {
 export interface NikaEventsOptions {
   /** Stops this subscriber view. It never cancels the run. */
   signal?: AbortSignal;
-  /** Per-view queue bound, capped by the client eventBufferSize. */
+  /**
+   * Per-view queue bound, capped by the client eventBufferSize, which is also
+   * its default. A live view that falls further behind than this fails with
+   * `reason: 'live_backpressure'`; a view opened after more frames than this
+   * is refused with `reason: 'replay_truncated'`. Neither skips a frame.
+   */
   bufferSize?: number;
 }
 

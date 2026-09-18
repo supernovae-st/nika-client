@@ -107,6 +107,12 @@ and the receipt. The `engine.event` is the native journal's own
 `workflow_completed` frame: the SDK gives it no lifecycle name and no state,
 drops nothing, and shows it on `event.raw.kind`.
 
+That is six frames for one task; the same shape with 90 tasks was measured at
+273 (`3N + 3`). A session retains the most recent 4096 frames by default, so
+`run.events()` opened after `run.result()` replays them all, and is refused,
+never shortened, past that bound; see
+[Observing a run after the fact](#observing-a-run-after-the-fact).
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/supernovae-st/nika-client/main/media/local-driver.gif" alt="The typed driver over the released binary: check the workflow, gate on the report, run it to the end under a cost ceiling, count the events" width="960">
 </p>
@@ -585,7 +591,9 @@ Shared options:
 
 - `cwd`: engine working directory and snapshot root
 - `bin`: explicit engine path
-- `eventBufferSize`: per-client observer ceiling, default 256
+- `eventBufferSize`: how many of a run's most recent frames a session retains
+  for a view opened after the fact, and the largest `bufferSize` a view may
+  ask for; default 4096. See [Observing a run after the fact](#observing-a-run-after-the-fact)
 - `machineBufferBytes`: machine frame/diagnostic ceiling, default 64 KiB
 
 Remote-only options:
@@ -622,6 +630,75 @@ Remote-only options:
 Every member is bound to its run, so it can be extracted:
 `const { events, result } = run`. The handle is process-bound; it carries no
 `list`, `search`, proof, catalog or authoring door.
+
+### Observing a run after the fact
+
+```ts
+const run = await nika.run('wide.nika.yaml');
+const result = await run.result();          // first the result,
+for await (const event of run.events()) {}  // then every frame the session saw
+```
+
+A view opened late is seeded with every frame the session observed, or it is
+refused. It is never handed a shortened replay. How many frames a session
+retains is `eventBufferSize`, **4096 by default**.
+
+**The measured frame count: `3N + 3`, for one shape.** On the released 0.118.7
+engine, a clean run of N independent `mock/echo` `infer` tasks wrote
+`workflow_started`, then `task_scheduled`, `task_started` and `task_completed`
+per task, then `workflow_completed` and `run_settled`. Two points were
+measured: 1 task is 6 frames, 90 tasks are 273. That is this fixture, not a
+law of N-task workflows. Other shapes write more: a `nika:wait` task and a
+`nika:assert` task each showed one extra `permit_checked` frame, a failed task
+writes `task_failed`, and retries, agents and `for_each` were not measured.
+Count your own run rather than deriving it: `error.observed` below is the
+number. A `nika serve` job was measured at two frames, so the bound matters on
+a native process.
+
+| `eventBufferSize` | frames retained | in the measured shape only |
+|---|---|---|
+| 256, the default up to 0.118.7 | 256 | below the 273 frames of the 90-task run |
+| 4096, the default | 4096 | 15 times those 273 frames |
+
+**What the bound costs.** It is finite on purpose and is never `Infinity`.
+Every frame is bounded by `machineBufferBytes` (64 KiB), so the retained
+**history** holds at most `eventBufferSize × machineBufferBytes` of frame text:
+4096 × 64 KiB = 256 MiB per run at both defaults, where 256 frames gave
+16 MiB. That is arithmetic, not a measurement: the 273 measured frames total
+0.15 MiB (mean 571 bytes, largest 1501). It bounds the history only, not the
+session or the process: a frame already handed to your code lives as long as
+you keep it, and every open view and every concurrent run adds its own. Nothing
+here is a claim about heap or process memory. If that ceiling matters to you,
+set `eventBufferSize` yourself: an explicit value is kept exactly as given, so
+`eventBufferSize: 256` behaves as it always did.
+
+**Past the bound.** A run that writes more frames than the bound still runs and
+still succeeds: `run.result()` resolves as usual and is never affected. Only a
+view is refused, with `NikaEventBufferOverflowError`, and its `reason` says
+which of two different bounds was exceeded:
+
+| `error.reason` | What happened | What to do |
+|---|---|---|
+| `replay_truncated` | the view was opened after the run had produced more frames (`error.observed`) than it can be given (`error.limit`); `error.retained` is how many the session still holds | when `retained === observed` nothing is lost: open the view with `bufferSize >= observed`. Otherwise the earlier frames are gone from this process: set `eventBufferSize >= observed` for the next run, or observe it live |
+| `live_backpressure` | a view that was observing live fell more than `error.limit` frames behind the stream | read faster, or raise that view's `bufferSize`. Other views and the result are unaffected |
+
+```ts
+try {
+  for await (const event of run.events()) render(event);
+} catch (error) {
+  if (error instanceof NikaEventBufferOverflowError && error.reason === 'replay_truncated') {
+    // The run is fine. Its history is longer than this view can replay.
+    console.warn(`${error.observed} frames, ${error.retained} retained; run ${result.status}`);
+  } else throw error;
+}
+```
+
+Neither refusal skips a frame, and neither is about the run. `error.observed`
+is a count taken when the view was opened. The engine's journal stays the
+source of truth for a native trace (`receipt.trace_path`, `traceVerify`): a
+late `run.events()` is a convenience over what this process already saw, and
+the SDK reads no journal to extend it. Over HTTP the resident holds the job,
+so recover there with `attachRun(id, { lastEventId })`.
 
 ### The lifecycle vocabulary
 
@@ -795,6 +872,12 @@ NikaError
 ├── NikaEventBufferOverflowError
 └── NikaRunOwnershipError
 ```
+
+`NikaEventBufferOverflowError` is never about the run: `run.result()` is
+unaffected by it. Its `reason` tells a live view that fell behind
+(`live_backpressure`) from a view opened after more frames than it can replay
+(`replay_truncated`, with `observed` and `retained`); see
+[Observing a run after the fact](#observing-a-run-after-the-fact).
 
 Native engine event vocabulary stays open. HTTP events instead enforce the
 closed, redacted `JobEvent` projection advertised by the pinned OpenAPI contract;

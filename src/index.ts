@@ -28,7 +28,23 @@ import type {
   NikaWorkflowMetadata,
 } from './types.js';
 
-const DEFAULT_EVENT_BUFFER_SIZE = 256;
+/**
+ * Frames a session retains for a view opened after the fact (issue #122).
+ *
+ * Sized from one measured fixture, not from a law of N-task workflows: on the
+ * released 0.118.7 engine a clean run of N independent mock/echo infer tasks
+ * wrote `3N + 3` frames (N = 1 is 6, N = 90 is 273). The previous 256 was
+ * below those 273. Other shapes write more (a tool call showed an extra
+ * `permit_checked` frame; retries, agents and `for_each` were not measured),
+ * so 4096 is headroom over the measured run, not a promised task count.
+ *
+ * It stays finite. With `machineBufferBytes` bounding each frame, the retained
+ * HISTORY holds at most `eventBufferSize * machineBufferBytes` of frame text
+ * (256 MiB at both defaults; the measured 273 frames total 0.15 MiB). That
+ * bounds the history only, never the session or the process. An explicit
+ * `eventBufferSize` is kept exactly as given.
+ */
+const DEFAULT_EVENT_BUFFER_SIZE = 4096;
 const DEFAULT_MACHINE_BUFFER_BYTES = 64 * 1024;
 const DEFAULT_REQUEST_TIMEOUT = 30_000;
 

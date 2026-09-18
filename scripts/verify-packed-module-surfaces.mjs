@@ -90,14 +90,14 @@ try {
       // Issue #122: the packed default replays the measured 90-task shape (273
       // frames) observed only after its result, and an explicit 256 keeps its
       // cap with a refusal that names the history, never a slow subscriber.
-      "  const wide = await nika.run('wide90.nika.yaml');",
+      "  const wide = await nika.run('wide90.nika');",
       '  const wideResult = await wide.result();',
       '  let replayed = 0;',
       '  for await (const event of wide.events()) replayed += event.raw ? 1 : 0;',
       "  if (replayed !== 3 * 90 + 3) throw new Error('late replay frames: ' + replayed);",
       "  if (!isNikaRunSucceeded(wideResult)) throw new Error('late replay result');",
       `  const capped = new Nika({ bin: ${JSON.stringify(replayEngine)}, eventBufferSize: 256 });`,
-      "  const cappedRun = await capped.run('wide90.nika.yaml');",
+      "  const cappedRun = await capped.run('wide90.nika');",
       '  const cappedResult = await cappedRun.result();',
       '  let refused;',
       '  try { cappedRun.events(); } catch (cause) { refused = cause; }',

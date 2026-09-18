@@ -580,7 +580,7 @@ Every member is bound to its run, so it can be extracted:
 ### Observing a run after the fact
 
 ```ts
-const run = await nika.run('wide.nika.yaml');
+const run = await nika.run('wide.nika');
 const result = await run.result();          // first the result,
 for await (const event of run.events()) {}  // then every frame the session saw
 ```

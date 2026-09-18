@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PROJECT_FILE,
   WORKFLOW_SUFFIX,
   isCanonicalWorkflowPath,
   isContainedWorkflowName,
@@ -55,5 +56,14 @@ describe('SDK filename contract', () => {
     expect(isLegacyWorkflowPath('./daily.nika.yaml')).toBe(true);
     expect(renameLegacyWorkflow('daily.nika.yaml')).toBe('daily.nika');
     expect(legacyWorkflowRenameMessage('daily.nika.yaml')).toContain('daily.nika');
+  });
+
+  it('treats nika.yaml as the project file, never a program, regardless of bytes', () => {
+    expect(PROJECT_FILE).toBe('nika.yaml');
+    expect(isCanonicalWorkflowPath(PROJECT_FILE)).toBe(false);
+    expect(isContainedWorkflowName(PROJECT_FILE)).toBe(false);
+    expect(isLegacyWorkflowPath(PROJECT_FILE)).toBe(false);
+    expect(isLegacyContainedWorkflowName(PROJECT_FILE)).toBe(false);
+    expect(workflowLogicalStem(PROJECT_FILE)).toBeUndefined();
   });
 });

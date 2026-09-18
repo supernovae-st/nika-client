@@ -86,7 +86,7 @@ describe.skipIf(!posix)('late replay capacity (issue #122)', () => {
   describe('the default client', () => {
     it('replays every frame of a 90-task run observed only after its result', async () => {
       const client = native();
-      const run = await client.run('wide90.nika.yaml');
+      const run = await client.run('wide90.nika');
       const result = await run.result();
       expect(isNikaRunSucceeded(result)).toBe(true);
 
@@ -121,7 +121,7 @@ describe.skipIf(!posix)('late replay capacity (issue #122)', () => {
 
     it('replays the 3003 frames the same shape writes for 1000 tasks', async () => {
       const client = native();
-      const run = await client.run('wide1000.nika.yaml');
+      const run = await client.run('wide1000.nika');
       await run.result();
 
       const kinds = (await collect(client.events(run))).map((event) => event.kind);
@@ -131,7 +131,7 @@ describe.skipIf(!posix)('late replay capacity (issue #122)', () => {
 
     it('leaves a 1-task run exactly as it was', async () => {
       const client = native();
-      const run = await client.run('wide1.nika.yaml');
+      const run = await client.run('wide1.nika');
       await run.result();
 
       expect((await collect(client.events(run))).map((event) => event.kind)).toEqual([
@@ -146,13 +146,13 @@ describe.skipIf(!posix)('late replay capacity (issue #122)', () => {
 
     it('replays to the frame at its capacity and refuses one frame past it', async () => {
       const client = native();
-      const atCapacity = await client.run('frames4096.nika.yaml');
+      const atCapacity = await client.run('frames4096.nika');
       await atCapacity.result();
       const replayed = await collect(client.events(atCapacity));
       expect(replayed).toHaveLength(4096);
       expect(replayed.at(-1)?.kind).toBe('run_settled');
 
-      const pastCapacity = await client.run('frames4097.nika.yaml');
+      const pastCapacity = await client.run('frames4097.nika');
       const result = await pastCapacity.result();
       const refused = refusal(() => client.events(pastCapacity));
 
@@ -172,7 +172,7 @@ describe.skipIf(!posix)('late replay capacity (issue #122)', () => {
   describe('an explicit eventBufferSize keeps its cap', () => {
     it('still refuses a 273-frame replay under an explicit 256, and says why', async () => {
       const client = native({ eventBufferSize: 256 });
-      const run = await client.run('wide90.nika.yaml');
+      const run = await client.run('wide90.nika');
       const result = await run.result();
 
       const refused = refusal(() => run.events());
@@ -207,7 +207,7 @@ describe.skipIf(!posix)('late replay capacity (issue #122)', () => {
       [272, 'refuses'],
     ] as const)('under an explicit %i a 273-frame run %s', async (eventBufferSize, outcome) => {
       const client = native({ eventBufferSize });
-      const run = await client.run('wide90.nika.yaml');
+      const run = await client.run('wide90.nika');
       await run.result();
 
       if (outcome === 'replays') {
@@ -224,7 +224,7 @@ describe.skipIf(!posix)('late replay capacity (issue #122)', () => {
 
     it('refuses a late view smaller than an intact history, and loses nothing by it', async () => {
       const client = native({ eventBufferSize: 300 });
-      const run = await client.run('wide90.nika.yaml');
+      const run = await client.run('wide90.nika');
       await run.result();
 
       // The session kept all 273 frames; only this view's bound is too small.
@@ -293,7 +293,7 @@ describe.skipIf(!posix)('late replay capacity (issue #122)', () => {
   describe('live backpressure is a different refusal', () => {
     it('fails a bufferSize 1 view that fell behind, and nothing else', async () => {
       const client = native();
-      const run = await client.run('wide90.nika.yaml');
+      const run = await client.run('wide90.nika');
       const slow = run.events({ bufferSize: 1 })[Symbol.asyncIterator]();
       const reading = collect(client.events(run));
 
@@ -318,13 +318,13 @@ describe.skipIf(!posix)('late replay capacity (issue #122)', () => {
     it('still protects a default live view, at the default bound and to the frame', async () => {
       const client = native();
       // A view that never reads holds exactly its bound: 4096 frames fit.
-      const fits = await client.run('frames4096.nika.yaml');
+      const fits = await client.run('frames4096.nika');
       const idle = fits.events();
       await fits.result();
       expect(await collect(idle)).toHaveLength(4096);
 
       // One frame more and the live view fails typed; it is never shortened.
-      const overflows = await client.run('frames4097.nika.yaml');
+      const overflows = await client.run('frames4097.nika');
       const stalled = overflows.events()[Symbol.asyncIterator]();
       const result = await overflows.result();
       const failure = await stalled.next().catch((cause: unknown) => cause);

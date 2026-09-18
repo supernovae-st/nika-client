@@ -6,6 +6,7 @@
 // never authority.
 
 export const WORKFLOW_SUFFIX = '.nika';
+export const PROJECT_FILE = 'nika.yaml';
 export const LEGACY_WORKFLOW_SUFFIXES = ['.nika.yaml', '.nika.yml'] as const;
 
 const CONTAINED_CHAR = /[A-Za-z0-9/._-]/;

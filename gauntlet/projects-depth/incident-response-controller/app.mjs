@@ -41,9 +41,17 @@ export async function exerciseIncident(nika, gate, signal) {
     await bounded(observation.catch(() => {}), 2_000, 'incident replay observer cleanup');
   }
   const remoteProof = await step(nika.traceVerify(result.receipt), 5_000, 'remote receipt verdict');
-  assert.equal(remoteProof.verified, false);
-  assert.equal(remoteProof.verdict, 'unavailable');
-  assert.equal(remoteProof.reason, 'trace_journal_unavailable');
+  // 0.118 serve had no journal door (verified false / unavailable). A
+  // candidate that lists `.nika` also verifies the sealed receipt it issued.
+  // HTTP verify is GET /v1/jobs/:id/trace/verify: chain_head is not a request
+  // body. A receipt whose trace_id is not the journal's never reads verified.
+  assert.equal(remoteProof.verified, true);
+  assert.notEqual(remoteProof.verdict, 'unavailable');
+  const mismatchedTrace = await step(nika.traceVerify({
+    ...result.receipt,
+    trace_id: '0'.repeat(32),
+  }), 5_000, 'mismatched trace_id');
+  assert.equal(mismatchedTrace.verified, false);
   return {
     project: 'incident-response-controller', status: 'succeeded',
     project_workflow_status: projectResult.status,
@@ -57,7 +65,9 @@ export async function exerciseIncident(nika, gate, signal) {
     settlement: settlementFacts(result),
     same_job_terminal_and_replay_matched: true,
     cancellation_rendezvous: rendezvous,
-    remote_receipt_verdict: { verdict: remoteProof.verdict, reason: remoteProof.reason },
+    remote_receipt_verdict: { verdict: remoteProof.verdict, reason: remoteProof.reason,
+      verified: remoteProof.verified },
+    mismatched_trace_rejected: true,
     deterministic_cost_cap_usd: 0,
   };
 }

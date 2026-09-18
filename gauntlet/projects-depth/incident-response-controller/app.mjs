@@ -46,6 +46,7 @@ export async function exerciseIncident(nika, gate, signal) {
   // HTTP verify is GET /v1/jobs/:id/trace/verify: chain_head is not a request
   // body. A receipt whose trace_id is not the journal's never reads verified.
   assert.equal(remoteProof.verified, true);
+  assert.equal(remoteProof.trace_id, result.receipt.trace_id);
   assert.notEqual(remoteProof.verdict, 'unavailable');
   const mismatchedTrace = await step(nika.traceVerify({
     ...result.receipt,
@@ -66,7 +67,7 @@ export async function exerciseIncident(nika, gate, signal) {
     same_job_terminal_and_replay_matched: true,
     cancellation_rendezvous: rendezvous,
     remote_receipt_verdict: { verdict: remoteProof.verdict, reason: remoteProof.reason,
-      verified: remoteProof.verified },
+      verified: remoteProof.verified, trace_id: remoteProof.trace_id },
     mismatched_trace_rejected: true,
     deterministic_cost_cap_usd: 0,
   };

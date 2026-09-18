@@ -130,18 +130,17 @@ describe('run by served name (ADR-131)', () => {
     expect(fetch.mock.calls.some(([called]) => String(called).includes('/v1/workflows'))).toBe(false);
   });
 
-  it('generates one idempotency key when the caller omits it', async () => {
-    const fetch = vi.fn()
-      .mockResolvedValueOnce(healthResponse())
-      .mockResolvedValueOnce(jsonResponse({ id: 'job-1', status: 'queued' }, 202))
-      .mockResolvedValueOnce(sseResponse([
-        { sequence: 1, kind: 'execution.settled', status: 'succeeded', receipt: RECEIPT },
-      ]));
-    const run = await remote(fetch).run('daily.nika.yaml');
-    const key = new Headers(request(fetch, 1).init.headers).get('Idempotency-Key');
-    expect(key).toMatch(/^[0-9a-f-]{36}$/);
-    await expect(run.done).resolves.toMatchObject({ status: 'succeeded' });
-  });
+  it.each(['daily.nika.yaml', './daily.nika.yaml'])(
+    'refuses a missing caller key before network or local capture for %s',
+    async (workflow) => {
+      const fetch = vi.fn();
+      const resolveEngine = vi.fn(() => { throw new Error('must not capture'); });
+      await expect(transport(fetch, resolveEngine).startRun(workflow, {}))
+        .rejects.toMatchObject({ name: 'NikaConfigurationError' });
+      expect(fetch).not.toHaveBeenCalled();
+      expect(resolveEngine).not.toHaveBeenCalled();
+    },
+  );
 
   it('carries the settlement the resident nests on the terminal frame', async () => {
     const fetch = vi.fn()
@@ -154,7 +153,7 @@ describe('run by served name (ADR-131)', () => {
         receipt: RECEIPT,
         settlement: SETTLEMENT,
       }]));
-    const run = await remote(fetch).run('daily.nika.yaml');
+    const run = await remote(fetch).run('daily.nika.yaml', { idempotencyKey: 'test-admission' });
     const result = await run.done;
     expect(result.status).toBe('succeeded');
     expect(result.settlement).toEqual(SETTLEMENT);
@@ -171,7 +170,7 @@ describe('run by served name (ADR-131)', () => {
         receipt: RECEIPT,
         settlement: 'private',
       } as unknown as NikaEvent]));
-    const run = await remote(fetch).run('daily.nika.yaml');
+    const run = await remote(fetch).run('daily.nika.yaml', { idempotencyKey: 'test-admission' });
     await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);
   });
 
@@ -191,7 +190,7 @@ describe('run by served name (ADR-131)', () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(jsonResponse({ error: NOT_FOUND }, 404));
-    const refused = await failure(remote(fetch).run('missing.nika.yaml'));
+    const refused = await failure(remote(fetch).run('missing.nika.yaml', { idempotencyKey: 'test-admission' }));
     expect(refused).toBeInstanceOf(NikaOperationError);
     expect(refused).toMatchObject({
       operation: 'run',
@@ -319,7 +318,7 @@ describe('the local capture path is unchanged', () => {
         status: 'succeeded',
         receipt: { ...RECEIPT, snapshot_digest: 'a'.repeat(64) },
       }]));
-    const source = await transport(fetch, resolveEngine).startRun('./flow.nika.yaml', {});
+    const source = await transport(fetch, resolveEngine).startRun('./flow.nika.yaml', { idempotencyKey: 'test-admission' });
     expect(resolveEngine).toHaveBeenCalledTimes(1);
     const body = String(request(fetch, 1).init.body);
     expect(JSON.parse(body)).toMatchObject({ format_version: 1, digest: 'a'.repeat(64) });
@@ -340,7 +339,7 @@ describe('the local capture path is unchanged', () => {
     const unavailable = () => {
       throw new NikaEngineUnavailable('darwin', 'arm64', '@supernovae-st/nika-darwin-arm64');
     };
-    await expect(transport(fetch, unavailable).startRun(workflow, {}))
+    await expect(transport(fetch, unavailable).startRun(workflow, { idempotencyKey: 'test-admission' }))
       .rejects.toBeInstanceOf(NikaEngineUnavailable);
     await expect(transport(fetch, unavailable).check(workflow, {}))
       .rejects.toBeInstanceOf(NikaEngineUnavailable);

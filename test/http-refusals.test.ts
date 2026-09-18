@@ -56,7 +56,7 @@ describe('typed HTTP refusals', () => {
         { error: { code: 'NIKA-AUTH-006', message: 'effect under an absent permits block' } },
         422,
       ));
-    const refused = await failure(client(fetch as typeof globalThis.fetch).run('flow.nika.yaml'));
+    const refused = await failure(client(fetch as typeof globalThis.fetch).run('flow.nika.yaml', { idempotencyKey: 'test-admission' }));
     expect(refused).toMatchObject({
       name: 'NikaOperationError',
       operation: 'run',

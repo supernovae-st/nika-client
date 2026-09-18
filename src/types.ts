@@ -423,7 +423,10 @@ export interface NikaRunOptions {
   vars?: Record<string, string | number | boolean>;
   model?: string;
   maxCostUsd?: number;
-  /** Retained for HTTP admission deduplication. */
+  /**
+   * Required for HTTP admission; reuse the same key and request after an
+   * uncertain response. Direct native runs reject this option.
+   */
   idempotencyKey?: string;
 }
 

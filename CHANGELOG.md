@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- HTTP `run()` now requires a caller-owned `idempotencyKey` and refuses an
+  omitted key before admission. Reuse that key and request after a lost
+  response so an application retry cannot silently create a second job.
+  Direct native runs continue to omit the key and reject one if supplied.
+
 - The package is published as `@supernovae-st/nika`, the product's name: one
   namespace for the owner, one artifact name per registry. The native payloads
   were already `@supernovae-st/nika-<os>-<arch>`; the repository keeps its

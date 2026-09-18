@@ -675,7 +675,8 @@ export type NikaOperation =
   | 'workflow'
   | 'traceVerify'
   | 'schedule'
-  | 'scheduleStatus';
+  | 'scheduleStatus'
+  | 'compile';
 
 /** One engine-owned schedule finding. The vocabulary remains additive. */
 export interface NikaScheduleFinding {
@@ -830,4 +831,126 @@ export interface NikaScheduleApplyResult {
   applied: true;
   changed: boolean;
   status: NikaScheduleStatus;
+}
+
+/* ------------------------------------------------------------------ */
+/* Compile (issue #128) — the SDK projection of the engine's one       */
+/* authoring capability. Field names mirror the engine's               */
+/* `compile_version: 1` wire verbatim; the SDK invents none of them.   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * One stateless authoring request. Exactly one shape:
+ *
+ * - CREATE: `{ intent }` (or the bare-string shorthand), optionally with
+ *   `answers` to the engine's stable question keys.
+ * - EDIT: `{ workflow, change }` — the accepted workflow's SOURCE plus the
+ *   change request — optionally with `answers`.
+ *
+ * The two shapes never mix, and there is no session: every call is a fresh
+ * request carrying everything the engine needs.
+ */
+export type NikaCompileRequest = NikaCompileCreateRequest | NikaCompileEditRequest;
+
+export interface NikaCompileCreateRequest {
+  /** Intent text, or an exact embedded skeleton name in this foundation. */
+  intent: string;
+  /**
+   * Answers to engine questions, by stable question key (`const.request`),
+   * as strict JSON values — never pre-serialized text. The SDK serializes
+   * each value exactly once onto the argv `KEY=JSON` channel; a value JSON
+   * cannot carry refuses with `NikaConfigurationError` before any spawn.
+   */
+  answers?: Record<string, unknown>;
+  workflow?: never;
+  change?: never;
+}
+
+export interface NikaCompileEditRequest {
+  /** The accepted workflow's exact source bytes (as a string). */
+  workflow: string;
+  /** The requested change, in the engine's supported edit vocabulary. */
+  change: string;
+  answers?: Record<string, unknown>;
+  intent?: never;
+}
+
+export interface NikaCompileOptions {
+  /**
+   * Aborts this authoring process only. Compile owns no Run: this never
+   * touches `run.cancel()` semantics (client#126), and no workflow effect
+   * exists to interrupt.
+   */
+  signal?: AbortSignal;
+  /** Positive integer milliseconds before the bounded child is stopped. */
+  timeoutMs?: number;
+}
+
+/** The engine's own completeness words; `ready` is never derived from confidence. */
+export type NikaCompileStatus = 'ready' | 'incomplete' | 'refused';
+
+/** One authoring question, exactly as the engine emitted it. */
+export interface NikaCompileQuestion {
+  /** Stable semantic hole path (`const.request`), never a session id. */
+  key: string;
+  label: string;
+  type: string;
+  why: string;
+  mandatory: boolean;
+  [key: string]: unknown;
+}
+
+/** One structured authoring finding, exactly as the engine emitted it. */
+export interface NikaCompileDiagnostic {
+  kind: string;
+  target: string;
+  message: string;
+  [key: string]: unknown;
+}
+
+/** Authoring provenance — not program identity (#1664), not execution Proof. */
+export interface NikaCompileProvenance {
+  compiler_version: string;
+  spec_pin: string;
+  skeleton: string | null;
+  cognition: string;
+  [key: string]: unknown;
+}
+
+/** The candidate's pure Check judgment, with its deliberately limited scope. */
+export interface NikaCompilePreview {
+  /** `sourceOnly` in this foundation: no environment or admission claim. */
+  scope: string;
+  report: NikaCheckResult;
+  [key: string]: unknown;
+}
+
+/**
+ * The reviewable authoring result. `candidate` is ordinary `.nika.yaml`
+ * SOURCE in memory — it is not a `Workflow` handle, and `run()` does not
+ * accept raw source: the caller materializes the candidate and `run(path)`
+ * re-admits it. The SDK never writes the candidate for you in this slice
+ * (no `dest`/`force`), and the engine never executes it.
+ *
+ * `incomplete` and `refused` are data, not exceptions: the SDK throws only
+ * on transport, protocol, compatibility and engine-stamped failures.
+ */
+export interface NikaCompileOutcome {
+  /** The wire generation this payload was validated against. Always 1. */
+  compile_version: 1;
+  status: NikaCompileStatus;
+  /** Exactly `status === 'ready'` — the engine's word, not a client judgment. */
+  ready: boolean;
+  /** The candidate source; may still carry unfilled holes when not ready. */
+  candidate: string | null;
+  questions: NikaCompileQuestion[];
+  diagnostics: NikaCompileDiagnostic[];
+  /** The boundary the candidate requests (from its pure report); never a grant. */
+  requested_boundary: Record<string, unknown> | null;
+  check_preview: NikaCompilePreview | null;
+  provenance: NikaCompileProvenance;
+  /** Engine-materialized destination. Always null here: the SDK passes no dest. */
+  written: null;
+  /** The compile child's exit code (0 ready · 2 incomplete/refused). */
+  exitCode: number;
 }

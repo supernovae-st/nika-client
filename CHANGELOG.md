@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Nika.compile(request, options)` — the SDK projection of the engine's one
+  authoring capability (issue #128, engine nika#1663). The native transport
+  runs one bounded `nika compile --json` child and validates the versioned
+  `compile_version: 1` wire: `status` (`ready` / `incomplete` / `refused`),
+  `ready` derived exactly from it, `candidate` source, `questions`,
+  `diagnostics`, `requested_boundary`, `check_preview` and `provenance` are
+  preserved verbatim. Incomplete and refused are data, never exceptions; a
+  ready outcome is accepted only from a child that exited 0, and a dead,
+  truncated, malformed or wrong-version wire fails typed
+  (`NikaProtocolError` / `NikaCompatibilityError` / `NikaOperationError` with
+  the engine's own code). The engine must advertise the `compile` capability;
+  older engines are refused before any compile spawn. CREATE takes an intent
+  (or exact skeleton name) plus `answers` — strict JSON values serialized
+  once onto argv as `KEY=JSON`; EDIT takes the accepted source plus a change
+  and lends the base through a 0700 scratch dir with a 0600 file, removed on
+  every path. `signal`/`timeoutMs` stop only this child (SIGTERM, then
+  SIGKILL inside a kill grace); no Run exists to cancel. The candidate is
+  source: `run()` still takes a path, and the caller owns materialization —
+  this slice ships no `dest`/`force`. Over `{ url }` the method typed-refuses
+  until nika serve exposes its authoring door (engine nika#1670); the SDK
+  never compiles in TypeScript as a fallback.
+
 - The Run owns its lifecycle (#120). `NikaRun` now carries `events()`,
   `result()`, `status()` and `cancel()` next to `id`; `run.result()` is the
   documented settlement read and `run.done` stays as its compatibility alias

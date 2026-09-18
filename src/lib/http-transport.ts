@@ -11,6 +11,9 @@ import type {
   NikaAttachRunOptions,
   NikaCheckOptions,
   NikaCheckResult,
+  NikaCompileOptions,
+  NikaCompileOutcome,
+  NikaCompileRequest,
   NikaEvent,
   NikaExecutionId,
   NikaJournalEvidence,
@@ -36,6 +39,7 @@ import {
   type NikaEngineIdentity,
 } from './engine-identity.js';
 import { literalInputs } from './literal-inputs.js';
+import { COMPILE_CAPABILITY } from './compile.js';
 import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
 import { readSettlement } from './settlement.js';
 import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
@@ -175,6 +179,25 @@ export class HttpTransport implements Transport {
       throw new NikaProtocolError(this.kind, 'Check admission did not acknowledge the snapshot');
     }
     return captured.report;
+  }
+
+  /**
+   * Authoring over HTTP (issue #128): nika serve has no authoring door yet
+   * (engine nika#1670), so this refuses typed after the identity probe alone.
+   * A remote connection never falls back to a local compile — the candidate
+   * must come from the server the caller connected to, or not exist.
+   */
+  async compile(
+    _request: NikaCompileRequest,
+    _options: NikaCompileOptions,
+  ): Promise<NikaCompileOutcome> {
+    await this.ensureServerIdentity();
+    throw this.gap(
+      COMPILE_CAPABILITY,
+      'The connected nika serve does not expose an authoring door (engine nika#1670 '
+      + 'is still open). No request was sent, and the SDK never compiles locally '
+      + 'as a substitute for the connected engine',
+    );
   }
 
   async startRun(workflow: string, options: NikaRunOptions): Promise<TransportRun> {

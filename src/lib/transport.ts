@@ -3,6 +3,9 @@ import type {
   NikaAttachRunOptions,
   NikaCheckOptions,
   NikaCheckResult,
+  NikaCompileOptions,
+  NikaCompileOutcome,
+  NikaCompileRequest,
   NikaEvent,
   NikaReceipt,
   NikaRunId,
@@ -31,6 +34,7 @@ export interface TransportRun {
 export interface Transport {
   readonly kind: NikaTransportKind;
   check(workflow: string, options: NikaCheckOptions): Promise<NikaCheckResult>;
+  compile(request: NikaCompileRequest, options: NikaCompileOptions): Promise<NikaCompileOutcome>;
   startRun(workflow: string, options: NikaRunOptions): Promise<TransportRun>;
   attachRun(id: string, options: NikaAttachRunOptions): Promise<TransportRun>;
   listWorkflows(): Promise<readonly string[]>;

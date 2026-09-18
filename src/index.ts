@@ -7,11 +7,18 @@ import { NativeProcessTransport } from './lib/native-process-transport.js';
 import { NikaEngineUnavailable, resolveNikaEngine } from './lib/binary/index.js';
 import { RunSession } from './lib/run-session.js';
 import type { Transport, TransportRun } from './lib/transport.js';
+import {
+  normalizeCompileOptions,
+  normalizeCompileRequest,
+} from './lib/compile.js';
 import type {
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckOptions,
   NikaCheckResult,
+  NikaCompileOptions,
+  NikaCompileOutcome,
+  NikaCompileRequest,
   NikaConfig,
   NikaEvent,
   NikaEventsOptions,
@@ -113,6 +120,32 @@ export class Nika {
 
   check(workflow: string, options: NikaCheckOptions = {}): Promise<NikaCheckResult> {
     return this.transport.check(workflowName(workflow), options);
+  }
+
+  /**
+   * Authoring (issue #128): describe work — or name an accepted workflow plus
+   * a change — and get the engine's checked candidate back, without running
+   * anything. `compile()` never means `run()`: the outcome is data (candidate
+   * source, questions, diagnostics, requested boundary, source-only Check
+   * preview, provenance), `incomplete`/`refused` resolve instead of throwing,
+   * and no workflow effect, approval or Proof exists.
+   *
+   * The candidate is ordinary `.nika.yaml` SOURCE. `run()` consumes a path,
+   * so the caller materializes the candidate and `run(path)` re-admits it —
+   * the compile preview is a review, never admission. Over `{ url }` this is
+   * a typed refusal until nika serve grows its authoring door (engine
+   * nika#1670); the SDK never compiles in TypeScript as a fallback.
+   */
+  async compile(
+    request: string | NikaCompileRequest,
+    options: NikaCompileOptions = {},
+  ): Promise<NikaCompileOutcome> {
+    // `async` on purpose: like `run()`, every failure — including a caller's
+    // configuration mistake — arrives as a rejection, never a sync throw.
+    return this.transport.compile(
+      normalizeCompileRequest(request),
+      normalizeCompileOptions(options),
+    );
   }
 
   /**
@@ -346,6 +379,14 @@ export type {
   NikaCheckFinding,
   NikaCheckOptions,
   NikaCheckResult,
+  NikaCompileDiagnostic,
+  NikaCompileOptions,
+  NikaCompileOutcome,
+  NikaCompilePreview,
+  NikaCompileProvenance,
+  NikaCompileQuestion,
+  NikaCompileRequest,
+  NikaCompileStatus,
   NikaConfig,
   NikaLocalConfig,
   NikaRemoteConfig,

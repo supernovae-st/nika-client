@@ -6,6 +6,11 @@ export interface EngineCapture {
   exitCode: number;
   stdout: string;
   stderr: string;
+  /**
+   * The signal that ended the child, when it did (an external kill — the
+   * caller's own abort and overflow paths reject instead of resolving).
+   */
+  exitSignal: string | null;
 }
 
 interface EngineCaptureOptions {
@@ -14,6 +19,13 @@ interface EngineCaptureOptions {
   bufferBytes: number;
   transport: NikaTransportKind;
   label: string;
+  /**
+   * When set, a child that was asked to stop (caller abort or buffer
+   * overflow) and has not exited within this grace is sent SIGKILL, so a
+   * wedged producer can never keep the capture pending. Unset keeps the
+   * historical SIGTERM-only behavior.
+   */
+  killGraceMs?: number;
 }
 
 /** Capture one bounded machine adapter invocation without a shell. */
@@ -36,6 +48,16 @@ export function captureEngine(
     let stderr = '';
     let overflow = false;
     let spawnError: Error | undefined;
+    let closed = false;
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
+    const stop = () => {
+      child.kill('SIGTERM');
+      if (options.killGraceMs === undefined) return;
+      killTimer ??= setTimeout(() => {
+        if (!closed) child.kill('SIGKILL');
+      }, options.killGraceMs);
+      killTimer.unref();
+    };
     const append = (stream: 'stdout' | 'stderr', chunk: string) => {
       if (overflow) return;
       if (stream === 'stdout') stdout += chunk;
@@ -43,19 +65,21 @@ export function captureEngine(
       if (Buffer.byteLength(stdout) > options.bufferBytes
         || Buffer.byteLength(stderr) > options.bufferBytes) {
         overflow = true;
-        child.kill('SIGTERM');
+        stop();
       }
     };
     child.stdout.setEncoding('utf8');
     child.stderr.setEncoding('utf8');
     child.stdout.on('data', (chunk: string) => append('stdout', chunk));
     child.stderr.on('data', (chunk: string) => append('stderr', chunk));
-    const abort = () => child.kill('SIGTERM');
+    const abort = () => stop();
     options.signal?.addEventListener('abort', abort, { once: true });
     child.once('error', (cause) => {
       spawnError = cause;
     });
-    child.once('close', (code) => {
+    child.once('close', (code, exitSignal) => {
+      closed = true;
+      if (killTimer) clearTimeout(killTimer);
       options.signal?.removeEventListener('abort', abort);
       if (options.signal?.aborted) {
         reject(new NikaTransportError(options.transport, `${options.label} aborted by caller`));
@@ -72,7 +96,7 @@ export function captureEngine(
           `${options.label} exceeded ${options.bufferBytes} bytes`,
         ));
       } else {
-        resolve({ exitCode: code ?? 3, stdout, stderr });
+        resolve({ exitCode: code ?? 3, stdout, stderr, exitSignal });
       }
     });
   });

@@ -175,8 +175,45 @@ try {
     );
   }
 
+  // Issue #128: compile from the packed package, once per module system. The
+  // engines are fixtures: one advertises the compile capability, one predates
+  // it. The resident has no authoring door (engine nika#1670).
+  const COMPILE_SCENARIO = 'compile-scenario.cjs';
+  const compileEngines = JSON.stringify({
+    compile: path.join(root, 'test/fixtures/fake-nika-compile.mjs'),
+    old: path.join(root, 'test/fixtures/fake-nika.mjs'),
+  });
+  await copyFile(
+    path.join(root, 'scripts/packed-consumers', COMPILE_SCENARIO),
+    path.join(consumer, COMPILE_SCENARIO),
+  );
+  await writeFile(path.join(consumer, 'compile.cjs'), [
+    `const sdk = require('${packageName}');`,
+    `const scenario = require('./${COMPILE_SCENARIO}');`,
+    'scenario(sdk, JSON.parse(process.argv[2]))',
+    '  .then((report) => process.stdout.write(JSON.stringify(report)));',
+    '',
+  ].join('\n'));
+  await writeFile(path.join(consumer, 'compile.mjs'), [
+    `import * as sdk from '${packageName}';`,
+    `import scenario from './${COMPILE_SCENARIO}';`,
+    'process.stdout.write(JSON.stringify(await scenario(sdk, JSON.parse(process.argv[2]))));',
+    '',
+  ].join('\n'));
+  for (const [moduleSystem, entry] of [['CommonJS', 'compile.cjs'], ['ESM', 'compile.mjs']]) {
+    const report = JSON.parse(
+      run(process.execPath, [entry, compileEngines], { cwd: consumer, env: consumerEnv }).stdout,
+    );
+    assertCompile(report, moduleSystem);
+    process.stdout.write(
+      `Packed ${packageName}@${expectedVersion} compiles from ${moduleSystem} `
+      + 'over the native compile wire; HTTP refuses typed\n',
+    );
+  }
+
   const typedConsumer = [
     `import { Nika, isNikaRunSucceeded, type NikaConfig, type NikaRunOptions, type NikaRunResult } from '${packageName}';`,
+    `import type { NikaCompileOutcome, NikaCompileRequest } from '${packageName}';`,
     `import type { NikaEvent, NikaJournalEvidence, NikaRun, NikaRunEvent, NikaRunEventKind } from '${packageName}';`,
     `import type { NikaEventBufferOverflowError } from '${packageName}';`,
     "const config: NikaConfig = { bin: '/tmp/nika' };",
@@ -248,6 +285,23 @@ try {
     '  const answer: number | undefined = result.outputs?.answer;',
     '  void answer;',
     '}',
+    '// Issue #128: the compile surface is typed, narrow and source-only.',
+    'declare const compileOutcome: NikaCompileOutcome;',
+    'const compileReady: boolean = compileOutcome.ready;',
+    'const compileSource: string | null = compileOutcome.candidate;',
+    'const compileWritten: null = compileOutcome.written;',
+    'void compileReady; void compileSource; void compileWritten;',
+    `const compileCreate: NikaCompileRequest = { intent: 'x', answers: { 'const.request': 42 } };`,
+    `const compileEdit: NikaCompileRequest = { workflow: 'src', change: 'c' };`,
+    'void compileCreate; void compileEdit;',
+    '// @ts-expect-error create and edit never mix in one request',
+    `const compileMixed: NikaCompileRequest = { intent: 'x', workflow: 'w', change: 'c' };`,
+    'void compileMixed;',
+    '// @ts-expect-error the first slice has no destination/materialization field',
+    `const compileDest: NikaCompileRequest = { intent: 'x', dest: 'f.nika.yaml' };`,
+    'void compileDest;',
+    `const compilePromise: Promise<NikaCompileOutcome> = client.compile('x');`,
+    'void compilePromise;',
     '',
   ].join('\n');
   await writeFile(path.join(consumer, 'consumer.mts'), typedConsumer);
@@ -371,4 +425,80 @@ function assertLiteralInputs(report, moduleSystem) {
     requests: [],
   }, say('a snapshot takes no input overlay and nothing is sent'));
   assert.match(snapshotMessage, /served name/);
+}
+
+/**
+ * What one packed consumer observed (issue #128). The compile fixture replays
+ * the wire shape of the pinned engine render layer; the expected argv bytes
+ * are spelled here without importing anything from the package.
+ */
+function assertCompile(report, moduleSystem) {
+  const typed = (kind) => ({
+    compatibility: kind === 'compatibility',
+    configuration: kind === 'configuration',
+    nikaError: true,
+  });
+  const say = (what) => `${moduleSystem}: ${what}`;
+
+  assert.deepEqual(report.ready, {
+    status: 'ready',
+    ready: true,
+    exitCode: 0,
+    written: null,
+    cognition: 'deterministicOnly',
+    candidateHasAnswer: true,
+    argv: [
+      ['--sdk-identity'],
+      ['compile', '--json', '--answer=const.request="Reroute 雪 \\"quoted\\" tickets"', '--', 'classify-and-route'],
+    ],
+  }, say('a ready compile preserves the engine outcome and serializes the answer exactly once'));
+
+  assert.deepEqual(report.incomplete, {
+    status: 'incomplete',
+    ready: false,
+    exitCode: 2,
+    questionKey: 'const.request',
+    mandatory: true,
+  }, say('incomplete is data: the question rides the outcome, exit 2'));
+
+  assert.equal(report.edit.status, 'ready', say('edit resolves'));
+  assert.equal(report.edit.candidateKeepsBase, true, say('edit preserves the base bytes'));
+  assert.equal(report.edit.scratchRemoved, true, say('the edit scratch dir is removed'));
+  assert.equal(report.edit.argv[0], 'compile', say('edit spawns compile'));
+  assert.ok(report.edit.argv.includes('--json'), say('edit asks the machine wire'));
+
+  const { message: oldEngineMessage, ...oldEngine } = report.oldEngine;
+  assert.deepEqual(oldEngine, {
+    name: 'NikaCompatibilityError',
+    capability: 'compile',
+    transport: 'native-process',
+    ...typed('compatibility'),
+    argv: [['--sdk-identity']],
+  }, say('an engine without the compile capability is refused after the probe alone'));
+  assert.match(oldEngineMessage, /does not advertise compile/, say('the refusal names the capability'));
+
+  const { message: mixedMessage, ...mixed } = report.mixed;
+  assert.deepEqual(mixed, {
+    name: 'NikaConfigurationError',
+    ...typed('configuration'),
+  }, say('a mixed-shape request is a configuration refusal, not a silent mode pick'));
+  assert.match(mixedMessage, /never mixes/, say('the refusal names the ambiguity'));
+  const { message: badAnswerMessage, ...badAnswer } = report.badAnswer;
+  assert.deepEqual(badAnswer, {
+    name: 'NikaConfigurationError',
+    ...typed('configuration'),
+  }, say('an ambiguous answer key is a configuration refusal'));
+  assert.match(badAnswerMessage, /question key/, say('the refusal names the key law'));
+  assert.deepEqual(report.silentArgv, [], say('a refused request never spawns the engine'));
+
+  const { message: httpMessage, ...http } = report.http;
+  assert.deepEqual(http, {
+    name: 'NikaCompatibilityError',
+    capability: 'compile',
+    transport: 'http',
+    ...typed('compatibility'),
+    requests: [{ path: '/health', method: 'GET', body: null }],
+    argv: [],
+  }, say('HTTP compile typed-refuses after /health alone: nothing posted, nothing local'));
+  assert.match(httpMessage, /never compiles locally/, say('no local fallback is promised'));
 }

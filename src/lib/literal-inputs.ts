@@ -68,11 +68,16 @@ const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 const PATH_LIMIT = 240;
 
-export function encodeLiteralInputs(inputs: unknown): LiteralInputs {
+export function encodeLiteralInputs(
+  inputs: unknown,
+  label: 'run({ inputs })' | 'compile({ answers })' = 'run({ inputs })',
+): LiteralInputs {
   if (containerKind(inputs) !== 'object') {
+    const subject = label === 'run({ inputs })'
+      ? 'inputs must be a plain object mapping declared workflow input names'
+      : 'answers must be a plain object mapping stable question keys';
     throw new NikaConfigurationError(
-      'run({ inputs }): inputs must be a plain object mapping declared workflow input names '
-      + `to strict JSON values; received ${describe(inputs)}`,
+      `${label}: ${subject} to strict JSON values; received ${describe(inputs)}`,
     );
   }
 
@@ -80,7 +85,7 @@ export function encodeLiteralInputs(inputs: unknown): LiteralInputs {
   let bytes = 0;
   const write = (chunk: string): void => {
     bytes += Buffer.byteLength(chunk);
-    if (bytes > LITERAL_INPUTS_MAX_BYTES) throw tooLarge();
+    if (bytes > LITERAL_INPUTS_MAX_BYTES) throw tooLarge(label);
     parts.push(chunk);
   };
 
@@ -91,7 +96,7 @@ export function encodeLiteralInputs(inputs: unknown): LiteralInputs {
     const shown = path.length > PATH_LIMIT
       ? `${path.slice(0, PATH_LIMIT / 2)}…${path.slice(-PATH_LIMIT / 2)}`
       : path;
-    return new NikaConfigurationError(`run({ inputs }): ${shown} ${problem}; ${STRICT_JSON}`);
+    return new NikaConfigurationError(`${label}: ${shown} ${problem}; ${STRICT_JSON}`);
   };
   const enter = (value: object, segment: string, kind: 'array' | 'object'): void => {
     open.add(value);
@@ -156,7 +161,7 @@ export function encodeLiteralInputs(inputs: unknown): LiteralInputs {
     switch (typeof value) {
       case 'string':
         // Every UTF-16 unit is at least one UTF-8 byte: refuse before copying.
-        if (value.length > LITERAL_INPUTS_MAX_BYTES) throw tooLarge();
+        if (value.length > LITERAL_INPUTS_MAX_BYTES) throw tooLarge(label);
         if (LONE_SURROGATE.test(value)) {
           throw refuse(segment, 'contains a lone surrogate, which is not valid Unicode');
         }
@@ -192,7 +197,13 @@ export function encodeLiteralInputs(inputs: unknown): LiteralInputs {
   return { json: parts.join(''), bytes };
 }
 
-function tooLarge(): NikaConfigurationError {
+function tooLarge(label: 'run({ inputs })' | 'compile({ answers })'): NikaConfigurationError {
+  if (label === 'compile({ answers })') {
+    return new NikaConfigurationError(
+      `compile({ answers }): the serialized answers exceed ${LITERAL_INPUTS_MAX_BYTES} bytes (1 MiB); `
+      + 'answers ride argv, one KEY=JSON element each, never a wire',
+    );
+  }
   return new NikaConfigurationError(
     `run({ inputs }): the serialized inputs map exceeds ${LITERAL_INPUTS_MAX_BYTES} bytes (1 MiB), `
     + 'the bound both transports share with the native engine',

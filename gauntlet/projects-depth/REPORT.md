@@ -69,3 +69,14 @@ GitHub Actions run 34260625242 (candidate b688b8b7). macOS reproduced every
 behavioral field identically; its locally packed archive had a different
 SHA-256. Both original records are retained in the integration evidence.
 CI compares the exact Linux package digest as well as all behavioral fields.
+
+The current committed depth baseline is the complete Linux observation from
+[GitHub Actions run 35385698065](https://github.com/supernovae-st/nika-client/actions/runs/35385698065)
+(`released-engine-replay`, artifact 10564395708). Every behavioral probe passed;
+the final comparison correctly refused the earlier macOS compressed archive hash.
+The measured Linux package SHA-256 is
+`fbd179ac7232df08cd227546753580198df80b23688a74c359304c5d7616d762`.
+Both platforms produced byte-identical uncompressed tar data (SHA-256
+`cab67f73531ce602502136523c6081881e69f5de3df6d9bf37bc97658849ae2d`),
+but different compressed bytes. The Linux CI comparison continues to require
+its exact archive digest; no package-identity exception was added.

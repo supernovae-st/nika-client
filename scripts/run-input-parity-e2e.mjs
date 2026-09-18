@@ -11,7 +11,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { OwnedProcesses } from './one-door/process.mjs';
 import { stopResident, waitForHealth } from './one-door/resident.mjs';
 import {
-  ENGINE_CASES, ENV_CANARY, REQUIRED_INPUTS, SDK_CASES, WORKFLOW, WORKFLOW_NAME,
+  ENGINE_CASES, ENV_CANARY, REQUIRED_INPUTS, SDK_CASES, WORKFLOW, WORKFLOW_NAME, parityVerdict,
 } from './input-parity/contract.mjs';
 
 // Literal input parity (issue #116): the PACKED SDK drives one real engine as a
@@ -31,7 +31,9 @@ import {
 //     them, rightly, and so cannot observe any HTTP run of that engine). The
 //     unadapted refusal is measured and reported first; only then, and only if
 //     this is set, does the harness drop exactly these fields from responses.
-//     A report that used it says so on every row: it is never silent.
+//     Such a run is a DIAGNOSTIC, never a qualification: its report says
+//     `result: "diagnostic"`, every HTTP row is stamped `adapted-harness`, its
+//     headline never says green, and it exits 2 so it can satisfy no gate.
 
 const root = path.resolve(import.meta.dirname, '..');
 const { digested } = createRequire(import.meta.url)('./input-parity/consumer-scenario.cjs');
@@ -75,6 +77,7 @@ let report;
 let server;
 let oldServer;
 let observation;
+let verdict;
 /** Empty unless the unadapted SDK could not observe this resident AND the operator opted in. */
 let dropFields = [];
 
@@ -276,8 +279,13 @@ try {
 
   assert.equal(await sha256(binary), engine.binary_sha256, 'engine artifact changed during proof');
   abort.signal.throwIfAborted();
+  // One function decides what this run may claim; it also stamps every row.
+  verdict = parityVerdict({ dropFields, rows });
   report = {
-    result: 'green',
+    result: verdict.result,
+    qualifies: verdict.qualifies,
+    headline: verdict.headline,
+    observed_rows: verdict.rows,
     evidence_kind: 'development npm-pack parity against an explicit engine binary',
     provenance: 'not attested by this script; the engine is whatever NIKA_BIN named',
     engine,
@@ -327,14 +335,17 @@ try {
 // scratch directory has been removed.
 abort.signal.throwIfAborted();
 if (reportPath) writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
-console.log(`input-parity green: ${report.coverage.rows} rows · ${ENGINE_CASES.length} engine cases on `
-  + `2 transports × 2 module systems · old producer ${oldBinary ? 'refused' : 'not supplied'} `
-  + `(${report.engine.version})`);
-if (report.projection_adapter.used) {
-  console.log(`input-parity LIMIT: the unmodified SDK could not observe this resident `
-    + `(${observation.message}); HTTP rows dropped [${dropFields.join(', ')}] from `
-    + `${report.projection_adapter.dropped_total} response objects. Not unmodified-SDK HTTP qualification.`);
+// The headline is the verdict's, never composed here: an adapted run cannot
+// print the word a qualifying run prints, and it cannot exit 0.
+console.log(verdict.headline);
+console.log(`  ${ENGINE_CASES.length} engine cases on 2 transports × 2 module systems · old producer `
+  + `${oldBinary ? 'refused' : 'not supplied'} · ${report.engine.version}`);
+if (!verdict.qualifies) {
+  console.log(`  unmodified SDK against this resident: ${observation.error}: ${observation.message}`);
+  console.log(`  adapter removed ${report.projection_adapter.dropped_total} fields from responses; `
+    + 'no request was touched');
 }
+process.exitCode = verdict.exitCode;
 
 /** Judge one row against its case, and bind an HTTP run to its journal for provenance. */
 async function judged(row, scenario, before) {

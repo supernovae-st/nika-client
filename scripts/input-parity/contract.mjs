@@ -112,3 +112,48 @@ export const SDK_CASES = [
 ];
 
 export const REQUIRED_INPUTS = required;
+
+/** A run that adapted any response exits with this, so it can never satisfy a gate. */
+export const DIAGNOSTIC_EXIT_CODE = 2;
+
+/**
+ * What a finished proof may claim. `green` means one thing only: the
+ * UNMODIFIED SDK observed every row. Once the harness adapted a resident's
+ * responses (an engine ahead of this SDK's pinned wire), the run is a
+ * diagnostic of the inputs contract around that drift: it never says green,
+ * it never exits 0, and every HTTP row is marked as observed by the harness
+ * whether or not a field was actually dropped from it, because the adapter sat
+ * in that row's path. Each row is stamped so none can be read out of context.
+ */
+export function parityVerdict({ dropFields, rows }) {
+  const adapterOn = dropFields.length > 0;
+  let adapted = 0;
+  for (const row of rows) {
+    const behindAdapter = adapterOn && row.door === 'http';
+    if (!adapterOn && row.projection_adapter) {
+      throw new Error(`row ${row.case} carries a projection adapter the run did not declare`);
+    }
+    row.observed_by = behindAdapter ? 'adapted-harness' : 'unmodified-sdk';
+    if (behindAdapter) adapted += 1;
+  }
+  const counts = { total: rows.length, unmodified_sdk: rows.length - adapted, adapted };
+  if (!adapterOn) {
+    return {
+      result: 'green',
+      qualifies: true,
+      exitCode: 0,
+      rows: counts,
+      headline: `input-parity green: ${counts.total} rows, every one observed by the unmodified SDK`,
+    };
+  }
+  return {
+    result: 'diagnostic',
+    qualifies: false,
+    exitCode: DIAGNOSTIC_EXIT_CODE,
+    rows: counts,
+    headline: `input-parity DIAGNOSTIC, NOT a qualification: ${counts.adapted} of ${counts.total} rows `
+      + `(every HTTP row) were observed through a harness adapter that drops [${dropFields.join(', ')}] `
+      + 'from the resident\'s responses, because the unmodified SDK refuses them; '
+      + `${counts.unmodified_sdk} native rows were observed by the unmodified SDK`,
+  };
+}

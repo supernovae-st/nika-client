@@ -5,6 +5,7 @@ import {
   MAP_LIMIT_BYTES,
   SDK_CASES,
   WORKFLOW,
+  parityVerdict,
   sizedInputs,
 } from '../scripts/input-parity/contract.mjs';
 import { LITERAL_INPUTS_MAX_BYTES, encodeLiteralInputs } from '../src/lib/literal-inputs.ts';
@@ -74,6 +75,55 @@ describe('the parity case table means what it says', () => {
     for (const forbidden of ['infer:', 'agent:', 'exec:', 'nika:fetch', 'nika:write', 'secrets:', 'model:']) {
       expect(WORKFLOW, forbidden).not.toContain(forbidden);
     }
+  });
+});
+
+describe('an adapted run is a diagnostic, never a qualification', () => {
+  const native = (name) => ({ case: name, door: 'native', outcome: 'settled' });
+  const http = (name, dropped) => ({
+    case: name,
+    door: 'http',
+    outcome: 'settled',
+    ...(dropped ? { projection_adapter: { drop_fields: ['at', 'evidence'], dropped } } : {}),
+  });
+
+  it('is green only when the unmodified SDK observed every HTTP row', () => {
+    const verdict = parityVerdict({ dropFields: [], rows: [native('a'), http('a')] });
+    expect(verdict).toEqual({
+      result: 'green',
+      qualifies: true,
+      exitCode: 0,
+      rows: { total: 2, unmodified_sdk: 2, adapted: 0 },
+      headline: 'input-parity green: 2 rows, every one observed by the unmodified SDK',
+    });
+  });
+
+  it('is diagnostic, exits non-zero and never says green once the adapter was on', () => {
+    const rows = [native('a'), http('a', { at: 2 }), native('b'), http('b', {})];
+    const verdict = parityVerdict({ dropFields: ['at', 'evidence'], rows });
+    expect(verdict.result).toBe('diagnostic');
+    expect(verdict.qualifies).toBe(false);
+    expect(verdict.exitCode).not.toBe(0);
+    // Every HTTP row ran behind the adapter, whether or not it dropped a field.
+    expect(verdict.rows).toEqual({ total: 4, unmodified_sdk: 2, adapted: 2 });
+    expect(verdict.headline).not.toMatch(/green/i);
+    expect(verdict.headline).toContain('DIAGNOSTIC');
+    expect(verdict.headline).toContain('NOT a qualification');
+    expect(verdict.headline).toContain('at, evidence');
+  });
+
+  it('marks each row with how it was observed, so no row can be read out of context', () => {
+    const rows = [native('a'), http('a', { at: 1 })];
+    parityVerdict({ dropFields: ['at'], rows });
+    expect(rows.map((row) => row.observed_by)).toEqual(['unmodified-sdk', 'adapted-harness']);
+    const clean = [native('a'), http('a')];
+    parityVerdict({ dropFields: [], rows: clean });
+    expect(clean.map((row) => row.observed_by)).toEqual(['unmodified-sdk', 'unmodified-sdk']);
+  });
+
+  it('refuses a row set that claims no adapter while a row carries one', () => {
+    expect(() => parityVerdict({ dropFields: [], rows: [http('a', { at: 1 })] }))
+      .toThrow(/adapter/);
   });
 });
 

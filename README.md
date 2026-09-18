@@ -137,6 +137,59 @@ A workflow the engine refuses before admission never yields a run: `run()`
 itself rejects with a `NikaOperationError` that names the engine's code and,
 for a red check, carries its `findings[]` (see [Errors](#errors)). The engine
 checks on every run, so no `check()` is needed first to be protected or taught.
+
+### Workflow inputs
+
+`inputs` binds the workflow's declared `inputs:` by name, and means the same
+thing on both transports:
+
+```ts
+const run = await nika.run('support-triage.nika.yaml', {
+  inputs: { ticketId: '42' },
+  // idempotencyKey: `triage-${ticket.id}`, // HTTP only
+});
+```
+
+Values are strict JSON and stay literal. `'42'` stays a string and `42` a
+number; `'@env:HOME'` and `'${{ tasks.x.output }}'` are text, never read from
+the environment or evaluated; nothing is coerced to the declared type. The
+engine owns the verdict and refuses before any run exists: an undeclared key
+(`unknown_input`), a value that does not fit its declared type
+(`input_type_mismatch`), a required input left out (`NIKA-1708`). Each rejects
+`run()` as a `NikaOperationError` with that code, native (`status: 3`) or HTTP
+(`status: 422`). Supplied values are recorded with `api-caller` provenance;
+declared defaults keep `file`.
+
+The SDK refuses, before it spawns or sends anything, a value JSON would
+silently lose: `undefined`, a function, a symbol, a bigint, `NaN` or
+`Infinity`, a cycle, a class instance (a `Date`, a `Map`), an object whose
+prototype only claims to be plain, an array hole, an accessor. That is a
+`NikaConfigurationError` naming the path (`inputs.ticket.tags[1] is
+undefined`), never the value. No caller code runs while the map is judged: a
+getter is never invoked, and a `Proxy` is refused before it is read, so none
+of its traps run. The serialized map is
+bounded at 1 MiB on both transports. Do not put a secret in `inputs`.
+
+The engine must advertise the channel, and the SDK checks before admission:
+
+- Native: `inputsLiteral` in `nika --sdk-identity`. The map rides the engine's
+  stdin (`nika run --inputs-json -`), so a value never appears in a process
+  listing.
+- HTTP: `jobInputs` in `GET /health`, for a workflow run by its served name.
+  An execution snapshot froze its inputs and takes no overlay, so an HTTP run
+  of a local path (`./flow.nika.yaml`) refuses `inputs`, an empty map included.
+
+An engine without the capability rejects with `NikaCompatibilityError`
+(`capability: 'inputsLiteral'` or `'jobInputs'`) and nothing runs. The SDK
+never falls back to `--var`, and a resident that merely answers 202 has
+negotiated nothing: one from before the envelope accepts the field and ignores
+its values. The engine payload pinned by this package version advertises
+neither capability yet, so `inputs` is refused on it until the pin moves.
+
+`vars` is deprecated. It remains the native `--var KEY=VALUE` operator channel,
+unchanged: the engine reads `@env:NAME` from its environment and coerces text
+to the declared type, so it cannot carry literal values and has no HTTP form.
+`inputs` and `vars` together reject `run()`; they are never merged.
 An admitted workflow failure is result data with `status: "failed"` and, when
 the engine named the failing task, `error: { code, message, task }`; transport,
 protocol, configuration, and compatibility failures throw typed SDK errors.
@@ -450,8 +503,10 @@ bearer token never leaves the machine in plaintext. A URL may not contain
 credentials, a query, or a fragment, and a 32–512 byte visible-ASCII token is
 mandatory.
 
-Remote snapshots currently do not have request envelopes for per-call `vars`
-or `model`; declare those facts in the workflow. There is no per-run spend
+A remote run by served name carries per-call `inputs` once the resident
+advertises `jobInputs` (see [Workflow inputs](#workflow-inputs)); a snapshot
+takes none. There is no request envelope for `model`, and none for the
+deprecated `vars`: declare a model in the workflow. There is no per-run spend
 bound over HTTP at all today: `maxCostUsd` is refused, the workflow language
 has no budget field, and the resident applies its own server-wide default
 ceiling. Bound a remote run by its model and `max_tokens` until the request
@@ -513,7 +568,9 @@ it; a scheduled budget is always a real number.
 | Operation | Native process | HTTP |
 |---|---|---|
 | `check` | yes; `model` and `nativeStrict` allowed | yes; those two overrides refused |
-| `run` | yes; `vars`, `model`, `maxCostUsd` allowed | yes; `idempotencyKey` required |
+| `run` | yes; `model`, `maxCostUsd` allowed | yes; `idempotencyKey` required; `model`, `maxCostUsd` refused |
+| `run` `inputs` | literal JSON over stdin; engine must advertise `inputsLiteral` | literal JSON by served name; resident must advertise `jobInputs`; a snapshot refuses them |
+| `run` `vars` (deprecated) | the `--var` operator channel, unchanged | typed refusal |
 | `attachRun` | typed refusal: a native run is process-bound | reattach to a durable job with an optional SSE cursor |
 | `run.status()` | typed refusal; await `run.result()` | durable status projection |
 | `run.events()` | lifecycle words over the engine's task and run frames | the same lifecycle words over sequenced SSE frames with bounded replay; no per-task frame |

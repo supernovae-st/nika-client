@@ -358,6 +358,7 @@ export type {
   NikaExecutionSettledEvent,
   NikaExecutionStartedEvent,
   NikaJobId,
+  NikaJournalEvidence,
   NikaMachineError,
   NikaRunCause,
   NikaCostQualifier,

@@ -31,3 +31,31 @@ no provider key at all. The gate's question was never answered.
 | `0.119.0-admitted-failure.ndjson.stdout` | admitted run whose `nika:assert` fails: seven frames | 1 |
 | `0.118.7-human-gate.ndjson.stdout` | a `nika:prompt` with no `default:` run unattended: `workflow_paused`, then `run_settled` with `status: "paused"` and `cause: "human_gate"`; four frames | 4 |
 | `0.118.7-sigterm-cancel.ndjson.stdout` | a `nika:wait` run sent SIGTERM after its first frame: `workflow_cancelled`, then `run_settled` with `status: "cancelled"` and `cause: "operator"`; seven frames | 130 |
+
+## Literal input channel (`c1683-*` · issue #116)
+
+Replayed by `fake-nika-inputs.mjs`. Captured 2026-09-18 on macos/aarch64 with
+the SDK's own argv (`run <file> --json --inputs-json - --max-cost-usd 0`, the
+map on stdin), a cleared environment, a throwaway `HOME`, `NIKA_KEYCHAIN=off`
+and a pure `nika:jq` workflow (no model seat, no network).
+
+| Prefix | Engine | Dialect |
+|---|---|---|
+| `c1683-*` | clean integration build for engine #1683, `nika 0.120.0-dev (21ff7d53a)`, binary sha256 `0daa94a6e13f178461b30ffa76a3090c6bbc6a88050355f71b1903fc2977e301`; joins Compile and build-identity main, not a release | one compact `{"error":{"code","message"}}` per pre-run refusal, prose on stderr |
+
+These are the bytes of a candidate, so they pin how the SDK decodes that
+envelope, not what a released engine writes: recapture them from the release
+that ships the channel.
+
+| File | Stdin map | Exit |
+|---|---|---|
+| `c1683-unknown-input.*` | a key the workflow does not declare (`unknown_input`) | 3 |
+| `c1683-type-mismatch.*` | the string `"42"` for a declared `integer` (`input_type_mismatch`) | 3 |
+| `c1683-missing-required.*` | `{}` against four required inputs (`NIKA-1708`) | 3 |
+| `c1683-duplicate-key.*` | `{"ticket":"a","ticket":"b",…}` (`invalid_inputs_json`) | 3 |
+| `c1683-literal.ndjson.stdout` | admitted: `ticket` is the text `@env:NIKA_TEST_LITERAL`, kept literal; `workflow_started` names `api-caller` for supplied inputs and `file` for the default: seven frames | 0 |
+
+Recaptured at 2026-09-18 15:01 UTC from the clean integration build above.
+All eight refusal stdout/stderr files were byte-identical. The admitted seven-frame
+trace was replaced with the new measured bytes, including Spec pin
+`be8ff017d448c4d4e413d11c40613af0afb90754`. No envelope or refusal changed.

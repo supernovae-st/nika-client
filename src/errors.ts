@@ -55,6 +55,10 @@ export class NikaProtocolError extends NikaTransportError {
 /**
  * Observation broke before terminal settlement and the final durable read
  * stayed non-terminal. The cursor feeds attachRun(id, { lastEventId }).
+ *
+ * This is about the client's view, never about the run: the run may still be
+ * running on the resident. It is not the engine's own `interrupted` state,
+ * which arrives as a `run.interrupted` event and as `result.status`.
  */
 export class NikaObservationInterrupted extends NikaTransportError {
   readonly runId: string;

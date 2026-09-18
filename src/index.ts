@@ -6,7 +6,7 @@ import { HttpTransport } from './lib/http-transport.js';
 import { NativeProcessTransport } from './lib/native-process-transport.js';
 import { NikaEngineUnavailable, resolveNikaEngine } from './lib/binary/index.js';
 import { RunSession } from './lib/run-session.js';
-import type { Transport } from './lib/transport.js';
+import type { Transport, TransportRun } from './lib/transport.js';
 import type {
   NikaCancelResult,
   NikaAttachRunOptions,
@@ -100,6 +100,10 @@ export class Nika {
   }
 
   /**
+   * Resolves with the run's handle once the engine admitted it, and rejects
+   * without one when the engine refused it. The handle owns the lifecycle:
+   * `run.events()`, `run.result()`, `run.status()`, `run.cancel()`.
+   *
    * `Outputs` is the caller's projection of the engine-emitted outputs map;
    * the SDK transports outputs without validating their shape.
    */
@@ -108,12 +112,15 @@ export class Nika {
     options: NikaRunOptions = {},
   ): Promise<NikaRun<Outputs>> {
     const source = await this.transport.startRun(workflowName(workflow), options);
-    const session = new RunSession(source, this.eventBufferSize);
-    this.sessions.set(session.run, session);
-    return session.run as NikaRun<Outputs>;
+    return this.own<Outputs>(source);
   }
 
-  /** Reattach this client process to an already-admitted durable HTTP job. */
+  /**
+   * The one recovery door: reattach this client process to an
+   * already-admitted durable HTTP job and get a full `NikaRun` back. Pass the
+   * last `event.sequence` you fully processed as `lastEventId`. A native
+   * process is process-bound and refuses with a typed compatibility error.
+   */
   async attachRun<Outputs extends Record<string, unknown> = Record<string, unknown>>(
     id: string,
     options: NikaAttachRunOptions = {},
@@ -123,9 +130,7 @@ export class Nika {
       throw new RangeError('lastEventId must be a non-negative safe integer');
     }
     const source = await this.transport.attachRun(jobId(id), { lastEventId });
-    const session = new RunSession(source, this.eventBufferSize);
-    this.sessions.set(session.run, session);
-    return session.run as NikaRun<Outputs>;
+    return this.own<Outputs>(source);
   }
 
   /** List contained workflow names from a resident HTTP authority. */
@@ -138,6 +143,17 @@ export class Nika {
     return this.transport.workflow(workflowName(name));
   }
 
+  /**
+   * The run's events in the protocol vocabulary of its transport
+   * (`workflow_*` · `task_*` · `run_*` natively, `execution.*` over HTTP).
+   *
+   * @deprecated Use `run.events()`: one lifecycle vocabulary on both
+   * transports, with this same frame kept on `event.raw`. This wrapper is a
+   * compatibility door for one release train, counted from publication: it
+   * ships unchanged in the first published train that carries `run.events()`,
+   * and the earliest train that may remove it is the one after, as announced
+   * in that train's release notes. It accepts only a run this client created.
+   */
   events<Outputs extends Record<string, unknown> = Record<string, unknown>>(
     run: NikaRun<Outputs>,
     options: NikaEventsOptions = {},
@@ -145,11 +161,21 @@ export class Nika {
     return this.session(run).events(options) as AsyncIterable<NikaEvent<Outputs>>;
   }
 
+  /**
+   * @deprecated Use `run.cancel()`; both return the one memoized request.
+   * Kept through the same compatibility window as `events(run)`. It accepts
+   * only a run this client created.
+   */
   cancel(run: NikaRun): Promise<NikaCancelResult> {
     return this.session(run).cancel();
   }
 
-  /** Read the current durable status without waiting for terminal settlement. */
+  /**
+   * Read the current durable status without waiting for terminal settlement.
+   *
+   * @deprecated Use `run.status()`. Kept through the same compatibility
+   * window as `events(run)`. It accepts only a run this client created.
+   */
   status(run: NikaRun): Promise<NikaRunStatus> {
     return this.session(run).status();
   }
@@ -174,6 +200,13 @@ export class Nika {
       throw new TypeError('traceVerify() accepts an engine-issued NikaReceipt object only');
     }
     return this.transport.traceVerify(receipt, options);
+  }
+
+  /** One session per admitted run, owned by this client and by no registry. */
+  private own<Outputs extends Record<string, unknown>>(source: TransportRun): NikaRun<Outputs> {
+    const session = new RunSession(source, this.eventBufferSize, this.transportKind);
+    this.sessions.set(session.run, session);
+    return session.run as NikaRun<Outputs>;
   }
 
   private session(run: NikaRun): RunSession {
@@ -319,6 +352,8 @@ export type {
   NikaOperation,
   NikaOperationFinding,
   NikaRun,
+  NikaRunEvent,
+  NikaRunEventKind,
   NikaRunId,
   NikaRunOptions,
   NikaRunResult,

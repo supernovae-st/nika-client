@@ -18,9 +18,9 @@ Any other non-2xx body is discarded and reported as a redacted
 | `POST /v1/check` | `check()` | validates a served name or immutable snapshot bytes without a job |
 | `POST /v1/jobs` | `run()` | admits a served name or exact snapshot bytes with an idempotency key |
 | `GET /v1/jobs/{id}` | internal settlement | durable job identity, outputs, receipt, settlement, or redacted error |
-| `GET /v1/jobs/{id}/status` | `status(run)` | current status only |
-| `GET /v1/jobs/{id}/events` | `events(run)` / `attachRun()` | bounded, sequenced SSE with replay |
-| `POST /v1/jobs/{id}/cancel` | `cancel(run)` | 200 a settled job or its terminal replay; 202 the request accepted on a running job, settled later by observation |
+| `GET /v1/jobs/{id}/status` | `run.status()` | current status only |
+| `GET /v1/jobs/{id}/events` | `run.events()` / `attachRun()` | bounded, sequenced SSE with replay |
+| `POST /v1/jobs/{id}/cancel` | `run.cancel()` | 200 a settled job or its terminal replay; 202 the request accepted on a running job, settled later by observation |
 | `GET /v1/jobs/{id}/trace/verify` | `traceVerify(receipt)` | engine-owned typed trace verdict; `reason` only on a verdict that does not hold |
 | `GET/PUT /v1/schedules/{id}` | `scheduleStatus()` / `schedule()` | resident schedule projection and CAS mutation |
 
@@ -67,6 +67,32 @@ named with its task. The SDK types every known field, refuses a settlement
 whose `status` contradicts the record carrying it, keeps fields it does not
 know, and never derives a settlement from an exit code; a job the resident
 lost (`interrupted`) carries none.
+
+## Lifecycle vocabulary over the resident's frames
+
+`run.events()` names the resident's closed `JobEvent` frames in the SDK's
+lifecycle vocabulary and keeps each frame on `event.raw`:
+
+| `JobEvent.kind` | `JobEvent.status` | `event.kind` |
+|---|---|---|
+| `execution.started` | any | `run.started` |
+| `execution.settled` | `paused` | `run.waiting` |
+| `execution.settled` | `succeeded` · `failed` · `cancelled` | `run.settled` |
+| `execution.cancelled` | `cancelled` only | `run.settled` |
+| `execution.refused` | `failed` only | `run.settled` |
+| `execution.interrupted` · `interrupted` | `interrupted` | `run.interrupted` |
+| anything else: a `null` or future kind; an end kind whose status is absent, `null`, future, `queued` or `running`; or a pair that contradicts itself (`execution.refused` carrying `succeeded` or `cancelled`, `execution.cancelled` carrying `succeeded` or `failed`, an end kind carrying `interrupted`) | | `engine.event` |
+
+The pairs above are exhaustive and listed, never computed as a product of
+kinds and words. An unnamed frame is still delivered with `event.raw` intact,
+and `run.result()` still reads the state word the engine wrote on it.
+
+The resident streams no per-task frame, so an HTTP run yields no `task.*`
+event: the SDK never synthesizes one. `event.sequence` is the validated SSE
+id, the cursor to persist. The engine's `interrupted` (execution ownership
+was lost, settlement unknown) is data: a `run.interrupted` event and
+`result.status`. It is unrelated to `NikaObservationInterrupted` below, which
+is this client losing its view of a run that may still be running.
 
 ## SSE recovery
 

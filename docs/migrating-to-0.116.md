@@ -64,9 +64,20 @@ invariants; observe or cancel a returned run through its owned lifecycle.
 | `nika.workflows.list()` | `nika.listWorkflows()` |
 | `nika.workflows.metadata(name)` | `nika.workflow(name)` |
 
-The new run handle is intentionally only `{ id, done }`. Methods reject a
-look-alike object from another client, so persist the job id and reattach after
-a process restart instead of rebuilding a handle by hand.
+In 0.116 the run handle was only `{ id, done }`. The Run now owns its
+lifecycle: `run.events()`, `run.result()`, `run.status()` and `run.cancel()`,
+with `run.done` kept as the alias of `run.result()`. The `nika.events(run)`,
+`nika.cancel(run)` and `nika.status(run)` forms this guide shows still work
+unchanged as deprecated wrappers, and `nika.events(run)` still yields the
+protocol vocabulary; `run.events()` yields one lifecycle vocabulary on both
+transports with that frame on `event.raw`. The wrappers stay for one release
+train counted from the first published train that carries the new API, with
+no version or date fixed; "Migrating to the Run-owned lifecycle" in the
+README defines that window.
+
+The client-level methods reject a look-alike object and a run from another
+client, so persist the job id and reattach after a process restart instead of
+rebuilding a handle by hand.
 
 `LocalNika.version()`, `dryRunPlan()`, and `test()` have no One SDK method in
 0.116. Keep those CLI-facing probes in deployment/CI (`nika --version`,

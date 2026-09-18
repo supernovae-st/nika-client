@@ -17,6 +17,8 @@ const WIRE_REPLAYS = {
     stdout: '0.119.0-admitted-failure.ndjson.stdout',
     exitCode: 1,
   },
+  'wire-0118-human-gate': { stdout: '0.118.7-human-gate.ndjson.stdout', exitCode: 4 },
+  'wire-0118-sigterm-cancel': { stdout: '0.118.7-sigterm-cancel.ndjson.stdout', exitCode: 130 },
   'wire-pr1679-sec004': { stdout: 'pr1679-sec004.compact.stdout', exitCode: 2 },
   'wire-pr1679-parse005': { stdout: 'pr1679-parse005.compact.stdout', exitCode: 2 },
   'wire-pr1679-missing-file': { stdout: 'pr1679-missing-file.compact.stdout', exitCode: 3 },

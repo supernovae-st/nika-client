@@ -90,35 +90,43 @@ const report = await nika.check('hello.nika.yaml', {
 if (!report.clean) throw new Error('workflow did not pass nika check');
 
 const run = await nika.run('hello.nika.yaml', { maxCostUsd: 0 });
-const watching = (async () => {
-  for await (const event of nika.events(run)) {
-    // Native progress frames carry no status; only the terminal frame does.
-    console.log(event.kind, event.status ?? '');
-  }
-})();
+for await (const event of run.events()) {
+  // The same lifecycle words on both transports; the engine's own frame,
+  // in its protocol vocabulary, stays on event.raw.
+  console.log([event.kind, event.task, event.status].filter(Boolean).join(' '));
+}
 
-const result = await run.done;
-await watching;
+const result = await run.result();
 console.log(result.status, result.outputs, result.receipt);
 ```
 
-Expected output: `workflow_started`, `task_scheduled`, `task_started`,
-`task_completed`, `workflow_completed`, then `run_settled succeeded`, then the
-terminal `succeeded` line with the outputs and the receipt.
+Expected output: `run.started`, `task.scheduled greeting`,
+`task.started greeting`, `task.completed greeting`, `engine.event`, then
+`run.settled succeeded`, then the terminal `succeeded` line with the outputs
+and the receipt. The `engine.event` is the native journal's own
+`workflow_completed` frame: the SDK gives it no lifecycle name and no state,
+drops nothing, and shows it on `event.raw.kind`.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/supernovae-st/nika-client/main/media/local-driver.gif" alt="The typed driver over the released binary: check the workflow, gate on the report, run it to the end under a cost ceiling, count the events" width="960">
 </p>
 
 *Recorded by `scripts/media/render.sh` against this package and the released
-engine; every line on screen is the SDK's own output.*
+engine; every line on screen is the SDK's own output. The recorded driver
+predates the Run-owned lifecycle: it still calls `nika.events(run)`, a
+deprecated wrapper that keeps working through the
+[compatibility window](#migrating-to-the-run-owned-lifecycle), and the
+`run.done` alias, which is not deprecated.*
 
 Native checks and explicit local snapshot checks preserve the engine's
 `findings[]` and `exitCode`. A check by served name returns the resident's
 compact acknowledgement with `clean: true`, or its typed workflow refusal
 with `clean: false`; it does not invent local findings or an exit code.
 
-`run()` returns after stable admission. `run.done` is the sole terminal result.
+`run()` returns after stable admission, and the `NikaRun` it returns owns its
+lifecycle: `run.events()`, `run.result()`, `run.status()` and `run.cancel()`.
+`run.result()` is the sole terminal result (`run.done` is its compatibility
+alias, the same promise).
 A workflow the engine refuses before admission never yields a run: `run()`
 itself rejects with a `NikaOperationError` that names the engine's code and,
 for a red check, carries its `findings[]` (see [Errors](#errors)). The engine
@@ -176,7 +184,7 @@ to the declared type, so it cannot carry literal values and has no HTTP form.
 An admitted workflow failure is result data with `status: "failed"` and, when
 the engine named the failing task, `error: { code, message, task }`; transport,
 protocol, configuration, and compatibility failures throw typed SDK errors.
-A `try { await run.done } catch {}` alone therefore never catches a failed
+A `try { await run.result() } catch {}` alone therefore never catches a failed
 workflow: a CI job or an application must read `result.status` and treat
 anything but `succeeded` as its own failure, or a red run passes silently.
 
@@ -189,7 +197,7 @@ For CI built from this branch:
 import { Nika, isNikaRunSucceeded } from '@supernovae-st/nika';
 
 const run = await new Nika().run<{ answer: number }>('flow.nika.yaml');
-const result = await run.done;
+const result = await run.result();
 if (isNikaRunSucceeded(result)) {
   console.log(result.outputs?.answer); // outputs stay typed and optional
 } else {
@@ -198,10 +206,12 @@ if (isNikaRunSucceeded(result)) {
 }
 ```
 
-A paused result is a human gate, not a successful completion. Applications
-can render that state separately; a CI job awaiting completion must not pass
-it as success. The guard reads the engine's status and never turns absent
-outputs into a fabricated output map.
+A paused result is a human gate, not a successful completion and not a
+failure. It arrives as a `run.waiting` event, never as `run.settled`, and
+`result.status` keeps the engine's word, `paused`. Applications can render
+that state separately; a CI job awaiting completion must not pass it as
+success. The guard reads the engine's status and never turns absent outputs
+into a fabricated output map.
 
 ## Why this door
 
@@ -217,13 +227,32 @@ outputs into a fabricated output map.
   re-implements the proof.
 - **One vocabulary, two transports.** `check`, `run`, `events`, `cancel`,
   `traceVerify` and `schedule` read the same against a local process and an
-  authenticated `nika serve`; only the constructor changes.
+  authenticated `nika serve`; only the constructor changes. Run events carry
+  the same lifecycle words on both (`run.started`, `run.waiting`,
+  `run.settled`), with the engine's own frame kept on `event.raw`.
 
 ## One vocabulary
 
-`Nika` exposes one lifecycle vocabulary: `check`, `run`, `attachRun`, `status`, `events`,
-`cancel`, `traceVerify`, `listWorkflows`, `workflow`, `schedule`, and
-`scheduleStatus`.
+`Nika` exposes `check`, `run`, `attachRun`, `traceVerify`, `listWorkflows`,
+`workflow`, `schedule`, and `scheduleStatus`. The `NikaRun` it returns owns the
+run's lifecycle:
+
+```
+NikaRun
+├── id
+├── events()   one lifecycle vocabulary · event.raw keeps the protocol frame
+├── result()   the one settlement · admitted failure is data, never a throw
+├── status()   durable over HTTP · a typed refusal on a native process
+└── cancel()   idempotent
+```
+
+`nika.events(run)`, `nika.cancel(run)` and `nika.status(run)` remain as
+deprecated wrappers for one release train, counted from the first published
+train that carries this API; see
+[Migrating to the Run-owned lifecycle](#migrating-to-the-run-owned-lifecycle).
+The handle owns observation, settlement, `status` and cancellation and nothing
+else: checking, proof, catalogs and authoring stay on `Nika`.
+
 The engine remains authoritative for parsing, admission, execution, receipts,
 traces, permits, scheduling, and cost. The SDK transports those facts; it does
 not parse YAML or reconstruct proof in TypeScript.
@@ -269,10 +298,14 @@ dependencies; npm installs the one that matches your platform.
 
 Earlier packages expose the retired `LocalNika`/HTTP split and do not
 implement the root facade documented here. This package carries the product's
-name: up to 0.115.0 it was published as `@supernovae-st/nika-client`, a name
-that is deprecated on npm, stays installable for the versions it already holds
-and receives no further releases. The repository keeps its name
-(`supernovae-st/nika-client`).
+name: up to 0.115.0 it was published as `@supernovae-st/nika-client`. That
+name receives no further releases from this repository and stays installable
+for the versions it already holds. It is **not** marked deprecated on the npm
+registry: its published versions carry no `deprecated` field, so `npm install
+@supernovae-st/nika-client` still succeeds without a warning and installs the
+retired 0.115.0 API. The move to the new name says nothing about the
+registry; check it yourself with `npm view @supernovae-st/nika-client
+deprecated`. The repository keeps its name (`supernovae-st/nika-client`).
 
 ## Scaffold with the engine
 
@@ -330,22 +363,25 @@ into SDK configuration, source control, workflow inputs, or an HTTP request.
 
 ```ts
 const run = await nika.run('slow.nika.yaml');
-const cancellation = await nika.cancel(run);
-const result = await run.done;
+const cancellation = await run.cancel();
+const result = await run.result();
 
 console.log(cancellation.accepted, result.status);
 ```
 
-Cancellation is idempotent per `NikaRun`. An `AbortSignal` passed to `check`,
-`events`, or `traceVerify` only stops that request or observer; it never stands
-in for `cancel(run)`.
+Cancellation is idempotent per `NikaRun`: every `run.cancel()` returns the one
+request. An `AbortSignal` passed to `check`, `events`, or `traceVerify` only
+stops that request or observer; it never stands in for `run.cancel()`.
 
 Over HTTP a running job answers the request with 202: `cancellation` reads
-`{ accepted: true, status: 'cancellation_requested' }` and `run.done` settles
-on the terminal the resident records, `cancelled`, `succeeded`, `failed`, or
-`interrupted` once its grace expired. A job that already ended replays its
-result with `accepted: false` and `status: 'already_settled'`. The native
-transport signals its process the same way and settles `interrupted`.
+`{ accepted: true, status: 'cancellation_requested' }` and `run.result()`
+settles on the terminal the resident records, `cancelled`, `succeeded`,
+`failed`, or `interrupted` once its grace expired. A job that already ended
+replays its result with `accepted: false` and `status: 'already_settled'`. The
+native transport signals its process the same way; the result is whatever the
+engine then wrote, `cancelled` when it settled the request (the released
+0.118.7 engine does), or `interrupted` when the process ended with no
+settlement frame.
 
 ## Connect to `nika serve`
 
@@ -402,11 +438,17 @@ const report = await nika.check('hello.nika.yaml');
 const run = await nika.run('hello.nika.yaml', {
   idempotencyKey: 'hello-2026-08-30', // persist before admission; reuse on retry
 });
-for await (const event of nika.events(run)) {
+for await (const event of run.events()) {
   console.log(event.sequence, event.kind, event.status);
 }
-console.log(await run.done);
+console.log(await run.result());
 ```
+
+The application code after `new Nika(...)` is the same as the local one: the
+events read `run.started` then `run.settled`, in the same words. The resident
+streams no per-task frame today, so an HTTP run yields no `task.*` event; the
+SDK never invents one. `event.sequence` is the resident's replay cursor and
+exists only over HTTP.
 
 HTTP `run()` requires a caller-owned `idempotencyKey` before it sends a request.
 Persist a unique key for each business operation. If the response is lost or times
@@ -420,22 +462,30 @@ submitting the workflow again:
 const recovered = await nika.attachRun(saved.jobId, {
   lastEventId: saved.lastEventSequence,
 });
-for await (const event of nika.events(recovered)) {
+for await (const event of recovered.events()) {
   await saveApplicationCheckpoint(recovered.id, event.sequence);
 }
-console.log(await recovered.done);
+console.log(await recovered.result());
 ```
 
-Persist the job id and last committed sequence in application state. The
+`attachRun` is the one recovery door, and it returns a full `NikaRun`. A run
+handle is process-bound and is not serialized: persist the **job id** and the
+last committed `event.sequence` in application state. That id is durable only
+over HTTP, where `run.id` is the resident's job id. A native `run.id` is an
+ephemeral correlation id of the SDK process: it appears in no journal, cannot
+be recovered after the process ends, and `attachRun` refuses it. The
 idempotency namespace spans the server's entire `state-root` and currently has
 no TTL; use globally unique business keys and do not recycle them between
 workflows.
 
 When observation loses connectivity past its retry budget, the SDK performs
-one final durable read before giving up: a terminal record settles `run.done`
-from the workflow's truth, and a still-running record rejects with
-`NikaObservationInterrupted`, whose `lastSequence` feeds
-`attachRun(id, { lastEventId })` to resume.
+one final durable read before giving up: a terminal record settles
+`run.result()` from the workflow's truth, and a still-running record rejects
+with `NikaObservationInterrupted`, whose `lastSequence` feeds
+`attachRun(id, { lastEventId })` to resume. That error is about this client's
+view, not about the run, which may still be running. It is not the engine's
+own `interrupted` state: a resident that lost an execution says so with a
+`run.interrupted` event and `result.status === 'interrupted'`, as data.
 
 Plain HTTP is accepted only for a loopback host (`localhost`, `127.0.0.0/8`,
 `[::1]`), and only when `allowInsecureHttp: true` is explicit. Every other host
@@ -512,17 +562,20 @@ it; a scheduled budget is always a real number.
 | `run` | yes; `model`, `maxCostUsd` allowed | yes; `idempotencyKey` required; `model`, `maxCostUsd` refused |
 | `run` `inputs` | literal JSON over stdin; engine must advertise `inputsLiteral` | literal JSON by served name; resident must advertise `jobInputs`; a snapshot refuses them |
 | `run` `vars` (deprecated) | the `--var` operator channel, unchanged | typed refusal |
-| `attachRun` | typed refusal | reattach to a durable job with an optional SSE cursor |
-| `status` | typed refusal; await `run.done` | durable status projection |
-| `events` | raw engine lifecycle frames | sequenced SSE frames with bounded replay |
-| `cancel` | signal-backed, idempotent | 200 settles the job; 202 accepts the request and `run.done` settles on the resident's terminal |
+| `attachRun` | typed refusal: a native run is process-bound | reattach to a durable job with an optional SSE cursor |
+| `run.status()` | typed refusal; await `run.result()` | durable status projection |
+| `run.events()` | lifecycle words over the engine's task and run frames | the same lifecycle words over sequenced SSE frames with bounded replay; no per-task frame |
+| `run.cancel()` | signal-backed, idempotent | 200 settles the job; 202 accepts the request and `run.result()` settles on the resident's terminal |
+| `run.id` | ephemeral correlation id; never durable | the resident's durable job id; the one to persist |
 | `traceVerify` | engine verification + signed receipt binding | typed verdict: `unavailable` until remote journal authority exists, then the CLI's tiers |
 | `schedule` / `scheduleStatus` | typed refusal | resident schedule authority |
 | `listWorkflows` / `workflow` | typed refusal | contained path-free workflow catalog |
 
-Event vocabulary is deliberately open. Native execution exposes detailed task
-lifecycle frames; HTTP exposes durable sequenced execution frames. Consumers
-must not assume identical cardinality across transports.
+The lifecycle vocabulary is one; the cardinality is not. Native execution
+exposes detailed task frames, HTTP exposes durable sequenced execution frames,
+and the SDK names only the facts a transport actually emitted. Consumers must
+not assume identical cardinality across transports. The protocol vocabulary
+under `event.raw` stays deliberately open.
 
 ## API
 
@@ -547,21 +600,128 @@ Remote-only options:
 | Method | Result |
 |---|---|
 | `check(workflow, options?)` | `clean` plus the native check report or resident acknowledgement/refusal |
-| `run(workflow, options?)` | admitted `NikaRun` |
-| `attachRun(id, options?)` | reattached durable HTTP `NikaRun` |
-| `status(run)` | current durable HTTP status |
-| `events(run, options?)` | bounded `AsyncIterable<NikaEvent>` |
-| `cancel(run)` | `NikaCancelResult` |
+| `run(workflow, options?)` | admitted `NikaRun`; rejects without one when the engine refuses |
+| `attachRun(id, options?)` | reattached durable HTTP `NikaRun`: the one recovery door |
 | `traceVerify(receipt, options?)` | `NikaTraceVerifyResult` |
 | `schedule(workflow, options)` | durable apply acknowledgement |
 | `scheduleStatus(id)` | fresh engine schedule projection |
 | `listWorkflows()` | contained resident workflow names |
 | `workflow(name)` | path-free resident workflow metadata |
 
-### Typed events, outputs, and identities
+### `NikaRun`
 
-`NikaEvent` is a discriminated union over the known lifecycle kinds of both
-transports. A native engine process emits `workflow_started`,
+| Member | Result |
+|---|---|
+| `run.id` | `NikaRunId`: the durable job id over HTTP, an ephemeral correlation id natively |
+| `run.events(options?)` | bounded `AsyncIterable<NikaRunEvent>` in the lifecycle vocabulary |
+| `run.result()` | `Promise<NikaRunResult>`, settled once; an admitted failure resolves |
+| `run.status()` | current durable HTTP status; a typed refusal natively |
+| `run.cancel()` | `NikaCancelResult`; idempotent |
+| `run.done` | compatibility alias of `run.result()`: the same promise |
+
+Every member is bound to its run, so it can be extracted:
+`const { events, result } = run`. The handle is process-bound; it carries no
+`list`, `search`, proof, catalog or authoring door.
+
+### The lifecycle vocabulary
+
+`run.events()` yields `NikaRunEvent`: a lifecycle `kind` that is the same on
+both transports, plus the exact protocol frame on `raw`.
+
+| `event.kind` | Native frame (`event.raw.kind`) | HTTP frame (`event.raw.kind`) |
+|---|---|---|
+| `run.started` | `workflow_started` | `execution.started` |
+| `task.scheduled` · `task.started` · `task.completed` · `task.failed` | `task_scheduled` · `task_started` · `task_completed` · `task_failed` | none: the resident streams no per-task frame |
+| `run.waiting` | `run_settled` carrying `paused` | `execution.settled` carrying `paused` |
+| `run.settled` | `run_settled` carrying `succeeded` · `failed` · `cancelled` | `execution.settled` carrying `succeeded` · `failed` · `cancelled`; `execution.cancelled` carrying `cancelled` only; `execution.refused` carrying `failed` only |
+| `run.interrupted` | `workflow_interrupted` carrying `interrupted` | `execution.interrupted` · `interrupted` carrying `interrupted` |
+| `run.sealed` | `run_sealed` | none |
+| `engine.event` | every other frame (`workflow_completed`, `workflow_paused`, `permit_checked`, …) | every other frame, a `null` or future kind included |
+
+The SDK names a fact only when the engine wrote it. A frame that speaks of the
+run's state earns its name only for a (kind, status) pair a producer defines;
+the pairs are the ones listed above and nothing is computed from them. The
+engine's state word decides and is never defaulted, so an absent, null, future
+or still-running status stays an `engine.event`, and so does a terminal word
+on the wrong dedicated kind: `execution.refused` carrying `succeeded` or
+`cancelled`, or `execution.cancelled` carrying `succeeded` or `failed`,
+contradicts itself and is never called settled. `event.raw` still holds that
+frame, and `run.result()` still reads the state word the engine wrote. The
+projection keeps no state between frames, deduplicates nothing, and never
+synthesizes an event, so transports differ in cardinality but never in names.
+
+```ts
+for await (const event of run.events()) {
+  switch (event.kind) {
+    case 'run.started': break;
+    case 'task.completed': console.log('done:', event.task); break;
+    case 'task.failed': console.error(event.task, event.error?.code); break;
+    case 'run.waiting': console.log('a human gate holds the run'); break;
+    case 'run.settled': console.log('ended:', event.status); break;
+    case 'run.interrupted': console.warn('the engine lost this execution'); break;
+    default: break; // additive vocabulary: event.raw.kind names the frame
+  }
+}
+```
+
+`event.status` is always the engine's own word (a waiting run reads `paused`);
+`event.task` is the task a `task.*` frame named; `event.error` is the failure
+a `task.failed` frame or a `failed` settlement named, and no other state
+carries one; `event.sequence` is the resident's replay cursor and exists only
+over HTTP.
+An `engine.event` is given no lifecycle meaning: it carries its cursor and
+`raw`, never a `status`.
+
+`run.waiting` is not `run.settled`: a human gate holds a resumable run, which
+has neither failed nor completed. `run.interrupted` is the engine's report
+that it lost an execution, whose settlement is unknown; it is unrelated to
+the thrown `NikaObservationInterrupted`, which means this client lost its view
+of a run that may still be running.
+
+### Migrating to the Run-owned lifecycle
+
+The client-level lifecycle methods are deprecated and stay for one release
+train. They keep the ownership check: a run this client did not create still
+throws `NikaRunOwnershipError`, because there is no global run registry.
+
+**The compatibility window.** A release train is one published
+SDK-and-engine version, the meaning this repository already uses (see
+[Keeping it fresh](#keeping-it-fresh)). The window is counted from
+publication, never from a merge:
+
+1. It opens with the first train **published to npm** whose package carries
+   the Run-owned lifecycle. That train ships the wrappers, unchanged, next to
+   the new API.
+2. The earliest train that may remove them is the one **after** it. Removal
+   is not automatic: it is decided by the One SDK baseline owner
+   ([#114](https://github.com/supernovae-st/nika-client/issues/114)) and is
+   announced in the release notes of the train that performs it.
+3. No version and no date are fixed here. Until a train carrying this API is
+   published, nothing has started counting and the wrappers stay.
+
+| Deprecated | Use | What changes |
+|---|---|---|
+| `nika.events(run, options?)` | `run.events(options?)` | lifecycle `kind`; the protocol frame the wrapper yields is `event.raw` |
+| `nika.cancel(run)` | `run.cancel()` | nothing: the same memoized request |
+| `nika.status(run)` | `run.status()` | nothing |
+| `await run.done` | `await run.result()` | nothing: `done` stays as an alias of the same promise |
+
+`nika.events(run)` still yields the protocol vocabulary exactly as before, so
+existing consumers keep working unchanged while they migrate:
+
+```ts
+// before                                     // after
+for await (const e of nika.events(run)) {     for await (const e of run.events()) {
+  if (e.kind === 'workflow_started' ||          if (e.kind === 'run.started') start();
+      e.kind === 'execution.started') start();
+}                                             }
+```
+
+### Typed protocol events, outputs, and identities
+
+`NikaEvent` is the protocol frame under `event.raw` (and what the deprecated
+`nika.events(run)` yields): a discriminated union over the known protocol
+kinds of both transports. A native engine process emits `workflow_started`,
 `task_scheduled`, `task_started`, `task_completed`, `workflow_completed`,
 `workflow_failed`, `workflow_interrupted`, `run_settled`, and `run_sealed`. A
 `nika serve` job streams `execution.started`, `execution.settled`,
@@ -571,36 +731,36 @@ this SDK version does not know yet stay representable through the
 `NikaUnknownEvent` fallback, so the union is intentionally non-exhaustive and
 every variant keeps its future fields open.
 
-`run`, `attachRun`, and `events` accept one `Outputs` type argument. It types
-the terminal settlement — `run.done` and the `run_settled` /
-`execution.settled` / `workflow_completed` frames — without any runtime
-validation, and defaults to `Record<string, unknown>` so untyped callers see
-no change:
+`run` and `attachRun` accept one `Outputs` type argument. It types the
+terminal settlement — `run.result()` and, on the protocol frame, the
+`run_settled` / `execution.settled` / `workflow_completed` frames — without
+any runtime validation, and defaults to `Record<string, unknown>` so untyped
+callers see no change:
 
 ```ts
 const run = await nika.run<{ answer: number }>('flow.nika.yaml');
-const result = await run.done;          // result.outputs?: { answer: number }
+const result = await run.result();      // result.outputs?: { answer: number }
 
-for await (const event of nika.events(run)) {
-  if (isNikaRunSettledEvent(event)) {
+for await (const event of run.events()) {
+  if (isNikaRunSettledEvent(event.raw)) {
     // The settlement frame of either transport (`run_settled` natively,
     // `execution.settled` over HTTP): status, outputs, and receipt typed
     // together on the one frame that carries all three.
-    console.log(event.status, event.outputs?.answer, event.receipt);
+    console.log(event.raw.status, event.raw.outputs?.answer, event.raw.receipt);
   }
 }
 ```
 
-A run can also end without settling outputs — cancelled, refused, or
-interrupted. `isNikaTerminalEvent(event)` narrows those too: it reads the
-engine-reported `status` (`succeeded`, `failed`, `interrupted`, `cancelled`)
-rather than the kind, so it holds on either transport and on kinds this SDK
-version does not know yet:
+The protocol guards read `event.raw`. A run can also end without settling
+outputs — cancelled, refused, or interrupted. `isNikaTerminalEvent(event.raw)`
+narrows those too: it reads the engine-reported `status` (`succeeded`,
+`failed`, `interrupted`, `cancelled`) rather than the kind, so it holds on
+either transport and on kinds this SDK version does not know yet:
 
 ```ts
-for await (const event of nika.events(run)) {
-  if (isNikaTerminalEvent(event)) {
-    console.log('no further frames for this run:', event.status);
+for await (const event of run.events()) {
+  if (isNikaTerminalEvent(event.raw)) {
+    console.log('no further frames for this run:', event.raw.status);
   }
 }
 ```
@@ -657,7 +817,7 @@ carrying `operation: 'run'` and the engine's exit status in `status`:
 ```ts
 try {
   const run = await nika.run('./workflow.nika.yaml');
-  const result = await run.done; // admitted: a failure here is result data
+  const result = await run.result(); // admitted: a failure here is result data
 } catch (error) {
   if (error instanceof NikaOperationError && error.operation === 'run') {
     console.error(error.code); // 'NIKA-SEC-004'

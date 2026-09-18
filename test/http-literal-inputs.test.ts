@@ -11,7 +11,6 @@ import { HttpTransport } from '../src/lib/http-transport.js';
 import { LITERAL_INPUTS_MAX_BYTES, encodeLiteralInputs } from '../src/lib/literal-inputs.js';
 import {
   TOKEN_A,
-  collect,
   healthResponse,
   jsonResponse,
   sseResponse,
@@ -95,8 +94,12 @@ describe('run by served name carries literal inputs (issue #116 · engine #1642)
     expect(headers.get('Idempotency-Key')).toBe('triage-42');
     expect(headers.get('Content-Type')).toBe('application/json');
 
-    await expect(collect(nika.events(run))).resolves.toHaveLength(1);
-    await expect(run.done).resolves.toMatchObject({ status: 'succeeded', outputs: { value: inputs } });
+    // The Run owns its lifecycle: one settled frame, named in the lifecycle
+    // vocabulary, with the resident's protocol frame untouched on `raw`.
+    const observed: string[] = [];
+    for await (const event of run.events()) observed.push(`${event.kind} <- ${event.raw.kind}`);
+    expect(observed).toEqual(['run.settled <- execution.settled']);
+    await expect(run.result()).resolves.toMatchObject({ status: 'succeeded', outputs: { value: inputs } });
     expect(fetch).toHaveBeenCalledTimes(3);
   });
 
@@ -109,7 +112,7 @@ describe('run by served name carries literal inputs (issue #116 · engine #1642)
       ]));
     const run = await remote(fetch).run('triage.nika.yaml', { inputs: {}, idempotencyKey: 'k' });
     expect(request(fetch, 1).init.body).toBe('{"workflow":"triage.nika.yaml","inputs":{}}');
-    await run.done;
+    await run.result();
   });
 
   it('keeps the body of a run without inputs exactly as it was', async () => {
@@ -121,7 +124,7 @@ describe('run by served name carries literal inputs (issue #116 · engine #1642)
       ]));
     const run = await remote(fetch).run('triage.nika.yaml', { idempotencyKey: 'k' });
     expect(request(fetch, 1).init.body).toBe('{"workflow":"triage.nika.yaml"}');
-    await run.done;
+    await run.result();
   });
 
   it('escapes the workflow name itself as JSON', async () => {
@@ -134,7 +137,7 @@ describe('run by served name carries literal inputs (issue #116 · engine #1642)
     const name = 'équipe/"quoted".nika.yaml';
     const run = await remote(fetch).run(name, { inputs: { a: 1 }, idempotencyKey: 'k' });
     expect(JSON.parse(String(request(fetch, 1).init.body))).toEqual({ workflow: name, inputs: { a: 1 } });
-    await run.done;
+    await run.result();
   });
 });
 
@@ -247,7 +250,7 @@ describe('a map the SDK cannot send is refused before any request', () => {
     const body = String(request(fetch, 1).init.body);
     expect(Buffer.byteLength(body))
       .toBe('{"workflow":"triage.nika.yaml","inputs":}'.length + LITERAL_INPUTS_MAX_BYTES);
-    await run.done;
+    await run.result();
   });
 });
 

@@ -96,7 +96,7 @@ module.exports = async function literalInputsScenario(sdk, engines) {
     const nativeLog = path.join(scratch, 'native.argv');
     process.env.NIKA_FAKE_ARGV_LOG = nativeLog;
     const native = new sdk.Nika({ bin: engines.literal });
-    const settled = await (await native.run('echo-packed.nika.yaml', { inputs: INPUTS })).done;
+    const settled = await (await native.run('echo-packed.nika.yaml', { inputs: INPUTS })).result();
     report.native = {
       status: settled.status,
       succeeded: sdk.isNikaRunSucceeded(settled),
@@ -130,7 +130,7 @@ module.exports = async function literalInputsScenario(sdk, engines) {
     const job = await (await remote.run('triage.nika.yaml', {
       inputs: INPUTS,
       idempotencyKey: 'packed-1',
-    })).done;
+    })).result();
     report.http = { status: job.status, requests: current.requests };
 
     // HTTP: a resident from before the envelope is refused after /health alone.

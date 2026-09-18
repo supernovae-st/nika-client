@@ -108,7 +108,7 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
       };
       const { result, argvs } = await spawned(async () => {
         const run = await literal().run('echo-literal.nika.yaml', { inputs });
-        return run.done;
+        return run.result();
       });
       expect(argvs).toEqual([
         ['--sdk-identity'],
@@ -133,7 +133,7 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
           model: 'mock/echo',
           maxCostUsd: 0.01,
         });
-        return run.done;
+        return run.result();
       });
       expect(argvs.at(-1)).toEqual([
         'run', 'echo-secret.nika.yaml', '--json', '--inputs-json', '-',
@@ -146,7 +146,7 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
     it('sends an empty map as the explicit empty object, not as an absent channel', async () => {
       const { result, argvs } = await spawned(async () => {
         const run = await literal().run('echo-empty.nika.yaml', { inputs: {} });
-        return run.done;
+        return run.result();
       });
       expect(argvs.at(-1)).toEqual(['run', 'echo-empty.nika.yaml', '--json', '--inputs-json', '-']);
       expect(result.outputs).toMatchObject({ stdin: '{}', stdin_bytes: 2 });
@@ -158,7 +158,7 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
       const expected = encodeLiteralInputs(inputs);
       expect(expected.bytes).toBe(LITERAL_INPUTS_MAX_BYTES);
       const run = await literal().run('echo-exact-bound.nika.yaml', { inputs });
-      const result = await run.done;
+      const result = await run.result();
       expect(result.outputs).toEqual({
         stdin_kind: expect.stringMatching(/^(socket|fifo)$/),
         stdin_bytes: LITERAL_INPUTS_MAX_BYTES,
@@ -169,7 +169,7 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
     it('opens no stdin pipe and adds no flag for a run without inputs', async () => {
       const { result, argvs } = await spawned(async () => {
         const run = await literal().run('echo-plain.nika.yaml');
-        return run.done;
+        return run.result();
       });
       expect(argvs.at(-1)).toEqual(['run', 'echo-plain.nika.yaml', '--json']);
       expect(result.outputs).toMatchObject({ stdin_kind: 'character-device', stdin_bytes: 0 });
@@ -180,9 +180,15 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
       const run = await client.run('wire-c1683-literal.nika.yaml', {
         inputs: { ticket: '@env:NIKA_TEST_LITERAL', count: 42, tags: ['é', '東京'], record: { name: '🦋' } },
       });
+      // The Run owns its lifecycle. Provenance is an engine fact, so it is read
+      // from the protocol frame each lifecycle event keeps, untouched, on `raw`.
       const events = [];
-      for await (const event of client.events(run)) events.push(event);
-      const started = events[0] as { kind: string; fields: { key: string; value: unknown }[] };
+      for await (const event of run.events()) events.push(event);
+      expect(events.map((event) => event.kind)).toEqual([
+        'run.started', 'task.scheduled', 'task.started', 'engine.event',
+        'task.completed', 'engine.event', 'run.settled',
+      ]);
+      const started = events[0]!.raw as { kind: string; fields: { key: string; value: unknown }[] };
       expect(started.kind).toBe('workflow_started');
       const origins = started.fields.find((row) => row.key === 'inputs')?.value;
       expect(JSON.parse(String(origins))).toEqual({
@@ -192,7 +198,7 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
         tags: 'api-caller',
         ticket: 'api-caller',
       });
-      await expect(run.done).resolves.toMatchObject({
+      await expect(run.result()).resolves.toMatchObject({
         status: 'succeeded',
         exitCode: 0,
         outputs: {
@@ -243,10 +249,10 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
     it('still runs that engine without inputs, and with the deprecated vars alias', async () => {
       const { result, argvs } = await spawned(async () => {
         const client = new Nika({ bin: OLD_ENGINE });
-        const plain = await (await client.run('ok.nika.yaml')).done;
+        const plain = await (await client.run('ok.nika.yaml')).result();
         const aliased = await (await client.run('ok.nika.yaml', {
           vars: { locale: 'fr-FR', retries: 3, dry: false },
-        })).done;
+        })).result();
         return [plain.status, aliased.status];
       });
       expect(result).toEqual(['succeeded', 'succeeded']);
@@ -314,11 +320,11 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
         const run = await client.run('hostile-never-reads.nika.yaml', { inputs: big });
         const pid = Number(readFileSync(pidFile, 'utf8'));
         expect(processIsGone(pid)).toBe(false);
-        await expect(client.cancel(run)).resolves.toMatchObject({
+        await expect(run.cancel()).resolves.toMatchObject({
           accepted: true,
           status: 'cancellation_requested',
         });
-        await expect(run.done).resolves.toMatchObject({ status: 'interrupted', exitCode: 130 });
+        await expect(run.result()).resolves.toMatchObject({ status: 'interrupted', exitCode: 130 });
         expect(processIsGone(pid)).toBe(true);
       } finally {
         delete process.env.NIKA_FAKE_PID_FILE;

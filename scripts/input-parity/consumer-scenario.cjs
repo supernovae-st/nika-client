@@ -27,8 +27,8 @@ function digested(value) {
 }
 
 /** The engine's own provenance line: `inputs` on the native `workflow_started` frame. */
-function nativeOrigins(events) {
-  const started = events.find((event) => event.kind === 'workflow_started');
+function nativeOrigins(frames) {
+  const started = frames.find((frame) => frame.kind === 'workflow_started');
   const row = Array.isArray(started?.fields)
     ? started.fields.find((field) => field.key === 'inputs')
     : undefined;
@@ -111,16 +111,18 @@ module.exports = async function inputParityAction(sdk, config) {
   };
   try {
     const run = await client.run(config.workflow, options);
-    const events = [];
-    for await (const event of client.events(run)) events.push(event);
-    const result = await run.done;
+    // The Run owns its lifecycle; provenance is an engine fact, so it is read
+    // from the protocol frame each lifecycle event carries on `raw`.
+    const frames = [];
+    for await (const event of run.events()) frames.push(event.raw);
+    const result = await run.result();
     return {
       ...row,
       outcome: 'settled',
       status: result.status,
       succeeded: sdk.isNikaRunSucceeded(result),
       outputs: digested(result.outputs ?? null),
-      origins: config.door === 'native' ? nativeOrigins(events) : null,
+      origins: config.door === 'native' ? nativeOrigins(frames) : null,
       execution_id: result.receipt?.execution_id ?? null,
       requests,
     };

@@ -1,0 +1,15 @@
+{
+  "clean": false,
+  "findings": [
+    {
+      "code": "NIKA-PARSE-005",
+      "docs_url": "https://nika.sh/language/errors/NIKA-PARSE-005",
+      "gate": "PARSE",
+      "kind": "parse",
+      "message": "unknown field `from` in typed output `greeting` (strict mode) — the fields here: value · type · description · → nika explain NIKA-PARSE-005",
+      "severity": "error"
+    }
+  ],
+  "parse_fatal": true,
+  "report_version": 1
+}

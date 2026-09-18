@@ -200,7 +200,7 @@ jobs:
           trap cleanup EXIT
           mkdir -p "$project_dir" "$workflows_dir" "$state_dir"
           printf '%s\n' 'nika: ci-type-drift-probe' > "$project_dir/nika.yaml"
-          cat > "$workflows_dir/test.nika.yaml" <<'EOF'
+          cat > "$workflows_dir/test.nika" <<'EOF'
           nika: test
           permits: {}
           tasks:

@@ -36,7 +36,7 @@ const INCOMPATIBLE_FIXTURE = path.join(
 const posix = process.platform !== 'win32';
 const SERVER_TOKEN = 's'.repeat(32);
 const SNAPSHOT_DIGEST = 'a'.repeat(64);
-const SNAPSHOT_BYTES = `{"format_version":1,"root":"fixture.nika.yaml","digest":"${SNAPSHOT_DIGEST}","units":[{"path":"fixture.nika.yaml","kind":0,"digest":"${'b'.repeat(64)}","bytes_hex":"00"}]}`;
+const SNAPSHOT_BYTES = `{"format_version":1,"root":"fixture.nika","digest":"${SNAPSHOT_DIGEST}","units":[{"path":"fixture.nika","kind":0,"digest":"${'b'.repeat(64)}","bytes_hex":"00"}]}`;
 
 function healthResponse(overrides: Record<string, unknown> = {}): Response {
   return jsonResponse({
@@ -86,7 +86,7 @@ function scheduleProjection(overrides: Record<string, unknown> = {}) {
   return {
     definition: {
       id: 'daily',
-      workflow: 'flow.nika.yaml',
+      workflow: 'flow.nika',
       when: { kind: 'cadence', expression: 'daily at 09:00 Europe/Paris' },
       maxCostUsd: 0.25,
       missed: 'catch-up-once',
@@ -159,7 +159,7 @@ describe('one Nika surface', () => {
       bin: FIXTURE,
       fetch: fetch as typeof globalThis.fetch,
     });
-    const run = await client.run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+    const run = await client.run('flow.nika', { idempotencyKey: 'test-admission' });
     // Issue #120: the handle owns events/result/status/cancel; `done` stays
     // as the compatibility alias. Nothing else rides it.
     expect(Object.keys(run).sort()).toEqual([
@@ -176,11 +176,11 @@ describe.skipIf(!posix)('native-process transport', () => {
       capability: 'workflowCatalog',
       transport: 'native-process',
     });
-    await expect(client.workflow('flow.nika.yaml')).rejects.toMatchObject({
+    await expect(client.workflow('flow.nika')).rejects.toMatchObject({
       capability: 'workflowCatalog',
       transport: 'native-process',
     });
-    await expect(client.schedule('flow.nika.yaml', {
+    await expect(client.schedule('flow.nika', {
       id: 'daily',
       when: { kind: 'once', at: '2026-09-01T07:00:00Z' },
       maxCostUsd: 0.25,
@@ -201,7 +201,7 @@ describe.skipIf(!posix)('native-process transport', () => {
     process.env.NIKA_EFFECT_SENTINEL = sentinel;
     try {
       const client = new Nika({ bin: INCOMPATIBLE_FIXTURE });
-      await expect(client.run('must-not-run.nika.yaml'))
+      await expect(client.run('must-not-run.nika'))
         .rejects.toMatchObject({
           name: 'NikaCompatibilityError',
           capability: 'engineIdentity',
@@ -214,7 +214,7 @@ describe.skipIf(!posix)('native-process transport', () => {
   });
 
   it('returns the engine-owned check report without interpreting the workflow', async () => {
-    const report = await native().check('dirty.nika.yaml', {
+    const report = await native().check('dirty.nika', {
       model: 'mock/echo',
       nativeStrict: true,
     });
@@ -226,7 +226,7 @@ describe.skipIf(!posix)('native-process transport', () => {
     });
     expect(report.argv).toEqual([
       'check',
-      'dirty.nika.yaml',
+      'dirty.nika',
       '--json',
       '--model',
       'mock/echo',
@@ -236,7 +236,7 @@ describe.skipIf(!posix)('native-process transport', () => {
 
   it('eagerly drains a run even when the caller never iterates events', async () => {
     const client = native({ eventBufferSize: 4 });
-    const run = await client.run('ok.nika.yaml', {
+    const run = await client.run('ok.nika', {
       vars: { locale: 'fr-FR' },
       model: 'mock/echo',
       maxCostUsd: 1,
@@ -258,7 +258,7 @@ describe.skipIf(!posix)('native-process transport', () => {
 
   it('bounds each slow subscriber without blocking done or other subscribers', async () => {
     const client = native({ eventBufferSize: 8 });
-    const run = await client.run('burst.nika.yaml');
+    const run = await client.run('burst.nika');
     const slow = client.events(run, { bufferSize: 1 })[Symbol.asyncIterator]();
     const fastPromise = collect(client.events(run, { bufferSize: 8 }));
     await expect(run.done).resolves.toMatchObject({ status: 'succeeded' });
@@ -270,7 +270,7 @@ describe.skipIf(!posix)('native-process transport', () => {
 
   it('treats an event AbortSignal as subscriber cleanup, not run cancellation', async () => {
     const client = native();
-    const run = await client.run('slow.nika.yaml');
+    const run = await client.run('slow.nika');
     const controller = new AbortController();
     const view = client.events(run, { signal: controller.signal });
     controller.abort();
@@ -280,7 +280,7 @@ describe.skipIf(!posix)('native-process transport', () => {
 
   it('cancels explicitly and idempotently', async () => {
     const client = native();
-    const run = await client.run('cancel.nika.yaml');
+    const run = await client.run('cancel.nika');
     const first = client.cancel(run);
     expect(client.cancel(run)).toBe(first);
     await expect(first).resolves.toMatchObject({
@@ -315,7 +315,7 @@ describe.skipIf(!posix)('native-process transport', () => {
 
   it('rejects HTTP-only run options and foreign run handles', async () => {
     const client = native();
-    await expect(client.run('ok.nika.yaml', { idempotencyKey: 'remote-only' }))
+    await expect(client.run('ok.nika', { idempotencyKey: 'remote-only' }))
       .rejects.toBeInstanceOf(NikaCompatibilityError);
     const foreign: NikaRun = {
       id: 'foreign' as NikaRunId,
@@ -348,33 +348,33 @@ describe('HTTP transport', () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(jsonResponse({
-        workflows: ['flows/customer/onboarding.nika.yaml'],
+        workflows: ['flows/customer/onboarding.nika'],
       }))
       .mockResolvedValueOnce(jsonResponse({
-        workflow: 'flows/customer/onboarding.nika.yaml',
+        workflow: 'flows/customer/onboarding.nika',
       }));
     const client = remote(fetch as typeof globalThis.fetch);
 
     await expect(client.listWorkflows()).resolves.toEqual([
-      'flows/customer/onboarding.nika.yaml',
+      'flows/customer/onboarding.nika',
     ]);
-    await expect(client.workflow('flows/customer/onboarding.nika.yaml')).resolves.toEqual({
-      workflow: 'flows/customer/onboarding.nika.yaml',
+    await expect(client.workflow('flows/customer/onboarding.nika')).resolves.toEqual({
+      workflow: 'flows/customer/onboarding.nika',
     });
     expect(String(fetch.mock.calls[1]?.[0])).toBe('https://nika.example/v1/workflows');
     expect(String(fetch.mock.calls[2]?.[0])).toBe(
-      'https://nika.example/v1/workflows/flows/customer/onboarding.nika.yaml',
+      'https://nika.example/v1/workflows/flows/customer/onboarding.nika',
     );
-    await expect(client.workflow('../secret.nika.yaml')).rejects.toThrow(/contained/);
+    await expect(client.workflow('../secret.nika')).rejects.toThrow(/contained/);
     expect(fetch).toHaveBeenCalledTimes(3);
   });
 
   it('rejects uncontained or ambiguous workflow catalog responses', async () => {
     for (const body of [
-      { workflows: ['../secret.nika.yaml'] },
-      { workflows: ['flow.nika.yaml', 'flow.nika.yaml'] },
+      { workflows: ['../secret.nika'] },
+      { workflows: ['flow.nika', 'flow.nika'] },
       { workflows: ['flow.yaml'] },
-      { workflows: ['flow.nika.yaml'], source: 'secret' },
+      { workflows: ['flow.nika'], source: 'secret' },
     ]) {
       const fetch = vi.fn()
         .mockResolvedValueOnce(healthResponse())
@@ -387,8 +387,8 @@ describe('HTTP transport', () => {
   it('rejects workflow metadata that changes the requested contained identity', async () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse())
-      .mockResolvedValueOnce(jsonResponse({ workflow: '../secret.nika.yaml' }));
-    await expect(remote(fetch as typeof globalThis.fetch).workflow('safe.nika.yaml'))
+      .mockResolvedValueOnce(jsonResponse({ workflow: '../secret.nika' }));
+    await expect(remote(fetch as typeof globalThis.fetch).workflow('safe.nika'))
       .rejects.toMatchObject({ name: 'NikaProtocolError' });
   });
 
@@ -408,7 +408,7 @@ describe('HTTP transport', () => {
       throw new Error(`unexpected URL ${url}`);
     });
     const client = remote(fetch as typeof globalThis.fetch);
-    const run = await client.run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+    const run = await client.run('flow.nika', { idempotencyKey: 'test-admission' });
     await expect(client.status(run)).resolves.toBe('running');
     await expect(run.done).resolves.toMatchObject({ status: 'succeeded' });
     expect(() => client.status({ id: run.id, done: run.done }))
@@ -538,7 +538,7 @@ describe('HTTP transport', () => {
       .mockResolvedValueOnce(jsonResponse(status));
     const client = remote(fetch as typeof globalThis.fetch);
 
-    await expect(client.schedule('flow.nika.yaml', scheduleOptions)).resolves.toEqual({
+    await expect(client.schedule('flow.nika', scheduleOptions)).resolves.toEqual({
       applied: true,
       changed: true,
       status,
@@ -552,7 +552,7 @@ describe('HTTP transport', () => {
     expect(applyHeaders.get('If-None-Match')).toBe('*');
     expect(applyHeaders.has('If-Match')).toBe(false);
     expect(JSON.parse(String(applyInit.body))).toEqual({
-      workflow: 'flow.nika.yaml',
+      workflow: 'flow.nika',
       when: scheduleOptions.when,
       maxCostUsd: 0.25,
       missed: 'catch-up-once',
@@ -569,7 +569,7 @@ describe('HTTP transport', () => {
   it('requires the remote schedule capability before calling its route', async () => {
     const fetch = vi.fn().mockResolvedValueOnce(healthResponse());
     await expect(remote(fetch as typeof globalThis.fetch).schedule(
-      'flow.nika.yaml',
+      'flow.nika',
       scheduleOptions,
     )).rejects.toMatchObject({
       name: 'NikaCompatibilityError',
@@ -597,7 +597,7 @@ describe('HTTP transport', () => {
     const client = remote(fetch as typeof globalThis.fetch);
     let failure: unknown;
     try {
-      await client.schedule('flow.nika.yaml', { ...scheduleOptions, revision });
+      await client.schedule('flow.nika', { ...scheduleOptions, revision });
     } catch (cause) {
       failure = cause;
     }
@@ -627,7 +627,7 @@ describe('HTTP transport', () => {
       }))
       .mockResolvedValueOnce(jsonResponse({ findings }, 422));
     await expect(remote(fetch as typeof globalThis.fetch).schedule(
-      'flow.nika.yaml',
+      'flow.nika',
       { ...scheduleOptions, jitter: 'hash' },
     )).rejects.toMatchObject({
       name: 'NikaOperationError',
@@ -669,7 +669,7 @@ describe('HTTP transport', () => {
         { sequence: 3, kind: 'settled', status: 'succeeded' },
       ]));
     const client = remote(fetch as typeof globalThis.fetch);
-    const run = await client.run('./nested/flow.nika.yaml', { idempotencyKey: 'stable-key' });
+    const run = await client.run('./nested/flow.nika', { idempotencyKey: 'stable-key' });
     await expect(run.done).resolves.toEqual({
       id: 'remote-1',
       status: 'succeeded',
@@ -680,7 +680,7 @@ describe('HTTP transport', () => {
     const [url, init] = fetch.mock.calls[1] as [string, RequestInit];
     expect(url).toBe('https://nika.example/v1/jobs');
     expect(init.body).toBe(SNAPSHOT_BYTES);
-    expect(init.body).not.toContain('nested/flow.nika.yaml');
+    expect(init.body).not.toContain('nested/flow.nika');
     expect(init.body).not.toContain('workflow');
     const headers = new Headers(init.headers);
     const healthHeaders = new Headers(fetch.mock.calls[0]?.[1]?.headers);
@@ -708,7 +708,7 @@ describe('HTTP transport', () => {
         },
       ]));
     const client = remote(fetch as typeof globalThis.fetch);
-    const run = await client.run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+    const run = await client.run('flow.nika', { idempotencyKey: 'test-admission' });
     await expect(run.done).resolves.toMatchObject({
       status: 'failed',
       error: { code: 'NIKA-TEST-002', message: 'no' },
@@ -726,11 +726,11 @@ describe('HTTP transport', () => {
       .mockResolvedValueOnce(jsonResponse({
         status: 'accepted',
         snapshot_digest: SNAPSHOT_DIGEST,
-        root: 'fixture.nika.yaml',
+        root: 'fixture.nika',
         units: 1,
       }));
     const client = remote(fetch as typeof globalThis.fetch);
-    const report = await client.check('/local/only/flow.nika.yaml');
+    const report = await client.check('/local/only/flow.nika');
     expect(report).toMatchObject({
       clean: true,
       report_version: 1,
@@ -740,14 +740,14 @@ describe('HTTP transport', () => {
     expect(report).not.toHaveProperty('execution_snapshot');
     expect(report.argv).toEqual([
       'check',
-      '/local/only/flow.nika.yaml',
+      '/local/only/flow.nika',
       '--json',
       '--sdk-snapshot',
     ]);
     const [url, init] = fetch.mock.calls[1] as [string, RequestInit];
     expect(url).toBe('https://nika.example/v1/check');
     expect(init.body).toBe(SNAPSHOT_BYTES);
-    expect(init.body).not.toContain('/local/only/flow.nika.yaml');
+    expect(init.body).not.toContain('/local/only/flow.nika');
   });
 
   it('refuses a check acknowledgement for a different snapshot', async () => {
@@ -756,10 +756,10 @@ describe('HTTP transport', () => {
       .mockResolvedValueOnce(jsonResponse({
         status: 'accepted',
         snapshot_digest: 'c'.repeat(64),
-        root: 'other.nika.yaml',
+        root: 'other.nika',
         units: 1,
       }));
-    await expect(remote(fetch as typeof globalThis.fetch).check('./flow.nika.yaml'))
+    await expect(remote(fetch as typeof globalThis.fetch).check('./flow.nika'))
       .rejects.toMatchObject({ name: 'NikaProtocolError', transport: 'http' });
   });
 
@@ -769,7 +769,7 @@ describe('HTTP transport', () => {
       .mockResolvedValueOnce(jsonResponse({
         status: 'accepted',
         snapshot_digest: SNAPSHOT_DIGEST,
-        root: 'fixture.nika.yaml',
+        root: 'fixture.nika',
         units: 1,
       }))
       .mockResolvedValueOnce(jsonResponse({ id: 'cached', status: 'queued' }, 202))
@@ -777,8 +777,8 @@ describe('HTTP transport', () => {
         { sequence: 1, kind: 'settled', status: 'succeeded' },
       ]));
     const compatible = remote(compatibleFetch as typeof globalThis.fetch);
-    await compatible.check('one.nika.yaml');
-    const run = await compatible.run('two.nika.yaml', { idempotencyKey: 'test-admission' });
+    await compatible.check('one.nika');
+    const run = await compatible.run('two.nika', { idempotencyKey: 'test-admission' });
     await run.done;
     expect(compatibleFetch.mock.calls.filter(([url]) => String(url).endsWith('/health')))
       .toHaveLength(1);
@@ -786,13 +786,13 @@ describe('HTTP transport', () => {
     const incompatibleFetch = vi.fn().mockResolvedValueOnce(healthResponse({
       machineProtocolVersion: 99,
     }));
-    await expect(remote(incompatibleFetch as typeof globalThis.fetch).run('never.nika.yaml', { idempotencyKey: 'test-admission' }))
+    await expect(remote(incompatibleFetch as typeof globalThis.fetch).run('never.nika', { idempotencyKey: 'test-admission' }))
       .rejects.toMatchObject({ capability: 'engineIdentity', transport: 'http' });
     expect(incompatibleFetch).toHaveBeenCalledTimes(1);
   });
 
   it('refuses dirty or tampered local capture before network admission', async () => {
-    for (const workflow of ['./dirty.nika.yaml', './tampered.nika.yaml']) {
+    for (const workflow of ['./dirty.nika', './tampered.nika']) {
       const fetch = vi.fn().mockResolvedValueOnce(healthResponse());
       await expect(remote(fetch as typeof globalThis.fetch).run(workflow, { idempotencyKey: 'test-admission' }))
         .rejects.toBeInstanceOf(NikaCompatibilityError);
@@ -803,7 +803,7 @@ describe('HTTP transport', () => {
 
   it('returns a parse-fatal remote check report without misclassifying identity', async () => {
     const fetch = vi.fn().mockResolvedValueOnce(healthResponse());
-    const report = await remote(fetch as typeof globalThis.fetch).check('./parse-fatal.nika.yaml');
+    const report = await remote(fetch as typeof globalThis.fetch).check('./parse-fatal.nika');
     expect(report).toMatchObject({
       clean: false,
       parse_fatal: true,
@@ -862,18 +862,18 @@ describe('HTTP transport', () => {
       ]))
       .mockResolvedValueOnce(jsonResponse({ id: 'remote-gaps', status: 'succeeded' }));
     const client = remote(fetch as typeof globalThis.fetch);
-    await expect(client.check('flow.nika.yaml', { model: 'mock/echo' }))
+    await expect(client.check('flow.nika', { model: 'mock/echo' }))
       .rejects.toMatchObject({ capability: 'checkOptions', transport: 'http' });
     for (const options of [
       { vars: { x: 1 } },
       { model: 'mock/echo' },
       { maxCostUsd: 1 },
     ]) {
-      await expect(client.run('flow.nika.yaml', options))
+      await expect(client.run('flow.nika', options))
         .rejects.toMatchObject({ capability: 'runOptions', transport: 'http' });
     }
     expect(fetch).not.toHaveBeenCalled();
-    const run = await client.run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+    const run = await client.run('flow.nika', { idempotencyKey: 'test-admission' });
     await run.done;
     await expect(client.cancel(run)).resolves.toMatchObject({
       accepted: false,
@@ -894,7 +894,7 @@ describe('HTTP transport', () => {
     const client = remote(fetch as typeof globalThis.fetch);
     let failure: unknown;
     try {
-      await client.run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+      await client.run('flow.nika', { idempotencyKey: 'test-admission' });
     } catch (cause) {
       failure = cause;
     }
@@ -963,10 +963,10 @@ describe('remote observation without a local engine', () => {
         });
       }
       if (url.pathname === '/v1/workflows') {
-        return jsonResponse({ workflows: ['flow.nika.yaml'] });
+        return jsonResponse({ workflows: ['flow.nika'] });
       }
-      if (url.pathname === '/v1/workflows/flow.nika.yaml') {
-        return jsonResponse({ workflow: 'flow.nika.yaml' });
+      if (url.pathname === '/v1/workflows/flow.nika') {
+        return jsonResponse({ workflow: 'flow.nika' });
       }
       if (url.pathname === '/v1/jobs/durable-job') {
         return jsonResponse({ id: 'durable-job', status: 'running' });
@@ -1018,11 +1018,11 @@ describe('remote observation without a local engine', () => {
       status: 'already_settled',
       transport: 'http',
     });
-    await expect(client.listWorkflows()).resolves.toEqual(['flow.nika.yaml']);
-    await expect(client.workflow('flow.nika.yaml')).resolves.toEqual({
-      workflow: 'flow.nika.yaml',
+    await expect(client.listWorkflows()).resolves.toEqual(['flow.nika']);
+    await expect(client.workflow('flow.nika')).resolves.toEqual({
+      workflow: 'flow.nika',
     });
-    await expect(client.schedule('flow.nika.yaml', scheduleOptions)).resolves.toEqual({
+    await expect(client.schedule('flow.nika', scheduleOptions)).resolves.toEqual({
       applied: true,
       changed: true,
       status,
@@ -1043,11 +1043,11 @@ describe('remote observation without a local engine', () => {
       bin: '/nonexistent/nika-engine',
       fetch: fetch as typeof globalThis.fetch,
     });
-    await expect(client.check('./flow.nika.yaml')).rejects.toMatchObject({
+    await expect(client.check('./flow.nika')).rejects.toMatchObject({
       name: 'NikaCompatibilityError',
       capability: 'engineIdentity',
     });
-    await expect(client.run('./flow.nika.yaml', { idempotencyKey: 'test-admission' })).rejects.toMatchObject({
+    await expect(client.run('./flow.nika', { idempotencyKey: 'test-admission' })).rejects.toMatchObject({
       name: 'NikaCompatibilityError',
       capability: 'engineIdentity',
     });
@@ -1066,11 +1066,11 @@ describe('remote observation without a local engine', () => {
           token: SERVER_TOKEN,
           fetch: fetch as typeof globalThis.fetch,
         });
-        await expect(client.check('./flow.nika.yaml')).rejects.toMatchObject({
+        await expect(client.check('./flow.nika')).rejects.toMatchObject({
           name: 'NikaEngineUnavailable',
           code: 'NIKA_ENGINE_UNAVAILABLE',
         });
-        await expect(client.run('./flow.nika.yaml', { idempotencyKey: 'test-admission' })).rejects.toMatchObject({
+        await expect(client.run('./flow.nika', { idempotencyKey: 'test-admission' })).rejects.toMatchObject({
           name: 'NikaEngineUnavailable',
           code: 'NIKA_ENGINE_UNAVAILABLE',
         });

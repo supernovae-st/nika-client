@@ -172,7 +172,7 @@ describe('HTTP response framing, status, and deadlines', () => {
     ));
     await expect(transport(fetch as typeof globalThis.fetch, {
       requestTimeout: 5,
-    }).startRun('flow.nika.yaml', { idempotencyKey: 'test-admission' })).rejects.toMatchObject({
+    }).startRun('flow.nika', { idempotencyKey: 'test-admission' })).rejects.toMatchObject({
       name: 'NikaTransportError',
       transport: 'http',
       message: expect.stringMatching(/timed out/),
@@ -186,7 +186,7 @@ describe('HTTP response framing, status, and deadlines', () => {
         status: 202,
         headers: { 'Content-Type': 'text/plain' },
       }));
-    await expect(transport(fetch as typeof globalThis.fetch).startRun('flow.nika.yaml', { idempotencyKey: 'test-admission' }))
+    await expect(transport(fetch as typeof globalThis.fetch).startRun('flow.nika', { idempotencyKey: 'test-admission' }))
       .rejects.toBeInstanceOf(NikaProtocolError);
   });
 
@@ -194,7 +194,7 @@ describe('HTTP response framing, status, and deadlines', () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(jsonResponse({ id: 'job-1', status: 'queued' }, 201));
-    await expect(transport(fetch as typeof globalThis.fetch).startRun('flow.nika.yaml', { idempotencyKey: 'test-admission' }))
+    await expect(transport(fetch as typeof globalThis.fetch).startRun('flow.nika', { idempotencyKey: 'test-admission' }))
       .rejects.toBeInstanceOf(NikaProtocolError);
   });
 
@@ -208,7 +208,7 @@ describe('HTTP response framing, status, and deadlines', () => {
       }, 202));
     await expect(transport(fetch as typeof globalThis.fetch, {
       machineBufferBytes: 1_024,
-    }).startRun('flow.nika.yaml', { idempotencyKey: 'test-admission' })).rejects.toBeInstanceOf(NikaProtocolError);
+    }).startRun('flow.nika', { idempotencyKey: 'test-admission' })).rejects.toBeInstanceOf(NikaProtocolError);
   });
 
   it('keeps the request deadline active while the admission body is read', async () => {
@@ -219,7 +219,7 @@ describe('HTTP response framing, status, and deadlines', () => {
       ));
     await expect(transport(fetch as typeof globalThis.fetch, {
       requestTimeout: 5,
-    }).startRun('flow.nika.yaml', { idempotencyKey: 'test-admission' })).rejects.toMatchObject({
+    }).startRun('flow.nika', { idempotencyKey: 'test-admission' })).rejects.toMatchObject({
       name: 'NikaTransportError',
       transport: 'http',
     });
@@ -234,12 +234,12 @@ describe('HTTP response framing, status, and deadlines', () => {
       return delayedJsonResponse({
         status: 'accepted',
         snapshot_digest: 'fixture-digest',
-        root: 'fixture.nika.yaml',
+        root: 'fixture.nika',
         units: 1,
       }, 40);
     });
     await expect(transport(fetch as typeof globalThis.fetch).check(
-      'flow.nika.yaml',
+      'flow.nika',
       { signal: controller.signal },
     )).rejects.toBeInstanceOf(NikaTransportError);
   });
@@ -256,7 +256,7 @@ describe('HTTP response framing, status, and deadlines', () => {
     let failure: unknown;
     try {
       await transport(fetch as typeof globalThis.fetch).startRun(
-        'flow.nika.yaml',
+        'flow.nika',
         { idempotencyKey: 'same-key' },
       );
     } catch (cause) {
@@ -281,7 +281,7 @@ describe('HTTP response framing, status, and deadlines', () => {
       .mockResolvedValueOnce(new Response(`reflected ${TOKEN_A}`, { status: 502 }));
     let failure: unknown;
     try {
-      await transport(fetch as typeof globalThis.fetch).startRun('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+      await transport(fetch as typeof globalThis.fetch).startRun('flow.nika', { idempotencyKey: 'test-admission' });
     } catch (cause) {
       failure = cause;
     }
@@ -293,7 +293,7 @@ describe('HTTP response framing, status, and deadlines', () => {
 });
 
 describe('cross-client concurrency contracts', () => {
-  it.each(['daily.nika.yaml', './flow.nika.yaml'])(
+  it.each(['daily.nika', './flow.nika'])(
     'retries an admitted request with a lost response using the same caller key: %s',
     async (workflow) => {
       const fixture = makeSnapshotFixture('a');
@@ -400,14 +400,14 @@ describe('cross-client concurrency contracts', () => {
       const replayClient = client(fetch as typeof globalThis.fetch, TOKEN_A, fixtureA.bin);
       const conflictClient = client(fetch as typeof globalThis.fetch, TOKEN_A, fixtureB.bin);
       // Local paths: each client captures its own snapshot bytes, which the key binds.
-      const first = await firstClient.run('./flow.nika.yaml', { idempotencyKey: 'shared-key' });
-      const replay = await replayClient.run('./flow.nika.yaml', { idempotencyKey: 'shared-key' });
+      const first = await firstClient.run('./flow.nika', { idempotencyKey: 'shared-key' });
+      const replay = await replayClient.run('./flow.nika', { idempotencyKey: 'shared-key' });
       expect(first.id).toBe(replay.id);
       await expect(Promise.all([first.done, replay.done])).resolves.toEqual([
         expect.objectContaining({ id: 'job-shared', status: 'succeeded' }),
         expect.objectContaining({ id: 'job-shared', status: 'succeeded' }),
       ]);
-      await expect(conflictClient.run('./flow.nika.yaml', {
+      await expect(conflictClient.run('./flow.nika', {
         idempotencyKey: 'shared-key',
       })).rejects.toMatchObject({
         name: 'NikaOperationError',
@@ -465,8 +465,8 @@ describe('cross-client concurrency contracts', () => {
       revision: oldRevision,
     };
     const results = await Promise.allSettled([
-      client(fetch as typeof globalThis.fetch).schedule('flow.nika.yaml', options),
-      client(fetch as typeof globalThis.fetch).schedule('flow.nika.yaml', options),
+      client(fetch as typeof globalThis.fetch).schedule('flow.nika', options),
+      client(fetch as typeof globalThis.fetch).schedule('flow.nika', options),
     ]);
     expect(results.filter(({ status }) => status === 'fulfilled')).toHaveLength(1);
     const rejected = results.find(({ status }) => status === 'rejected') as PromiseRejectedResult;

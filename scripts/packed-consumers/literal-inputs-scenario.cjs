@@ -96,7 +96,7 @@ module.exports = async function literalInputsScenario(sdk, engines) {
     const nativeLog = path.join(scratch, 'native.argv');
     process.env.NIKA_FAKE_ARGV_LOG = nativeLog;
     const native = new sdk.Nika({ bin: engines.literal });
-    const settled = await (await native.run('echo-packed.nika.yaml', { inputs: INPUTS })).result();
+    const settled = await (await native.run('echo-packed.nika', { inputs: INPUTS })).result();
     report.native = {
       status: settled.status,
       succeeded: sdk.isNikaRunSucceeded(settled),
@@ -108,26 +108,26 @@ module.exports = async function literalInputsScenario(sdk, engines) {
     const oldLog = path.join(scratch, 'old.argv');
     process.env.NIKA_FAKE_ARGV_LOG = oldLog;
     report.oldEngine = await refusal(sdk, () => new sdk.Nika({ bin: engines.old })
-      .run('ok.nika.yaml', { inputs: INPUTS }));
+      .run('ok.nika', { inputs: INPUTS }));
     report.oldEngine.argv = argvLog(oldLog);
 
     // The caller's mistakes need no engine at all.
     const silentLog = path.join(scratch, 'silent.argv');
     process.env.NIKA_FAKE_ARGV_LOG = silentLog;
-    report.conflict = await refusal(sdk, () => native.run('echo.nika.yaml', {
+    report.conflict = await refusal(sdk, () => native.run('echo.nika', {
       inputs: { a: 1 },
       vars: { a: 1 },
     }));
-    report.undefinedValue = await refusal(sdk, () => native.run('echo.nika.yaml', {
+    report.undefinedValue = await refusal(sdk, () => native.run('echo.nika', {
       inputs: { a: { b: undefined } },
     }));
-    report.bigint = await refusal(sdk, () => native.run('echo.nika.yaml', { inputs: { a: 1n } }));
+    report.bigint = await refusal(sdk, () => native.run('echo.nika', { inputs: { a: 1n } }));
     report.silentArgv = argvLog(silentLog);
 
     // HTTP: the same bytes ride JobByName.inputs once jobInputs is advertised.
     const current = resident(['check', 'executionSnapshot', 'eventStream', 'cancel', 'jobInputs']);
     const remote = new sdk.Nika({ url: 'https://nika.example', token: TOKEN, fetch: current.fetch });
-    const job = await (await remote.run('triage.nika.yaml', {
+    const job = await (await remote.run('triage.nika', {
       inputs: INPUTS,
       idempotencyKey: 'packed-1',
     })).result();
@@ -139,7 +139,7 @@ module.exports = async function literalInputsScenario(sdk, engines) {
       url: 'https://nika.example',
       token: TOKEN,
       fetch: old.fetch,
-    }).run('triage.nika.yaml', { inputs: INPUTS, idempotencyKey: 'packed-2' }));
+    }).run('triage.nika', { inputs: INPUTS, idempotencyKey: 'packed-2' }));
     report.oldResident.requests = old.requests;
 
     // HTTP: a snapshot takes no overlay; nothing is captured or sent.
@@ -148,7 +148,7 @@ module.exports = async function literalInputsScenario(sdk, engines) {
       url: 'https://nika.example',
       token: TOKEN,
       fetch: untouched.fetch,
-    }).run('./local.nika.yaml', { inputs: {}, idempotencyKey: 'packed-3' }));
+    }).run('./local.nika', { inputs: {}, idempotencyKey: 'packed-3' }));
     report.snapshot.requests = untouched.requests;
     return report;
   } finally {

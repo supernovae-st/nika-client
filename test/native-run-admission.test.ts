@@ -95,8 +95,8 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
 
   describe('a Check refusal rejects run() with the engine findings', () => {
     it.each([
-      ['released 0.119.0 · pretty CheckReport', 'wire-0119-sec004.nika.yaml'],
-      ['engine PR #1679 · one compact object', 'wire-pr1679-sec004.nika.yaml'],
+      ['released 0.119.0 · pretty CheckReport', 'wire-0119-sec004.nika'],
+      ['engine PR #1679 · one compact object', 'wire-pr1679-sec004.nika'],
     ])('%s · NIKA-SEC-004', async (_dialect, workflow) => {
       const failure = await refusedRun(workflow);
 
@@ -117,8 +117,8 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     });
 
     it.each([
-      ['released 0.119.0 · pretty CheckReport', 'wire-0119-parse005.nika.yaml'],
-      ['engine PR #1679 · one compact object', 'wire-pr1679-parse005.nika.yaml'],
+      ['released 0.119.0 · pretty CheckReport', 'wire-0119-parse005.nika'],
+      ['engine PR #1679 · one compact object', 'wire-pr1679-parse005.nika'],
     ])('%s · NIKA-PARSE-005', async (_dialect, workflow) => {
       const failure = await refusedRun(workflow);
 
@@ -141,9 +141,11 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     });
 
     it.each([
-      ['released 0.119.0 · pretty CheckReport', 'wire-0119-missing-file.nika.yaml'],
-      ['engine PR #1679 · one compact object', 'wire-pr1679-missing-file.nika.yaml'],
+      ['released 0.119.0 · pretty CheckReport', 'wire-0119-missing-file.nika'],
+      ['engine PR #1679 · one compact object', 'wire-pr1679-missing-file.nika'],
     ])('%s · a finding without a code is never given one', async (_dialect, workflow) => {
+      // Historical decode only: fake-nika replays frozen 0.119.0 / PR1679
+      // stdout that named missing.nika.yaml. Not a live engine probe.
       const failure = await refusedRun(workflow);
 
       expect(failure).toBeInstanceOf(NikaOperationError);
@@ -162,8 +164,8 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
 
   describe('a budget or launch refusal rejects run() with the engine code', () => {
     it.each([
-      ['released 0.119.0 · plain teaching line', 'wire-0119-budget1709.nika.yaml'],
-      ['engine PR #1679 · compact error envelope', 'wire-pr1679-budget1709.nika.yaml'],
+      ['released 0.119.0 · plain teaching line', 'wire-0119-budget1709.nika'],
+      ['engine PR #1679 · compact error envelope', 'wire-pr1679-budget1709.nika'],
     ])('%s · NIKA-1709', async (_dialect, workflow) => {
       const failure = await refusedRun(workflow);
 
@@ -181,8 +183,8 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     });
 
     it.each([
-      ['released 0.119.0 · stderr only, stdout empty', 'wire-0119-input1708.nika.yaml'],
-      ['engine PR #1679 · compact error envelope', 'wire-pr1679-input1708.nika.yaml'],
+      ['released 0.119.0 · stderr only, stdout empty', 'wire-0119-input1708.nika'],
+      ['engine PR #1679 · compact error envelope', 'wire-pr1679-input1708.nika'],
     ])('%s · NIKA-1708', async (_dialect, workflow) => {
       const failure = await refusedRun(workflow);
 
@@ -198,7 +200,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     });
 
     it('SYNTHETIC · an envelope whose code is null keeps the SDK word', async () => {
-      const failure = await refusedRun('synthetic-null-code-envelope.nika.yaml');
+      const failure = await refusedRun('synthetic-null-code-envelope.nika');
 
       expect(failure).toBeInstanceOf(NikaOperationError);
       expect(failure).toMatchObject({ operation: 'run', code: 'run_refused', status: 3 });
@@ -210,10 +212,10 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
 
   describe('only what an engine was measured to write is read as a refusal', () => {
     it.each([
-      ['a report that calls itself clean', 'synthetic-clean-report.nika.yaml'],
-      ['a clean report that lists findings', 'synthetic-clean-report-with-findings.nika.yaml'],
-      ['findings with no `clean: false` beside them', 'synthetic-findings-without-verdict.nika.yaml'],
-      ['an error envelope with no message', 'synthetic-envelope-without-message.nika.yaml'],
+      ['a report that calls itself clean', 'synthetic-clean-report.nika'],
+      ['a clean report that lists findings', 'synthetic-clean-report-with-findings.nika'],
+      ['findings with no `clean: false` beside them', 'synthetic-findings-without-verdict.nika'],
+      ['an error envelope with no message', 'synthetic-envelope-without-message.nika'],
     ])('SYNTHETIC · %s is not a refusal', async (_shape, workflow) => {
       const failure = await refusedRun(workflow);
 
@@ -223,7 +225,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     });
 
     it('SYNTHETIC · a refusing report whose findings are not objects is a protocol fault', async () => {
-      const failure = await refusedRun('synthetic-malformed-findings.nika.yaml');
+      const failure = await refusedRun('synthetic-malformed-findings.nika');
 
       expect(failure).toBeInstanceOf(NikaProtocolError);
       expect(failure).not.toBeInstanceOf(NikaOperationError);
@@ -233,7 +235,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     it('SYNTHETIC · a pretty-printed event is never admission evidence', async () => {
       // Only check reports were measured pretty; the legacy reader recovers
       // a refusal or nothing, never a Run.
-      const failure = await refusedRun('synthetic-pretty-event.nika.yaml');
+      const failure = await refusedRun('synthetic-pretty-event.nika');
 
       expect(failure).toBeInstanceOf(NikaProtocolError);
       expect((failure as Error).message).toContain('neither a run event nor a pre-run refusal');
@@ -241,7 +243,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     });
 
     it('SYNTHETIC · a refusal object contradicted by exit 0 is a protocol fault', async () => {
-      const failure = await refusedRun('synthetic-refusal-exit-0.nika.yaml');
+      const failure = await refusedRun('synthetic-refusal-exit-0.nika');
 
       expect(failure).toBeInstanceOf(NikaProtocolError);
       expect((failure as Error).message).toContain('exited 0');
@@ -250,9 +252,9 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     });
 
     it.each([
-      ['a non-JSON line', 'synthetic-refusal-then-garbage.nika.yaml', 'this line follows a refusal'],
-      ['a second object', 'synthetic-refusal-then-object.nika.yaml', 'a second object'],
-      ['a line after a teaching line', 'synthetic-teaching-then-extra.nika.yaml', 'a line after'],
+      ['a non-JSON line', 'synthetic-refusal-then-garbage.nika', 'this line follows a refusal'],
+      ['a second object', 'synthetic-refusal-then-object.nika', 'a second object'],
+      ['a line after a teaching line', 'synthetic-teaching-then-extra.nika', 'a line after'],
     ])('SYNTHETIC · a refusal followed by %s is a protocol fault', async (_shape, workflow, extra) => {
       const failure = await refusedRun(workflow);
 
@@ -263,7 +265,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     });
 
     it('SYNTHETIC · an uncoded stderr line is no refusal: only the coded one was measured', async () => {
-      const failure = await refusedRun('synthetic-uncoded-stderr.nika.yaml');
+      const failure = await refusedRun('synthetic-uncoded-stderr.nika');
 
       expect(failure).toBeInstanceOf(NikaProtocolError);
       expect((failure as Error).message).toContain('(exit 3)');
@@ -273,7 +275,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     it('SYNTHETIC · a plain code line after admission is a protocol fault on run.done', async () => {
       const client = native();
       // Admitted: the first frame is a run event, so a Run exists.
-      const run = await client.run('synthetic-teaching-after-admission.nika.yaml');
+      const run = await client.run('synthetic-teaching-after-admission.nika');
       const failure = await run.done.catch((cause) => cause);
 
       expect(failure).toBeInstanceOf(NikaProtocolError);
@@ -286,7 +288,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     it('a complete refusal line past the bound, in one chunk, is a protocol fault', async () => {
       // The real 3.3 KB compact report, newline included, under a 1 KiB bound.
       const failure = await refusedRun(
-        'wire-pr1679-sec004.nika.yaml',
+        'wire-pr1679-sec004.nika',
         native({ machineBufferBytes: 1024 }),
       );
 
@@ -297,7 +299,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
 
     it('SYNTHETIC · a complete event past the bound, in one chunk, fails the admitted run', async () => {
       const client = native({ machineBufferBytes: 4096 });
-      const run = await client.run('synthetic-big-event.nika.yaml');
+      const run = await client.run('synthetic-big-event.nika');
       const failure = await run.done.catch((cause) => cause);
 
       expect(failure).toBeInstanceOf(NikaProtocolError);
@@ -305,11 +307,11 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     });
 
     it('SYNTHETIC · the bound is exact: a 512-byte line passes at 512 and fails at 511', async () => {
-      const fits = await native({ machineBufferBytes: 512 }).run('synthetic-exact-bound.nika.yaml');
+      const fits = await native({ machineBufferBytes: 512 }).run('synthetic-exact-bound.nika');
       await expect(fits.done).resolves.toMatchObject({ status: 'succeeded' });
 
       const failure = await refusedRun(
-        'synthetic-exact-bound.nika.yaml',
+        'synthetic-exact-bound.nika',
         native({ machineBufferBytes: 511 }),
       );
       expect(failure).toBeInstanceOf(NikaProtocolError);
@@ -320,7 +322,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
   describe('an admitted run keeps its events and its result', () => {
     it('released 0.119.0 · hello replays all six frames, the first included', async () => {
       const client = native();
-      const run = await client.run<{ greeting: string }>('wire-0119-hello.nika.yaml');
+      const run = await client.run<{ greeting: string }>('wire-0119-hello.nika');
       expect(Object.keys(run).sort()).toEqual([
         'cancel', 'done', 'events', 'id', 'result', 'status',
       ]);
@@ -357,7 +359,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
 
     it('released 0.119.0 · an admitted failure is result data, never a throw', async () => {
       const client = native();
-      const run = await client.run('wire-0119-admitted-failure.nika.yaml');
+      const run = await client.run('wire-0119-admitted-failure.nika');
 
       expect(await kinds(client, run)).toEqual([
         'workflow_started',
@@ -381,8 +383,8 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
 
   describe('output that is neither a run nor a refusal stays a protocol error', () => {
     it.each([
-      ['a pretty report cut mid-document', 'synthetic-truncated-pretty.nika.yaml'],
-      ['a compact report cut mid-line', 'synthetic-truncated-compact.nika.yaml'],
+      ['a pretty report cut mid-document', 'synthetic-truncated-pretty.nika'],
+      ['a compact report cut mid-line', 'synthetic-truncated-compact.nika'],
     ])('SYNTHETIC · %s', async (_shape, workflow) => {
       const failure = await refusedRun(workflow);
 
@@ -394,7 +396,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
 
     it('SYNTHETIC · a first line beyond machineBufferBytes', async () => {
       const failure = await refusedRun(
-        'synthetic-oversize.nika.yaml',
+        'synthetic-oversize.nika',
         native({ machineBufferBytes: 4096 }),
       );
 
@@ -405,7 +407,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     it('SYNTHETIC · a pretty report beyond machineBufferBytes', async () => {
       // The real 4.5 KB report, read under a bound smaller than the document.
       const failure = await refusedRun(
-        'wire-0119-sec004.nika.yaml',
+        'wire-0119-sec004.nika',
         native({ machineBufferBytes: 1024 }),
       );
 
@@ -414,8 +416,8 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     });
 
     it.each([
-      ['exit 0', 'synthetic-silent-exit-0.nika.yaml', '(exit 0)'],
-      ['exit 2', 'synthetic-silent-exit-2.nika.yaml', '(exit 2)'],
+      ['exit 0', 'synthetic-silent-exit-0.nika', '(exit 0)'],
+      ['exit 2', 'synthetic-silent-exit-2.nika', '(exit 2)'],
     ])('SYNTHETIC · no output at all · %s', async (_exit, workflow, named) => {
       const failure = await refusedRun(workflow);
 
@@ -425,7 +427,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     });
 
     it('SYNTHETIC · a crash before any frame quotes the diagnostic', async () => {
-      const failure = await refusedRun('synthetic-crash-before-frame.nika.yaml');
+      const failure = await refusedRun('synthetic-crash-before-frame.nika');
 
       expect(failure).toBeInstanceOf(NikaProtocolError);
       expect((failure as Error).message).toContain('(exit 101)');
@@ -433,14 +435,14 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     });
 
     it('SYNTHETIC · a first object that is neither an event nor a refusal', async () => {
-      const failure = await refusedRun('synthetic-unknown-first-object.nika.yaml');
+      const failure = await refusedRun('synthetic-unknown-first-object.nika');
 
       expect(failure).toBeInstanceOf(NikaProtocolError);
       expect((failure as Error).message).toContain('neither a run event nor a pre-run refusal');
     });
 
     it('keeps the protocol verdict for a line that is not machine output', async () => {
-      const failure = await refusedRun('garbage-line.nika.yaml');
+      const failure = await refusedRun('garbage-line.nika');
 
       expect(failure).toBeInstanceOf(NikaProtocolError);
       expect((failure as Error).message).toContain('this line is not machine output at all');
@@ -452,11 +454,11 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
       const log = scratchFile('argv');
       process.env.NIKA_FAKE_ARGV_LOG = log;
       try {
-        await refusedRun('wire-0119-sec004.nika.yaml');
+        await refusedRun('wire-0119-sec004.nika');
         const invoked = readFileSync(log, 'utf8').trim().split('\n')
           .map((line) => JSON.parse(line) as string[]);
         expect(invoked.filter(([command]) => command === 'run')).toEqual([
-          ['run', 'wire-0119-sec004.nika.yaml', '--json'],
+          ['run', 'wire-0119-sec004.nika', '--json'],
         ]);
         expect(invoked.filter(([command]) => command === 'check')).toEqual([]);
       } finally {
@@ -469,7 +471,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
       const pidFile = scratchFile('pid');
       process.env.NIKA_FAKE_PID_FILE = pidFile;
       try {
-        const failure = await refusedRun('synthetic-lingering-refusal.nika.yaml');
+        const failure = await refusedRun('synthetic-lingering-refusal.nika');
         // The exit status is the engine's own, not a signal the SDK sent.
         expect(failure).toMatchObject({ code: 'NIKA-1709', status: 2 });
         expect(existsSync(pidFile)).toBe(true);
@@ -481,8 +483,8 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     });
 
     it.each([
-      ['a refusal object followed by run events', 'synthetic-refusal-then-events.nika.yaml'],
-      ['a garbage line from an engine that keeps running', 'synthetic-garbage-then-hang.nika.yaml'],
+      ['a refusal object followed by run events', 'synthetic-refusal-then-events.nika'],
+      ['a garbage line from an engine that keeps running', 'synthetic-garbage-then-hang.nika'],
     ])('SYNTHETIC · stops %s', async (_shape, workflow) => {
       const pidFile = scratchFile('pid');
       process.env.NIKA_FAKE_PID_FILE = pidFile;
@@ -504,7 +506,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
       process.env.NIKA_FAKE_PID_FILE = pidFile;
       try {
         const started = Date.now();
-        const failure = await refusedRun('synthetic-ignores-sigterm.nika.yaml');
+        const failure = await refusedRun('synthetic-ignores-sigterm.nika');
         // The fixture would live thirty seconds and shrugs off SIGTERM: the
         // rejection is bounded by the escalation, never by the engine.
         expect(Date.now() - started).toBeLessThan(6_000);
@@ -520,7 +522,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     it('rejects run() with the transport error when the engine cannot spawn', async () => {
       // The identity probe ignores cwd, so only the run spawn meets this one.
       const failure = await refusedRun(
-        'ok.nika.yaml',
+        'ok.nika',
         native({ cwd: path.join(tmpdir(), `nika-sdk-absent-${randomUUID()}`) }),
       );
 
@@ -530,10 +532,10 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
 
     it('keeps the client usable after a refusal', async () => {
       const client = native();
-      await refusedRun('wire-pr1679-sec004.nika.yaml', client);
-      await refusedRun('wire-0119-sec004.nika.yaml', client);
+      await refusedRun('wire-pr1679-sec004.nika', client);
+      await refusedRun('wire-0119-sec004.nika', client);
 
-      const run = await client.run('ok.nika.yaml');
+      const run = await client.run('ok.nika');
       await expect(run.done).resolves.toMatchObject({ status: 'succeeded', exitCode: 0 });
     });
   });

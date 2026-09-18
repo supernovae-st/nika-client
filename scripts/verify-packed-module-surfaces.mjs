@@ -64,7 +64,7 @@ try {
     const lifecycle = [
       'async function lifecycle(Nika, isNikaRunSucceeded) {',
       `  const nika = new Nika({ bin: ${JSON.stringify(replayEngine)} });`,
-      "  const run = await nika.run('wire-0119-hello.nika.yaml');",
+      "  const run = await nika.run('wire-0119-hello.nika');",
       '  const { events, result } = run;',
       '  const kinds = [];',
       '  const protocol = [];',
@@ -81,7 +81,7 @@ try {
       '  const legacy = [];',
       '  for await (const event of nika.events(run)) legacy.push(event.kind);',
       "  if (legacy.join() !== protocolWords) throw new Error('deprecated wrapper: ' + legacy.join());",
-      "  const gate = await nika.run('wire-0118-human-gate.nika.yaml');",
+      "  const gate = await nika.run('wire-0118-human-gate.nika');",
       '  const gateKinds = [];',
       '  for await (const event of gate.events()) gateKinds.push(event.kind);',
       '  const held = await gate.result();',
@@ -92,14 +92,14 @@ try {
       // Issue #122: the packed default replays the measured 90-task shape (273
       // frames) observed only after its result, and an explicit 256 keeps its
       // cap with a refusal that names the history, never a slow subscriber.
-      "  const wide = await nika.run('wide90.nika.yaml');",
+      "  const wide = await nika.run('wide90.nika');",
       '  const wideResult = await wide.result();',
       '  let replayed = 0;',
       '  for await (const event of wide.events()) replayed += event.raw ? 1 : 0;',
       "  if (replayed !== 3 * 90 + 3) throw new Error('late replay frames: ' + replayed);",
       "  if (!isNikaRunSucceeded(wideResult)) throw new Error('late replay result');",
       `  const capped = new Nika({ bin: ${JSON.stringify(replayEngine)}, eventBufferSize: 256 });`,
-      "  const cappedRun = await capped.run('wide90.nika.yaml');",
+      "  const cappedRun = await capped.run('wide90.nika');",
       '  const cappedResult = await cappedRun.result();',
       '  let refused;',
       '  try { cappedRun.events(); } catch (cause) { refused = cause; }',
@@ -313,7 +313,7 @@ function assertLiteralInputs(report, moduleSystem) {
   assert.deepEqual(report.native, {
     status: 'succeeded',
     succeeded: true,
-    argv: [['--sdk-identity'], ['run', 'echo-packed.nika.yaml', '--json', '--inputs-json', '-']],
+    argv: [['--sdk-identity'], ['run', 'echo-packed.nika', '--json', '--inputs-json', '-']],
     stdin: map,
   }, say('native run writes the map to stdin and only names the channel in argv'));
 
@@ -347,7 +347,7 @@ function assertLiteralInputs(report, moduleSystem) {
     status: 'succeeded',
     requests: [
       { path: '/health', method: 'GET', body: null },
-      { path: '/v1/jobs', method: 'POST', body: `{"workflow":"triage.nika.yaml","inputs":${map}}` },
+      { path: '/v1/jobs', method: 'POST', body: `{"workflow":"triage.nika","inputs":${map}}` },
       { path: '/v1/jobs/job-1/events', method: 'GET', body: null },
     ],
   }, say('HTTP posts the same map bytes as JobByName.inputs'));

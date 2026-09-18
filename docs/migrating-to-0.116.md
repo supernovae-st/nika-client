@@ -126,7 +126,7 @@ These methods require an HTTP client. A native-process client returns a typed
 ## Durable status
 
 ```ts
-const run = await nika.run('flow.nika.yaml');
+const run = await nika.run('flow.nika');
 console.log(await nika.status(run));
 console.log(await run.done);
 ```

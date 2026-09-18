@@ -37,7 +37,7 @@ const SETTLEMENT = Object.freeze({
 const ACK = Object.freeze({
   status: 'accepted',
   snapshot_digest: 'f'.repeat(64),
-  root: 'daily.nika.yaml',
+  root: 'daily.nika',
   units: 3,
 });
 
@@ -104,13 +104,13 @@ describe('run by served name (ADR-131)', () => {
         },
       ]));
     const nika = remote(fetch);
-    const run = await nika.run('daily.nika.yaml', { idempotencyKey: 'daily-2026-09-04' });
+    const run = await nika.run('daily.nika', { idempotencyKey: 'daily-2026-09-04' });
     expect(run.id).toBe('job-1');
 
     const { url, init } = request(fetch, 1);
     expect(url).toBe('https://nika.example/v1/jobs');
     expect(init.method).toBe('POST');
-    expect(init.body).toBe('{"workflow":"daily.nika.yaml"}');
+    expect(init.body).toBe('{"workflow":"daily.nika"}');
     const headers = new Headers(init.headers);
     expect(headers.get('Idempotency-Key')).toBe('daily-2026-09-04');
     expect(headers.get('Content-Type')).toBe('application/json');
@@ -130,7 +130,7 @@ describe('run by served name (ADR-131)', () => {
     expect(fetch.mock.calls.some(([called]) => String(called).includes('/v1/workflows'))).toBe(false);
   });
 
-  it.each(['daily.nika.yaml', './daily.nika.yaml'])(
+  it.each(['daily.nika', './daily.nika'])(
     'refuses a missing caller key before network or local capture for %s',
     async (workflow) => {
       const fetch = vi.fn();
@@ -153,7 +153,7 @@ describe('run by served name (ADR-131)', () => {
         receipt: RECEIPT,
         settlement: SETTLEMENT,
       }]));
-    const run = await remote(fetch).run('daily.nika.yaml', { idempotencyKey: 'test-admission' });
+    const run = await remote(fetch).run('daily.nika', { idempotencyKey: 'test-admission' });
     const result = await run.done;
     expect(result.status).toBe('succeeded');
     expect(result.settlement).toEqual(SETTLEMENT);
@@ -170,7 +170,7 @@ describe('run by served name (ADR-131)', () => {
         receipt: RECEIPT,
         settlement: 'private',
       } as unknown as NikaEvent]));
-    const run = await remote(fetch).run('daily.nika.yaml', { idempotencyKey: 'test-admission' });
+    const run = await remote(fetch).run('daily.nika', { idempotencyKey: 'test-admission' });
     await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);
   });
 
@@ -181,7 +181,7 @@ describe('run by served name (ADR-131)', () => {
       .mockResolvedValueOnce(sseResponse([
         { sequence: 1, kind: 'execution.settled', status: 'succeeded', receipt: RECEIPT },
       ]));
-    const run = await remote(fetch).run('daily.nika.yaml', { idempotencyKey: 'same-key' });
+    const run = await remote(fetch).run('daily.nika', { idempotencyKey: 'same-key' });
     expect(run.id).toBe('job-1');
     await expect(run.done).resolves.toMatchObject({ id: 'job-1', status: 'succeeded' });
   });
@@ -190,7 +190,7 @@ describe('run by served name (ADR-131)', () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(jsonResponse({ error: NOT_FOUND }, 404));
-    const refused = await failure(remote(fetch).run('missing.nika.yaml', { idempotencyKey: 'test-admission' }));
+    const refused = await failure(remote(fetch).run('missing.nika', { idempotencyKey: 'test-admission' }));
     expect(refused).toBeInstanceOf(NikaOperationError);
     expect(refused).toMatchObject({
       operation: 'run',
@@ -207,10 +207,10 @@ describe('run by served name (ADR-131)', () => {
     const fetch = vi.fn();
     const nika = remote(fetch);
     for (const options of [{ vars: { x: 1 } }, { model: 'mock/echo' }, { maxCostUsd: 1 }]) {
-      await expect(nika.run('daily.nika.yaml', options))
+      await expect(nika.run('daily.nika', options))
         .rejects.toMatchObject({ name: 'NikaCompatibilityError', capability: 'runOptions' });
     }
-    await expect(nika.run('daily.nika.yaml', { idempotencyKey: '' }))
+    await expect(nika.run('daily.nika', { idempotencyKey: '' }))
       .rejects.toBeInstanceOf(NikaTransportError);
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -221,7 +221,7 @@ describe('check by served name (ADR-131)', () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(jsonResponse(ACK));
-    const report = await remote(fetch).check('daily.nika.yaml');
+    const report = await remote(fetch).check('daily.nika');
     expect(report).toEqual({ clean: true, ...ACK });
     expect(report).not.toHaveProperty('report_version');
     expect(report).not.toHaveProperty('findings');
@@ -229,7 +229,7 @@ describe('check by served name (ADR-131)', () => {
     const { url, init } = request(fetch, 1);
     expect(url).toBe('https://nika.example/v1/check');
     expect(init.method).toBe('POST');
-    expect(init.body).toBe('{"workflow":"daily.nika.yaml"}');
+    expect(init.body).toBe('{"workflow":"daily.nika"}');
     expect(new Headers(init.headers).has('Idempotency-Key')).toBe(false);
   });
 
@@ -241,7 +241,7 @@ describe('check by served name (ADR-131)', () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(jsonResponse({ error }, status));
-    await expect(remote(fetch).check('daily.nika.yaml'))
+    await expect(remote(fetch).check('daily.nika'))
       .resolves.toEqual({ clean: false, error });
   });
 
@@ -254,7 +254,7 @@ describe('check by served name (ADR-131)', () => {
     for (const status of [404, 422]) {
       const fetch = vi.fn().mockResolvedValueOnce(healthResponse())
         .mockResolvedValueOnce(jsonResponse(body, status));
-      await expect(remote(fetch).check('daily.nika.yaml'))
+      await expect(remote(fetch).check('daily.nika'))
         .rejects.toBeInstanceOf(NikaTransportError);
     }
   });
@@ -266,7 +266,7 @@ describe('check by served name (ADR-131)', () => {
         { error: { code: 'unauthorized', message: 'authentication required' } },
         401,
       ));
-    await expect(remote(unauthorized).check('daily.nika.yaml')).rejects.toMatchObject({
+    await expect(remote(unauthorized).check('daily.nika')).rejects.toMatchObject({
       name: 'NikaOperationError',
       operation: 'check',
       code: 'unauthorized',
@@ -276,14 +276,14 @@ describe('check by served name (ADR-131)', () => {
     const untyped = vi.fn()
       .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(new Response(`reflected ${TOKEN_A}`, { status: 503 }));
-    const failed = await failure(remote(untyped).check('daily.nika.yaml'));
+    const failed = await failure(remote(untyped).check('daily.nika'));
     expect(failed).toBeInstanceOf(NikaTransportError);
     expect(String(failed)).toContain('[REDACTED]');
     expect(String(failed)).not.toContain(TOKEN_A);
   });
 
   it.each([
-    ['an unknown field', { ...ACK, path: '/private/daily.nika.yaml' }],
+    ['an unknown field', { ...ACK, path: '/private/daily.nika' }],
     ['a status other than accepted', { ...ACK, status: 'rejected' }],
     ['a digest that is not canonical', { ...ACK, snapshot_digest: 'short' }],
     ['a unit count below one', { ...ACK, units: 0 }],
@@ -292,15 +292,15 @@ describe('check by served name (ADR-131)', () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(jsonResponse(body));
-    await expect(remote(fetch).check('daily.nika.yaml'))
+    await expect(remote(fetch).check('daily.nika'))
       .rejects.toBeInstanceOf(NikaProtocolError);
   });
 
   it('keeps the check option gap ahead of any request', async () => {
     const fetch = vi.fn();
-    await expect(remote(fetch).check('daily.nika.yaml', { model: 'mock/echo' }))
+    await expect(remote(fetch).check('daily.nika', { model: 'mock/echo' }))
       .rejects.toMatchObject({ capability: 'checkOptions', transport: 'http' });
-    await expect(remote(fetch).check('daily.nika.yaml', { nativeStrict: true }))
+    await expect(remote(fetch).check('daily.nika', { nativeStrict: true }))
       .rejects.toMatchObject({ capability: 'checkOptions', transport: 'http' });
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -318,7 +318,7 @@ describe('the local capture path is unchanged', () => {
         status: 'succeeded',
         receipt: { ...RECEIPT, snapshot_digest: 'a'.repeat(64) },
       }]));
-    const source = await transport(fetch, resolveEngine).startRun('./flow.nika.yaml', { idempotencyKey: 'test-admission' });
+    const source = await transport(fetch, resolveEngine).startRun('./flow.nika', { idempotencyKey: 'test-admission' });
     expect(resolveEngine).toHaveBeenCalledTimes(1);
     const body = String(request(fetch, 1).init.body);
     expect(JSON.parse(body)).toMatchObject({ format_version: 1, digest: 'a'.repeat(64) });
@@ -329,10 +329,10 @@ describe('the local capture path is unchanged', () => {
   });
 
   it.each([
-    ['a relative path', './flow.nika.yaml'],
-    ['a parent path', '../flow.nika.yaml'],
-    ['an absolute path', '/srv/flow.nika.yaml'],
-    ['a backslash path', 'dir\\flow.nika.yaml'],
+    ['a relative path', './flow.nika'],
+    ['a parent path', '../flow.nika'],
+    ['an absolute path', '/srv/flow.nika'],
+    ['a backslash path', 'dir\\flow.nika'],
     ['a name without the extension', 'flow.yaml'],
   ])('routes %s to the local engine, never to the by-name door', async (_name, workflow) => {
     const fetch = vi.fn();
@@ -346,7 +346,32 @@ describe('the local capture path is unchanged', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it.each([['flow.nika.yaml'], ['nested/daily.nika.yaml']])(
+  it.each(['daily.nika.yaml', 'nested/daily.nika.yml', 'équipe/"quoted".nika.yaml'])(
+    'refuses retired suffix %s instead of falling back to local capture',
+    async (workflow) => {
+      const fetch = vi.fn();
+      const resolveEngine = vi.fn(() => { throw new Error('must not capture'); });
+      await expect(transport(fetch, resolveEngine).startRun(workflow, { idempotencyKey: 'test-admission' }))
+        .rejects.toMatchObject({ name: 'NikaConfigurationError' });
+      await expect(transport(fetch, resolveEngine).check(workflow, {}))
+        .rejects.toMatchObject({ name: 'NikaConfigurationError' });
+      expect(fetch).not.toHaveBeenCalled();
+      expect(resolveEngine).not.toHaveBeenCalled();
+    },
+  );
+
+  it('refuses a quoted hostile retired name with inputs before any HTTP or engine action', async () => {
+    const fetch = vi.fn();
+    const resolveEngine = vi.fn(() => { throw new Error('must not capture'); });
+    await expect(transport(fetch, resolveEngine).startRun('équipe/"quoted".nika.yaml', {
+      inputs: { a: 1 },
+      idempotencyKey: 'hostile',
+    })).rejects.toMatchObject({ name: 'NikaConfigurationError' });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(resolveEngine).not.toHaveBeenCalled();
+  });
+
+  it.each([['flow.nika'], ['nested/daily.nika']])(
     'submits %s by name without resolving an engine',
     async (workflow) => {
       const resolveEngine = vi.fn(() => {

@@ -91,17 +91,17 @@ let report;
 if (config.action === 'catalog') {
   const names = await remote.listWorkflows();
   for (const name of config.names) {
-    assert(names.includes(`${name}.nika.yaml`));
-    assert.equal((await remote.check(`${name}.nika.yaml`)).clean, true, `check by name: ${name}`);
+    assert(names.includes(`${name}.nika`));
+    assert.equal((await remote.check(`${name}.nika`)).clean, true, `check by name: ${name}`);
   }
   report = { installed_package: { name: installed.name, version: installed.version }, names };
 } else if (config.action === 'replay') {
-  active = await remote.run('clean.nika.yaml', { idempotencyKey: 'world-replay' });
+  active = await remote.run('clean.nika', { idempotencyKey: 'world-replay' });
   const original = active;
   const result = structuredClone(await original.done);
   compareResult(result, config.expected, 'original before registry mutation');
-  writeFileSync(`${config.project}/clean.nika.yaml`, 'not valid workflow yaml\n');
-  active = await remote.run('clean.nika.yaml', { idempotencyKey: 'world-replay' });
+  writeFileSync(`${config.project}/clean.nika`, 'not valid workflow yaml\n');
+  active = await remote.run('clean.nika', { idempotencyKey: 'world-replay' });
   assert.equal(active.id, original.id);
   const replayedResult = await active.done;
   compareResult(replayedResult, config.expected, 'replay before recapture');
@@ -113,6 +113,6 @@ if (config.action === 'catalog') {
   const options = config.door === 'sdk-native'
     ? undefined
     : { idempotencyKey: `one-door-${config.name}-${config.door}` };
-  report = await execute(`${config.name}.nika.yaml`, options, config.name === 'cancelled');
+  report = await execute(`${config.name}.nika`, options, config.name === 'cancelled');
 }
 console.log(JSON.stringify(report));

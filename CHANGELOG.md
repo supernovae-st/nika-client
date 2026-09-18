@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.120.0]
+
+### Known engine limitation
+
+The public 0.120.0 project schema still rejects canonical `.nika` paths in
+`nika.yaml` arm bindings. The correction belongs to
+[engine #1692](https://github.com/supernovae-st/nika/pull/1692) and
+[Spec #345](https://github.com/supernovae-st/nika-spec/pull/345), for a later
+engine release. This SDK aligns with the current public engine; the broader
+file-identity migration remains open.
+
+### Changed
+
+- Canonical live workflow files are lowercase `.nika`. HTTP by-name
+  admission (`isContainedWorkflowName`) keeps contained-relative shape and
+  refuses retired `.nika.yaml` / `.nika.yml` names instead of falling back
+  to local capture. Project `nika.yaml` and runtime `.nika/` are unchanged.
+  Generated OpenAPI was regenerated from the engine Serve schema (`info.version`
+  0.120.0). Lockstep with public engine `v0.120.0`.
+
 ### Added
 
 - The Run owns its lifecycle (#120). `NikaRun` now carries `events()`,

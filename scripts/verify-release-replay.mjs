@@ -100,8 +100,23 @@ export function stableDepthEvidence(report) {
           "depth cancellation project lacks the exact cancellation terminal its cancel reply leads to",
         );
       }
+      // The app binds this journal identity to the actual run receipt and
+      // rejects a substituted trace before recording evidence. A fresh run
+      // necessarily has a new trace id; retain it in the raw ledger but compare
+      // its verified shape and every behavioral verdict across replays.
+      let receipt = project.remote_receipt_verdict;
+      if (receipt !== undefined) {
+        const { trace_id: traceId, ...verdict } = receipt;
+        if (typeof traceId !== "string" || !/^[0-9a-f]{32}$/.test(traceId)
+          || /^0+$/.test(traceId) || verdict.verified !== true
+          || project.mismatched_trace_rejected !== true) {
+          throw new Error("depth receipt evidence lacks a verified trace identity and substitution refusal");
+        }
+        receipt = verdict;
+      }
       return {
         ...project,
+        ...(receipt === undefined ? {} : { remote_receipt_verdict: receipt }),
         sse_event_kinds: kinds.map(stableCancellationTerminalKind),
         sse_terminal: {
           ...terminal,

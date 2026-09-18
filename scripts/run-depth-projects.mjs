@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -74,6 +74,12 @@ export async function runDepthProjects() {
     const packed = JSON.parse(await run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', scratch],
       { cwd: root, timeoutMs: 30_000 }));
     const tarball = path.join(scratch, packed[0].filename);
+    if (process.env.NIKA_GAUNTLET_RESULTS_DIR) {
+      // Keep the exact tested archive beside its provenance, so replay digest
+      // differences can be inspected without substituting a later rebuild.
+      copyFileSync(tarball, path.join(resultsRoot, packed[0].filename));
+      writeFileSync(path.join(resultsRoot, 'depth-package.json'), `${JSON.stringify(packed[0], null, 2)}\n`);
+    }
     // Preserve the repository-relative imports in the committed app. Only
     // shared harness helpers are copied; no SDK source or dist is staged.
     mkdirSync(path.join(scratch, 'scripts', 'one-door'), { recursive: true });

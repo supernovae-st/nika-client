@@ -86,6 +86,16 @@ Every release wave must ask and demonstrate an answer to these questions:
   knowledge?
 - Do ESM and CommonJS load from the packed tarball on every supported Node
   major?
+- Does a workflow the engine refuses reject native `run()` with the engine's
+  code and findings, on every refusal dialect a supported engine writes, with
+  no run handle, no second spawn and no preflight check? Does output that
+  proves neither admission nor refusal stay a protocol fault? The answer is
+  `test/native-run-admission.test.ts`. Its `wire-*` cases replay stdout and
+  stderr captured byte-for-byte from real engines
+  (`test/fixtures/run-wire/README.md` records which, and how); its
+  `SYNTHETIC` cases are invented hostile shapes. A replay proves the SDK
+  decodes those bytes, never that an engine still writes them: a new engine
+  release needs a new capture.
 - What happens if the server dies after admission but before the first SSE
   frame?
 - What happens if SSE reconnects after a duplicate, gap, conflicting replay,

@@ -26,7 +26,16 @@ local nika process         authenticated nika serve
   Adapters must implement and makes unsupported authority explicit.
 - `src/lib/native-process-transport.ts` is the local Adapter. It spawns the
   selected engine without a shell and consumes newline-delimited machine
-  events.
+  events. It reads the first machine frame before it returns a run, so
+  `run()` resolves on the engine's admission and rejects on its refusal.
+- `src/lib/run-refusal.ts` reads the engine's one pre-run refusal object (its
+  check report carrying `clean: false`, or its `{ error }` envelope) and turns
+  it into the typed `NikaOperationError`. It judges nothing: a shape the
+  engine was not measured to write is a protocol fault, never a refusal.
+- `src/lib/legacy-run-refusals.ts` is temporary. It recovers the three refusal
+  dialects of engines up to 0.119.0, which predate the one `run --json`
+  grammar, and is deleted with its call sites once no supported engine writes
+  them.
 - `src/lib/http-transport.ts` is the remote Adapter. It verifies the remote
   server identity once per client, resolves and verifies a local engine only
   for caller-owned snapshot capture, then uses the authenticated HTTP
@@ -62,7 +71,13 @@ Some operations deliberately have one authority:
 ## Lifecycle invariants
 
 1. `run()` resolves only after stable admission and returns an immutable
-   `{ id, done }` handle.
+   `{ id, done }` handle. A run handle never means "maybe a run": a refusal
+   before admission rejects `run()` with `NikaOperationError` and no handle
+   exists. Over HTTP a red local snapshot refuses before any request is sent;
+   on the native transport the first machine frame decides. A run event is the
+   engine's admission evidence and is replayed as the first event; a refusal
+   object is the whole stream. The one spawn that executes the workflow is the
+   one that judges it: the SDK adds no preflight check and never spawns twice.
 2. `run.done` is the only terminal promise. Workflow failure is result data;
    configuration, transport, protocol, and compatibility failures throw.
 3. `events(run)` creates an independent bounded observer. Aborting an observer

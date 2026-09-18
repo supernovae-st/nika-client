@@ -119,6 +119,10 @@ compact acknowledgement with `clean: true`, or its typed workflow refusal
 with `clean: false`; it does not invent local findings or an exit code.
 
 `run()` returns after stable admission. `run.done` is the sole terminal result.
+A workflow the engine refuses before admission never yields a run: `run()`
+itself rejects with a `NikaOperationError` that names the engine's code and,
+for a red check, carries its `findings[]` (see [Errors](#errors)). The engine
+checks on every run, so no `check()` is needed first to be protected or taught.
 An admitted workflow failure is result data with `status: "failed"` and, when
 the engine named the failing task, `error: { code, message, task }`; transport,
 protocol, configuration, and compatibility failures throw typed SDK errors.
@@ -591,9 +595,37 @@ Server messages are engine-owned and path-free; a reflected bearer token is
 redacted before it reaches an error message. A non-2xx answer without that
 typed body stays a `NikaTransportError` whose body is redacted entirely.
 
-An engine refusal printed before a run starts — a `NIKA-…` code line such as a
-cost-floor refusal — settles `run.done` with a `NikaOperationError` carrying
-`operation: 'run'`, the engine's code, and its full refusal line.
+A native engine refuses a workflow before admitting it: a red check, a cost
+floor above `maxCostUsd`, a required input left unset, a file it cannot read.
+`run()` then rejects, before any `NikaRun` exists, with a `NikaOperationError`
+carrying `operation: 'run'` and the engine's exit status in `status`:
+
+```ts
+try {
+  const run = await nika.run('./workflow.nika.yaml');
+  const result = await run.done; // admitted: a failure here is result data
+} catch (error) {
+  if (error instanceof NikaOperationError && error.operation === 'run') {
+    console.error(error.code); // 'NIKA-SEC-004'
+    for (const finding of error.findings ?? []) console.error(finding.message);
+  } else throw error;
+}
+```
+
+- `code` is the engine's own code: the first check finding that names one
+  (`NIKA-SEC-004`, `NIKA-PARSE-005`, `NIKA-AUTH-006`, …) or the refusal's code
+  (`NIKA-1709`, `NIKA-1708`). `machineCode` repeats it. When the engine named
+  none, as for an unreadable file, `code` is the SDK's `run_refused` and
+  `machineCode` is absent; the SDK never supplies an engine code.
+- `findings` holds the engine's check findings untouched, as
+  `NikaCheckFinding` (`code?`, `message`, `severity`, `gate`, `kind`, `task`,
+  `docs_url`). A budget or launch refusal has no findings.
+- Nothing was admitted, so nothing else exists: no run id, no events, no
+  trace, no receipt.
+
+Output that proves neither an admission nor a refusal (a line that is not
+machine output, a truncated or oversized report, an engine that exits without
+a frame) rejects `run()` with `NikaProtocolError` instead.
 
 ## Security boundaries
 

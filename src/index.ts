@@ -294,6 +294,7 @@ export {
 export type {
   NikaCancelResult,
   NikaAttachRunOptions,
+  NikaCheckFinding,
   NikaCheckOptions,
   NikaCheckResult,
   NikaConfig,

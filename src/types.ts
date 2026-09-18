@@ -474,8 +474,30 @@ export interface NikaScheduleFinding {
   [key: string]: unknown;
 }
 
-/** Findings carried by the one operation-error taxonomy. */
-export type NikaOperationFinding = NikaScheduleFinding;
+/**
+ * One engine-owned check finding, exactly as the engine's check report
+ * carries it. `code` is absent when the engine's failure class names none (an
+ * unreadable workflow file); the SDK never supplies one. The vocabulary
+ * remains additive.
+ */
+export interface NikaCheckFinding {
+  code?: string;
+  message?: string;
+  severity?: string;
+  gate?: string;
+  kind?: string;
+  /** The task the finding judges, when it judges one. */
+  task?: string;
+  docs_url?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * Findings carried by the one operation-error taxonomy: a schedule refusal
+ * carries schedule findings (`detail`), a refused `run()` carries the check
+ * findings that refused it (`message`).
+ */
+export type NikaOperationFinding = NikaScheduleFinding | NikaCheckFinding;
 
 export type NikaScheduleWhen =
   | { kind: 'once'; at: string }

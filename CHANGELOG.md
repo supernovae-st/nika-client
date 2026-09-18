@@ -18,6 +18,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Native `run()` resolves only after the engine admitted the run (#121). A
+  refusal the engine writes before admission now rejects `run()` itself with
+  `NikaOperationError` (`operation: 'run'`, the engine's exit status in
+  `status`) and no `NikaRun` exists: there is nothing to await, observe or
+  cancel for a run that never started. A check refusal names the first
+  finding's code (`NIKA-SEC-004`, `NIKA-PARSE-005`, `NIKA-AUTH-006`, …) and
+  carries the engine's `findings[]` untouched; a budget or launch refusal
+  names its code (`NIKA-1709`, `NIKA-1708`). When the engine named no code,
+  as for an unreadable workflow file, `code` is the SDK's own `run_refused`
+  and `machineCode` stays absent. Before this change the handle was minted
+  first and a red check surfaced on `run.done` as `NikaProtocolError: Engine
+  machine output was not valid JSON: {`. The engine's own check on run is the
+  only judge: the SDK adds no preflight `check` and spawns the workflow once.
+  An admitted run is unchanged: its first frame is still delivered as the
+  first event, and an admitted failure still resolves as result data.
+  **Migration:** catch the refusal around `await nika.run(…)`, not only
+  around `await run.done`.
+- Output that proves neither admission nor a refusal rejects `run()` with
+  `NikaProtocolError` as well, instead of surfacing later on `run.done`: a
+  line that is not machine output, a truncated or oversized report, an engine
+  that exits without a frame, a refusal followed by any further output, a
+  refusal contradicted by exit 0, and a report that calls itself clean. After
+  admission a plain non-JSON line is a protocol fault on `run.done`; it is no
+  longer read as a late refusal, which no engine was measured to write.
+- `machineBufferBytes` now bounds every native machine line exactly. A
+  complete line that arrived whole in one pipe chunk used to pass unmeasured,
+  so the same frame could pass or fail with the chunking. A run whose frames
+  (for instance a `run_settled` with large outputs) exceed the 64 KiB default
+  must raise `machineBufferBytes`.
+- `NikaOperationFinding` is now `NikaScheduleFinding | NikaCheckFinding`. The
+  new exported `NikaCheckFinding` is the engine's check finding as written
+  (`code?`, `message`, `severity`, `gate`, `kind`, `task`, `docs_url`, open to
+  additive fields); schedule findings keep `code` and `detail`. Code that read
+  `error.findings[n].detail` as a `string` must narrow first.
+- Ending a native engine process is bounded: SIGTERM, then SIGKILL after a
+  two-second grace, so an engine that ignores SIGTERM can no longer hold a
+  rejection or a cleanup forever.
+- Engines up to 0.119.0 predate the engine's one `run --json` grammar
+  (engine #1650) and refuse in three other dialects: a pretty-printed check
+  report, a plain `NIKA-1709 · …` line, and a `NIKA-1708` line on stderr with
+  an empty stdout. One temporary module, `src/lib/legacy-run-refusals.ts`,
+  recovers exactly those measured shapes and nothing else. It is not a
+  protocol: it is deleted, with its three call sites, once the oldest
+  supported engine writes one compact refusal object.
+
 - HTTP `run()` now requires a caller-owned `idempotencyKey` and refuses an
   omitted key before admission. Reuse that key and request after a lost
   response so an application retry cannot silently create a second job.

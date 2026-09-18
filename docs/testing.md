@@ -171,3 +171,28 @@ cleanup before emitting green evidence. The corpus runs in a fresh project and
 HOME. Changed fixtures require new measured results: old committed ledgers
 remain historical observations until a successful exact-version replay replaces
 them. Never relabel an old binary or weaken the replay comparison.
+
+## Compile foundation parity
+
+Hermetic compile cases run with `npm test`, including strict request literals,
+capability/version refusal, native exit and signal laws, temporary-file failure
+cleanup, authenticated HTTP responses and cancellation. `npm run check:package-surface`
+checks both packed module faces and their public TypeScript contracts.
+
+For a frozen engine that advertises `compile` on both native and Serve doors:
+
+```sh
+NIKA_BIN=/absolute/path/to/frozen/nika \
+NIKA_COMPILE_PARITY_REPORT=/absolute/path/to/compile-parity.json \
+node scripts/run-compile-parity-e2e.mjs
+```
+
+This installs the SDK tarball into an isolated consumer and compares the full
+common authoring outcomes across native/HTTP and ESM/CommonJS. It checks literal
+round trips, incomplete questions, refused expression islands, invalid bases,
+authentication, no project-file changes and no created jobs. HTTP is given a
+nonexistent local engine path, proving that it cannot use a fallback. The report
+records binary and package hashes and is green only after owned-process cleanup.
+A compile-capable development binary is required; the bundled 0.118.7 engine
+predates this capability. This is a foundation test, not general intent authoring
+or execution admission qualification.

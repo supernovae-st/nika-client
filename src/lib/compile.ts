@@ -443,7 +443,7 @@ function questionsFrom(
       !question
       || typeof question.key !== 'string'
       || typeof question.label !== 'string'
-      || typeof question.type !== 'string'
+      || (question.type !== 'text' && question.type !== 'literal')
       || typeof question.why !== 'string'
       || typeof question.mandatory !== 'boolean'
     ) {
@@ -463,6 +463,7 @@ function diagnosticsFrom(
     if (
       !diagnostic
       || typeof diagnostic.kind !== 'string'
+      || !['applied', 'missed', 'unknown', 'requiresHuman', 'refused'].includes(diagnostic.kind)
       || typeof diagnostic.target !== 'string'
       || typeof diagnostic.message !== 'string'
     ) {
@@ -478,7 +479,7 @@ function previewFrom(
 ): NikaCompilePreview | null {
   if (value === null) return null;
   const preview = machineObject(value);
-  if (!preview || typeof preview.scope !== 'string' || !machineObject(preview.report)) {
+  if (!preview || preview.scope !== 'sourceOnly' || !machineObject(preview.report)) {
     throw protocol('check_preview lacks its scope/report shape');
   }
   return { ...preview, scope: preview.scope, report: preview.report as NikaCheckResult };
@@ -494,7 +495,7 @@ function provenanceFrom(
     || typeof provenance.compiler_version !== 'string'
     || typeof provenance.spec_pin !== 'string'
     || (provenance.skeleton !== null && typeof provenance.skeleton !== 'string')
-    || typeof provenance.cognition !== 'string'
+    || provenance.cognition !== 'deterministicOnly'
   ) {
     throw protocol('provenance lacks its compiler_version/spec_pin/skeleton/cognition shape');
   }

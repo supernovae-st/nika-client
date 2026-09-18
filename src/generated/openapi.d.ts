@@ -62,7 +62,7 @@ export interface paths {
             };
             requestBody: {
                 content: {
-                    "application/json": components["schemas"]["JobByName"] | components["schemas"]["ExecutionSnapshot"];
+                    "application/json": components["schemas"]["CheckByName"] | components["schemas"]["ExecutionSnapshot"];
                 };
             };
             responses: {
@@ -128,6 +128,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/compile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Author a candidate workflow without running it (stateless · source-only)
+         * @description The HTTP transport of the same Compile core as `nika compile`. Foundation scope: CREATE resolves an exact embedded skeleton name (or `hello`), EDIT changes one existing constant, answers are explicit JSON literals; any other intent is answered `incomplete` with no substitute workflow. Creates no job, run, approval or trace, writes no file, contacts no provider: ambient keys are never consent. `check_preview` is a REVIEW of the source only, never admission: POST /v1/jobs judges a candidate again. Questions carry stable keys; answering is a new request, not a session.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CompileRequest"];
+                };
+            };
+            responses: {
+                /** @description Authoring outcome — ready, incomplete and refused are all data */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CompileOutcome"];
+                    };
+                };
+                /** @description Error envelope */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Request deadline */
+                408: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Encoded body above the compile ceiling */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Content-Type or Content-Encoding refused */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description malformed_compile_request · compile_version_unsupported · compile_mode_unsupported · compile_cognition_unsupported · compile_limit */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Compiler machinery failure; nothing is echoed */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description compile_busy — every compile slot is in use */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/jobs": {
         parameters: {
             query?: never;
@@ -139,7 +245,7 @@ export interface paths {
         put?: never;
         /**
          * Admit a workflow as a durable job — by served name, or as immutable snapshot bytes
-         * @description Two forms, one admission (ADR-131). `{"workflow": "<name>"}` names a workflow the served registry lists: the resident captures its world through ExecutionService, exactly as a schedule does. A snapshot body is the world `nika check <file> --json --sdk-snapshot` prints, decoded and readmitted through the same ExecutionService; its digests are optional caller-supplied integrity digests (a content assertion, never a signature). The server never interprets a caller filesystem path. Idempotency binds to the exact request bytes.
+         * @description Two forms, one admission (ADR-131). `{"workflow": "<name>"}` names a workflow the served registry lists: the resident captures its world through ExecutionService, exactly as a schedule does. Optional `access` on that form is CLI `--access` for this job only. A snapshot body is the world `nika check <file> --json --sdk-snapshot` prints, decoded and readmitted through the same ExecutionService; its digests are optional caller-supplied integrity digests (a content assertion, never a signature). Snapshot jobs inherit the resident's unpinned plan. The server never interprets a caller filesystem path. Idempotency binds to the exact request bytes.
          */
         post: {
             parameters: {
@@ -527,8 +633,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Return the run-scoped trace verification verdict
-         * @description Returns a typed honest refusal while no remote trace-journal authority exists. It never scans a trace directory or exposes a filesystem path.
+         * Verify the job's trace journal
+         * @description Locates the journal the resident wrote for this job under the project it serves (by the job's execution and trace identity) and verifies it through the same verifier `nika trace verify` runs; the vocabulary is the CLI's. `unavailable` is the honest refusal when no journal exists. The response never exposes a filesystem path.
          */
         get: {
             parameters: {
@@ -782,7 +888,7 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Project-relative .nika.yaml names under the served registry (--workflows) */
+                /** @description Project-relative .nika names under the served registry (--workflows) */
                 200: {
                     headers: {
                         [name: string]: unknown;
@@ -870,6 +976,94 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @description Source-only Check by served name. Required launch inputs may remain unsupplied; caller inputs are accepted only on POST /v1/jobs and are refused here. Check does not execute an access plan. */
+        CheckByName: {
+            /** @description Access pin, same vocabulary as `--access` (class or harness id). A pin never silently substitutes a metered seat. */
+            access?: string;
+            workflow: string;
+        };
+        /** @description The engine-owned machine document of one authoring result — the document `nika compile --json` prints, without the CLI-only `written`. No field grants authority, writes or executes source. */
+        CompileOutcome: {
+            /** @description Ordinary `.nika` source; may still be incomplete */
+            candidate: string | null;
+            /** @description The engine's pure Check report over the source only. No child file, skill, credential probe, access plan or admission was evaluated */
+            check_preview: {
+                report: {
+                    [key: string]: unknown;
+                };
+                /** @constant */
+                scope: "sourceOnly";
+            } | null;
+            /** @constant */
+            compile_version: 1;
+            diagnostics: {
+                /** @enum {string} */
+                kind: "applied" | "missed" | "unknown" | "requiresHuman" | "refused";
+                /** @description For a reader; never parsed to recover compiler state */
+                message: string;
+                target: string;
+            }[];
+            /** @description Reproduction metadata; neither program identity nor run evidence */
+            provenance: {
+                /** @constant */
+                cognition: "deterministicOnly";
+                compiler_version: string;
+                skeleton: string | null;
+                spec_pin: string;
+            };
+            questions: {
+                /** @description Stable semantic hole path such as `const.request`, never a session id */
+                key: string;
+                label: string;
+                mandatory: boolean;
+                /** @enum {string} */
+                type: "text" | "literal";
+                why: string;
+            }[];
+            /** @description The candidate's requested permits, derived by Check. Requested, never granted */
+            requested_boundary: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * @description Completeness of authoring, never permission to execute
+             * @enum {string}
+             */
+            status: "ready" | "incomplete" | "refused";
+        };
+        /** @description Generation 1 of the compile request. The encoded body is limited to 1048576 bytes (or the listener's lower ceiling). Byte bounds below are UTF-8 bytes. Unknown fields, a present null, duplicate keys (including inside `answers`) and positional arrays are refused. No field names a host path: an EDIT base travels inline in `source`. */
+        CompileRequest: {
+            /** @description Question key → one JSON literal with its type preserved, judged exactly as sent (at most 65536 bytes each) */
+            answers?: {
+                [key: string]: unknown;
+            };
+            change?: {
+                set_constant?: {
+                    /** @description Bare constant name, not a path */
+                    name: string;
+                    /** @description One JSON literal, judged exactly as sent (at most 65536 bytes) */
+                    value: unknown;
+                };
+                /** @description `Set const.NAME to JSON_LITERAL`, or `Set const.NAME` answered through `answers` */
+                text?: string;
+            };
+            /**
+             * @description The only authoring cognition of this build. Any other value is refused; no authoring model is contacted
+             * @constant
+             */
+            cognition?: "deterministicOnly";
+            /** @constant */
+            compile_version: 1;
+            intent?: string;
+            /**
+             * @description create requires `intent` and forbids `source`/`change`; edit requires `source` and `change` and forbids `intent`
+             * @enum {string}
+             */
+            mode: "create" | "edit";
+            /** @description Accepted `.nika` source, inline. The caller owns source selection, revision checks and materialization */
+            source?: string;
+            /** @description Names a created workflow. On edit the core refuses it as data: an edit cannot rename its accepted base */
+            workflow_id?: string;
+        };
         Error: {
             error: {
                 code: string;
@@ -908,6 +1102,13 @@ export interface components {
             spec_sha: string;
             /** @constant */
             status: "ok";
+            /** @description Durable store formats this resident reads and writes; independent of the HTTP and event protocol versions. */
+            storeFormatVersion: {
+                /** @example 3 */
+                jobs: number;
+                /** @example 1 */
+                schedules: number;
+            };
             supportedCapabilities: string[];
             traceFormatVersion: number;
         };
@@ -916,6 +1117,7 @@ export interface components {
                 code: string;
                 message: string;
             };
+            evidence?: components["schemas"]["JournalEvidence"];
             execution_id?: string;
             /** Format: uuid */
             id: string;
@@ -928,13 +1130,26 @@ export interface components {
             status: components["schemas"]["JobStatus"];
             trace_id?: string;
         };
-        /** @description The by-name form (ADR-131): a workflow the served registry lists (GET /v1/workflows · project-root-relative, `.nika.yaml`). The resident captures its world exactly as a schedule does — the one owner of the snapshot and its digest domain. Idempotency binds to these request bytes. */
+        /** @description The by-name form (ADR-131): a workflow the served registry lists (GET /v1/workflows · project-root-relative, `.nika`). The resident captures its world exactly as a schedule does — the one owner of the snapshot and its digest domain. Idempotency binds to these request bytes. Optional `access` is the same pin as CLI `--access` (a pin is a pin). Absent: the resident's unpinned plan. Snapshot bodies reject both access and inputs overlays, including null or empty maps. Optional inputs are literal JSON values checked against declared keys, types and required values before a job exists; strings are never CLI @env instructions or expressions. */
         JobByName: {
+            /** @description Access pin, same vocabulary as `--access` (class or harness id). A pin never silently substitutes a metered seat. */
+            access?: string;
+            /** @description Literal JSON overrides for declared workflow inputs. Unknown keys, wrong types and missing required values refuse with 422; defaults remain authored. A present null is refused. Inputs bind exact request identity and survive durable queue recovery; workflow bytes are unchanged. */
+            inputs?: {
+                [key: string]: unknown;
+            };
             workflow: string;
         };
         JobEvent: {
+            /**
+             * Format: date-time
+             * @description When the resident admitted the event (RFC 3339 · UTC). Outside the event's hash chain; absent on an event written before the journal was dated.
+             */
+            at?: string;
             code?: string;
-            kind: string | null;
+            evidence?: components["schemas"]["JournalEvidence"];
+            /** @description The resident's event vocabulary: execution.<word> (queued · started · prepared · requeued · settled · cancelled · interrupted · refused · aborted_before_claim), plus the approval_decided frame the journal admits. Null on a payload that carries no kind. */
+            kind: ("execution.queued" | "execution.started" | "execution.prepared" | "execution.requeued" | "execution.settled" | "execution.cancelled" | "execution.interrupted" | "execution.refused" | "execution.aborted_before_claim" | "approval_decided") | null;
             message?: string;
             outputs?: {
                 [key: string]: unknown;
@@ -982,6 +1197,13 @@ export interface components {
         /** @description Status only. Redacted diagnosis lives on GET /v1/jobs/{id} and SSE, never here. */
         JobStatusOnly: {
             status: components["schemas"]["JobStatus"];
+        };
+        /** @description Reported journal delivery loss, independent of execution status. The reason classifies the mirror's first error without exposing OS text or paths. Absence is not a claim that a journal exists. */
+        JournalEvidence: {
+            /** @enum {string} */
+            reason: "write_failed" | "record_refused";
+            /** @constant */
+            status: "mirror_lost";
         };
         /** @description The run's settlement (ADR-128), built once by the runtime and projected whole: the state word every door speaks, why, the elapsed time on the kernel clock, the task tally, the spend with its qualifier, the failure named. Unknown cost is never zero: `total_cost_usd` is absent when nothing was metered. Present on the terminal event and durable job response of a job whose runtime settled; absent when the resident lost the execution (interrupted) or refused it before any task. Reattachment and idempotent admission replay project the same hash-bound terminal event, never a new settlement. */
         RunSettlement: {
@@ -1066,13 +1288,35 @@ export interface components {
             status: "accepted";
             units: number;
         };
-        /** @description Run-scoped typed verdict. Unavailable is an honest refusal: this server has no remote trace-journal authority and never scans or returns filesystem paths. */
+        /** @description Run-scoped verdict on the journal the resident wrote for the job, through the ONE verifier `nika trace verify --json` runs. `verdict` is the CLI's headline word: the attained tier (ok · sealed · anchored · replayed), incomplete for a journal with no terminal frame (the writer's liveness rides `reason`), tampered for a buried seal, broken for an edited chain, and the CLI's refusal classes; `unavailable` only when no journal exists for the job (refused before its first event · queued · a backend keeping none). `reason` is the machine class beside it (the seal tier under a ladder verdict). The CLI's own document rides verbatim (exit · chain · seal · anchor · replay · lines); a filesystem path is never returned. */
         TraceVerification: {
+            anchor?: {
+                [key: string]: unknown;
+            };
+            /** @description events · head · headline (intact · torn · incomplete) · liveness (alive · dead · unknown · null) */
+            chain?: {
+                [key: string]: unknown;
+            };
+            /**
+             * @description The CLI's exit class: 0 the reported tier holds · 2 a forged or edited journal · 3 the environment (unchained · unreadable · a missing input) · 5 incomplete lifecycle evidence
+             * @enum {integer}
+             */
+            exit?: 0 | 2 | 3 | 5;
+            /** @description The CLI's ladder lines, the journal path replaced by <journal> */
+            lines?: string[];
             /** @enum {string} */
-            reason: "run_not_terminal" | "trace_journal_unavailable";
+            reason: "run_not_terminal" | "trace_journal_unavailable" | "sealed" | "unsealed" | "forged" | "buried" | "unattributable" | "writer_alive" | "writer_dead" | "writer_unknown" | "buried_seal" | "broken" | "unchained" | "empty" | "unreadable" | "refused" | "line_over_long" | "unknown";
+            replay?: {
+                [key: string]: unknown;
+            };
+            /** @description tier (unsealed · sealed · forged · buried · unattributable) and the tier's facts */
+            seal?: {
+                [key: string]: unknown;
+            };
             trace_id?: string;
             /** @enum {string} */
-            verdict: "unavailable";
+            verdict: "unavailable" | "ok" | "sealed" | "anchored" | "replayed" | "incomplete" | "tampered" | "broken" | "unchained" | "empty" | "unreadable" | "refused" | "line-over-long" | "unknown";
+            verify_version?: number;
         };
         WorkflowList: {
             workflows: string[];

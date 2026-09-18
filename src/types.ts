@@ -909,7 +909,7 @@ export interface NikaCompileQuestion {
   /** Stable semantic hole path (`const.request`), never a session id. */
   key: string;
   label: string;
-  type: string;
+  type: 'text' | 'literal';
   why: string;
   mandatory: boolean;
   [key: string]: unknown;
@@ -917,7 +917,7 @@ export interface NikaCompileQuestion {
 
 /** One structured authoring finding, exactly as the engine emitted it. */
 export interface NikaCompileDiagnostic {
-  kind: string;
+  kind: 'applied' | 'missed' | 'unknown' | 'requiresHuman' | 'refused';
   target: string;
   message: string;
   [key: string]: unknown;
@@ -928,14 +928,14 @@ export interface NikaCompileProvenance {
   compiler_version: string;
   spec_pin: string;
   skeleton: string | null;
-  cognition: string;
+  cognition: 'deterministicOnly';
   [key: string]: unknown;
 }
 
 /** The candidate's pure Check judgment, with its deliberately limited scope. */
 export interface NikaCompilePreview {
   /** `sourceOnly` in this foundation: no environment or admission claim. */
-  scope: string;
+  scope: 'sourceOnly';
   report: NikaCheckResult;
   [key: string]: unknown;
 }

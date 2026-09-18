@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.120.0]
 
+### Known engine limitation
+
+The public 0.120.0 project schema still rejects canonical `.nika` paths in
+`nika.yaml` arm bindings. The correction belongs to
+[engine #1692](https://github.com/supernovae-st/nika/pull/1692) and
+[Spec #345](https://github.com/supernovae-st/nika-spec/pull/345), for a later
+engine release. This SDK aligns with the current public engine; the broader
+file-identity migration remains open.
+
 ### Changed
 
 - Canonical live workflow files are lowercase `.nika`. HTTP by-name

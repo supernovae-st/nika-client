@@ -1,0 +1,228 @@
+name: Candidate engine qualification
+# Premerge qualification against an exact supernovae-st/nika commit.
+# Not a release receipt. ci.yml type-drift and release-evidence-replay stay
+# bound to the public asset for package.json and may be truthfully red.
+
+on:
+  workflow_dispatch:
+    inputs:
+      engine_sha:
+        description: Exact 40-hex supernovae-st/nika commit
+        required: true
+        type: string
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    name: resolve candidate SHA
+    runs-on: ubuntu-latest
+    outputs:
+      engine_sha: ${{ steps.pin.outputs.engine_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: pin
+        env:
+          DISPATCH_SHA: ${{ inputs.engine_sha }}
+        run: |
+          set -euo pipefail
+          sha=""
+          if [ -n "${DISPATCH_SHA:-}" ]; then
+            sha="$DISPATCH_SHA"
+          elif [ -f ENGINE_CANDIDATE ]; then
+            sha=$(grep -E '^[0-9a-f]{40}$' ENGINE_CANDIDATE | head -1 || true)
+          fi
+          if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::candidate engine SHA must be an exact 40-hex supernovae-st/nika commit"
+            exit 1
+          fi
+          echo "engine_sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "candidate engine $sha (not a release pin)"
+
+  qualify:
+    name: type-drift + replay vs candidate
+    needs: resolve
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ENGINE_SHA: ${{ needs.resolve.outputs.engine_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: supernovae-st/nika
+          ref: ${{ env.ENGINE_SHA }}
+          path: _nika_candidate
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # master
+        with:
+          toolchain: "1.91"
+      - uses: Swatinem/rust-cache@f0d9c3887740aee45f6153b24b3a6b815192ec16 # v2
+        with:
+          workspaces: _nika_candidate
+          shared-key: candidate-nika-cli
+      - name: Build candidate nika binary
+        working-directory: _nika_candidate
+        run: |
+          set -euo pipefail
+          if ! [[ "$ENGINE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::refusing to build a non-hex engine SHA"
+            exit 1
+          fi
+          test "$(git rev-parse HEAD)" = "$ENGINE_SHA"
+          cargo build --locked -p nika-cli --bin nika
+          chmod +x target/debug/nika
+          mkdir -p "$RUNNER_TEMP/nika-candidate"
+          cp target/debug/nika "$RUNNER_TEMP/nika-candidate/nika"
+          {
+            echo "kind: candidate-engine-qualification"
+            echo "engine_sha: $ENGINE_SHA"
+            echo "engine_version: $("$RUNNER_TEMP/nika-candidate/nika" --version)"
+            echo "engine_sha256: $(sha256sum "$RUNNER_TEMP/nika-candidate/nika" | awk '{print $1}')"
+            echo "sdk_package: $(node -p "require('$GITHUB_WORKSPACE/package.json').version")"
+            echo "not_a_release_receipt: true"
+          } | tee "$RUNNER_TEMP/nika-candidate/provenance.txt"
+      - run: npm ci
+      - name: Candidate type-drift against live nika serve
+        env:
+          NIKA_BIN: ${{ runner.temp }}/nika-candidate/nika
+          NIKA_SERVE_TOKEN: ci-test-token-32-chars-minimum!!
+          NIKA_TOKEN: ci-test-token-32-chars-minimum!!
+        run: |
+          set -euo pipefail
+          test -x "$NIKA_BIN"
+          sdk_version=$(node -p "require('./package.json').version")
+          engine_identity=$("$NIKA_BIN" --version)
+          echo "SDK package $sdk_version · candidate $engine_identity"
+          serve_help=$("$NIKA_BIN" serve --help 2>&1 || true)
+          if [[ "$serve_help" != *"--bind"* || "$serve_help" != *"--workflows"* ]]; then
+            echo "::error::candidate engine is missing the promised HTTP serve contract"
+            exit 1
+          fi
+          probe_root=$(mktemp -d "${RUNNER_TEMP:-/tmp}/nika-client-candidate-type-drift.XXXXXX")
+          project_dir="$probe_root/project"
+          workflows_dir="$probe_root/workflows"
+          state_dir="$probe_root/state"
+          token_file="$probe_root/serve.token"
+          server_pid=""
+          server_url=""
+          cleanup() {
+            if [ -n "$server_pid" ]; then
+              kill "$server_pid" 2>/dev/null || true
+              wait "$server_pid" 2>/dev/null || true
+            fi
+            find "$probe_root" -depth -delete
+          }
+          assert_server_live() {
+            phase=$1
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat "$probe_root/server.log" >&2
+              echo "::error::launched candidate nika serve exited $phase"
+              exit 1
+            fi
+          }
+          trap cleanup EXIT
+          mkdir -p "$project_dir" "$workflows_dir" "$state_dir"
+          printf '%s\n' 'nika: ci-candidate-type-drift' > "$project_dir/nika.yaml"
+          cat > "$workflows_dir/test.nika" <<'EOF'
+          nika: test
+          permits: {}
+          tasks:
+            hello:
+              infer:
+                model: mock/fast
+                prompt: "say hello"
+                max_tokens: 64
+          outputs:
+            greeting: ${{ '${{ tasks.hello.output }}' }}
+          EOF
+          umask 077
+          printf '%s' "$NIKA_SERVE_TOKEN" > "$token_file"
+          chmod 600 "$token_file"
+          : >"$probe_root/server.log"
+          (
+            cd "$project_dir"
+            exec "$NIKA_BIN" serve \
+              --bind 127.0.0.1:0 \
+              --workflows "$workflows_dir" \
+              --token-file "$token_file" \
+              --state-root "$state_dir" \
+              --plain
+          ) >"$probe_root/server.log" 2>&1 &
+          server_pid=$!
+          for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            assert_server_live "before listener discovery"
+            while IFS= read -r line; do
+              if [[ "$line" =~ ^nika\ serve.*listening\ (http://127\.0\.0\.1:[0-9]+) ]]; then
+                server_url="${BASH_REMATCH[1]}"
+                break
+              fi
+            done < "$probe_root/server.log"
+            if [ -n "$server_url" ]; then
+              break
+            fi
+            sleep 1
+          done
+          if ! [[ "$server_url" =~ ^http://127\.0\.0\.1:[0-9]+$ ]]; then
+            cat "$probe_root/server.log" >&2
+            echo "::error::candidate nika serve did not emit its loopback listener receipt"
+            exit 1
+          fi
+          ok=0
+          for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
+            assert_server_live "before GET /health"
+            if curl -sf "$server_url/health" >/dev/null; then
+              assert_server_live "after GET /health"
+              ok=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ok" != 1 ]; then
+            cat "$probe_root/server.log" >&2
+            echo "::error::candidate nika serve --bind never answered GET /health"
+            exit 1
+          fi
+          assert_server_live "before GET /v1/openapi.json"
+          curl -sf -H "Authorization: Bearer $NIKA_TOKEN" \
+            "$server_url/v1/openapi.json" > "$probe_root/live-openapi.json"
+          assert_server_live "after GET /v1/openapi.json"
+          mkdir -p "$RUNNER_TEMP/nika-candidate"
+          jq -S . openapi.json > "$probe_root/pinned-openapi.sorted.json"
+          jq -S . "$probe_root/live-openapi.json" > "$probe_root/live-openapi.sorted.json"
+          cp "$probe_root/live-openapi.sorted.json" "$RUNNER_TEMP/nika-candidate/live-openapi.sorted.json"
+          diff -u "$probe_root/pinned-openapi.sorted.json" "$probe_root/live-openapi.sorted.json"
+          assert_server_live "before generated-type fetch"
+          npm run generate:types -- "$server_url"
+          assert_server_live "after generated-type fetch"
+          git diff --exit-code -- src/generated/openapi.d.ts
+          echo "Pinned OpenAPI and generated types match the candidate engine (not a release receipt)"
+      - name: Candidate behavioral replay
+        env:
+          NIKA_BIN: ${{ runner.temp }}/nika-candidate/nika
+          NIKA_GAUNTLET_RESULTS_DIR: ${{ runner.temp }}/nika-candidate-replay
+          NIKA_ONE_DOOR_REPORT: ${{ runner.temp }}/nika-candidate-replay/one-door.json
+        run: |
+          set -euo pipefail
+          mkdir -p "$NIKA_GAUNTLET_RESULTS_DIR"
+          cp "$RUNNER_TEMP/nika-candidate/provenance.txt" "$NIKA_GAUNTLET_RESULTS_DIR/provenance.txt"
+          "$NIKA_BIN" key init --plain
+          npm run gauntlet:run
+          npm run gauntlet:projects
+          npm run gauntlet:depth
+          npm run gauntlet:hostile
+          npm run gauntlet:recovery
+          npm run gauntlet:one-door
+      - name: Preserve candidate qualification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: candidate-engine-qualification
+          path: |
+            ${{ runner.temp }}/nika-candidate
+            ${{ runner.temp }}/nika-candidate-replay
+          if-no-files-found: warn

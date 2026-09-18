@@ -5,6 +5,7 @@ import {
   isCanonicalWorkflowPath,
   isContainedWorkflowName,
   isLegacyContainedWorkflowName,
+  isRetiredByNameAttempt,
   isLegacyWorkflowPath,
   legacyWorkflowRenameMessage,
   renameLegacyWorkflow,
@@ -56,6 +57,16 @@ describe('SDK filename contract', () => {
     expect(isLegacyWorkflowPath('./daily.nika.yaml')).toBe(true);
     expect(renameLegacyWorkflow('daily.nika.yaml')).toBe('daily.nika');
     expect(legacyWorkflowRenameMessage('daily.nika.yaml')).toContain('daily.nika');
+  });
+
+  it('treats a quoted hostile retired name as a by-name attempt, not a local path', () => {
+    const hostile = 'équipe/"quoted".nika.yaml';
+    expect(isLegacyWorkflowPath(hostile)).toBe(true);
+    expect(isLegacyContainedWorkflowName(hostile)).toBe(false);
+    expect(isRetiredByNameAttempt(hostile)).toBe(true);
+    expect(isRetiredByNameAttempt('./daily.nika.yaml')).toBe(false);
+    expect(isRetiredByNameAttempt('/srv/flow.nika.yaml')).toBe(false);
+    expect(isContainedWorkflowName(hostile)).toBe(false);
   });
 
   it('treats nika.yaml as the project file, never a program, regardless of bytes', () => {

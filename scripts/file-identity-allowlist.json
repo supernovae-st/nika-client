@@ -26,8 +26,8 @@
   {
     "path": "test/workflow-name.test.ts",
     "category": "negative",
-    "count": 8,
-    "lines_sha256": "sha256:3fe10dc49c2a936c8ce18c346bd68e71e95f11a17fd5b65a386d93783620e25d",
+    "count": 11,
+    "lines_sha256": "sha256:9cec7a4dc1fd19b1fe654f1b54df3b2f2e42dcbdb62b75e764bd303111c043aa",
     "reason": "Positive/negative filename and contained-name matrix.",
     "owner": "nika-client"
   },
@@ -42,8 +42,8 @@
   {
     "path": "test/http-by-name.test.ts",
     "category": "negative",
-    "count": 1,
-    "lines_sha256": "sha256:878d899ce7832a11020e1311dcf5a44c90c927a3f5da6cef3a83eda572886b9a",
+    "count": 2,
+    "lines_sha256": "sha256:364500cd215460be6cc2785ded6cf67a7aaeef9c990da8b660953eccfff7a7c3",
     "reason": "HTTP by-name path refuses .nika.yaml / .nika.yml without local capture fallback.",
     "owner": "nika-client"
   },

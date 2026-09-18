@@ -78,6 +78,19 @@ export function isLegacyContainedWorkflowName(value: unknown): value is string {
     && containedRelativeShape(value);
 }
 
+/**
+ * HTTP by-name attempt using a retired suffix. Includes hostile quoted
+ * names that fail contained-relative shape. Filesystem paths (`./`, `/`,
+ * backslash) stay out so local snapshot capture can still name them.
+ */
+export function isRetiredByNameAttempt(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length === 0) { return false; }
+  if (value.startsWith('/') || value.startsWith('./') || value.includes('\\')) {
+    return false;
+  }
+  return isLegacyWorkflowPath(value);
+}
+
 export function renameLegacyWorkflow(name: string): string {
   if (name.endsWith('.nika.yaml')) { return `${name.slice(0, -'.nika.yaml'.length)}${WORKFLOW_SUFFIX}`; }
   if (name.endsWith('.nika.yml')) { return `${name.slice(0, -'.nika.yml'.length)}${WORKFLOW_SUFFIX}`; }

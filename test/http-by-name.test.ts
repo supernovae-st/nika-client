@@ -346,7 +346,7 @@ describe('the local capture path is unchanged', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it.each(['daily.nika.yaml', 'nested/daily.nika.yml'])(
+  it.each(['daily.nika.yaml', 'nested/daily.nika.yml', 'équipe/"quoted".nika.yaml'])(
     'refuses retired suffix %s instead of falling back to local capture',
     async (workflow) => {
       const fetch = vi.fn();
@@ -359,6 +359,17 @@ describe('the local capture path is unchanged', () => {
       expect(resolveEngine).not.toHaveBeenCalled();
     },
   );
+
+  it('refuses a quoted hostile retired name with inputs before any HTTP or engine action', async () => {
+    const fetch = vi.fn();
+    const resolveEngine = vi.fn(() => { throw new Error('must not capture'); });
+    await expect(transport(fetch, resolveEngine).startRun('équipe/"quoted".nika.yaml', {
+      inputs: { a: 1 },
+      idempotencyKey: 'hostile',
+    })).rejects.toMatchObject({ name: 'NikaConfigurationError' });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(resolveEngine).not.toHaveBeenCalled();
+  });
 
   it.each([['flow.nika'], ['nested/daily.nika']])(
     'submits %s by name without resolving an engine',

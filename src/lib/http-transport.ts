@@ -42,7 +42,7 @@ import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
 import type { Transport, TransportRun } from './transport.js';
 import {
   isContainedWorkflowName,
-  isLegacyContainedWorkflowName,
+  isRetiredByNameAttempt,
   legacyWorkflowRenameMessage,
 } from './workflow-name.js';
 
@@ -1425,7 +1425,7 @@ export class HttpTransport implements Transport {
 }
 
 function refuseLegacyContainedName(workflow: string): void {
-  if (isLegacyContainedWorkflowName(workflow)) {
+  if (isRetiredByNameAttempt(workflow)) {
     throw new NikaConfigurationError(legacyWorkflowRenameMessage(workflow));
   }
 }

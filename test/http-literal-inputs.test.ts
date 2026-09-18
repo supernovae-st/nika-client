@@ -127,16 +127,18 @@ describe('run by served name carries literal inputs (issue #116 · engine #1642)
     await run.result();
   });
 
-  it('escapes the workflow name itself as JSON', async () => {
+  it('JSON-encodes input values that require escaping on a legal contained name', async () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse({ supportedCapabilities: WITH_JOB_INPUTS }))
       .mockResolvedValueOnce(jsonResponse({ id: 'job-1', status: 'queued' }, 202))
       .mockResolvedValueOnce(sseResponse([
         { sequence: 1, kind: 'execution.settled', status: 'succeeded', receipt: RECEIPT },
       ]));
-    const name = 'equipe/quoted.nika';
-    const run = await remote(fetch).run(name, { inputs: { a: 1 }, idempotencyKey: 'k' });
-    expect(JSON.parse(String(request(fetch, 1).init.body))).toEqual({ workflow: name, inputs: { a: 1 } });
+    const inputs = { note: 'say "hello" \\ and more' };
+    const run = await remote(fetch).run('triage.nika', { inputs, idempotencyKey: 'k' });
+    const { init } = request(fetch, 1);
+    expect(init.body).toBe(`{"workflow":"triage.nika","inputs":${encodeLiteralInputs(inputs).json}}`);
+    expect(JSON.parse(String(init.body))).toEqual({ workflow: 'triage.nika', inputs });
     await run.result();
   });
 });

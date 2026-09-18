@@ -1,5 +1,4 @@
 # Candidate supernovae-st/nika commit for premerge qualification.
 # Not a release pin and not ENGINE_PIN. Exact 40-hex SHA only.
-# Intermediate: 718ca3ca (pack migrated). Replace with the final engine
-# receipt when ctx_df6fd1d94c3d supplies it.
-718ca3ca36f82040bdb3d5450c7b1f80599ca41b
+4d9db6a8a30c6f36f7657ec7f86a7dc29f9d1d92
+

@@ -31,6 +31,8 @@ jobs:
           sha=""
           if [ -n "${DISPATCH_SHA:-}" ]; then
             sha="$DISPATCH_SHA"
+          elif [ -f ENGINE_QUAL_PIN ]; then
+            sha=$(grep -E '^[0-9a-f]{40}$' ENGINE_QUAL_PIN | head -1 || true)
           elif [ -f ENGINE_CANDIDATE ]; then
             sha=$(grep -E '^[0-9a-f]{40}$' ENGINE_CANDIDATE | head -1 || true)
           fi

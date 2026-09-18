@@ -47,7 +47,7 @@ describe('the engine teaching report survives every transport', () => {
   it('falls back to the plain check report when snapshot capture is red', async () => {
     const fetch = vi.fn().mockResolvedValueOnce(healthResponse());
     const report = await remote(fetch as typeof globalThis.fetch)
-      .check('./red-snapshot.nika.yaml');
+      .check('./red-snapshot.nika');
 
     expect(report).toMatchObject({ clean: false, exitCode: 2, report_version: 1 });
     expect(findings(report)[0]).toMatchObject({
@@ -71,10 +71,10 @@ describe('the engine teaching report survives every transport', () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({
         status: 'accepted',
         snapshot_digest: 'a'.repeat(64),
-        root: 'fixture.nika.yaml',
+        root: 'fixture.nika',
         units: 1,
       }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
-    const report = await remote(fetch as typeof globalThis.fetch).check('./flow.nika.yaml');
+    const report = await remote(fetch as typeof globalThis.fetch).check('./flow.nika');
 
     expect(report).toMatchObject({ clean: true, exitCode: 0 });
     expect(report).not.toHaveProperty('snapshot_error');
@@ -82,7 +82,7 @@ describe('the engine teaching report survives every transport', () => {
   });
 
   it('reads the native check report the engine wrote to stderr', async () => {
-    const report = await native().check('stderr-report.nika.yaml');
+    const report = await native().check('stderr-report.nika');
 
     expect(report).toMatchObject({
       clean: false,
@@ -94,7 +94,7 @@ describe('the engine teaching report survives every transport', () => {
   });
 
   it('teaches from stderr when neither stream carries a report', async () => {
-    const failure = await native().check('stderr-plain.nika.yaml').catch((cause) => cause);
+    const failure = await native().check('stderr-plain.nika').catch((cause) => cause);
 
     expect(failure).toBeInstanceOf(NikaCompatibilityError);
     expect((failure as NikaCompatibilityError).capability).toBe('check');
@@ -104,7 +104,7 @@ describe('the engine teaching report survives every transport', () => {
 
   it('surfaces a pre-run engine refusal as a typed operation error', async () => {
     // Issue #121: a refusal rejects run() itself; no Run exists to await.
-    const failure = await native().run('refuse-1709.nika.yaml').catch((cause) => cause);
+    const failure = await native().run('refuse-1709.nika').catch((cause) => cause);
 
     expect(failure).toBeInstanceOf(NikaOperationError);
     expect(failure).toMatchObject({
@@ -120,7 +120,7 @@ describe('the engine teaching report survives every transport', () => {
 
   it('keeps a protocol error for machine output that is not a refusal', async () => {
     // Issue #121: output that proves no admission never yields a Run either.
-    const failure = await native().run('garbage-line.nika.yaml').catch((cause) => cause);
+    const failure = await native().run('garbage-line.nika').catch((cause) => cause);
 
     expect(failure).toMatchObject({ name: 'NikaProtocolError', transport: 'native-process' });
     expect((failure as Error).message).toContain('this line is not machine output at all');
@@ -128,7 +128,7 @@ describe('the engine teaching report survives every transport', () => {
 
   it('names the engine path and the spawn errno when the engine cannot start', async () => {
     const failure = await new Nika({ bin: '/nonexistent/nika' })
-      .check('flow.nika.yaml')
+      .check('flow.nika')
       .catch((cause) => cause);
 
     expect(failure).toBeInstanceOf(NikaCompatibilityError);

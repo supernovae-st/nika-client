@@ -105,7 +105,7 @@ describe('the settlement the resident nests on the wire (engine 0.118)', () => {
       '/v1/jobs/job-1/events': () => sseResponse([STARTED, SETTLED_FRAME]),
     });
     const nika = client(fetch as typeof globalThis.fetch);
-    const run = await nika.run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+    const run = await nika.run('flow.nika', { idempotencyKey: 'test-admission' });
 
     await expect(collect(nika.events(run))).resolves.toEqual([STARTED, SETTLED_FRAME]);
     const result = await run.done;
@@ -127,7 +127,7 @@ describe('the settlement the resident nests on the wire (engine 0.118)', () => {
       '/v1/jobs/job-1/events': () => sseResponse([STARTED, FAILED_FRAME]),
     });
     const nika = client(fetch as typeof globalThis.fetch);
-    const run = await nika.run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+    const run = await nika.run('flow.nika', { idempotencyKey: 'test-admission' });
 
     await expect(run.done).resolves.toMatchObject({
       status: 'failed',
@@ -173,7 +173,7 @@ describe('the settlement the resident nests on the wire (engine 0.118)', () => {
         { ...SETTLED_FRAME, settlement: { ...SETTLED, novel: { future: true } } },
       ]),
     });
-    const kept = await client(additive as typeof globalThis.fetch).run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+    const kept = await client(additive as typeof globalThis.fetch).run('flow.nika', { idempotencyKey: 'test-admission' });
     await expect(kept.done).resolves.toMatchObject({
       settlement: { ...SETTLED, novel: { future: true } },
     });
@@ -184,7 +184,7 @@ describe('the settlement the resident nests on the wire (engine 0.118)', () => {
         { ...SETTLED_FRAME, settlement: { ...SETTLED, elapsed_ms: 'soon' } },
       ]),
     });
-    const refused = await client(malformed as typeof globalThis.fetch).run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+    const refused = await client(malformed as typeof globalThis.fetch).run('flow.nika', { idempotencyKey: 'test-admission' });
     await expect(refused.done).rejects.toBeInstanceOf(NikaProtocolError);
     await expect(refused.done).rejects.toThrow(/settlement was malformed: elapsed_ms/);
 
@@ -226,7 +226,7 @@ describe('cancellation on the 0.118 wire', () => {
       }, 202),
     });
     const nika = client(fetch as typeof globalThis.fetch);
-    const run = await nika.run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+    const run = await nika.run('flow.nika', { idempotencyKey: 'test-admission' });
     const observer = nika.events(run)[Symbol.asyncIterator]();
     stream.enqueue(sseFrame(STARTED));
     await expect(observer.next()).resolves.toMatchObject({ done: false, value: STARTED });
@@ -272,7 +272,7 @@ describe('cancellation on the 0.118 wire', () => {
         '/v1/jobs/job-1/cancel': () => jsonResponse({ id: 'job-1', status }, 202),
       });
       const nika = client(fetch as typeof globalThis.fetch);
-      const run = await nika.run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+      const run = await nika.run('flow.nika', { idempotencyKey: 'test-admission' });
 
       await expect(nika.cancel(run)).rejects.toThrow(/Pending cancellation returned a terminal job/);
       stream.close();
@@ -303,7 +303,7 @@ describe('cancellation on the 0.118 wire', () => {
       '/v1/jobs/job-1/cancel': () => jsonResponse({ id: 'job-1', status: 'paused', ...evidence }),
     });
     const nika = client(fetch as typeof globalThis.fetch);
-    const run = await nika.run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+    const run = await nika.run('flow.nika', { idempotencyKey: 'test-admission' });
 
     await expect(nika.cancel(run)).resolves.toEqual({
       runId: 'job-1',
@@ -334,7 +334,7 @@ describe('cancellation on the 0.118 wire', () => {
       '/v1/jobs/job-1/cancel': () => jsonResponse(body),
     });
     const nika = client(fetch as typeof globalThis.fetch);
-    const run = await nika.run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+    const run = await nika.run('flow.nika', { idempotencyKey: 'test-admission' });
 
     await expect(nika.cancel(run)).rejects.toBeInstanceOf(NikaProtocolError);
     stream.close();
@@ -379,7 +379,7 @@ describe('cancellation on the 0.118 wire', () => {
       }),
     });
     const nika = client(fetch as typeof globalThis.fetch);
-    const run = await nika.run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+    const run = await nika.run('flow.nika', { idempotencyKey: 'test-admission' });
 
     await expect(nika.cancel(run)).resolves.toEqual({
       runId: 'job-1',

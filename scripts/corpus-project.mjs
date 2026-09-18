@@ -13,7 +13,7 @@ export function stageCorpus(root, scratch, env) {
   assert(lstatSync(path.join(source, 'workflows')).isDirectory(), 'corpus workflows must be a directory');
   const inventory = JSON.parse(readFileSync(inventoryPath, 'utf8'));
   const workflowFiles = readdirSync(path.join(source, 'workflows'))
-    .filter((file) => file.endsWith('.nika.yaml')).sort();
+    .filter((file) => file.endsWith('.nika')).sort();
   assert(Array.isArray(inventory), 'corpus inventory must be an array');
   assert.equal(inventory.length, 100, 'expected exactly 100 corpus cases');
   assert.equal(workflowFiles.length, 100, 'expected exactly 100 corpus workflows');
@@ -27,7 +27,7 @@ export function stageCorpus(root, scratch, env) {
   }
   assert.equal(new Set(inventory.map((entry) => entry.domain)).size, 20, 'expected 20 distinct domains');
   for (const entry of inventory) {
-    assert(typeof entry.workflow === 'string' && /^workflows\/[^/\\]+\.nika\.yaml$/.test(entry.workflow),
+    assert(typeof entry.workflow === 'string' && /^workflows\/[^/\\]+\.nika$/.test(entry.workflow),
       'corpus workflows must remain inside the isolated project');
     assert(lstatSync(path.join(source, entry.workflow)).isFile(), 'corpus workflow must be a regular file');
   }

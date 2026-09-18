@@ -1,0 +1,74 @@
+[
+  {
+    "path": "gauntlet/personas/REPORT.md",
+    "category": "historical",
+    "reason": "Frozen persona gauntlet findings that recorded the real old executable spelling.",
+    "owner": "nika-client"
+  },
+  {
+    "path": "CHANGELOG.md",
+    "category": "historical",
+    "reason": "Unreleased notes name the retired suffixes being cut; older entries stay authentic.",
+    "owner": "nika-client"
+  },
+  {
+    "path": "openapi.json",
+    "category": "generated",
+    "reason": "Engine-owned Serve schema pin; regenerate from the migrated engine, never hand-edit.",
+    "owner": "nika-client"
+  },
+  {
+    "path": "src/generated/openapi.d.ts",
+    "category": "generated",
+    "reason": "Generated from openapi.json; waits on the engine OpenAPI pin.",
+    "owner": "nika-client"
+  },
+  {
+    "path": "src/lib/workflow-name.ts",
+    "category": "negative",
+    "reason": "Lexical owner names retired suffixes so HTTP can refuse them.",
+    "owner": "nika-client"
+  },
+  {
+    "path": "test/workflow-name.test.ts",
+    "category": "negative",
+    "reason": "Positive/negative filename and contained-name matrix.",
+    "owner": "nika-client"
+  },
+  {
+    "path": "test/native-run-admission.test.ts",
+    "category": "historical",
+    "reason": "Asserts frozen engine missing-file stdout that still names missing.nika.yaml.",
+    "owner": "nika-client"
+  },
+  {
+    "path": "test/http-by-name.test.ts",
+    "category": "negative",
+    "reason": "HTTP by-name path refuses .nika.yaml / .nika.yml without local capture fallback.",
+    "owner": "nika-client"
+  },
+  {
+    "path": "test/fixtures/run-wire/0.119.0-missing-file.pretty.stdout",
+    "category": "historical",
+    "reason": "Frozen engine stdout for a missing-file teaching line; bytes stay authentic.",
+    "owner": "nika-client"
+  },
+  {
+    "path": "test/fixtures/run-wire/pr1679-missing-file.compact.stdout",
+    "category": "historical",
+    "reason": "Frozen compact engine stdout for the same missing-file family.",
+    "owner": "nika-client"
+  },
+  {
+    "path": "scripts/file-identity-ratchet.mjs",
+    "category": "negative",
+    "reason": "Scanner's own forbidden-pattern data.",
+    "owner": "nika-client"
+  },
+  {
+    "path": "scripts/file-identity-allowlist.json",
+    "category": "negative",
+    "reason": "Allowlist names the retired suffixes in its reason strings.",
+    "owner": "nika-client"
+  }
+]

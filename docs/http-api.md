@@ -40,7 +40,7 @@ Any other non-2xx body is discarded and reported as a redacted
   paths. Absolute paths, backslashes, empty segments, `.` and `..` are
   rejected before network I/O.
 
-A contained `.nika.yaml` name uses the resident registry without a local
+A contained `.nika` name uses the resident registry without a local
 engine. Prefix a local file with `./` to capture and submit its snapshot.
 A successful by-name check returns `clean: true` and the compact resident
 acknowledgement; no local check report or exit code is fabricated.

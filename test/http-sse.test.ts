@@ -97,7 +97,7 @@ function admittedFetch(...observation: Array<Response | Error>): ReturnType<type
 
 async function startObserved(fetch: ReturnType<typeof vi.fn>, delays: number[] = []) {
   const source = await transport(fetch as typeof globalThis.fetch, delays)
-    .startRun('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+    .startRun('flow.nika', { idempotencyKey: 'test-admission' });
   const events = collect(source.events);
   return { source, events };
 }
@@ -244,7 +244,7 @@ describe('HTTP observation state machine', () => {
       bin: FIXTURE,
       fetch: fetch as typeof globalThis.fetch,
     });
-    const run = await client.run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+    const run = await client.run('flow.nika', { idempotencyKey: 'test-admission' });
     await expect(run.done).resolves.toMatchObject({
       id: 'job-1',
       status: 'failed',
@@ -382,7 +382,7 @@ describe('HTTP observation state machine', () => {
       .mockResolvedValueOnce(jsonResponse({ id: 'job-1', status: 'running' }))
       .mockResolvedValueOnce(sse(frame(two)));
     const direct = transport(fetch as typeof globalThis.fetch, delays);
-    const source = await direct.startRun('flow.nika.yaml', { idempotencyKey: 'test-admission' });
+    const source = await direct.startRun('flow.nika', { idempotencyKey: 'test-admission' });
     const events = collect(source.events);
 
     await expect(events).rejects.toBeInstanceOf(NikaObservationInterrupted);
@@ -436,18 +436,18 @@ describe('HTTP engine resolution boundary', () => {
     const resolveEngine = vi.fn(() => resolveNikaEngine(FIXTURE));
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse())
-      .mockResolvedValueOnce(jsonResponse({ workflows: ['flow.nika.yaml'] }))
+      .mockResolvedValueOnce(jsonResponse({ workflows: ['flow.nika'] }))
       .mockResolvedValueOnce(jsonResponse({
         status: 'accepted',
         snapshot_digest: 'a'.repeat(64),
-        root: 'fixture.nika.yaml',
+        root: 'fixture.nika',
         units: 1,
       }));
     const transport = lazyTransport(fetch, resolveEngine);
-    await expect(transport.listWorkflows()).resolves.toEqual(['flow.nika.yaml']);
+    await expect(transport.listWorkflows()).resolves.toEqual(['flow.nika']);
     expect(resolveEngine).not.toHaveBeenCalled();
     // A local path is caller-owned source: only that capture resolves the engine.
-    await expect(transport.check('./flow.nika.yaml', {}))
+    await expect(transport.check('./flow.nika', {}))
       .resolves.toMatchObject({ clean: true });
     expect(resolveEngine).toHaveBeenCalledTimes(1);
   });
@@ -457,9 +457,9 @@ describe('HTTP engine resolution boundary', () => {
     const transport = lazyTransport(fetch, () => {
       throw new NikaEngineUnavailable('darwin', 'arm64', '@supernovae-st/nika-darwin-arm64');
     });
-    await expect(transport.check('./flow.nika.yaml', {}))
+    await expect(transport.check('./flow.nika', {}))
       .rejects.toBeInstanceOf(NikaEngineUnavailable);
-    await expect(transport.startRun('./flow.nika.yaml', { idempotencyKey: 'test-admission' }))
+    await expect(transport.startRun('./flow.nika', { idempotencyKey: 'test-admission' }))
       .rejects.toBeInstanceOf(NikaEngineUnavailable);
     expect(fetch).not.toHaveBeenCalled();
   });

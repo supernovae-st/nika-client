@@ -38,6 +38,11 @@ import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject 
 import { readSettlement } from './settlement.js';
 import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
 import type { Transport, TransportRun } from './transport.js';
+import {
+  isContainedWorkflowName,
+  isLegacyContainedWorkflowName,
+  legacyWorkflowRenameMessage,
+} from './workflow-name.js';
 
 export interface HttpTransportOptions {
   url: string;
@@ -148,6 +153,7 @@ export class HttpTransport implements Transport {
         'nika serve admission has no request envelope for model or nativeStrict overrides',
       );
     }
+    refuseLegacyContainedName(workflow);
     if (isContainedWorkflowName(workflow)) return this.checkByName(workflow, options.signal);
     const captured = await this.captureSnapshot(workflow, options.signal, true);
     if (captured.bytes === undefined) return captured.report;
@@ -193,6 +199,7 @@ export class HttpTransport implements Transport {
     if (Buffer.byteLength(idempotencyKey) < 1 || Buffer.byteLength(idempotencyKey) > 255) {
       throw new NikaTransportError(this.kind, 'Idempotency-Key must be 1-255 bytes');
     }
+    refuseLegacyContainedName(workflow);
     if (isContainedWorkflowName(workflow)) {
       // The by-name form (ADR-131): the resident captures the world of a
       // workflow its registry lists and computes the digest its receipt
@@ -284,6 +291,7 @@ export class HttpTransport implements Transport {
   }
 
   async workflow(name: string): Promise<NikaWorkflowMetadata> {
+    refuseLegacyContainedName(name);
     await this.ensureServerIdentity();
     const object = await this.json(`/v1/workflows/${workflowPath(name)}`, {
       method: 'GET',
@@ -303,6 +311,7 @@ export class HttpTransport implements Transport {
     workflow: string,
     options: NikaScheduleOptions,
   ): Promise<NikaScheduleApplyResult> {
+    refuseLegacyContainedName(workflow);
     await this.ensureScheduleCapability();
     const path = `/v1/schedules/${encodeURIComponent(options.id)}`;
     const headers = new Headers({ 'Content-Type': 'application/json' });
@@ -1361,6 +1370,12 @@ export class HttpTransport implements Transport {
   }
 }
 
+function refuseLegacyContainedName(workflow: string): void {
+  if (isLegacyContainedWorkflowName(workflow)) {
+    throw new NikaConfigurationError(legacyWorkflowRenameMessage(workflow));
+  }
+}
+
 function workflowPath(name: string): string {
   const segments = name.split('/');
   if (
@@ -1371,16 +1386,6 @@ function workflowPath(name: string): string {
     throw new TypeError('workflow name must be a contained slash-separated path');
   }
   return segments.map(encodeURIComponent).join('/');
-}
-
-function isContainedWorkflowName(value: unknown): value is string {
-  if (typeof value !== 'string' || !value.endsWith('.nika.yaml')) return false;
-  try {
-    workflowPath(value);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function scheduleBody(

@@ -43,7 +43,7 @@ npm install @supernovae-st/nika@0.118.7
 nika 0.118.7 (f3a31a6ee)
 ```
 
-Write `hello.nika.yaml`. The `mock/echo` model rehearses with no key and no
+Write `hello.nika`. The `mock/echo` model rehearses with no key and no
 network:
 
 ```yaml
@@ -62,7 +62,7 @@ outputs:
 Audit it before anything runs:
 
 ```sh
-./node_modules/.bin/nika check hello.nika.yaml
+./node_modules/.bin/nika check hello.nika
 ```
 
 ```
@@ -84,12 +84,12 @@ const nika = new Nika({
   // bin: '/absolute/path/to/nika', // or set NIKA_BIN
 });
 
-const report = await nika.check('hello.nika.yaml', {
+const report = await nika.check('hello.nika', {
   nativeStrict: true,
 });
 if (!report.clean) throw new Error('workflow did not pass nika check');
 
-const run = await nika.run('hello.nika.yaml', { maxCostUsd: 0 });
+const run = await nika.run('hello.nika', { maxCostUsd: 0 });
 for await (const event of run.events()) {
   // The same lifecycle words on both transports; the engine's own frame,
   // in its protocol vocabulary, stays on event.raw.
@@ -146,7 +146,7 @@ For CI built from this branch:
 ```ts
 import { Nika, isNikaRunSucceeded } from '@supernovae-st/nika';
 
-const run = await new Nika().run<{ answer: number }>('flow.nika.yaml');
+const run = await new Nika().run<{ answer: number }>('flow.nika');
 const result = await run.result();
 if (isNikaRunSucceeded(result)) {
   console.log(result.outputs?.answer); // outputs stay typed and optional
@@ -216,7 +216,7 @@ not parse YAML or reconstruct proof in TypeScript.
   name or a relative path is refused because the operating system would
   resolve it through `PATH` or the working directory, and a `nika` found on
   `PATH` is deliberately never used
-- a `.nika.yaml` workflow
+- a `.nika` workflow
 
 ## Documentation
 
@@ -263,10 +263,10 @@ The lowest-friction creation door is the engine-owned scaffold:
 
 ```sh
 ./node_modules/.bin/nika init --project-file
-./node_modules/.bin/nika new 01-hello hello.nika.yaml
+./node_modules/.bin/nika new 01-hello hello.nika
 ```
 
-`nika.yaml` is the project control plane. `hello.nika.yaml` is executable
+`nika.yaml` is the project control plane. `hello.nika` is executable
 workflow intent and is the file passed to `check()` and `run()`. The scaffold
 writes the engine's own annotated `01-hello` example (its task is named
 `greet` and its prompt asks for French); the contract this README relies on is
@@ -312,7 +312,7 @@ into SDK configuration, source control, workflow inputs, or an HTTP request.
 ## Cancel a run
 
 ```ts
-const run = await nika.run('slow.nika.yaml');
+const run = await nika.run('slow.nika');
 const cancellation = await run.cancel();
 const result = await run.result();
 
@@ -335,13 +335,13 @@ settlement frame.
 
 ## Connect to `nika serve`
 
-A contained workflow name such as `hello.nika.yaml` or
-`daily/report.nika.yaml` is resolved by the resident registry. `check()` and
+A contained workflow name such as `hello.nika` or
+`daily/report.nika` is resolved by the resident registry. `check()` and
 `run()` send that name without a local engine or a local workflow file.
 Use `listWorkflows()` to discover the served names.
 
 To capture your local file instead, pass an explicit path such as
-`./hello.nika.yaml`. The compatible local engine captures an immutable
+`./hello.nika`. The compatible local engine captures an immutable
 snapshot, and the SDK sends its exact bytes and verifies the acknowledgement.
 Only this path needs `bin`, `NIKA_BIN`, or the exact optional native package.
 Observation and scheduling also use the server identity alone.
@@ -384,8 +384,8 @@ const nika = new Nika({
   // bin: '/absolute/path/to/nika',
 });
 
-const report = await nika.check('hello.nika.yaml');
-const run = await nika.run('hello.nika.yaml', {
+const report = await nika.check('hello.nika');
+const run = await nika.run('hello.nika', {
   idempotencyKey: 'hello-2026-08-30', // persist before admission; reuse on retry
 });
 for await (const event of run.events()) {
@@ -460,7 +460,7 @@ client refuses `schedule` and `scheduleStatus` because a short-lived process
 cannot honestly own durable schedule state.
 
 ```ts
-const applied = await nika.schedule('hello.nika.yaml', {
+const applied = await nika.schedule('hello.nika', {
   id: 'weekday-hello',
   when: { kind: 'cadence', expression: 'TZ=Europe/Paris 0 9 * * 1-5' },
   maxCostUsd: 0.01,
@@ -472,7 +472,7 @@ const applied = await nika.schedule('hello.nika.yaml', {
 const status = await nika.scheduleStatus('weekday-hello');
 console.log(applied.changed, status.next, status.lastDecision);
 
-await nika.schedule('hello.nika.yaml', {
+await nika.schedule('hello.nika', {
   id: 'weekday-hello',
   when: { kind: 'cadence', expression: 'TZ=Europe/Paris 0 9 * * 1-5' },
   maxCostUsd: 0.01,
@@ -684,7 +684,7 @@ any runtime validation, and defaults to `Record<string, unknown>` so untyped
 callers see no change:
 
 ```ts
-const run = await nika.run<{ answer: number }>('flow.nika.yaml');
+const run = await nika.run<{ answer: number }>('flow.nika');
 const result = await run.result();      // result.outputs?: { answer: number }
 
 for await (const event of run.events()) {
@@ -762,7 +762,7 @@ carrying `operation: 'run'` and the engine's exit status in `status`:
 
 ```ts
 try {
-  const run = await nika.run('./workflow.nika.yaml');
+  const run = await nika.run('./workflow.nika');
   const result = await run.result(); // admitted: a failure here is result data
 } catch (error) {
   if (error instanceof NikaOperationError && error.operation === 'run') {

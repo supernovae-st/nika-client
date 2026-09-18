@@ -151,7 +151,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
     });
 
     it('reads a native run in lifecycle words, per-task facts included', async () => {
-      const report = await runToReport(native(), 'wire-0119-hello.nika.yaml');
+      const report = await runToReport(native(), 'wire-0119-hello.nika');
 
       expect(report).toMatchObject({
         facts: [
@@ -182,7 +182,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
         },
       ]);
 
-      const report = await runToReport(client, 'flow.nika.yaml', HTTP_RUN);
+      const report = await runToReport(client, 'flow.nika', HTTP_RUN);
 
       expect(report).toEqual({
         runId: 'job-1',
@@ -196,7 +196,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
     });
 
     it('receives an admitted failure as result data on both transports', async () => {
-      const local = await runToReport(native(), 'wire-0119-admitted-failure.nika.yaml');
+      const local = await runToReport(native(), 'wire-0119-admitted-failure.nika');
       expect(local).toMatchObject({
         outcome: 'failed',
         failure: { code: 'NIKA-BUILTIN-ASSERT-001', task: 'fail' },
@@ -213,7 +213,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
         { sequence: 1, kind: 'execution.started', status: 'running' },
         { sequence: 2, kind: 'execution.settled', status: 'failed', settlement: failed },
       ]);
-      const remote = await runToReport(client, 'flow.nika.yaml', HTTP_RUN);
+      const remote = await runToReport(client, 'flow.nika', HTTP_RUN);
       expect(remote).toMatchObject({
         facts: ['run.started', 'run.settled'],
         outcome: 'failed',
@@ -222,7 +222,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
     });
 
     it('holds a human gate as waiting on both transports: never failed, never completed', async () => {
-      const local = await runToReport(native(), 'wire-0118-human-gate.nika.yaml');
+      const local = await runToReport(native(), 'wire-0118-human-gate.nika');
       expect(local).toMatchObject({
         facts: ['run.started', 'task.scheduled', 'engine.event', 'run.waiting'],
         outcome: 'waiting',
@@ -235,7 +235,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
         { sequence: 1, kind: 'execution.started', status: 'running' },
         { sequence: 2, kind: 'execution.settled', status: 'paused', settlement: paused },
       ]);
-      const remote = await runToReport(client, 'flow.nika.yaml', HTTP_RUN);
+      const remote = await runToReport(client, 'flow.nika', HTTP_RUN);
       expect(remote).toMatchObject({
         facts: ['run.started', 'run.waiting'],
         outcome: 'waiting',
@@ -248,7 +248,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
     it('reads an operator cancellation as the engine wrote it, not as its exit code', async () => {
       // Released 0.118.7, SIGTERM mid-run: the engine settled `cancelled` and
       // only then exited 130. The state word it wrote outranks the exit class.
-      const report = await runToReport(native(), 'wire-0118-sigterm-cancel.nika.yaml');
+      const report = await runToReport(native(), 'wire-0118-sigterm-cancel.nika');
 
       expect(report).toMatchObject({
         facts: [
@@ -266,7 +266,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
     });
 
     it('is never handed a run the engine refused before admission', async () => {
-      const refused = await runToReport(native(), 'wire-pr1679-sec004.nika.yaml')
+      const refused = await runToReport(native(), 'wire-pr1679-sec004.nika')
         .catch((cause: unknown) => cause);
       expect(refused).toBeInstanceOf(NikaOperationError);
       expect(refused).toMatchObject({
@@ -280,7 +280,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
           error: { code: 'workflow_refused', message: 'the capture refused this workflow' },
         }, 422),
       });
-      const remote = await runToReport(client, 'flow.nika.yaml', HTTP_RUN)
+      const remote = await runToReport(client, 'flow.nika', HTTP_RUN)
         .catch((cause: unknown) => cause);
       expect(remote).toBeInstanceOf(NikaOperationError);
       expect(remote).toMatchObject({ operation: 'run', code: 'workflow_refused', status: 422 });
@@ -292,7 +292,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
   describe('a semantic event keeps its protocol frame', () => {
     it('shows the native word on raw, the very frame the engine wrote', async () => {
       const client = native();
-      const run = await client.run('wire-0119-hello.nika.yaml');
+      const run = await client.run('wire-0119-hello.nika');
       const events = await collect(run.events());
       await run.result();
 
@@ -317,7 +317,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
         { sequence: 2, kind: 'execution.settled', status: 'succeeded' },
       ];
       const { client } = served(frames);
-      const run = await client.run('flow.nika.yaml', HTTP_RUN);
+      const run = await client.run('flow.nika', HTTP_RUN);
       const events = await collect(run.events());
 
       expect(events.map((event) => [event.kind, event.raw.kind, event.sequence])).toEqual([
@@ -330,7 +330,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
 
   describe('the Run owns its lifecycle', () => {
     it('exposes identity, the four lifecycle methods, and the done alias, frozen', async () => {
-      const run = await native().run('ok.nika.yaml');
+      const run = await native().run('ok.nika');
 
       expect(Object.keys(run).sort()).toEqual([
         'cancel', 'done', 'events', 'id', 'result', 'status',
@@ -344,7 +344,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
     });
 
     it('settles result() and the done alias with the one same result', async () => {
-      const run = await native().run<{ answer: number }>('ok.nika.yaml');
+      const run = await native().run<{ answer: number }>('ok.nika');
 
       const result = await run.result();
       expect(result).toMatchObject({ id: run.id, status: 'succeeded', outputs: { answer: 42 } });
@@ -354,7 +354,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
     });
 
     it('keeps working when its methods are extracted from the handle', async () => {
-      const { events, result, status, cancel } = await native().run('wire-0119-hello.nika.yaml');
+      const { events, result, status, cancel } = await native().run('wire-0119-hello.nika');
 
       const kinds = (await collect(events())).map((event) => event.kind);
       expect(kinds.at(0)).toBe('run.started');
@@ -365,7 +365,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
     });
 
     it('refuses a native status instead of inventing a durable one', async () => {
-      const run = await native().run('ok.nika.yaml');
+      const run = await native().run('ok.nika');
 
       await expect(run.status()).rejects.toMatchObject({
         name: 'NikaCompatibilityError',
@@ -380,7 +380,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
         [{ sequence: 1, kind: 'execution.settled', status: 'succeeded' }],
         { 'GET /v1/jobs/job-1/status': () => jsonResponse({ status: 'running' }) },
       );
-      const run = await client.run('flow.nika.yaml', HTTP_RUN);
+      const run = await client.run('flow.nika', HTTP_RUN);
 
       await expect(run.status()).resolves.toBe('running');
       await run.result();
@@ -388,7 +388,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
 
     it('cancels a native run idempotently and lets the engine name the result', async () => {
       const client = native();
-      const run = await client.run('cancel.nika.yaml');
+      const run = await client.run('cancel.nika');
 
       const first = run.cancel();
       expect(run.cancel()).toBe(first);
@@ -418,7 +418,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
         },
         'POST /v1/jobs/job-1/cancel': () => jsonResponse({ id: 'job-1', status: 'running' }, 202),
       });
-      const run = await client.run('flow.nika.yaml', HTTP_RUN);
+      const run = await client.run('flow.nika', HTTP_RUN);
 
       const first = run.cancel();
       expect(run.cancel()).toBe(first);
@@ -436,7 +436,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
 
     it('bounds a semantic view like any other view of the one session', async () => {
       const client = native({ eventBufferSize: 8 });
-      const run = await client.run('burst.nika.yaml');
+      const run = await client.run('burst.nika');
       const slow = run.events({ bufferSize: 1 })[Symbol.asyncIterator]();
       const fast = collect(run.events({ bufferSize: 8 }));
 
@@ -447,7 +447,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
     });
 
     it('treats an events signal as the end of that view, never of the run', async () => {
-      const run = await native().run('slow.nika.yaml');
+      const run = await native().run('slow.nika');
       const controller = new AbortController();
       const view = run.events({ signal: controller.signal });
       controller.abort();
@@ -479,7 +479,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
           );
         },
       });
-      const run = await client.run('flow.nika.yaml', HTTP_RUN);
+      const run = await client.run('flow.nika', HTTP_RUN);
 
       const seen: NikaRunEvent[] = [];
       let failure: unknown;
@@ -527,7 +527,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
         { sequence: 2, kind: 'execution.interrupted', status: 'interrupted' },
       ]);
 
-      const report = await runToReport(client, 'flow.nika.yaml', HTTP_RUN);
+      const report = await runToReport(client, 'flow.nika', HTTP_RUN);
 
       expect(report).toEqual({
         runId: 'job-1',
@@ -554,7 +554,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
         { sequence: 2, kind, status },
       ]);
 
-      const run = await client.run('flow.nika.yaml', HTTP_RUN);
+      const run = await client.run('flow.nika', HTTP_RUN);
       const events = await collect(run.events());
 
       expect(events.map((event) => [event.kind, event.raw.kind, event.sequence])).toEqual([
@@ -590,7 +590,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
   describe('the deprecated client wrappers, kept for one train', () => {
     it('still streams the protocol vocabulary, frame for frame', async () => {
       const client = native();
-      const run = await client.run('wire-0119-hello.nika.yaml');
+      const run = await client.run('wire-0119-hello.nika');
 
       const legacy = await collect(client.events(run));
       const semantic = await collect(run.events());
@@ -610,7 +610,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
 
     it('shares the one memoized cancellation with the handle', async () => {
       const client = native();
-      const run = await client.run('cancel.nika.yaml');
+      const run = await client.run('cancel.nika');
 
       const first = run.cancel();
       expect(client.cancel(run)).toBe(first);
@@ -623,7 +623,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
         [{ sequence: 1, kind: 'execution.settled', status: 'succeeded' }],
         { 'GET /v1/jobs/job-1/status': () => jsonResponse({ status: 'queued' }) },
       );
-      const run = await client.run('flow.nika.yaml', HTTP_RUN);
+      const run = await client.run('flow.nika', HTTP_RUN);
 
       await expect(client.status(run)).resolves.toBe('queued');
       await run.result();
@@ -633,7 +633,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
   describe('ownership is unchanged: no silent global registry', () => {
     it('refuses a foreign, a reconstructed, and a serialized handle', async () => {
       const client = native();
-      const run = await client.run('ok.nika.yaml');
+      const run = await client.run('ok.nika');
       await run.result();
 
       const foreign = {
@@ -655,7 +655,7 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
     it('refuses a run another client owns', async () => {
       const owner = native();
       const stranger = native();
-      const run = await owner.run('ok.nika.yaml');
+      const run = await owner.run('ok.nika');
 
       expect(() => stranger.events(run)).toThrow(NikaRunOwnershipError);
       expect(() => stranger.cancel(run)).toThrow(NikaRunOwnershipError);

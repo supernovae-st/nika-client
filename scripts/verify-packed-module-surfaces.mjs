@@ -62,7 +62,7 @@ try {
     const lifecycle = [
       'async function lifecycle(Nika, isNikaRunSucceeded) {',
       `  const nika = new Nika({ bin: ${JSON.stringify(replayEngine)} });`,
-      "  const run = await nika.run('wire-0119-hello.nika.yaml');",
+      "  const run = await nika.run('wire-0119-hello.nika');",
       '  const { events, result } = run;',
       '  const kinds = [];',
       '  const protocol = [];',
@@ -79,7 +79,7 @@ try {
       '  const legacy = [];',
       '  for await (const event of nika.events(run)) legacy.push(event.kind);',
       "  if (legacy.join() !== protocolWords) throw new Error('deprecated wrapper: ' + legacy.join());",
-      "  const gate = await nika.run('wire-0118-human-gate.nika.yaml');",
+      "  const gate = await nika.run('wire-0118-human-gate.nika');",
       '  const gateKinds = [];',
       '  for await (const event of gate.events()) gateKinds.push(event.kind);',
       '  const held = await gate.result();',

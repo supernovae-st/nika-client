@@ -4,11 +4,11 @@ import { Nika, NikaCompatibilityError } from '@supernovae-st/nika';
 const engine = process.env.NIKA_BIN;
 assert(engine, 'NIKA_BIN is required');
 const nika = new Nika({ bin: engine, cwd: process.cwd(), eventBufferSize: 128 });
-const checked = await nika.check('workflow.nika.yaml', { nativeStrict: true });
+const checked = await nika.check('workflow.nika', { nativeStrict: true });
 assert.equal(checked.clean, true);
 const [allowed, refused] = await Promise.all([
-  nika.run('workflow.nika.yaml', { vars: { approved: true }, maxCostUsd: 0 }),
-  nika.run('workflow.nika.yaml', { vars: { approved: false }, maxCostUsd: 0 }),
+  nika.run('workflow.nika', { vars: { approved: true }, maxCostUsd: 0 }),
+  nika.run('workflow.nika', { vars: { approved: false }, maxCostUsd: 0 }),
 ]);
 const allowedEvents = [];
 const observe = (async () => { for await (const event of nika.events(allowed)) allowedEvents.push(event.kind ?? 'unknown'); })();
@@ -23,7 +23,7 @@ assert.equal((await nika.traceVerify(green.receipt)).verified, true);
 
 let typedError;
 try {
-  await nika.run('workflow.nika.yaml', { idempotencyKey: 'remote-option-on-native' });
+  await nika.run('workflow.nika', { idempotencyKey: 'remote-option-on-native' });
 } catch (error) { typedError = error; }
 assert(typedError instanceof NikaCompatibilityError);
 assert.equal(typedError.capability, 'idempotencyKey');

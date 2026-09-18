@@ -47,23 +47,23 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
     const project = stageProject(HOST_PACKAGE);
     const result = runNode(project, 'esm.mjs', `
       import { Nika } from '@supernovae-st/nika';
-      const report = await new Nika().check('esm-packed.nika.yaml');
+      const report = await new Nika().check('esm-packed.nika');
       console.log(JSON.stringify(report.argv));
     `);
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('esm-packed.nika.yaml');
+    expect(result.stdout).toContain('esm-packed.nika');
   });
 
   it('loads the supported host payload from a CJS require', () => {
     const project = stageProject(HOST_PACKAGE);
     const result = runNode(project, 'cjs.cjs', `
       const { Nika } = require('@supernovae-st/nika');
-      new Nika().check('cjs-packed.nika.yaml').then((report) => {
+      new Nika().check('cjs-packed.nika').then((report) => {
         console.log(JSON.stringify(report.argv));
       });
     `);
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain('cjs-packed.nika.yaml');
+    expect(result.stdout).toContain('cjs-packed.nika');
   });
 
   it('lets the Node process exit immediately after a durable schedule apply', () => {
@@ -83,7 +83,7 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
       };
       const status = {
         definition: {
-          id: 'exit', workflow: 'flow.nika.yaml',
+          id: 'exit', workflow: 'flow.nika',
           when: { kind: 'once', at: '2099-09-01T07:00:00Z' },
           maxCostUsd: 0.25, missed: 'skip', maxLatenessSeconds: null,
           overlap: 'skip', afterSkip: 'next_slot', jitter: null,
@@ -100,7 +100,7 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
       const nika = new Nika({
         url: 'https://nika.example', token: 'ssssssssssssssssssssssssssssssss', fetch,
       });
-      const applied = await nika.schedule('flow.nika.yaml', {
+      const applied = await nika.schedule('flow.nika', {
         id: 'exit', when: { kind: 'once', at: '2099-09-01T07:00:00Z' },
         maxCostUsd: 0.25, missed: 'skip',
       });
@@ -148,7 +148,7 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
     ), '\n// tampered\n');
     const result = runNode(project, 'tampered.mjs', `
       import { Nika } from '@supernovae-st/nika';
-      try { await new Nika().check('must-not-run.nika.yaml'); } catch (error) {
+      try { await new Nika().check('must-not-run.nika'); } catch (error) {
         console.log(JSON.stringify({ name: error.name, capability: error.capability }));
       }
     `);
@@ -172,11 +172,11 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
     );
     const result = spawnSync(
       process.execPath,
-      [shim, 'check', 'dirty-shim.nika.yaml', '--json'],
+      [shim, 'check', 'dirty-shim.nika', '--json'],
       { cwd: project, env: cleanEnv(), encoding: 'utf8' },
     );
     expect(result.status).toBe(2);
-    expect(result.stdout).toContain('dirty-shim.nika.yaml');
+    expect(result.stdout).toContain('dirty-shim.nika');
   });
 
   it('forwards signals to the payload and mirrors signal termination', async () => {

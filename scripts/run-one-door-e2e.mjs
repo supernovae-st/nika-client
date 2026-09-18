@@ -57,7 +57,7 @@ try {
   cancellationGate = await CancellationRendezvous.listen();
   const workflows = { ...fixtures, cancelled: cancellationFixture(cancellationGate.url) };
   writeFileSync(path.join(project, 'nika.yaml'), 'nika: one-door-e2e\n');
-  for (const [name, yaml] of Object.entries(workflows)) writeFileSync(path.join(project, `${name}.nika.yaml`), yaml);
+  for (const [name, yaml] of Object.entries(workflows)) writeFileSync(path.join(project, `${name}.nika`), yaml);
   writeFileSync(path.join(scratch, 'token'), `${token}\n`, { mode: 0o600 });
   const engine = await probe(binary, env);
   engine.binary_sha256 = await sha256(binary);
@@ -123,7 +123,7 @@ try {
   }
   assert(healthy, `resident listener/health unavailable: ${server.stdout}\n${server.stderr}`);
   assert(!existsSync(absentBinary));
-  for (const name of Object.keys(workflows)) assert(!existsSync(path.join(consumer, `${name}.nika.yaml`)));
+  for (const name of Object.keys(workflows)) assert(!existsSync(path.join(consumer, `${name}.nika`)));
   const catalog = await sdk({ action: 'catalog', names: Object.keys(workflows), door: 'sdk-name' });
   const expectations = {};
   for (const [name, expectedStatus, expectedExit] of [
@@ -131,7 +131,7 @@ try {
     ['paused', 'paused', 4], ['cancelled', 'cancelled', 130],
   ]) {
     process.stderr.write(`one-door scenario: ${name}\n`);
-    const file = `${name}.nika.yaml`;
+    const file = `${name}.nika`;
     const ordinary = await cli(['check', file, '--json'], 0);
     assert.equal(ordinary.execution_snapshot, undefined, 'snapshot export must stay opt-in');
     const captured = await cli(['check', file, '--json', '--sdk-snapshot'], 0);

@@ -18,8 +18,8 @@ test('controlled incident output satisfies the current replay judge without chan
     check: async () => ({ clean: true }),
     run: async (workflow) => {
       workflows.push(workflow);
-      if (workflow === 'controlled-cancel.nika.yaml') return controlled;
-      assert.equal(workflow, 'workflow.nika.yaml');
+      if (workflow === 'controlled-cancel.nika') return controlled;
+      assert.equal(workflow, 'workflow.nika');
       return { done: Promise.resolve({ status: 'succeeded', outputs: {
         plan: { incident: { id: 'inc-2042' }, breached: 3 },
         completion: { state: 'reassessed' }, plan_digest: 'a'.repeat(64),
@@ -33,7 +33,7 @@ test('controlled incident output satisfies the current replay judge without chan
   const gate = { arm() {}, arrived: Promise.resolve(), release: async () => release(),
     finish: () => ({ requests: { hold: 1, dependent: 0 } }) };
   const project = await exerciseIncident(client, gate);
-  assert.deepEqual(workflows, ['workflow.nika.yaml', 'controlled-cancel.nika.yaml']);
+  assert.deepEqual(workflows, ['workflow.nika', 'controlled-cancel.nika']);
   assert.equal(project.sse_terminal.settlement_cause, 'operator');
   assert.equal(project.settlement.spend.pricing_as_of, null);
   assert.doesNotThrow(() => stableDepthEvidence({ projects: [project] }));

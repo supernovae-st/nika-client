@@ -321,7 +321,9 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     it('released 0.119.0 · hello replays all six frames, the first included', async () => {
       const client = native();
       const run = await client.run<{ greeting: string }>('wire-0119-hello.nika.yaml');
-      expect(Object.keys(run).sort()).toEqual(['done', 'id']);
+      expect(Object.keys(run).sort()).toEqual([
+        'cancel', 'done', 'events', 'id', 'result', 'status',
+      ]);
 
       const events: NikaEvent[] = [];
       for await (const event of client.events(run)) events.push(event);

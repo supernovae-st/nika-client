@@ -493,7 +493,7 @@ export class HttpTransport implements Transport {
         // that already ended; 202 acknowledges the request on a job whose
         // execution owner has not settled. Acceptance is not a settlement:
         // the observation stays open, and the terminal frame or the final
-        // durable read settles run.done with what the owner recorded
+        // durable read settles run.result() with what the owner recorded
         // (cancelled, succeeded, failed, or interrupted once the grace expired).
         const { object, status } = await this.jsonWithStatus(
           `/v1/jobs/${encodeURIComponent(id)}/cancel`,

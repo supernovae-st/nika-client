@@ -13,6 +13,7 @@ import type {
   NikaCheckResult,
   NikaEvent,
   NikaExecutionId,
+  NikaJournalEvidence,
   NikaReceipt,
   NikaRunId,
   NikaRunOptions,
@@ -34,6 +35,7 @@ import {
   compatibleEngineIdentity,
   type NikaEngineIdentity,
 } from './engine-identity.js';
+import { literalInputs } from './literal-inputs.js';
 import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
 import { readSettlement } from './settlement.js';
 import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
@@ -91,6 +93,7 @@ interface DurableJob {
   receipt?: NikaReceipt;
   error?: { code: string; message: string };
   settlement?: NikaSettlement;
+  evidence?: NikaJournalEvidence;
 }
 
 interface RetryObservation {
@@ -136,6 +139,8 @@ const RETRY_MIN_MILLISECONDS = 25;
 const RETRY_MAX_MILLISECONDS = 5_000;
 
 const WORKFLOW_REFUSAL_STATUSES = new Set([404, 422]);
+/** The capability `/health` advertises for `JobByName.inputs` (nika#1642). */
+const JOB_INPUTS = 'jobInputs';
 
 export class HttpTransport implements Transport {
   readonly kind = 'http' as const;
@@ -179,6 +184,8 @@ export class HttpTransport implements Transport {
   }
 
   async startRun(workflow: string, options: NikaRunOptions): Promise<TransportRun> {
+    // A map the SDK cannot send is the caller's mistake: it needs no request.
+    const inputs = literalInputs(options);
     if (
       (options.vars && Object.keys(options.vars).length > 0)
       || options.model !== undefined
@@ -186,7 +193,20 @@ export class HttpTransport implements Transport {
     ) {
       throw this.gap(
         'runOptions',
-        'nika serve admission has no request envelope for vars, model, or maxCostUsd',
+        'nika serve admission has no request envelope for vars, model, or maxCostUsd; '
+        + 'literal workflow values ride inputs, and vars is the native --var operator channel',
+      );
+    }
+    refuseLegacyContainedName(workflow);
+    const byName = isContainedWorkflowName(workflow);
+    if (inputs && !byName) {
+      // A snapshot froze the author's world, inputs included (nika#1642): the
+      // resident refuses any overlay, an empty or null one too. Refused here,
+      // before a local capture is spawned or a byte leaves the machine.
+      throw this.gap(
+        'snapshotInputs',
+        'An execution snapshot freezes its inputs and takes no request overlay; '
+        + 'run({ inputs }) over HTTP binds a workflow by its served name (listWorkflows())',
       );
     }
     const idempotencyKey = options.idempotencyKey;
@@ -199,13 +219,17 @@ export class HttpTransport implements Transport {
     if (Buffer.byteLength(idempotencyKey) < 1 || Buffer.byteLength(idempotencyKey) > 255) {
       throw new NikaTransportError(this.kind, 'Idempotency-Key must be 1-255 bytes');
     }
-    refuseLegacyContainedName(workflow);
-    if (isContainedWorkflowName(workflow)) {
+    if (byName) {
       // The by-name form (ADR-131): the resident captures the world of a
       // workflow its registry lists and computes the digest its receipt
       // carries. No local engine is spawned and no digest is expected here.
       await this.ensureServerIdentity();
-      const job = await this.admitJob(JSON.stringify({ workflow }), idempotencyKey);
+      if (inputs) this.requireJobInputs();
+      // The map's bytes are the ones the native transport writes to stdin.
+      const body = inputs
+        ? `{"workflow":${JSON.stringify(workflow)},"inputs":${inputs.json}}`
+        : JSON.stringify({ workflow });
+      const job = await this.admitJob(body, idempotencyKey);
       return this.httpRun(job.id as NikaRunId, 0, job);
     }
     const captured = await this.captureSnapshot(workflow);
@@ -446,6 +470,9 @@ export class HttpTransport implements Transport {
       // job's own error is the same failure without it.
       const error = event ? eventError(event) : durable?.settlement?.error ?? durable?.error;
       const settlement = event ? eventSettlement(event, this.kind) : durable?.settlement;
+      // Copied from the frame or record that settled the run, never inferred:
+      // a loss the resident did not report stays absent, and none changes status.
+      const evidence = event ? eventEvidence(event, this.kind) : durable?.evidence;
       resolveDone({
         id,
         status: source.status!,
@@ -456,6 +483,7 @@ export class HttpTransport implements Transport {
         ...(receipt ? { receipt } : {}),
         ...(error ? { error } : {}),
         ...(settlement ? { settlement } : {}),
+        ...(evidence ? { evidence } : {}),
       });
     };
     if (attachedState && isObservationEnded(attachedState)) settle(attachedState);
@@ -682,9 +710,12 @@ export class HttpTransport implements Transport {
     if (!event) throw new NikaProtocolError(this.kind, 'SSE data was not an object');
     // The resident's projection (`JobEvent`, closed): the frame identity, the
     // terminal outputs and receipt, and the settlement it nests whole on the
-    // terminal frame (engine 0.118 · ADR-128).
+    // terminal frame (engine 0.118 · ADR-128). Engine main adds two optional
+    // fields ahead of the pinned contract: `at`, when the resident admitted the
+    // event, and `evidence`, a reported journal loss. Anything else still refuses.
     const allowed = new Set([
-      'sequence', 'kind', 'status', 'code', 'message', 'outputs', 'receipt', 'settlement',
+      'sequence', 'at', 'kind', 'status', 'code', 'message', 'outputs', 'receipt', 'settlement',
+      'evidence',
     ]);
     if (Object.keys(event).some((key) => !allowed.has(key))) {
       throw new NikaProtocolError(this.kind, 'SSE data contained fields outside the public projection');
@@ -711,6 +742,10 @@ export class HttpTransport implements Transport {
         throw new NikaProtocolError(this.kind, `SSE data.${field} was not a string`);
       }
     }
+    if (event.at !== undefined && (typeof event.at !== 'string' || !isCanonicalTimestamp(event.at))) {
+      throw new NikaProtocolError(this.kind, 'SSE data.at was not an RFC 3339 timestamp');
+    }
+    if (event.evidence !== undefined) journalEvidence(event.evidence, this.kind, 'SSE data.evidence');
     if (event.outputs !== undefined && !machineObject(event.outputs)) {
       throw new NikaProtocolError(this.kind, 'SSE data.outputs was not an object');
     }
@@ -1001,6 +1036,25 @@ export class HttpTransport implements Transport {
         'The connected nika serve process did not advertise resident schedule authority',
       );
     }
+  }
+
+  /**
+   * The resident must advertise named-input admission before a map is sent
+   * (nika#1642). A resident from before the envelope answered 202 to an extra
+   * `inputs` field and applied nothing, so an accepted POST negotiates nothing:
+   * only the capability `/health` advertised does. Called after
+   * `ensureServerIdentity()`.
+   */
+  private requireJobInputs(): void {
+    const identity = this.remoteIdentity;
+    if (identity?.supportedCapabilities.includes(JOB_INPUTS)) return;
+    throw this.gap(
+      JOB_INPUTS,
+      `The connected nika serve ${identity?.engineVersion ?? '(unidentified)'} does not advertise `
+      + `${JOB_INPUTS} (advertised: ${identity?.supportedCapabilities.join(', ') ?? 'nothing'}); `
+      + 'run({ inputs }) needs a resident that binds declared inputs by name. '
+      + 'Nothing was posted: an older resident accepts the field and ignores its values',
+    );
   }
 
   private async captureSnapshot(
@@ -1549,9 +1603,11 @@ function durableJob(
   transport: 'http',
 ): DurableJob {
   // The resident's durable projection (`Job`, closed), the nested settlement
-  // included (engine 0.118 · ADR-128).
+  // included (engine 0.118 · ADR-128), and the journal `evidence` engine main
+  // adds ahead of the pinned contract. `Job` declares no `at`.
   const allowed = new Set([
     'id', 'status', 'execution_id', 'trace_id', 'outputs', 'receipt', 'error', 'settlement',
+    'evidence',
   ]);
   if (Object.keys(value).some((key) => !allowed.has(key))) {
     throw new NikaProtocolError(transport, 'Durable job response contained unknown fields');
@@ -1582,6 +1638,9 @@ function durableJob(
   const settlement = value.settlement === undefined
     ? undefined
     : readSettlement(value.settlement, transport, value.status);
+  const evidence = value.evidence === undefined
+    ? undefined
+    : journalEvidence(value.evidence, transport, 'Durable job response evidence');
   if (value.outputs !== undefined && !outputs) {
     throw new NikaProtocolError(transport, 'Durable job response outputs were malformed');
   }
@@ -1608,7 +1667,46 @@ function durableJob(
     ...(receipt ? { receipt: Object.freeze(receipt) } : {}),
     ...(error ? { error } : {}),
     ...(settlement ? { settlement } : {}),
+    ...(evidence ? { evidence } : {}),
   };
+}
+
+/** The contract's whole vocabulary (engine `JournalEvidence`): one status, two reasons. */
+const JOURNAL_EVIDENCE_REASONS: ReadonlySet<string> = new Set(['write_failed', 'record_refused']);
+
+/**
+ * The resident's journal evidence, read as closed as its contract writes it:
+ * exactly `status` and `reason`, `mirror_lost`, and one of the two reasons.
+ * The engine refuses any other word itself, so an unknown one is a protocol
+ * fault here, not a future to guess at. The value is never quoted: a malformed
+ * one could carry the OS text or the path the contract exists to keep out.
+ */
+function journalEvidence(
+  value: unknown,
+  transport: 'http',
+  where: string,
+): NikaJournalEvidence {
+  const evidence = machineObject(value);
+  if (
+    !evidence
+    || Object.keys(evidence).length !== 2
+    || evidence.status !== 'mirror_lost'
+    || typeof evidence.reason !== 'string'
+    || !JOURNAL_EVIDENCE_REASONS.has(evidence.reason)
+  ) {
+    throw new NikaProtocolError(transport, `${where} was not the resident's journal evidence`);
+  }
+  return Object.freeze({
+    status: 'mirror_lost',
+    reason: evidence.reason as NikaJournalEvidence['reason'],
+  });
+}
+
+/** The evidence a frame carries; `nikaEvent()` already refused a malformed one. */
+function eventEvidence(event: NikaEvent, transport: 'http'): NikaJournalEvidence | undefined {
+  return event.evidence === undefined
+    ? undefined
+    : journalEvidence(event.evidence, transport, 'SSE data.evidence');
 }
 
 function assertReceiptIdentity(

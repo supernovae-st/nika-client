@@ -35,7 +35,20 @@ Any other non-2xx body is discarded and reported as a redacted
 - Each request has a bounded timeout and each JSON/SSE machine frame has a
   byte ceiling.
 - Remote `check()` refuses `model` and `nativeStrict`; remote `run()` refuses
-  `vars`, `model`, and `maxCostUsd` until the request envelope owns them.
+  `model`, `maxCostUsd` and the deprecated `vars` until a request envelope
+  owns them.
+- Remote `run()` sends `inputs` as `JobByName.inputs` only for a served name
+  and only when `GET /health` advertises `jobInputs`. That capability, not a
+  202, is the negotiation: a resident from before the envelope accepts the
+  extra field and ignores its values, so the SDK refuses it after `/health`
+  alone with `NikaCompatibilityError` (`capability: 'jobInputs'`). The
+  `inputs` envelope is engine-owned (nika#1642) and lands in the pinned
+  `openapi.json` when the engine pin reaches a release that serves it.
+- A snapshot body takes no `inputs` overlay, an empty map included: `run()` of
+  a local path with `inputs` is refused before any capture or request.
+- The serialized `inputs` map is bounded at 1 MiB by the SDK, the bound the
+  native channel reads. The resident's whole-request ceiling is its own and may
+  be lower.
 - Caller-provided workflow catalog names must be contained slash-separated
   paths. Absolute paths, backslashes, empty segments, `.` and `..` are
   rejected before network I/O.
@@ -54,6 +67,36 @@ named with its task. The SDK types every known field, refuses a settlement
 whose `status` contradicts the record carrying it, keeps fields it does not
 know, and never derives a settlement from an exit code; a job the resident
 lost (`interrupted`) carries none.
+
+## Frame time and journal evidence (engine main)
+
+Both resident projections are closed, and the SDK refuses any field it does
+not know. Engine main adds two optional fields that are
+ahead of the pinned `openapi.json`: no released engine writes them yet, and a
+resident that predates them never sends them, so nothing changes against a
+released resident. They are read so that a resident built from engine main can
+be observed at all; the pin itself moves only with a release.
+
+- `JobEvent.at` is when the resident admitted the event: an RFC 3339 timestamp
+  in UTC, outside the event's hash chain. It rides `event.raw.at` untouched.
+  Anything that is not such a timestamp is a `NikaProtocolError`. The durable
+  `Job` declares no `at`, so one there is still an unknown field.
+- `evidence`, on the terminal frame and on the durable `Job`, reports that the
+  run's journal mirror stopped recording. It is exactly a `status` and a
+  `reason`. The one status is `mirror_lost`. The reason is `write_failed`
+  (opening, writing or syncing the journal failed) or `record_refused` (a
+  record could not be admitted within the writer's bounds): a coarse class,
+  never OS text and never a path. Any other shape or word is a
+  `NikaProtocolError`, as the engine itself refuses one, and its value is
+  never quoted in the error.
+
+`evidence` is independent of the execution and is never a verdict: a run can
+settle `succeeded` while its mirror is lost. It never changes `result.status`,
+the settlement, or the receipt's identity checks. `run.result()` copies it to
+`result.evidence` from the frame or record that settled the run, so a caller
+who never iterates events still learns the trace may be incomplete before
+trusting `traceVerify`. Its absence claims nothing: not that a journal exists,
+only that no loss was reported. A native run never carries it.
 
 ## Lifecycle vocabulary over the resident's frames
 

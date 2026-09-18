@@ -181,10 +181,39 @@ export interface NikaRunSealedEvent extends NikaEventFields {
 }
 
 /**
+ * A journal delivery loss the resident reported, exactly as its contract
+ * closes it: the run's journal mirror stopped recording. It is independent of
+ * the execution: a run can settle `succeeded` and still carry it. It is never
+ * a verdict and never changes a status; it says the trace may be incomplete
+ * before `traceVerify` is trusted. Its absence is only absence: it never
+ * claims that a journal exists.
+ *
+ * Engine main, ahead of the contract this package pins: no released engine
+ * writes it yet, and a resident that predates it simply never sends it.
+ */
+export interface NikaJournalEvidence {
+  status: 'mirror_lost';
+  /** The mirror's first error, classified: never OS text, never a path. */
+  reason: 'write_failed' | 'record_refused';
+}
+
+/**
+ * Fields only the resident's frames carry, both from engine main, ahead of the
+ * contract this package pins. Both are optional on the wire and absent on a
+ * resident that predates them.
+ */
+interface NikaResidentEventFields extends NikaEventFields {
+  /** When the resident admitted the event: RFC 3339, UTC. Outside the event's hash chain. */
+  at?: string;
+  /** A reported journal delivery loss, on the terminal frame. */
+  evidence?: NikaJournalEvidence;
+}
+
+/**
  * The HTTP transport admitted the execution and it is running. This is the
  * first lifecycle frame `nika serve --bind` streams for a durable job.
  */
-export interface NikaExecutionStartedEvent extends NikaEventFields {
+export interface NikaExecutionStartedEvent extends NikaResidentEventFields {
   kind: 'execution.started';
 }
 
@@ -195,7 +224,7 @@ export interface NikaExecutionStartedEvent extends NikaEventFields {
  */
 export interface NikaExecutionSettledEvent<
   Outputs extends Record<string, unknown> = Record<string, unknown>,
-> extends NikaEventFields {
+> extends NikaResidentEventFields {
   kind: 'execution.settled';
   status?: NikaRunStatus;
   outputs?: Outputs;
@@ -209,13 +238,13 @@ export interface NikaExecutionSettledEvent<
  * claimed, or a running one whose owner settled the request as a
  * cancellation. It carries the settlement when the runtime built one.
  */
-export interface NikaExecutionCancelledEvent extends NikaEventFields {
+export interface NikaExecutionCancelledEvent extends NikaResidentEventFields {
   kind: 'execution.cancelled';
   settlement?: NikaSettlement;
 }
 
 /** The server refused the execution. */
-export interface NikaExecutionRefusedEvent extends NikaEventFields {
+export interface NikaExecutionRefusedEvent extends NikaResidentEventFields {
   kind: 'execution.refused';
 }
 
@@ -223,7 +252,7 @@ export interface NikaExecutionRefusedEvent extends NikaEventFields {
  * The execution was interrupted before settling. A resident that restarts
  * marks an orphaned running job with either word, so both are one variant.
  */
-export interface NikaExecutionInterruptedEvent extends NikaEventFields {
+export interface NikaExecutionInterruptedEvent extends NikaResidentEventFields {
   kind: 'execution.interrupted' | 'interrupted';
 }
 
@@ -444,6 +473,13 @@ export interface NikaRunResult<
   execution_id?: NikaExecutionId;
   /** The settlement's cause, tally and spend (engine 0.118+), when the terminal frame carried them. */
   settlement?: NikaSettlement;
+  /**
+   * HTTP only: the journal delivery loss the resident reported on the terminal
+   * frame or the durable job that settled this run. Copied, never inferred:
+   * absent when the resident reported none, which claims nothing about a
+   * journal. It never changes `status`. A native process reports none.
+   */
+  evidence?: NikaJournalEvidence;
   [key: string]: unknown;
 }
 
@@ -569,6 +605,32 @@ export interface NikaCheckOptions {
 }
 
 export interface NikaRunOptions {
+  /**
+   * Literal values for the workflow's declared `inputs:`, by name, with the
+   * same meaning on both transports. Values are strict JSON and stay literal:
+   * a string is never read as `@env:NAME`, an expression or a number, and
+   * nothing is coerced to the declared type. The engine validates the map
+   * (unknown key, type mismatch, missing required input) and refuses before
+   * any run exists. A value JSON cannot carry (`undefined`, a function, a
+   * symbol, a bigint, a non-finite number, a cycle, a class instance, a
+   * custom prototype, an array hole, an accessor, a Proxy) rejects `run()`
+   * with `NikaConfigurationError` instead of being dropped, and the
+   * serialized map is bounded at 1 MiB. No caller code runs while it is
+   * judged: no getter is invoked, and a Proxy is refused before it is read.
+   *
+   * Needs an engine that advertises the literal channel: `inputsLiteral`
+   * natively (values ride stdin, never argv), `jobInputs` over HTTP by served
+   * name. An engine without it rejects with `NikaCompatibilityError`; the SDK
+   * never falls back to `--var`. An execution snapshot freezes its inputs, so
+   * an HTTP run of a local path refuses `inputs`. Never put a secret here.
+   */
+  inputs?: Record<string, unknown>;
+  /**
+   * @deprecated Use `inputs`. `vars` is the native `--var KEY=VALUE` operator
+   * channel: the engine reads `@env:NAME` from its environment and coerces
+   * text to the declared type, so it cannot carry literal API values and has
+   * no HTTP form. Combining it with `inputs` rejects `run()`.
+   */
   vars?: Record<string, string | number | boolean>;
   model?: string;
   maxCostUsd?: number;

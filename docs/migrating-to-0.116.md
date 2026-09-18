@@ -103,8 +103,12 @@ both versions.
 
 `runToEnd()` returned `{ ok, exitCode, events[] }` with every event buffered.
 `run.done` returns the terminal result only; the events ride `events(run)`
-as a bounded live iterator (default 256), so observe it concurrently or the
-prefix is gone. The removed methods (`version()`, `dryRunPlan()`, path-based
+as a bounded iterator. In 0.116 a session retained 256 frames, below a clean
+native run of 85 tasks (`3N + 3` frames), so a longer run had to be observed
+concurrently or its prefix was gone. The default is now 4096 and a view opened
+after the result replays every retained frame; past the bound it is refused
+with `reason: 'replay_truncated'`, never shortened, and the result is
+unaffected. An explicit `eventBufferSize` keeps its cap. The removed methods (`version()`, `dryRunPlan()`, path-based
 `traceVerify()`) are absent, not stubbed: calling them throws a plain
 `TypeError: … is not a function`, and a trace that only exists as a file
 path in a later process has no SDK verification door in 0.116.

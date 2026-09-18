@@ -91,7 +91,17 @@ Some operations deliberately have one authority:
    Workflow failure is result data; configuration, transport, protocol, and
    compatibility failures throw. A `paused` result is a human gate: neither a
    failure nor a completed execution.
-3. `run.events()` creates an independent bounded observer in the lifecycle
+3. A session retains at most `eventBufferSize` frames (default 4096, never
+   unbounded; each frame is bounded by `machineBufferBytes`). Two different
+   bounds can be exceeded and they are never confused: a live view that falls
+   behind fails with `reason: 'live_backpressure'`, and a view opened after
+   more frames than it can be given is refused with
+   `reason: 'replay_truncated'` plus what was `observed` and `retained`.
+   Neither skips a frame, neither touches another view, and neither touches
+   the result: a run longer than the bound still settles normally. The
+   session is memory over what this process saw. It is not a control plane,
+   keeps nothing on disk, and reads no engine journal to extend a replay.
+   `run.events()` creates an independent bounded observer in the lifecycle
    vocabulary. Aborting an observer never cancels the run. The vocabulary is a
    stateless per-frame projection: it names a fact only for a (kind, status)
    pair a producer defines, never defaults a state word, never deduplicates,

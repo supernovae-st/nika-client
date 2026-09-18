@@ -60,6 +60,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The default `eventBufferSize` rises from 256 to 4096 frames (#122). A clean
+  native run writes `3N + 3` frames for N tasks (`workflow_started`, then
+  `task_scheduled` · `task_started` · `task_completed` per task, then
+  `workflow_completed` and `run_settled`), measured on the released 0.118.7
+  engine: 90 tasks are 273 frames. The old default was below a run of 85
+  tasks, so `await run.result()` followed by `run.events()` refused on a run
+  that had succeeded. 4096 replays a clean run of up to 1364 tasks, or 1023
+  when every task invokes a tool (one more `permit_checked` frame each). The
+  bound stays finite: each frame is bounded by `machineBufferBytes`, so a
+  session retains at most `eventBufferSize × machineBufferBytes` of frame
+  text per run, 256 MiB at both defaults where 256 frames gave 16 MiB. That
+  ceiling is arithmetic; the measured 273 frames total 0.15 MiB. No claim is
+  made about heap or process memory. **Migration:** nothing for most callers.
+  An explicit `eventBufferSize` is kept exactly as given, so
+  `eventBufferSize: 256` behaves as before; a process holding many long runs
+  at once that cannot afford the ceiling should set it. A view's `bufferSize`
+  still defaults to `eventBufferSize`, so a default live view now fails after
+  falling 4096 frames behind instead of 256.
+- `NikaEventBufferOverflowError` tells its two refusals apart with a new
+  `reason` (#122). `live_backpressure`: a view observing live fell more than
+  `limit` frames behind. `replay_truncated`: a view was opened after the run
+  had produced more frames than it can be given; the error then carries
+  `observed` (frames the session saw, counted when the view was opened) and
+  `retained` (frames it still holds), and its message names the history and
+  what to set, no longer a subscriber that never existed. Both remain
+  refusals: a frame is never silently skipped, and a late view is never handed
+  a shortened replay. Neither is about the run. A run longer than the bound
+  still succeeds and `run.result()` is unaffected. `runId` and `limit` are
+  unchanged and the class is the same, so existing handlers keep working.
+  The SDK still reads no engine journal, keeps nothing on disk and adds no run
+  listing to extend a replay.
 - Native `run()` resolves only after the engine admitted the run (#121). A
   refusal the engine writes before admission now rejects `run()` itself with
   `NikaOperationError` (`operation: 'run'`, the engine's exit status in

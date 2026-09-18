@@ -107,6 +107,11 @@ and the receipt. The `engine.event` is the native journal's own
 `workflow_completed` frame: the SDK gives it no lifecycle name and no state,
 drops nothing, and shows it on `event.raw.kind`.
 
+That is six frames for one task. A clean native run writes `3N + 3` frames for
+N tasks, and a session retains the most recent 4096 by default, so
+`run.events()` also works after `run.result()` for a run of hundreds of tasks;
+see [Observing a run after the fact](#observing-a-run-after-the-fact).
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/supernovae-st/nika-client/main/media/local-driver.gif" alt="The typed driver over the released binary: check the workflow, gate on the report, run it to the end under a cost ceiling, count the events" width="960">
 </p>
@@ -531,7 +536,9 @@ Shared options:
 
 - `cwd`: engine working directory and snapshot root
 - `bin`: explicit engine path
-- `eventBufferSize`: per-client observer ceiling, default 256
+- `eventBufferSize`: how many of a run's most recent frames a session retains
+  for a view opened after the fact, and the largest `bufferSize` a view may
+  ask for; default 4096. See [Observing a run after the fact](#observing-a-run-after-the-fact)
 - `machineBufferBytes`: machine frame/diagnostic ceiling, default 64 KiB
 
 Remote-only options:
@@ -568,6 +575,73 @@ Remote-only options:
 Every member is bound to its run, so it can be extracted:
 `const { events, result } = run`. The handle is process-bound; it carries no
 `list`, `search`, proof, catalog or authoring door.
+
+### Observing a run after the fact
+
+```ts
+const run = await nika.run('wide.nika.yaml');
+const result = await run.result();          // first the result,
+for await (const event of run.events()) {}  // then every frame the session saw
+```
+
+A view opened late is seeded with every frame the session observed, or it is
+refused. It is never handed a shortened replay. How many frames a session
+retains is `eventBufferSize`, **4096 by default**.
+
+**The native frame formula.** A clean native run of N tasks writes `3N + 3`
+frames: `workflow_started`, then `task_scheduled`, `task_started` and
+`task_completed` for each task, then `workflow_completed` and `run_settled`.
+Measured on the released 0.118.7 engine: 1 task is 6 frames, 90 tasks are 273.
+A task that invokes a tool was measured to add one `permit_checked` frame
+(`4N + 3`), and a failed task writes `task_failed` in place of
+`task_completed`. A `nika serve` job was measured at two frames, so this bound
+matters on a native process.
+
+| `eventBufferSize` | clean tasks replayable (`3N + 3`) | tool-calling tasks (`4N + 3`) |
+|---|---|---|
+| 256, the default up to 0.118.7 | 84 | 63 |
+| 4096, the default | 1364 | 1023 |
+
+**The memory ceiling.** The bound is finite on purpose and is never `Infinity`.
+Every frame is bounded by `machineBufferBytes` (64 KiB), so one session retains
+at most `eventBufferSize × machineBufferBytes` of frame text: 4096 × 64 KiB =
+256 MiB per run at both defaults, where 256 frames gave 16 MiB. That ceiling is
+arithmetic, not a measurement, and no measured run approaches it: the 273
+frames of the 90-task run total 0.15 MiB (mean 571 bytes, largest 1501), a size
+at which a full 4096-frame history is about 2.2 MiB. These are bytes of frame
+text as the engine wrote them; nothing here is a claim about heap or process
+memory. Views hold references to the retained frames, not copies. A process
+that keeps many long runs alive at once and cannot afford the ceiling sets
+`eventBufferSize` itself. An explicit value is kept exactly as given, so
+`eventBufferSize: 256` behaves as it always did.
+
+**Past the bound.** A run that writes more frames than the bound still runs and
+still succeeds: `run.result()` resolves as usual and is never affected. Only a
+view is refused, with `NikaEventBufferOverflowError`, and its `reason` says
+which of two different bounds was exceeded:
+
+| `error.reason` | What happened | What to do |
+|---|---|---|
+| `replay_truncated` | the view was opened after the run had produced more frames (`error.observed`) than it can be given (`error.limit`); `error.retained` is how many the session still holds | when `retained === observed` nothing is lost: open the view with `bufferSize >= observed`. Otherwise the earlier frames are gone from this process: set `eventBufferSize >= observed` for the next run, or observe it live |
+| `live_backpressure` | a view that was observing live fell more than `error.limit` frames behind the stream | read faster, or raise that view's `bufferSize`. Other views and the result are unaffected |
+
+```ts
+try {
+  for await (const event of run.events()) render(event);
+} catch (error) {
+  if (error instanceof NikaEventBufferOverflowError && error.reason === 'replay_truncated') {
+    // The run is fine. Its history is longer than this view can replay.
+    console.warn(`${error.observed} frames, ${error.retained} retained; run ${result.status}`);
+  } else throw error;
+}
+```
+
+Neither refusal skips a frame, and neither is about the run. `error.observed`
+is a count taken when the view was opened. The engine's journal stays the
+source of truth for a native trace (`receipt.trace_path`, `traceVerify`): a
+late `run.events()` is a convenience over what this process already saw, and
+the SDK reads no journal to extend it. Over HTTP the resident holds the job,
+so recover there with `attachRun(id, { lastEventId })`.
 
 ### The lifecycle vocabulary
 
@@ -741,6 +815,12 @@ NikaError
 ├── NikaEventBufferOverflowError
 └── NikaRunOwnershipError
 ```
+
+`NikaEventBufferOverflowError` is never about the run: `run.result()` is
+unaffected by it. Its `reason` tells a live view that fell behind
+(`live_backpressure`) from a view opened after more frames than it can replay
+(`replay_truncated`, with `observed` and `retained`); see
+[Observing a run after the fact](#observing-a-run-after-the-fact).
 
 Native engine event vocabulary stays open. HTTP events instead enforce the
 closed, redacted `JobEvent` projection advertised by the pinned OpenAPI contract;

@@ -146,7 +146,7 @@ describe('one Nika surface', () => {
     }).transportKind).toBe('http');
   });
 
-  it('exposes only identity and done on a run handle', async () => {
+  it('exposes only identity and its own lifecycle on a run handle', async () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse())
       .mockResolvedValueOnce(jsonResponse({ id: 'run-shape', status: 'queued' }, 202))
@@ -160,7 +160,11 @@ describe('one Nika surface', () => {
       fetch: fetch as typeof globalThis.fetch,
     });
     const run = await client.run('flow.nika.yaml', { idempotencyKey: 'test-admission' });
-    expect(Object.keys(run).sort()).toEqual(['done', 'id']);
+    // Issue #120: the handle owns events/result/status/cancel; `done` stays
+    // as the compatibility alias. Nothing else rides it.
+    expect(Object.keys(run).sort()).toEqual([
+      'cancel', 'done', 'events', 'id', 'result', 'status',
+    ]);
     await expect(run.done).resolves.toMatchObject({ id: 'run-shape', status: 'succeeded' });
   });
 });

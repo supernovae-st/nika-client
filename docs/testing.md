@@ -101,7 +101,14 @@ Every release wave must ask and demonstrate an answer to these questions:
 - What happens if SSE reconnects after a duplicate, gap, conflicting replay,
   or terminal race?
 - Can one slow observer overflow without damaging another observer or
-  `run.done`?
+  `run.result()`?
+- Does one application read the same lifecycle words over the native process
+  and over HTTP, with `event.raw` still the protocol frame, and without a
+  per-task event the resident never streamed?
+- Does a frame whose state word is absent, null, future, or still running
+  stay an `engine.event` instead of being named settled?
+- Is a human gate (`paused`) kept apart from both failure and completion, and
+  the engine's `interrupted` evidence apart from a broken observation?
 - Can two clients race the same idempotency key with equal and unequal
   snapshots?
 - Does cancellation win or replay honestly when settlement races it?

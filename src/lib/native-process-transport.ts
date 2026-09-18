@@ -425,7 +425,7 @@ export class NativeProcessTransport implements Transport {
         throw new NikaCompatibilityError(
           'runStatus',
           this.kind,
-          'A direct native process has no independent durable status authority; await run.done',
+          'A direct native process has no independent durable status authority; await run.result()',
         );
       },
       cancel: () => {

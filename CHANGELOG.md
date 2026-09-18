@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The Run owns its lifecycle (#120). `NikaRun` now carries `events()`,
+  `result()`, `status()` and `cancel()` next to `id`; `run.result()` is the
+  documented settlement read and `run.done` stays as its compatibility alias
+  (the same promise). Every member is a closure over the run's one session,
+  so an extracted method (`const { events, result } = run`) still works, and
+  `run.cancel()` returns the one memoized request. `attachRun` remains the
+  one recovery door and returns a full `NikaRun`. The handle owns observation,
+  settlement, status and cancellation only: checking, proof, catalogs and
+  authoring stay on `Nika`. Native durability is not faked: a native
+  `run.status()` and `attachRun` still refuse with a typed
+  `NikaCompatibilityError`, the SDK starts no hidden `nika serve`, and a
+  native `run.id` is documented as an ephemeral, non-durable correlation id.
+- One lifecycle vocabulary on both transports (#117). `run.events()` yields
+  the new `NikaRunEvent`: a lifecycle `kind` (`NikaRunEventKind`: `run.started`
+  · `task.scheduled` · `task.started` · `task.completed` · `task.failed` ·
+  `run.waiting` · `run.settled` · `run.interrupted` · `run.sealed` ·
+  `engine.event`) with the exact protocol frame kept by identity on
+  `event.raw`. The adapter is a stateless per-frame projection. It names a
+  fact only when the engine wrote it, and a state-bearing frame only for one
+  of the exact (kind, status) pairs a producer defines, listed and never
+  computed: `run_settled` / `execution.settled` carrying `succeeded`,
+  `failed` or `cancelled` (or `paused`, which is `run.waiting`),
+  `execution.cancelled` carrying `cancelled`, `execution.refused` carrying
+  `failed`, and an interrupted kind carrying `interrupted`. An absent, null,
+  future or still-running status is never defaulted, and a terminal word on
+  the wrong dedicated kind (`execution.refused` carrying `succeeded`,
+  `execution.cancelled` carrying `failed`) contradicts itself: both stay an
+  `engine.event`, which carries its cursor and `raw` but no lifecycle
+  meaning. Nothing is dropped,
+  deduplicated or synthesized: `nika serve` streams no per-task frame, so an
+  HTTP run yields no `task.*` event. `event.status` is always the engine's
+  own word; a human gate (`paused`) is `run.waiting`, never `run.settled` and
+  never a failure; the engine's `interrupted` evidence state is
+  `run.interrupted`, never the thrown `NikaObservationInterrupted`, which
+  still means this client lost its view of a run that may be running.
+  `event.sequence` is the resident's replay cursor and exists only over HTTP.
+- Two released-engine wire captures (`nika 0.118.7`, the verified npm
+  payload): a human gate (`workflow_paused`, then `run_settled` carrying
+  `paused` and `human_gate`, exit 4) and a SIGTERM cancellation
+  (`workflow_cancelled`, then `run_settled` carrying `cancelled` and
+  `operator`, exit 130).
+
 - Add `isNikaRunSucceeded(result)` to narrow the engine's successful result
   while preserving typed, optional outputs. Admitted failures still resolve;
   paused, cancelled, interrupted, and unknown results do not pass the guard.
@@ -76,9 +118,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
-- `@supernovae-st/nika-client` receives no further versions. The name stays
-  installable for the versions it already holds and is marked deprecated on
-  npm after the first `@supernovae-st/nika` publication.
+- `nika.events(run)`, `nika.cancel(run)` and `nika.status(run)` are deprecated
+  in favour of `run.events()`, `run.cancel()` and `run.status()` (#120). They
+  stay for one release train as compatibility wrappers over the same session.
+  The window is counted from publication, never from a merge: it opens with
+  the first train published to npm that carries the Run-owned lifecycle, which
+  ships the wrappers unchanged; the earliest train that may remove them is the
+  one after it; and removal is decided by the One SDK baseline owner (#114)
+  and announced in that train's release notes. No version and no date are
+  fixed here. Behaviour is unchanged: `nika.events(run)` still
+  yields the **protocol** vocabulary (`workflow_*` · `task_*` · `run_*` ·
+  `execution.*`) frame for frame, so existing consumers keep working while
+  they migrate, and a foreign, reconstructed, serialized or other-client
+  handle still throws `NikaRunOwnershipError`: there is no global run
+  registry. **Migration:** `nika.events(run)` → `run.events()` (switch on the
+  lifecycle `kind`; the frame the wrapper yielded is `event.raw`),
+  `nika.cancel(run)` → `run.cancel()`, `nika.status(run)` → `run.status()`,
+  `await run.done` → `await run.result()` (`done` itself is not deprecated).
+- `@supernovae-st/nika-client` receives no further versions from this
+  repository, and the name stays installable for the versions it already
+  holds. This is a project decision, not a registry state: the name is
+  **not** marked deprecated on npm. `@supernovae-st/nika` has been published
+  and the old name's versions still carry no `deprecated` field, so installing
+  it raises no warning. Marking it on the registry is a separate owner action
+  (#113) that this changelog does not claim.
 
 ### Fixed
 

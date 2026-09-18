@@ -1,3 +1,4 @@
+import { types } from 'node:util';
 import { NikaConfigurationError } from '../errors.js';
 import type { NikaRunOptions } from '../types.js';
 
@@ -14,6 +15,11 @@ import type { NikaRunOptions } from '../types.js';
  * So the map is judged and written in one pass, and a value JSON cannot carry
  * is refused by path before anything is spawned or sent. The offending value is
  * never quoted: an input may be a credential.
+ *
+ * No caller code runs while the map is judged. A member is judged from its
+ * descriptor and never read, so no getter runs; and a Proxy is refused before
+ * anything introspects it (the value, its prototype, that prototype's
+ * constructor), because every such read would run one of its traps.
  */
 
 /** The serialized-map bound the native engine reads; the SDK applies it to both transports. */
@@ -125,7 +131,8 @@ export function encodeLiteralInputs(inputs: unknown): LiteralInputs {
     const key = frame.keys ? frame.keys[position]! : String(position);
     const segment = frame.keys ? keySegment(key) : `[${position}]`;
     if (typeof key === 'symbol') throw refuse(segment, 'is a symbol key, which JSON cannot carry');
-    // The descriptor is read, never the property: no caller code runs here.
+    // The member is judged from its descriptor and never read, and this
+    // container is no Proxy (refused on entry): no getter and no trap can run.
     const member = Object.getOwnPropertyDescriptor(frame.value, key);
     if (!member) {
       throw refuse(segment, frame.keys
@@ -171,7 +178,7 @@ export function encodeLiteralInputs(inputs: unknown): LiteralInputs {
         }
         if (open.has(value)) throw refuse(segment, 'is a cycle, which JSON cannot carry');
         const kind = containerKind(value);
-        if (!kind) throw refuse(segment, `${describeInstance(value)}, not a plain object or array`);
+        if (!kind) throw refuse(segment, refusedObject(value));
         enter(value, segment, kind);
         break;
       }
@@ -197,30 +204,44 @@ function tooLarge(): NikaConfigurationError {
  * fetched or cloned under a test runner carries another realm's prototypes.
  * Anything else (a class instance, a Date, a Map, a subclass) has state or
  * behavior JSON would silently discard.
+ *
+ * A Proxy is refused first, before `Array.isArray` (which throws on a revoked
+ * one) and before `getPrototypeOf` (a trap): it cannot be read without running
+ * caller code, and what it would answer twice need not agree.
  */
 function containerKind(value: unknown): 'array' | 'object' | undefined {
-  if (value === null || typeof value !== 'object') return undefined;
+  if (value === null || typeof value !== 'object' || types.isProxy(value)) return undefined;
   const prototype: object | null = Object.getPrototypeOf(value);
-  if (Array.isArray(value)) {
-    return prototype !== null && isNative(constructorOf(prototype), NATIVE_ARRAY)
-      ? 'array'
-      : undefined;
-  }
+  if (Array.isArray(value)) return isRealmPrototype(prototype, NATIVE_ARRAY) ? 'array' : undefined;
   if (prototype === null) return 'object';
-  return isNative(constructorOf(prototype), NATIVE_OBJECT) ? 'object' : undefined;
+  return isRealmPrototype(prototype, NATIVE_OBJECT) ? 'object' : undefined;
 }
 
-function constructorOf(prototype: object): unknown {
-  return Object.getOwnPropertyDescriptor(prototype, 'constructor')?.value;
-}
-
-function isNative(constructor: unknown, source: string): boolean {
-  if (typeof constructor !== 'function') return false;
+/**
+ * Whether `prototype` IS some realm's `Object.prototype` (or `Array.prototype`),
+ * not merely an object that names that constructor: `Object.create({ constructor:
+ * Object })` has a custom prototype whose inherited data JSON would drop. Two
+ * facts a caller cannot arrange together decide it: the constructor's source is
+ * the native one, and that constructor's own `prototype` is this very object. A
+ * native constructor's `prototype` is non-writable and non-configurable, so it
+ * can never be pointed at a caller's object. Nothing here reads a Proxy.
+ */
+function isRealmPrototype(prototype: object | null, source: string): boolean {
+  if (prototype === null || types.isProxy(prototype)) return false;
+  const constructor = ownValue(prototype, 'constructor');
+  if (typeof constructor !== 'function' || types.isProxy(constructor)) return false;
+  let native: boolean;
   try {
-    return Function.prototype.toString.call(constructor) === source;
+    native = Function.prototype.toString.call(constructor) === source;
   } catch {
     return false;
   }
+  return native && ownValue(constructor, 'prototype') === prototype;
+}
+
+/** An own data property's value, from its descriptor: never a getter, and never on a Proxy. */
+function ownValue(target: object, key: string): unknown {
+  return Object.getOwnPropertyDescriptor(target, key)?.value;
 }
 
 function isArrayMember(key: string | symbol, length: number): boolean {
@@ -238,19 +259,29 @@ function keySegment(key: string | symbol): string {
 /** The kind of a refused value, never the value. */
 function describe(value: unknown): string {
   if (value === null) return 'null';
-  if (Array.isArray(value)) return 'an array';
-  if (typeof value === 'object') return describeInstance(value).replace(/^is /, '');
   if (typeof value === 'undefined') return 'undefined';
-  return `a ${typeof value}`;
+  if (typeof value !== 'object') return `a ${typeof value}`;
+  // Before Array.isArray: it throws on a revoked Proxy.
+  if (types.isProxy(value)) return 'a Proxy';
+  if (Array.isArray(value)) return 'an array';
+  return refusedObject(value).replace(/^is /, '').replace(/, not a plain object or array$/, '');
 }
 
-function describeInstance(value: object): string {
+/**
+ * Why an object that is no plain container is refused. A constructor is named
+ * only when the prototype really is that constructor's own, so a prototype that
+ * merely claims `Object` reads as what it is: custom. Nothing reads a Proxy.
+ */
+function refusedObject(value: object): string {
+  if (types.isProxy(value)) return 'is a Proxy, which cannot be read without running its traps';
+  const custom = 'is an object with a custom prototype, not a plain object or array';
   const prototype: object | null = Object.getPrototypeOf(value);
-  const constructor = prototype === null ? undefined : constructorOf(prototype);
-  const name = typeof constructor === 'function'
-    ? Object.getOwnPropertyDescriptor(constructor, 'name')?.value
-    : undefined;
+  if (prototype === null || types.isProxy(prototype)) return custom;
+  const constructor = ownValue(prototype, 'constructor');
+  if (typeof constructor !== 'function' || types.isProxy(constructor)) return custom;
+  if (ownValue(constructor, 'prototype') !== prototype) return custom;
+  const name = ownValue(constructor, 'name');
   return typeof name === 'string' && IDENTIFIER.test(name) && name.length <= 64
-    ? `is a ${name} instance`
-    : 'is an object with a custom prototype';
+    ? `is a ${name} instance, not a plain object or array`
+    : custom;
 }

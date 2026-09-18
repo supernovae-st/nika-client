@@ -70,9 +70,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     nothing: a resident from before the envelope accepts the field and ignores
     its values.
   - A value JSON would silently lose (`undefined`, a function, a symbol, a
-    bigint, a non-finite number, a cycle, a class instance, an array hole, an
-    accessor, a lone surrogate) rejects `run()` with `NikaConfigurationError`
-    naming the path and never the value. The serialized map is bounded at
+    bigint, a non-finite number, a cycle, a class instance, a prototype that
+    only claims to be plain, an array hole, an accessor, a lone surrogate, a
+    `Proxy`) rejects `run()` with `NikaConfigurationError` naming the path and
+    never the value. No caller code runs while the map is judged: a getter is
+    never invoked, and a `Proxy` is refused before anything reads it, its
+    prototype or that prototype's constructor, so none of its traps run. The serialized map is bounded at
     1 MiB on both transports.
   - The engine payload pinned by this package advertises neither capability
     yet: `inputs` is refused on it until the pin reaches an engine that does.

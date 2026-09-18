@@ -162,9 +162,12 @@ declared defaults keep `file`.
 
 The SDK refuses, before it spawns or sends anything, a value JSON would
 silently lose: `undefined`, a function, a symbol, a bigint, `NaN` or
-`Infinity`, a cycle, a class instance (a `Date`, a `Map`), an array hole, an
-accessor. That is a `NikaConfigurationError` naming the path
-(`inputs.ticket.tags[1] is undefined`), never the value. The serialized map is
+`Infinity`, a cycle, a class instance (a `Date`, a `Map`), an object whose
+prototype only claims to be plain, an array hole, an accessor. That is a
+`NikaConfigurationError` naming the path (`inputs.ticket.tags[1] is
+undefined`), never the value. No caller code runs while the map is judged: a
+getter is never invoked, and a `Proxy` is refused before it is read, so none
+of its traps run. The serialized map is
 bounded at 1 MiB on both transports. Do not put a secret in `inputs`.
 
 The engine must advertise the channel, and the SDK checks before admission:

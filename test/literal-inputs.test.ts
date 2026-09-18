@@ -234,6 +234,125 @@ describe('values JSON cannot carry are refused by path, never dropped or transfo
   });
 });
 
+describe('a Proxy is refused before it is read: no trap ever runs', () => {
+  const SECRET = 'sk-live-inside-a-proxy';
+
+  /**
+   * A handler that is itself a Proxy records EVERY trap the engine looks up on
+   * it. Any introspection of the outer proxy (getPrototypeOf, ownKeys,
+   * getOwnPropertyDescriptor, get, has…) reads a trap from this handler first,
+   * so an empty list proves that no caller code could have run.
+   */
+  function recorded<T extends object>(target: T): { proxy: T; lookups: string[] } {
+    const lookups: string[] = [];
+    const handler = new Proxy({}, {
+      get: (_target, trap) => {
+        lookups.push(String(trap));
+        return undefined;
+      },
+    });
+    return { proxy: new Proxy(target, handler as ProxyHandler<T>), lookups };
+  }
+
+  it.each([
+    ['the root map', (proxy: object) => proxy, 'inputs '],
+    ['a nested map', (proxy: object) => ({ a: { b: proxy } }), 'inputs.a.b '],
+    ['an array element', (proxy: object) => ({ list: [1, proxy] }), 'inputs.list[1] '],
+  ])('refuses a Proxy as %s without looking up one trap', (_name, place, path) => {
+    const { proxy, lookups } = recorded({ token: SECRET });
+    const error = refusal(place(proxy));
+    expect(lookups).toEqual([]);
+    expect(error.message).toContain(path);
+    expect(error.message).toContain('Proxy');
+    expect(error.message).not.toContain(SECRET);
+  });
+
+  it('refuses a Proxy of an array, which Array.isArray calls an array', () => {
+    const { proxy, lookups } = recorded([SECRET]);
+    expect(Array.isArray(proxy)).toBe(true);
+    const error = refusal({ list: proxy });
+    expect(lookups).toEqual([]);
+    expect(error.message).toContain('inputs.list is a Proxy');
+    expect(error.message).not.toContain(SECRET);
+  });
+
+  it('refuses a revoked Proxy cleanly, where Array.isArray itself would throw', () => {
+    const nested = Proxy.revocable({ a: 1 }, {});
+    nested.revoke();
+    expect(() => Array.isArray(nested.proxy)).toThrow(TypeError);
+    expect(refusal({ gone: nested.proxy }).message).toContain('inputs.gone is a Proxy');
+    const root = Proxy.revocable({ a: 1 }, {});
+    root.revoke();
+    expect(refusal(root.proxy).message).toMatch(/^run\(\{ inputs \}\): inputs must be a plain object.*Proxy/);
+  });
+
+  it('refuses a prototype that is a Proxy without reading it', () => {
+    const { proxy, lookups } = recorded({ inherited: SECRET });
+    const error = refusal({ o: Object.create(proxy) });
+    expect(lookups).toEqual([]);
+    expect(error.message).toContain('inputs.o ');
+    expect(error.message).toContain('custom prototype');
+    expect(error.message).not.toContain(SECRET);
+  });
+
+  it('refuses a prototype whose constructor is a Proxy without reading it', () => {
+    const { proxy, lookups } = recorded(Object);
+    const error = refusal({ o: Object.create({ constructor: proxy }) });
+    expect(lookups).toEqual([]);
+    expect(error.message).toContain('custom prototype');
+  });
+
+  it('refuses a Proxy from another realm the same way', () => {
+    const foreign = runInNewContext('new Proxy({ a: 1 }, {})') as object;
+    expect(refusal({ f: foreign }).message).toContain('inputs.f is a Proxy');
+  });
+});
+
+describe('a prototype that only claims to be plain is refused', () => {
+  it.each([
+    ['an empty spoof', () => Object.create({ constructor: Object })],
+    ['a spoof carrying inherited data', () => Object.create({ constructor: Object, inherited: 'dropped' })],
+    ['a spoof with own data', () => Object.assign(Object.create({ constructor: Object }), { own: 1 })],
+    ['a spoof two levels up', () => Object.create(Object.create({ constructor: Object }))],
+    ['a spoof from another realm', () => runInNewContext('Object.create({ constructor: Object, inherited: 1 })')],
+    ['a foreign constructor on a local prototype', () => Object.create({
+      constructor: runInNewContext('Object') as ObjectConstructor,
+    })],
+  ])('refuses %s: naming Object as its constructor does not make a prototype Object.prototype', (_name, make) => {
+    const error = refusal({ o: make() });
+    expect(error.message).toContain('inputs.o ');
+    expect(error.message).toContain('custom prototype');
+  });
+
+  it('refuses the spoof as the root map too', () => {
+    expect(refusal(Object.create({ constructor: Object })).message)
+      .toMatch(/^run\(\{ inputs \}\): inputs must be a plain object/);
+  });
+
+  it.each([
+    ['a local array', () => Object.setPrototypeOf([1, 2], { constructor: Array, extra: 'dropped' })],
+    ['an array from another realm', () => runInNewContext(
+      'Object.setPrototypeOf([1, 2], { constructor: Array, extra: 1 })',
+    )],
+    ['an array with a null prototype', () => Object.setPrototypeOf([1, 2], null)],
+  ])('refuses %s whose prototype is not Array.prototype', (_name, make) => {
+    const error = refusal({ list: make() });
+    expect(error.message).toContain('inputs.list ');
+    expect(error.message).toContain('custom prototype');
+  });
+
+  it('still accepts every genuinely plain container, in this realm and another', () => {
+    const foreign = runInNewContext(
+      '({ o: Object.assign(Object.create(null), { a: [1, { b: null }] }), list: [[], {}] })',
+    ) as Record<string, unknown>;
+    expect(encodeLiteralInputs(foreign).json).toBe('{"o":{"a":[1,{"b":null}]},"list":[[],{}]}');
+    const local = { o: Object.assign(Object.create(null), { a: [1, { b: null }] }), list: [[], {}] };
+    expect(encodeLiteralInputs(local).json).toBe('{"o":{"a":[1,{"b":null}]},"list":[[],{}]}');
+    // A plain object may still hold an own `constructor` data key: it is data.
+    expect(encodeLiteralInputs({ constructor: 'own data' }).json).toBe('{"constructor":"own data"}');
+  });
+});
+
 describe('the serialized map is bounded at 1 MiB on every transport', () => {
   const envelope = '{"blob":""}'.length;
 

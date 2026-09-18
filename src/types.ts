@@ -612,9 +612,11 @@ export interface NikaRunOptions {
    * nothing is coerced to the declared type. The engine validates the map
    * (unknown key, type mismatch, missing required input) and refuses before
    * any run exists. A value JSON cannot carry (`undefined`, a function, a
-   * symbol, a bigint, a non-finite number, a cycle, a class instance, an
-   * array hole, an accessor) rejects `run()` with `NikaConfigurationError`
-   * instead of being dropped, and the serialized map is bounded at 1 MiB.
+   * symbol, a bigint, a non-finite number, a cycle, a class instance, a
+   * custom prototype, an array hole, an accessor, a Proxy) rejects `run()`
+   * with `NikaConfigurationError` instead of being dropped, and the
+   * serialized map is bounded at 1 MiB. No caller code runs while it is
+   * judged: no getter is invoked, and a Proxy is refused before it is read.
    *
    * Needs an engine that advertises the literal channel: `inputsLiteral`
    * natively (values ride stdin, never argv), `jobInputs` over HTTP by served

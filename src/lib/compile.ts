@@ -1,6 +1,7 @@
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { types as utilTypes } from 'node:util';
 import {
   NikaCompatibilityError,
   NikaConfigurationError,
@@ -74,13 +75,7 @@ export function normalizeCompileRequest(
     }
     return { intent: input };
   }
-  const record = machineObject(input);
-  if (record === undefined) {
-    throw new NikaConfigurationError(
-      'compile: request must be an intent string, { intent, answers? }, or '
-      + '{ workflow, change, answers? }',
-    );
-  }
+  const record = dataRecord(input, 'request');
   for (const key of Reflect.ownKeys(record)) {
     if (key !== 'intent' && key !== 'workflow' && key !== 'change' && key !== 'answers') {
       throw new NikaConfigurationError(
@@ -90,11 +85,7 @@ export function normalizeCompileRequest(
     }
   }
   const answers = record.answers;
-  if (answers !== undefined && !machineObject(answers)) {
-    throw new NikaConfigurationError(
-      'compile: answers must be a plain object mapping stable question keys to JSON values',
-    );
-  }
+  if (answers !== undefined) encodeLiteralInputs(answers, 'compile({ answers })');
   const intent = record.intent;
   const workflow = record.workflow;
   const change = record.change;
@@ -127,6 +118,25 @@ export function normalizeCompileRequest(
     : { workflow, change: normalizedChange, answers: answers as Record<string, unknown> };
 }
 
+/** Inspect descriptors only: no request getter, Proxy trap or coercion runs. */
+function dataRecord(value: unknown, label: string): Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || utilTypes.isProxy(value)
+    || Array.isArray(value)
+    || (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) {
+    throw new NikaConfigurationError(`compile: ${label} must be ${label === 'request' ? 'an intent string or ' : ''}a plain object with own data fields`);
+  }
+  const result: Record<string, unknown> = Object.create(null);
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    const descriptor = descriptors[key as string]!;
+    if (typeof key !== 'string' || !('value' in descriptor) || !descriptor.enumerable) {
+      throw new NikaConfigurationError(`compile: ${label} must contain only enumerable string data fields`);
+    }
+    result[key] = descriptor.value;
+  }
+  return result;
+}
+
 function normalizeChange(change: unknown): string | NikaCompileSetConstant {
   if (typeof change === 'string' && change.length > 0) return change;
   if (change === undefined || change === '') {
@@ -149,21 +159,29 @@ function normalizeChange(change: unknown): string | NikaCompileSetConstant {
 
 /** Caller-facing options validation: a bad timeout is a configuration error. */
 export function normalizeCompileOptions(options: NikaCompileOptions): NikaCompileOptions {
-  for (const key of Reflect.ownKeys(options)) {
+  const record = dataRecord(options, 'options');
+  for (const key of Reflect.ownKeys(record)) {
     if (key !== 'signal' && key !== 'timeoutMs') {
       throw new NikaConfigurationError(`compile: unknown option ${String(key)}`);
     }
   }
-  const timeoutMs = options.timeoutMs;
-  if (timeoutMs !== undefined && (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 0x7fffffff)) {
+  const timeoutMs = record.timeoutMs;
+  if (timeoutMs !== undefined && (typeof timeoutMs !== 'number'
+    || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 0x7fffffff)) {
     throw new NikaConfigurationError(
-      `compile: timeoutMs must be a positive safe integer of milliseconds, got ${String(timeoutMs)}`,
+      'compile: timeoutMs must be a positive safe integer between 1 and 2147483647 milliseconds',
     );
   }
-  if (options.signal !== undefined && !(options.signal instanceof AbortSignal)) {
-    throw new NikaConfigurationError('compile: signal must be an AbortSignal');
+  const signal = record.signal;
+  if (signal !== undefined) {
+    const invalidSignal = () => new NikaConfigurationError('compile: signal must be an AbortSignal');
+    if (signal === null || typeof signal !== 'object' || utilTypes.isProxy(signal)
+      || Object.getPrototypeOf(signal) !== AbortSignal.prototype) throw invalidSignal();
+    try {
+      Object.getOwnPropertyDescriptor(AbortSignal.prototype, 'aborted')!.get!.call(signal);
+    } catch { throw invalidSignal(); }
   }
-  return options;
+  return record as NikaCompileOptions;
 }
 
 /**
@@ -215,7 +233,7 @@ export async function compileArgv(request: NikaCompileRequest): Promise<CompileI
   // core owns source selection; the SDK lends a scratch file outside the
   // caller's workspace rather than ever writing near it.
   const scratchDir = await mkdtemp(path.join(tmpdir(), 'nika-sdk-compile-'));
-  const base = path.join(scratchDir, 'base.nika.yaml');
+  const base = path.join(scratchDir, 'base.nika');
   try {
     await writeFile(base, request.workflow, { encoding: 'utf8', mode: 0o600 });
   } catch (cause) {

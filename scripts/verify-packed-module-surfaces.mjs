@@ -466,6 +466,7 @@ function assertCompile(report, moduleSystem) {
   assert.equal(report.edit.status, 'ready', say('edit resolves'));
   assert.equal(report.edit.candidateKeepsBase, true, say('edit preserves the base bytes'));
   assert.equal(report.edit.scratchRemoved, true, say('the edit scratch dir is removed'));
+  assert.equal(report.edit.scratchName, 'base.nika', say('temporary source uses the canonical suffix'));
   assert.equal(report.edit.argv[0], 'compile', say('edit spawns compile'));
   assert.ok(report.edit.argv.includes('--json'), say('edit asks the machine wire'));
 

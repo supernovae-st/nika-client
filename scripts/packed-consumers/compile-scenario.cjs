@@ -104,6 +104,7 @@ module.exports = async function compileScenario(sdk, engines) {
       candidateKeepsBase: typeof edited.candidate === 'string'
         && edited.candidate.startsWith(base),
       scratchRemoved: !existsSync(path.dirname(basePath)),
+      scratchName: path.basename(basePath),
       argv: editArgv,
     };
 

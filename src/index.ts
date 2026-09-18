@@ -130,7 +130,7 @@ export class Nika {
    * preview, provenance), `incomplete`/`refused` resolve instead of throwing,
    * and no workflow effect, approval or Proof exists.
    *
-   * The candidate is ordinary `.nika.yaml` SOURCE. `run()` consumes a path,
+   * The candidate is ordinary `.nika` SOURCE. `run()` consumes a path,
    * so the caller materializes the candidate and `run(path)` re-admits it —
    * the compile preview is a review, never admission. Over `{ url }` this calls
    * the authenticated Serve compile door, gated by its advertised capability;

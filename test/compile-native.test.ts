@@ -404,6 +404,7 @@ describe.skipIf(!posix)('native compile (issue #128 · engine #1663)', () => {
       const baseIndex = compileArgs.indexOf('--base');
       const basePath = compileArgs[baseIndex + 1]!;
       expect(basePath).toMatch(/nika-sdk-compile-/);
+      expect(path.basename(basePath)).toBe('base.nika');
       // The fixture echoed the base into the candidate: exact bytes, no loss.
       expect(result.candidate!.startsWith(BASE)).toBe(true);
       expect(result.candidate).toContain('# applied change: Set const.request to "a"');

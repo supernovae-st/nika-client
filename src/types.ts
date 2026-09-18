@@ -941,7 +941,7 @@ export interface NikaCompilePreview {
 }
 
 /**
- * The reviewable authoring result. `candidate` is ordinary `.nika.yaml`
+ * The reviewable authoring result. `candidate` is ordinary `.nika`
  * SOURCE in memory — it is not a `Workflow` handle, and `run()` does not
  * accept raw source: the caller materializes the candidate and `run(path)`
  * re-admits it. The SDK never writes the candidate for you in this slice

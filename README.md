@@ -363,7 +363,7 @@ booleans, null, strings, arrays and objects. The native adapter uses the engine'
 CLI; the HTTP adapter sends authenticated `POST /v1/compile`. An unavailable
 remote capability raises `NikaCompatibilityError` without local fallback.
 
-`candidate` is `.nika.yaml` source, distinct from the path accepted by `run()`.
+`candidate` is `.nika` source, distinct from the path accepted by `run()`.
 The caller reviews and materializes it before calling `run(path)`, which performs
 normal admission. `requested_boundary` and the source-only `check_preview` grant
 no execution authority. Compile creates no Run, job, approval or Proof, and the

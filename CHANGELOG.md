@@ -135,9 +135,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lifecycle `kind`; the frame the wrapper yielded is `event.raw`),
   `nika.cancel(run)` → `run.cancel()`, `nika.status(run)` → `run.status()`,
   `await run.done` → `await run.result()` (`done` itself is not deprecated).
-- `@supernovae-st/nika-client` receives no further versions. The name stays
-  installable for the versions it already holds and is marked deprecated on
-  npm after the first `@supernovae-st/nika` publication.
+- `@supernovae-st/nika-client` receives no further versions from this
+  repository, and the name stays installable for the versions it already
+  holds. This is a project decision, not a registry state: the name is
+  **not** marked deprecated on npm. `@supernovae-st/nika` has been published
+  and the old name's versions still carry no `deprecated` field, so installing
+  it raises no warning. Marking it on the registry is a separate owner action
+  (#113) that this changelog does not claim.
 
 ### Fixed
 

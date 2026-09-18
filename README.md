@@ -248,10 +248,14 @@ dependencies; npm installs the one that matches your platform.
 
 Earlier packages expose the retired `LocalNika`/HTTP split and do not
 implement the root facade documented here. This package carries the product's
-name: up to 0.115.0 it was published as `@supernovae-st/nika-client`, a name
-that is deprecated on npm, stays installable for the versions it already holds
-and receives no further releases. The repository keeps its name
-(`supernovae-st/nika-client`).
+name: up to 0.115.0 it was published as `@supernovae-st/nika-client`. That
+name receives no further releases from this repository and stays installable
+for the versions it already holds. It is **not** marked deprecated on the npm
+registry: its published versions carry no `deprecated` field, so `npm install
+@supernovae-st/nika-client` still succeeds without a warning and installs the
+retired 0.115.0 API. The move to the new name says nothing about the
+registry; check it yourself with `npm view @supernovae-st/nika-client
+deprecated`. The repository keeps its name (`supernovae-st/nika-client`).
 
 ## Scaffold with the engine
 

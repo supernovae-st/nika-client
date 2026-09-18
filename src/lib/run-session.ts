@@ -23,7 +23,8 @@ export class RunSession {
   private rejectDone!: (error: Error) => void;
   private terminal = false;
   private cancelPromise?: Promise<NikaCancelResult>;
-  private historyOverflowed = false;
+  /** Every frame the pump delivered; `history` holds at most the last `eventBufferSize`. */
+  private observed = 0;
 
   constructor(
     private readonly source: TransportRun,
@@ -81,8 +82,15 @@ export class RunSession {
         `events bufferSize must be an integer from 1 to ${this.eventBufferSize}`,
       );
     }
-    if (this.historyOverflowed || this.history.length > requested) {
-      throw new NikaEventBufferOverflowError(this.source.id, requested);
+    // A view opened late is seeded with everything it missed, or it is
+    // refused: never a silently shortened replay. This is not backpressure
+    // (no subscriber was slow), so the refusal names the history instead:
+    // what was observed and what is still retained.
+    if (this.observed > requested) {
+      throw new NikaEventBufferOverflowError(this.source.id, requested, {
+        observed: this.observed,
+        retained: this.history.length,
+      });
     }
     const subscription = new EventSubscription(
       this.source.id,
@@ -141,11 +149,12 @@ export class RunSession {
   private async pump(): Promise<void> {
     try {
       for await (const event of this.source.events) {
+        this.observed += 1;
         this.history.push(event);
-        if (this.history.length > this.eventBufferSize) {
-          this.history.shift();
-          this.historyOverflowed = true;
-        }
+        // The retained history is bounded, never the run: past the capacity
+        // the oldest frame goes, and a late view is refused rather than
+        // handed a replay with a hole in it.
+        if (this.history.length > this.eventBufferSize) this.history.shift();
         for (const subscriber of [...this.subscribers]) subscriber.push(event);
       }
       this.resolveDone(await this.source.done);

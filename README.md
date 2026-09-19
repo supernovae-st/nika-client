@@ -40,6 +40,8 @@ result. No server and no API key for the first run: `mock/echo` is a
 npm install @supernovae-st/nika@0.120.0
 ```
 
+Save as `hello.nika`:
+
 ```yaml
 nika: hello
 model: mock/echo
@@ -53,7 +55,9 @@ outputs:
   greeting: ${{ tasks.greeting.output }}
 ```
 
-```ts
+Save as `demo.mjs`:
+
+```js
 import { Nika, isNikaRunSucceeded } from '@supernovae-st/nika';
 
 const run = await new Nika({ cwd: process.cwd() }).run('hello.nika', { maxCostUsd: 0 });
@@ -65,6 +69,10 @@ if (!isNikaRunSucceeded(result)) {
   console.log(result.outputs);
   // { greeting: "mock(echo) · Say hello from the Nika SDK." }
 }
+```
+
+```sh
+node demo.mjs
 ```
 
 `run()` already admits: a red file throws `NikaOperationError` and never

@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { pathToFileURL } from "node:url";
@@ -83,9 +84,57 @@ export function stableCancellationTerminalKind(kind) {
   return CANCELLED_TERMINAL_KINDS.has(kind) ? STABLE_CANCELLED_TERMINAL_KIND : kind;
 }
 
+const PACK_SHA256 = /^[0-9a-f]{64}$/;
+
+export function sha256File(filePath) {
+  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
+export function depthPackProvenance(report) {
+  const name = report?.package;
+  const digest = report?.package_sha256;
+  if (typeof name !== "string" || !name.endsWith(".tgz")) {
+    throw new Error("depth evidence lacks a packed tarball filename");
+  }
+  if (typeof digest !== "string" || !PACK_SHA256.test(digest)) {
+    throw new Error("depth evidence lacks a 64-hex package_sha256 provenance digest");
+  }
+  return { package: name, package_sha256: digest };
+}
+
+// The digest names the exact tarball this ledger measured. Documentation-only
+// pack changes (README in the npm tarball) retarget it. Compare it to the
+// artifact bytes, never to committed behavior.
+export function assertReplayPackProvenance(report, replayResults) {
+  const provenance = depthPackProvenance(report);
+  const artifact = path.join(replayResults, provenance.package);
+  if (!existsSync(artifact)) {
+    throw new Error(
+      `replay pack artifact missing: expected ${provenance.package} beside the depth ledger`,
+    );
+  }
+  const actual = sha256File(artifact);
+  if (actual !== provenance.package_sha256) {
+    throw new Error(
+      `replay package_sha256 ${provenance.package_sha256} does not match packed tarball ${actual}`,
+    );
+  }
+  const manifestPath = path.join(replayResults, "depth-package.json");
+  if (existsSync(manifestPath)) {
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    if (manifest.filename !== provenance.package) {
+      throw new Error(
+        `depth-package.json filename ${String(manifest.filename)} does not match ledger ${provenance.package}`,
+      );
+    }
+  }
+  return { ...provenance, artifact };
+}
+
 export function stableDepthEvidence(report) {
+  const { package_sha256: _packageSha256, ...rest } = report;
   return {
-    ...report,
+    ...rest,
     projects: report.projects.map((project) => {
       if (project.project !== "incident-response-controller") return project;
       const kinds = project.sse_event_kinds;
@@ -180,11 +229,15 @@ export function verifyReleaseReplay(repositoryRoot, replayResults) {
     throw new Error("mini-SaaS replay does not match committed behavioral evidence");
   }
 
-  const committedDepth = stableDepthEvidence(readJson(
+  const committedDepthRaw = readJson(
     path.join(repositoryRoot, "gauntlet", "projects-depth"),
     "results.json",
-  ));
-  const replayedDepth = stableDepthEvidence(readJson(replayResults, "depth-projects.json"));
+  );
+  const replayedDepthRaw = readJson(replayResults, "depth-projects.json");
+  const committedPack = depthPackProvenance(committedDepthRaw);
+  const replayedPack = assertReplayPackProvenance(replayedDepthRaw, replayResults);
+  const committedDepth = stableDepthEvidence(committedDepthRaw);
+  const replayedDepth = stableDepthEvidence(replayedDepthRaw);
   if (!isDeepStrictEqual(replayedDepth, committedDepth)) {
     throw new Error("depth-project replay does not match committed stable behavioral evidence");
   }
@@ -204,6 +257,9 @@ export function verifyReleaseReplay(repositoryRoot, replayResults) {
     miniSaasProjects: replayedMiniSaas.projects.length,
     depthProjects: replayedDepth.projects.length,
     recoveryProcesses: replayedRecovery.process_count,
+    committedPackageSha256: committedPack.package_sha256,
+    replayedPackageSha256: replayedPack.package_sha256,
+    packDigestChanged: committedPack.package_sha256 !== replayedPack.package_sha256,
   };
 }
 
@@ -219,6 +275,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       + `${result.distinctOutputHashes} hashes, ${result.hostileScenarios} hostile scenarios, `
       + `${result.realEngineRuns} real engine runs, ${result.miniSaasProjects} mini-SaaS, `
       + `${result.depthProjects} depth projects, ${result.recoveryProcesses} recovery processes, `
-      + result.engine,
+      + result.engine
+      + (result.packDigestChanged
+        ? `; pack digest changed ${result.committedPackageSha256} → ${result.replayedPackageSha256} (artifact matched)`
+        : `; pack digest ${result.replayedPackageSha256}`),
   );
 }

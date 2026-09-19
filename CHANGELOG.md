@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Release replay treats depth `package_sha256` as pack provenance: it must
+  match the tarball beside the ledger, and documentation-only README pack
+  changes may retarget it. Behavioral verdicts still compare exactly.
 - README documents the live install split: npm latest **0.120.0** (bundled
   engine `0.120.0` / `f6155d1be`) versus public engine GitHub **v0.120.1**.
   Native `inputsLiteral` and `isNikaRunSucceeded` are published on 0.120.0;

@@ -138,6 +138,19 @@ async function compile() {
     process.exit(2);
     return;
   }
+  if (key === 'hostile-invalid-utf8') {
+    // Otherwise valid ready JSON: accepting replacement characters would
+    // silently change the candidate rather than refusing the broken wire.
+    const payload = JSON.stringify({
+      compile_version: 1, status: 'ready', candidate: 'INVALID_UTF8',
+      questions: [], diagnostics: [], requested_boundary: null,
+      check_preview: null, provenance: PROVENANCE, written: null,
+    });
+    const [before, after] = payload.split('INVALID_UTF8');
+    process.stdout.write(Buffer.concat([Buffer.from(before), Buffer.from([0xff]), Buffer.from(after)]),
+      () => process.exit(0));
+    return;
+  }
   if (key === 'hostile-wrong-version') {
     process.stdout.write(JSON.stringify({ compile_version: 2, status: 'ready' }) + '\n');
     process.exit(0);

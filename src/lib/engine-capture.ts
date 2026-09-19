@@ -44,8 +44,9 @@ export function captureEngine(
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    let stdout = '';
-    let stderr = '';
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    const bytes = { stdout: 0, stderr: 0 };
     let overflow = false;
     let spawnError: Error | undefined;
     let closed = false;
@@ -58,20 +59,18 @@ export function captureEngine(
       }, options.killGraceMs);
       killTimer.unref();
     };
-    const append = (stream: 'stdout' | 'stderr', chunk: string) => {
+    const append = (stream: 'stdout' | 'stderr', chunk: Buffer) => {
       if (overflow) return;
-      if (stream === 'stdout') stdout += chunk;
-      else stderr += chunk;
-      if (Buffer.byteLength(stdout) > options.bufferBytes
-        || Buffer.byteLength(stderr) > options.bufferBytes) {
+      bytes[stream] += chunk.byteLength;
+      if (bytes[stream] > options.bufferBytes) {
         overflow = true;
         stop();
+        return;
       }
+      (stream === 'stdout' ? stdout : stderr).push(chunk);
     };
-    child.stdout.setEncoding('utf8');
-    child.stderr.setEncoding('utf8');
-    child.stdout.on('data', (chunk: string) => append('stdout', chunk));
-    child.stderr.on('data', (chunk: string) => append('stderr', chunk));
+    child.stdout.on('data', (chunk: Buffer) => append('stdout', chunk));
+    child.stderr.on('data', (chunk: Buffer) => append('stderr', chunk));
     const abort = () => stop();
     options.signal?.addEventListener('abort', abort, { once: true });
     child.once('error', (cause) => {
@@ -96,7 +95,20 @@ export function captureEngine(
           `${options.label} exceeded ${options.bufferBytes} bytes`,
         ));
       } else {
-        resolve({ exitCode: code ?? 3, stdout, stderr, exitSignal });
+        // Bound raw bytes before decoding. Decode the complete stdout so a
+        // multibyte character split across chunks is preserved and a truncated
+        // final character refuses instead of silently becoming U+FFFD. Stderr
+        // is diagnostic text, not the machine document, and stays permissive.
+        let decoded: string;
+        try {
+          decoded = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true })
+            .decode(Buffer.concat(stdout, bytes.stdout));
+        } catch {
+          reject(new NikaProtocolError(options.transport, `${options.label} stdout was not valid UTF-8`));
+          return;
+        }
+        resolve({ exitCode: code ?? 3, stdout: decoded,
+          stderr: Buffer.concat(stderr, bytes.stderr).toString('utf8'), exitSignal });
       }
     });
   });

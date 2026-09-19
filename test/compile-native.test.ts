@@ -272,7 +272,7 @@ describe.skipIf(!posix)('native compile (issue #128 · engine #1663)', () => {
   });
 
   describe('wire law violations (typed, never data)', () => {
-    it.each(['hello', 'hostile-not-json', 'nul\0intent'])('releases the caller listener for %s', async (intent) => {
+    it.each(['hello', 'hostile-not-json', 'hostile-invalid-utf8', 'nul\0intent'])('releases the caller listener for %s', async (intent) => {
       const controller = new AbortController();
       const pending = client().compile(intent, { signal: controller.signal });
       if (intent === 'hello') await expect(pending).resolves.toHaveProperty('status');
@@ -310,6 +310,7 @@ describe.skipIf(!posix)('native compile (issue #128 · engine #1663)', () => {
     });
     it.each([
       ['hostile-not-json', NikaProtocolError, /absent or malformed/],
+      ['hostile-invalid-utf8', NikaProtocolError, /stdout was not valid UTF-8/],
       ['hostile-unknown-status', NikaProtocolError, /unknown compile status/],
       ['hostile-ready-exit-2', NikaProtocolError, /contradicts exit 2/],
       ['hostile-ready-exit-1', NikaProtocolError, /contradicts exit 1/],
@@ -468,6 +469,16 @@ describe.skipIf(!posix)('native compile (issue #128 · engine #1663)', () => {
       } finally {
         delete process.env.NIKA_FAKE_ARGV_LOG;
       }
+    });
+
+    it('cleans EDIT scratch when malformed UTF-8 refuses the native response', async () => {
+      const { result, argvs } = await spawned(() => failure(client().compile({
+        workflow: BASE, change: 'hostile-invalid-utf8',
+      })));
+      expect(result).toBeInstanceOf(NikaProtocolError);
+      const args = argvs[1]!;
+      const base = args[args.indexOf('--base') + 1]!;
+      expect(existsSync(path.dirname(base))).toBe(false);
     });
 
     it('keeps a leading-dash change as data', async () => {

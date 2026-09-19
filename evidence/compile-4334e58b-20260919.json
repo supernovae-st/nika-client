@@ -58,7 +58,7 @@
   },
   "sdk": {
     "version": "0.120.2",
-    "package_sha256": "5ac7cbf8be5e9d27a30f964b631a25d42523e22afd7f00701d2cda4f200ccfd7"
+    "package_sha256": "c145caf781aed04e21de0a4d34dc02ce81c131ebec3e47ae1198ecb3102edcc0"
   },
   "compile_openapi": {
     "post": {

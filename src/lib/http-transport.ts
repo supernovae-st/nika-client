@@ -219,7 +219,7 @@ export class HttpTransport implements Transport {
         throw new NikaProtocolError(this.kind, 'HTTP compile returned an invalid content-type');
       }
       const object = await this.readObservationObject(response, path, signal,
-        Math.min(this.options.machineBufferBytes, COMPILE_RESPONSE_MAX_BYTES));
+        Math.min(this.options.machineBufferBytes, COMPILE_RESPONSE_MAX_BYTES), false);
       if (signal.aborted) throw new NikaTransportError(this.kind, 'compile aborted');
       if (response.status !== 200) {
         const error = machineObject(object.error);
@@ -895,6 +895,7 @@ export class HttpTransport implements Transport {
     path: string,
     signal?: AbortSignal,
     maxBytes = this.options.machineBufferBytes,
+    useRequestTimeout = true,
   ): Promise<Record<string, unknown>> {
     if (!response.body) {
       throw new NikaProtocolError(this.kind, `HTTP ${path} omitted its JSON body`);
@@ -911,13 +912,13 @@ export class HttpTransport implements Transport {
       void reader.cancel().catch(() => {});
     };
     signal?.addEventListener('abort', abort, { once: true });
-    const timer = setTimeout(() => {
+    const timer = useRequestTimeout ? setTimeout(() => {
       rejectBoundary(new NikaTransportError(
         this.kind,
         `HTTP response body timed out after ${this.options.requestTimeout}ms`,
       ));
       void reader.cancel().catch(() => {});
-    }, this.options.requestTimeout);
+    }, this.options.requestTimeout) : undefined;
     try {
       if (signal?.aborted) abort();
       while (true) {
@@ -936,7 +937,7 @@ export class HttpTransport implements Transport {
       if (cause instanceof NikaProtocolError) throw cause;
       throw new NikaTransportError(this.kind, `HTTP ${path} response body reset`);
     } finally {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       signal?.removeEventListener('abort', abort);
       await reader.cancel().catch(() => {});
       reader.releaseLock();
@@ -1058,7 +1059,13 @@ export class HttpTransport implements Transport {
   }
 
   private async probeServerIdentity(signal?: AbortSignal): Promise<NikaEngineIdentity> {
-    const health = await this.json('/health', { method: 'GET', signal }, false);
+    // Compile supplies one operation-wide deadline, including negotiation.
+    // Do not reapply the client's shorter default during headers or body reads.
+    // Other callers retain their existing per-request timeout.
+    const outcome = await this.jsonOutcome('/health', { method: 'GET', signal },
+      false, [200], undefined, false, signal === undefined);
+    if ('refusal' in outcome) throw this.refused('/health', outcome);
+    const health = outcome.object;
     if (health.status !== 'ok' || health.service !== 'nika-serve') {
       throw new NikaCompatibilityError(
         'engineIdentity',
@@ -1263,8 +1270,9 @@ export class HttpTransport implements Transport {
     acceptedStatuses: readonly number[],
     operation: NikaOperation | undefined,
     strictRefusal = false,
+    useRequestTimeout = true,
   ): Promise<JsonOutcome> {
-    const response = await this.fetchResponse(path, init, true, authenticated, false);
+    const response = await this.fetchResponse(path, init, useRequestTimeout, authenticated, false);
     if (!acceptedStatuses.includes(response.status)) {
       if (response.ok) {
         await discardResponse(response);
@@ -1295,7 +1303,8 @@ export class HttpTransport implements Transport {
       throw new NikaProtocolError(this.kind, `HTTP ${path} returned an invalid content-type`);
     }
     return {
-      object: await this.readObservationObject(response, path, init.signal ?? undefined),
+      object: await this.readObservationObject(response, path, init.signal ?? undefined,
+        this.options.machineBufferBytes, useRequestTimeout),
       status: response.status,
     };
   }

@@ -33,6 +33,31 @@ function waitingBody() {
     headers: { 'Content-Type': 'application/json' },
   }) };
 }
+function delayedBody(value: unknown, delayMs: number) {
+  let timer: ReturnType<typeof setTimeout>;
+  const cancel = vi.fn(() => clearTimeout(timer));
+  const response = new Response(new ReadableStream({
+    start(controller) {
+      timer = setTimeout(() => {
+        controller.enqueue(new TextEncoder().encode(JSON.stringify(value)));
+        controller.close();
+      }, delayMs);
+    },
+    cancel,
+  }), { headers: { 'Content-Type': 'application/json' } });
+  return { response, cancel };
+}
+function delayedHeaders(response: Response, delayMs: number, signal?: AbortSignal | null): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const abort = () => { clearTimeout(timer); reject(signal?.reason); };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', abort);
+      resolve(response);
+    }, delayMs);
+    signal?.addEventListener('abort', abort, { once: true });
+    if (signal?.aborted) abort();
+  });
+}
 function waitForAbort(_url: unknown, init?: RequestInit): Promise<Response> {
   return new Promise((_resolve, reject) => {
     if (init?.signal?.aborted) reject(init.signal.reason);
@@ -171,6 +196,52 @@ describe('authenticated HTTP compile foundation', () => {
       : phase === 'post' ? vi.fn().mockResolvedValueOnce(health()).mockImplementationOnce(waitForAbort)
       : respond(waitingBody().response);
     await expect(client(fetch).compile('hello', { timeoutMs: 30 })).rejects.toThrow(/timed out/);
+  });
+
+  it.each(['health headers', 'health body', 'post headers', 'post body'])(
+    'allows a longer compile timeout during %s', async (phase) => {
+      const controller = new AbortController();
+      const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+        const isHealth = url.endsWith('/health');
+        const response = isHealth ? health() : jsonResponse(outcome());
+        const selected = phase.startsWith(isHealth ? 'health' : 'post');
+        if (!selected) return response;
+        if (phase.endsWith('headers')) return delayedHeaders(response, 100, init?.signal);
+        return delayedBody(await response.json(), 100).response;
+      });
+      await expect(client(fetch, { requestTimeout: 20 }).compile('hello', {
+        timeoutMs: 1000, signal: controller.signal,
+      })).resolves.toHaveProperty('ready', true);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
+    },
+  );
+
+  it.each(['health', 'post'])('uses a shorter compile deadline for a never-ending %s body and cancels it', async (phase) => {
+    const stalled = waitingBody();
+    const controller = new AbortController();
+    const fetch = phase === 'health' ? vi.fn().mockResolvedValueOnce(stalled.response)
+      : respond(stalled.response);
+    await expect(client(fetch, { requestTimeout: 1000 }).compile('hello', {
+      timeoutMs: 30, signal: controller.signal,
+    })).rejects.toThrow('compile timed out after 30 ms');
+    expect(stalled.cancel).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledTimes(phase === 'health' ? 1 : 2);
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
+  });
+
+  it('keeps one deadline across negotiation and POST instead of restarting it', async () => {
+    const stalled = waitingBody();
+    const controller = new AbortController();
+    const fetch = vi.fn().mockImplementationOnce((_url: unknown, init?: RequestInit) =>
+      delayedHeaders(health(), 60, init?.signal)).mockResolvedValueOnce(stalled.response);
+    await expect(client(fetch, { requestTimeout: 20 }).compile('hello', {
+      timeoutMs: 120, signal: controller.signal,
+    })).rejects.toThrow('compile timed out after 120 ms');
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch.mock.calls[1]![1]!.signal).toBe(fetch.mock.calls[0]![1]!.signal);
+    expect(stalled.cancel).toHaveBeenCalledOnce();
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
   });
 
   it('aborts a stalled response body, including an error body', async () => {

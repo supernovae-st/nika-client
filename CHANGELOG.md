@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- README documents the live install split: npm latest **0.120.0** (bundled
+  engine `0.120.0` / `f6155d1be`) versus public engine GitHub **v0.120.1**.
+  Native `inputsLiteral` and `isNikaRunSucceeded` are published on 0.120.0;
+  `nika compile hello` replaces retired `nika new`; admission, execution, and
+  seal are separate facts (a keyless HOME succeeds unsealed).
+
 ## [0.120.1]
 
 ### Changed

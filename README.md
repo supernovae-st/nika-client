@@ -10,8 +10,9 @@
 <h1 align="center">@supernovae-st/nika</h1>
 
 <p align="center">
-  <strong>The TypeScript door to Nika: audit a workflow, run it, watch it, prove it.</strong><br>
-  Locally through the released engine, or against an authenticated <code>nika serve</code>.
+  <strong>Run AI workflows from TypeScript.</strong><br>
+  Audit a <code>.nika</code> file, run it, read the result, verify the receipt — locally
+  or against authenticated <code>nika serve</code>.
 </p>
 
 <p align="center">
@@ -29,22 +30,20 @@
   <a href="https://archive.softwareheritage.org/browse/origin/?origin_url=https://github.com/supernovae-st/nika-client"><img src="https://archive.softwareheritage.org/badge/origin/https://github.com/supernovae-st/nika-client/" alt="Archived by Software Heritage"></a>
 </p>
 
-## Thirty seconds, no API key
+## Run a workflow from your app
 
-One package installs the client, the `nika` command and the engine payload for
-your platform (macOS and Linux, arm64 and x64):
+Put repeatable AI work in a `.nika` file. From Node, audit it, run it, and
+read typed outputs. No server and no API key for the first run: `mock/echo`
+is a **local simulation** (output is prefixed `mock(echo) ·`, not a model
+answer).
 
 ```sh
-npm install @supernovae-st/nika@0.118.7
-./node_modules/.bin/nika --version
+npm install @supernovae-st/nika@0.120.0
 ```
 
-```
-nika 0.118.7 (f3a31a6ee)
-```
-
-Write `hello.nika`. The `mock/echo` model rehearses with no key and no
-network:
+The `.nika` file is the contract (name, model, permits, tasks, outputs). The
+SDK is the application door: it does not parse YAML. Pin the version you
+tested; see [Install](#install) for npm vs GitHub engine tags.
 
 ```yaml
 nika: hello
@@ -59,7 +58,8 @@ outputs:
   greeting: ${{ tasks.greeting.output }}
 ```
 
-Audit it before anything runs:
+Admission is `check` (or the check inside every `run`). A red file never
+becomes a handle:
 
 ```sh
 ./node_modules/.bin/nika check hello.nika
@@ -74,10 +74,11 @@ Audit it before anything runs:
  layers · valid ✔ · access ready ✔ · capacity fit ✔ · run ready ✔
 ```
 
-Now drive the same engine from TypeScript:
+Drive the same engine from the app. Primary API: `run.events()` and
+`run.result()`. `isNikaRunSucceeded` ships in **0.120.0**:
 
 ```ts
-import { Nika } from '@supernovae-st/nika';
+import { Nika, isNikaRunSucceeded } from '@supernovae-st/nika';
 
 const nika = new Nika({
   cwd: process.cwd(),
@@ -91,27 +92,33 @@ if (!report.clean) throw new Error('workflow did not pass nika check');
 
 const run = await nika.run('hello.nika', { maxCostUsd: 0 });
 for await (const event of run.events()) {
-  // The same lifecycle words on both transports; the engine's own frame,
-  // in its protocol vocabulary, stays on event.raw.
+  // Same lifecycle words on both transports; the engine's own frame stays
+  // on event.raw.
   console.log([event.kind, event.task, event.status].filter(Boolean).join(' '));
 }
 
 const result = await run.result();
-console.log(result.status, result.outputs, result.receipt);
+if (!isNikaRunSucceeded(result)) {
+  console.error(result.status, result.error?.code, result.error?.message);
+  process.exitCode = 1;
+} else {
+  console.log(result.outputs);
+  // mock/echo → { greeting: "mock(echo) · Say hello from the Nika SDK." }
+}
 ```
 
-Expected output: `run.started`, `task.scheduled greeting`,
-`task.started greeting`, `task.completed greeting`, `engine.event`, then
-`run.settled succeeded`, then the terminal `succeeded` line with the outputs
-and the receipt. The `engine.event` is the native journal's own
-`workflow_completed` frame: the SDK gives it no lifecycle name and no state,
-drops nothing, and shows it on `event.raw.kind`.
+Expected native events for this one-task file: `run.started`,
+`task.scheduled greeting`, `task.started greeting`,
+`task.completed greeting`, `engine.event` (`workflow_completed` on
+`event.raw.kind`), then `run.settled succeeded`. The SDK names a fact only
+when the engine wrote it; it drops nothing.
 
-That is six frames for one task; the same shape with 90 tasks was measured at
-273 (`3N + 3`). A session retains the most recent 4096 frames by default, so
-`run.events()` opened after `run.result()` replays them all, and is refused,
-never shortened, past that bound; see
-[Observing a run after the fact](#observing-a-run-after-the-fact).
+That is six `run.events()` frames for this one-task file, sealed or not
+(probed on 0.120.0). A keyless machine still **succeeds**; only the receipt
+is unsealed — see [Admission, execution, seal](#admission-execution-seal).
+A session retains the most recent 4096 frames by default, so `run.events()`
+opened after `run.result()` replays them all, and is refused, never shortened,
+past that bound; see [Observing a run after the fact](#observing-a-run-after-the-fact).
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/supernovae-st/nika-client/main/media/local-driver.gif" alt="The typed driver over the released binary: check the workflow, gate on the report, run it to the end under a cost ceiling, count the events" width="960">
@@ -183,8 +190,11 @@ An engine without the capability rejects with `NikaCompatibilityError`
 (`capability: 'inputsLiteral'` or `'jobInputs'`) and nothing runs. The SDK
 never falls back to `--var`, and a resident that merely answers 202 has
 negotiated nothing: one from before the envelope accepts the field and ignores
-its values. The engine payload pinned by this package version advertises
-neither capability yet, so `inputs` is refused on it until the pin moves.
+its values.
+
+The **published 0.120.0** payload advertises `inputsLiteral` (`nika --sdk-identity`).
+Native `run({ inputs })` works on it. It does **not** advertise `jobInputs`;
+HTTP literal inputs stay a compatibility refusal until a resident that does.
 
 `vars` is deprecated. It remains the native `--var KEY=VALUE` operator channel,
 unchanged: the engine reads `@env:NAME` from its environment and coerces text
@@ -197,10 +207,9 @@ A `try { await run.result() } catch {}` alone therefore never catches a failed
 workflow: a CI job or an application must read `result.status` and treat
 anything but `succeeded` as its own failure, or a red run passes silently.
 
-On the development branch, `isNikaRunSucceeded` provides that TypeScript
-narrowing. It is **unreleased** and is not exported by the published
-`0.118.7` package; that package uses `result.status === 'succeeded'` directly.
-For CI built from this branch:
+`isNikaRunSucceeded` is exported by published **0.120.0**. Use it (or
+`result.status === 'succeeded'`) before treating a result as success.
+Paused, failed, cancelled, and interrupted all return false:
 
 ```ts
 import { Nika, isNikaRunSucceeded } from '@supernovae-st/nika';
@@ -229,16 +238,37 @@ into a fabricated output map.
   secret and the cost floor. A red check never becomes a run.
 - **Sovereign by default.** The same file runs on local models (Ollama,
   llama.cpp, vLLM), on Mistral, Hugging Face, OpenAI, xAI, Anthropic and the
-  rest of the engine's catalog; `mock/echo` rehearses with no key and no
-  network.
-- **Traced after.** Every native run leaves a hash-chained journal and hands
-  back a receipt; `traceVerify()` asks the engine to verify it. The SDK never
-  re-implements the proof.
+  rest of the engine's catalog; `mock/echo` is a local simulation with no key
+  and no network.
+- **Traced after.** A native run writes a hash-chained journal and a receipt.
+  `traceVerify()` asks the engine to verify that evidence. A succeeded run can
+  still be unsealed. The SDK never re-implements the proof.
 - **One vocabulary, two transports.** `check`, `run`, `events`, `cancel`,
   `traceVerify` and `schedule` read the same against a local process and an
   authenticated `nika serve`; only the constructor changes. Run events carry
   the same lifecycle words on both (`run.started`, `run.waiting`,
   `run.settled`), with the engine's own frame kept on `event.raw`.
+
+## Admission, execution, seal
+
+Three different facts. Do not collapse them.
+
+| Fact | How you see it | What it is not |
+|---|---|---|
+| **Admission** | `check().clean`, or `run()` resolving a handle. A red file throws `NikaOperationError` (`NIKA-PARSE-005`, `NIKA-1708`, …) before any run exists. | Not a successful execution. |
+| **Execution** | `run.result()` / `isNikaRunSucceeded(result)`. Admitted failure is **data** (`status: "failed"`). A human gate is `paused` (`run.waiting`), not success. | Not proof the journal is sealed. |
+| **Seal** | `result.receipt.sealed` and `traceVerify(receipt)`. Tamper-evident, not tamper-proof; not replayed unless you pass `--replay`; not anchored without a sidecar. | Not “the workflow was correct” and not “a human read the output”. |
+
+Probed on published 0.120.0 (2026-09-19): `run.events()` still yields the
+same six lifecycle frames with or without a signing key. With
+`~/.nika/keys/run-signing.*`, the hello fixture sealed and `traceVerify`
+returned `{ verified: true, verdict: "verified" }`. With an isolated `HOME`
+and no key files (keychain skipped: stderr not a TTY), the same file
+**succeeded**, `sealed: false`, and `traceVerify` returned
+`{ verified: false, verdict: "invalid", reason: "receipt_mismatch" }` while
+the engine still said the journal chain was OK and **UNSEALED**. Treat
+`receipt_mismatch` as “no signed binding”, not as a failed run. The CLI
+verify line that counts journal events is not `run.events()`.
 
 ## One vocabulary
 
@@ -287,17 +317,25 @@ not parse YAML or reconstruct proof in TypeScript.
   Socratic risk matrix
 - [Migrating to 0.116](docs/migrating-to-0.116.md) · the intentional breaking
   migration to the smaller durable client surface
-- [docs.nika.sh](https://docs.nika.sh) · the language, the engine and the
-  other doors
+- [docs.nika.sh](https://docs.nika.sh) · language and engine
+- [SDK quickstart](https://docs.nika.sh/sdk/start/quickstart) · app walkthrough
+  (install **npm `@supernovae-st/nika@0.120.0`**, matching this README)
 
 ## Install
 
 Pin the version you tested, then verify the package the project actually
-resolved:
+resolved. Channels differ (2026-09-19):
+
+| Channel | Version |
+|---|---|
+| npm `@supernovae-st/nika` **latest** | **0.120.0**, bundled engine **0.120.0 (`f6155d1be`)** |
+| Engine GitHub latest / brew / install script | **v0.120.1** (`9d554c84c`) |
+| This repository `package.json` | **0.120.1** (unreleased; not on npm) |
 
 ```sh
-npm install @supernovae-st/nika@0.118.7
+npm install @supernovae-st/nika@0.120.0
 node -p "require('@supernovae-st/nika/package.json').version"
+./node_modules/.bin/nika --version    # nika 0.120.0 (f6155d1be)
 ```
 
 This package metadata subpath is exported for CommonJS, ESM build tools and CI
@@ -318,19 +356,20 @@ deprecated`. The repository keeps its name (`supernovae-st/nika-client`).
 
 ## Scaffold with the engine
 
-The lowest-friction creation door is the engine-owned scaffold:
+On the published 0.120.0 binary, `nika new` is **retired** (`unrecognized
+subcommand`). The creation door is `compile`. Exact skeleton name or `hello`;
+free-text intent stays incomplete and writes nothing:
 
 ```sh
 ./node_modules/.bin/nika init --project-file
-./node_modules/.bin/nika new 01-hello hello.nika
+./node_modules/.bin/nika compile hello hello.nika
 ```
 
-`nika.yaml` is the project control plane. `hello.nika` is executable
-workflow intent and is the file passed to `check()` and `run()`. The scaffold
-writes the engine's own annotated `01-hello` example (its task is named
-`greet` and its prompt asks for French); the contract this README relies on is
-the `outputs.greeting` key and the `mock/echo` model, which the hand-written
-file above satisfies too.
+No destination means preview only. `nika.yaml` is the project control plane
+(needed for `nika serve`). `hello.nika` is the executable contract passed to
+`check()` and `run()`. The engine's `hello` skeleton names its task `greet`
+and asks for French; the hand-written file above is enough if it keeps
+`outputs.greeting` and `model: mock/echo`.
 
 ## Verify a local trace
 
@@ -340,7 +379,12 @@ Pass that receipt back unchanged:
 ```ts
 if (!result.receipt) throw new Error('run did not issue a receipt');
 const proof = await nika.traceVerify(result.receipt);
-if (!proof.verified) throw new Error(proof.output ?? 'trace verification failed');
+// proof.verified is the seal/binding, not the workflow outcome.
+// A succeeded mock run is UNSEALED on a keyless machine
+// (verdict invalid, reason receipt_mismatch, journal chain still OK).
+if (isNikaRunSucceeded(result) && proof.verified) {
+  // run succeeded and the journal is sealed
+}
 ```
 
 The SDK does not implement cryptography or inspect the trace itself. It asks the
@@ -388,9 +432,8 @@ settles on the terminal the resident records, `cancelled`, `succeeded`,
 `failed`, or `interrupted` once its grace expired. A job that already ended
 replays its result with `accepted: false` and `status: 'already_settled'`. The
 native transport signals its process the same way; the result is whatever the
-engine then wrote, `cancelled` when it settled the request (the released
-0.118.7 engine does), or `interrupted` when the process ended with no
-settlement frame.
+engine then wrote, `cancelled` when it settled the request, or `interrupted`
+when the process ended with no settlement frame.
 
 ## Connect to `nika serve`
 
@@ -646,8 +689,9 @@ A view opened late is seeded with every frame the session observed, or it is
 refused. It is never handed a shortened replay. How many frames a session
 retains is `eventBufferSize`, **4096 by default**.
 
-**The measured frame count: `3N + 3`, for one shape.** On the released 0.118.7
-engine, a clean run of N independent `mock/echo` `infer` tasks wrote
+**The measured frame count: `3N + 3`, for one sealed shape.** On the released
+0.118.7 engine (and still the native 0.120.0 hello fixture when sealed), a
+clean run of N independent `mock/echo` `infer` tasks wrote
 `workflow_started`, then `task_scheduled`, `task_started` and `task_completed`
 per task, then `workflow_completed` and `run_settled`. Two points were
 measured: 1 task is 6 frames, 90 tasks are 273. That is this fixture, not a

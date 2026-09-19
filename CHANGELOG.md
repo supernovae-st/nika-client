@@ -7,8 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.120.2]
+
 ### Changed
 
+- Lockstep with public engine `v0.120.2`
+  (`289a9adeae5a6937221ceac55b8080ef84c0ce69`, engine #1707). Package and
+  native optional payloads follow the engine train via `sync:native-versions`;
+  OpenAPI `info.version` is `0.120.2` with the Serve schema unchanged from
+  0.120.1, pending the type-drift gate against a live 0.120.2 resident.
+  `ENGINE_QUAL_PIN` / `ENGINE_CANDIDATE` name the tagged commit. Current
+  gauntlet evidence is regenerated from the verified public macOS arm64
+  archive (`verify-engine-archive`, SHA256SUMS `b46243de…`): all five current
+  reports record `nika 0.120.2 (289a9adea)`; the historical paid-provider and
+  trace ledgers are untouched. npm latest remains **0.120.0** (bundled engine
+  `0.120.0` / `f6155d1be`) until this package is published.
 - Release replay treats depth `package_sha256` as pack provenance: it must
   match the tarball beside the ledger, and documentation-only README pack
   changes may retarget it. Behavioral verdicts still compare exactly.

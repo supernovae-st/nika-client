@@ -78,7 +78,7 @@ node demo.mjs
 `run()` already admits: a red file throws `NikaOperationError` and never
 returns a handle. The `.nika` file is the contract; the SDK does not parse
 YAML. Pin the version you tested — see [Install](#install) for npm 0.120.0 vs
-engine GitHub v0.120.1.
+engine GitHub v0.120.2.
 
 `check()`, `run.events()`, and `traceVerify()` are the next steps. They stay
 taught and tested; they are not required to see the first result.
@@ -334,8 +334,8 @@ resolved. Channels differ (2026-09-19):
 | Channel | Version |
 |---|---|
 | npm `@supernovae-st/nika` **latest** | **0.120.0**, bundled engine **0.120.0 (`f6155d1be`)** |
-| Engine GitHub latest / brew / install script | **v0.120.1** (`9d554c84c`) |
-| This repository `package.json` | **0.120.1** (unreleased; not on npm) |
+| Engine GitHub latest / brew / install script | **v0.120.2** (`289a9adea`) |
+| This repository `package.json` | **0.120.2** (source candidate for engine v0.120.2; not on npm) |
 
 ```sh
 npm install @supernovae-st/nika@0.120.0

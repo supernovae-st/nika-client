@@ -206,8 +206,12 @@ A source binary containing engine commit
 Released engine 0.120.2 supports native compile but predates HTTP compile. This is a foundation test, not general intent authoring
 or execution admission qualification.
 
-The [2026-09-19 source-build receipt](evidence/compile-4334e58b-20260919.json)
+The [2026-09-19 source-build receipt](../evidence/compile-4334e58b-20260919.json)
 records 14 cases across both doors and both module systems at that producer,
 with exact outcome parity and no resident-state or project-file mutation. Its
 engine is a clean source build, not the published v0.120.2 binary; its SDK
 tarball is the unreleased PR candidate. The hashes identify those tested bytes.
+
+Compile source-build receipts live outside the published package, so recording
+a tarball hash does not change the bytes it identifies. They do not participate
+in the released-engine behavioral ledgers.

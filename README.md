@@ -32,18 +32,13 @@
 
 ## Run a workflow from your app
 
-Put repeatable AI work in a `.nika` file. From Node, audit it, run it, and
-read typed outputs. No server and no API key for the first run: `mock/echo`
-is a **local simulation** (output is prefixed `mock(echo) ·`, not a model
-answer).
+Put repeatable AI work in a `.nika` file. From Node, run it and read the
+result. No server and no API key for the first run: `mock/echo` is a
+**local simulation** (output is prefixed `mock(echo) ·`, not a model answer).
 
 ```sh
 npm install @supernovae-st/nika@0.120.0
 ```
-
-The `.nika` file is the contract (name, model, permits, tasks, outputs). The
-SDK is the application door: it does not parse YAML. Pin the version you
-tested; see [Install](#install) for npm vs GitHub engine tags.
 
 ```yaml
 nika: hello
@@ -58,8 +53,29 @@ outputs:
   greeting: ${{ tasks.greeting.output }}
 ```
 
-Admission is `check` (or the check inside every `run`). A red file never
-becomes a handle:
+```ts
+import { Nika, isNikaRunSucceeded } from '@supernovae-st/nika';
+
+const run = await new Nika({ cwd: process.cwd() }).run('hello.nika', { maxCostUsd: 0 });
+const result = await run.result();
+if (!isNikaRunSucceeded(result)) {
+  console.error(result.status, result.error?.code, result.error?.message);
+  process.exitCode = 1;
+} else {
+  console.log(result.outputs);
+  // { greeting: "mock(echo) · Say hello from the Nika SDK." }
+}
+```
+
+`run()` already admits: a red file throws `NikaOperationError` and never
+returns a handle. The `.nika` file is the contract; the SDK does not parse
+YAML. Pin the version you tested — see [Install](#install) for npm 0.120.0 vs
+engine GitHub v0.120.1.
+
+`check()`, `run.events()`, and `traceVerify()` are the next steps. They stay
+taught and tested; they are not required to see the first result.
+
+### Next: audit without running (`check`)
 
 ```sh
 ./node_modules/.bin/nika check hello.nika
@@ -74,51 +90,30 @@ becomes a handle:
  layers · valid ✔ · access ready ✔ · capacity fit ✔ · run ready ✔
 ```
 
-Drive the same engine from the app. Primary API: `run.events()` and
-`run.result()`. `isNikaRunSucceeded` ships in **0.120.0**:
+The same report is `await nika.check('hello.nika', { nativeStrict: true })`.
+A red check never becomes a run.
+
+### Next: watch the run (`run.events()`)
 
 ```ts
-import { Nika, isNikaRunSucceeded } from '@supernovae-st/nika';
-
-const nika = new Nika({
-  cwd: process.cwd(),
-  // bin: '/absolute/path/to/nika', // or set NIKA_BIN
-});
-
-const report = await nika.check('hello.nika', {
-  nativeStrict: true,
-});
-if (!report.clean) throw new Error('workflow did not pass nika check');
-
-const run = await nika.run('hello.nika', { maxCostUsd: 0 });
 for await (const event of run.events()) {
-  // Same lifecycle words on both transports; the engine's own frame stays
-  // on event.raw.
   console.log([event.kind, event.task, event.status].filter(Boolean).join(' '));
-}
-
-const result = await run.result();
-if (!isNikaRunSucceeded(result)) {
-  console.error(result.status, result.error?.code, result.error?.message);
-  process.exitCode = 1;
-} else {
-  console.log(result.outputs);
-  // mock/echo → { greeting: "mock(echo) · Say hello from the Nika SDK." }
 }
 ```
 
 Expected native events for this one-task file: `run.started`,
 `task.scheduled greeting`, `task.started greeting`,
 `task.completed greeting`, `engine.event` (`workflow_completed` on
-`event.raw.kind`), then `run.settled succeeded`. The SDK names a fact only
-when the engine wrote it; it drops nothing.
+`event.raw.kind`), then `run.settled succeeded`. Six `run.events()` frames,
+sealed or not (probed on 0.120.0). A session retains the most recent 4096
+frames by default; see
+[Observing a run after the fact](#observing-a-run-after-the-fact).
 
-That is six `run.events()` frames for this one-task file, sealed or not
-(probed on 0.120.0). A keyless machine still **succeeds**; only the receipt
-is unsealed — see [Admission, execution, seal](#admission-execution-seal).
-A session retains the most recent 4096 frames by default, so `run.events()`
-opened after `run.result()` replays them all, and is refused, never shortened,
-past that bound; see [Observing a run after the fact](#observing-a-run-after-the-fact).
+### Next: verify a seal (`traceVerify`)
+
+`traceVerify` **verifies** an existing seal. It does not create one. A keyless
+machine still **succeeds**; the receipt is unsealed — see
+[Admission, execution, seal](#admission-execution-seal).
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/supernovae-st/nika-client/main/media/local-driver.gif" alt="The typed driver over the released binary: check the workflow, gate on the report, run it to the end under a cost ceiling, count the events" width="960">

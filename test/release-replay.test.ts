@@ -11,6 +11,7 @@ import {
   isInterruptedCancellationTerminal,
   isOperatorCancelledTerminal,
   sha256File,
+  sha512Integrity,
   stableDepthEvidence,
   stableHostileEvidence,
   verifyReleaseReplay,
@@ -394,12 +395,45 @@ describe('public release evidence replay', () => {
     );
   });
 
-  it('refuses a depth-package.json that names a different archive', () => {
+  it('refuses a missing pack manifest', () => {
     const replay = createReplay();
-    writeJson(replay, 'depth-package.json', { filename: 'other.tgz' });
+    rmSync(path.join(replay, 'depth-package.json'));
 
     expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
-      'depth-package.json filename other.tgz does not match ledger',
+      'replay pack manifest missing: expected depth-package.json beside the depth ledger',
+    );
+  });
+
+  it('refuses a depth-package.json that names a different archive', () => {
+    const replay = createReplay();
+    const manifest = readJson(replay, 'depth-package.json');
+    manifest.filename = 'supernovae-st-nika-0.0.0.tgz';
+    writeJson(replay, 'depth-package.json', manifest);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'depth-package.json filename supernovae-st-nika-0.0.0.tgz does not match ledger',
+    );
+  });
+
+  it('refuses a manifest whose integrity does not match the tarball bytes', () => {
+    const replay = createReplay();
+    const manifest = readJson(replay, 'depth-package.json');
+    manifest.integrity = 'sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
+    writeJson(replay, 'depth-package.json', manifest);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'depth-package.json integrity does not match packed tarball',
+    );
+  });
+
+  it('refuses a pack filename that is not a plain basename', () => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    depth.package = '../supernovae-st-nika-0.120.1.tgz';
+    writeJson(replay, 'depth-projects.json', depth);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'packed tarball filename is not a plain basename',
     );
   });
 
@@ -677,8 +711,16 @@ function createReplay(): string {
   );
   const artifact = path.join(replay, depth.package);
   writeFileSync(artifact, `documentation-only-pack-fixture:${replay}\n`);
-  depth.package_sha256 = createHash('sha256').update(readFileSync(artifact)).digest('hex');
+  const bytes = readFileSync(artifact);
+  depth.package_sha256 = createHash('sha256').update(bytes).digest('hex');
   writeJson(replay, 'depth-projects.json', depth);
+  writeJson(replay, 'depth-package.json', {
+    name: '@supernovae-st/nika',
+    version: '0.120.1',
+    filename: depth.package,
+    size: bytes.length,
+    integrity: sha512Integrity(artifact),
+  });
   return replay;
 }
 

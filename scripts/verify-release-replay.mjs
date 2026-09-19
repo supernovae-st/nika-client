@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { pathToFileURL } from "node:url";
@@ -85,17 +85,33 @@ export function stableCancellationTerminalKind(kind) {
 }
 
 const PACK_SHA256 = /^[0-9a-f]{64}$/;
+const PACK_LEAF = /^supernovae-st-nika-\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\.tgz$/;
 
 export function sha256File(filePath) {
   return createHash("sha256").update(readFileSync(filePath)).digest("hex");
 }
 
-export function depthPackProvenance(report) {
-  const name = report?.package;
-  const digest = report?.package_sha256;
-  if (typeof name !== "string" || !name.endsWith(".tgz")) {
+export function sha512Integrity(filePath) {
+  return `sha512-${createHash("sha512").update(readFileSync(filePath)).digest("base64")}`;
+}
+
+export function assertPackBasename(name) {
+  if (typeof name !== "string" || name.length === 0) {
     throw new Error("depth evidence lacks a packed tarball filename");
   }
+  if (name !== path.basename(name) || path.isAbsolute(name)
+    || name.includes("..") || name.includes("/") || name.includes("\\") || name.includes("\0")) {
+    throw new Error(`packed tarball filename is not a plain basename: ${name}`);
+  }
+  if (!PACK_LEAF.test(name)) {
+    throw new Error(`packed tarball filename is not the expected package leaf: ${name}`);
+  }
+  return name;
+}
+
+export function depthPackProvenance(report) {
+  const name = assertPackBasename(report?.package);
+  const digest = report?.package_sha256;
   if (typeof digest !== "string" || !PACK_SHA256.test(digest)) {
     throw new Error("depth evidence lacks a 64-hex package_sha256 provenance digest");
   }
@@ -104,10 +120,12 @@ export function depthPackProvenance(report) {
 
 // The digest names the exact tarball this ledger measured. Documentation-only
 // pack changes (README in the npm tarball) retarget it. Compare it to the
-// artifact bytes, never to committed behavior.
+// artifact bytes, never to committed behavior. The committed digest is a
+// historical ledger identity, not a claim that this replay re-hashed that pack.
 export function assertReplayPackProvenance(report, replayResults) {
   const provenance = depthPackProvenance(report);
-  const artifact = path.join(replayResults, provenance.package);
+  const replayRoot = path.resolve(replayResults);
+  const artifact = path.join(replayRoot, provenance.package);
   if (!existsSync(artifact)) {
     throw new Error(
       `replay pack artifact missing: expected ${provenance.package} beside the depth ledger`,
@@ -119,16 +137,36 @@ export function assertReplayPackProvenance(report, replayResults) {
       `replay package_sha256 ${provenance.package_sha256} does not match packed tarball ${actual}`,
     );
   }
-  const manifestPath = path.join(replayResults, "depth-package.json");
-  if (existsSync(manifestPath)) {
-    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-    if (manifest.filename !== provenance.package) {
-      throw new Error(
-        `depth-package.json filename ${String(manifest.filename)} does not match ledger ${provenance.package}`,
-      );
-    }
+  const manifestPath = path.join(replayRoot, "depth-package.json");
+  if (!existsSync(manifestPath)) {
+    throw new Error("replay pack manifest missing: expected depth-package.json beside the depth ledger");
   }
-  return { ...provenance, artifact };
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  if (manifest.filename !== provenance.package) {
+    throw new Error(
+      `depth-package.json filename ${String(manifest.filename)} does not match ledger ${provenance.package}`,
+    );
+  }
+  const size = statSync(artifact).size;
+  if (manifest.size !== size) {
+    throw new Error(
+      `depth-package.json size ${String(manifest.size)} does not match packed tarball ${size}`,
+    );
+  }
+  const integrity = sha512Integrity(artifact);
+  if (manifest.integrity !== integrity) {
+    throw new Error("depth-package.json integrity does not match packed tarball");
+  }
+  if (manifest.name !== undefined && manifest.name !== "@supernovae-st/nika") {
+    throw new Error(`depth-package.json name ${String(manifest.name)} is not @supernovae-st/nika`);
+  }
+  const versionFromLeaf = provenance.package.slice("supernovae-st-nika-".length, -".tgz".length);
+  if (manifest.version !== undefined && manifest.version !== versionFromLeaf) {
+    throw new Error(
+      `depth-package.json version ${String(manifest.version)} does not match ${versionFromLeaf}`,
+    );
+  }
+  return { ...provenance, artifact, size, integrity, historical: false };
 }
 
 export function stableDepthEvidence(report) {
@@ -258,6 +296,7 @@ export function verifyReleaseReplay(repositoryRoot, replayResults) {
     depthProjects: replayedDepth.projects.length,
     recoveryProcesses: replayedRecovery.process_count,
     committedPackageSha256: committedPack.package_sha256,
+    historicalLedgerPackageSha256: committedPack.package_sha256,
     replayedPackageSha256: replayedPack.package_sha256,
     packDigestChanged: committedPack.package_sha256 !== replayedPack.package_sha256,
   };
@@ -277,7 +316,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       + `${result.depthProjects} depth projects, ${result.recoveryProcesses} recovery processes, `
       + result.engine
       + (result.packDigestChanged
-        ? `; pack digest changed ${result.committedPackageSha256} → ${result.replayedPackageSha256} (artifact matched)`
-        : `; pack digest ${result.replayedPackageSha256}`),
+        ? `; historical ledger pack ${result.historicalLedgerPackageSha256}; this replay ${result.replayedPackageSha256} (artifact+manifest matched)`
+        : `; pack digest ${result.replayedPackageSha256} (matches historical ledger)`),
   );
 }

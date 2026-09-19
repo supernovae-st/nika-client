@@ -54,9 +54,11 @@ terminals it may lead to, demand the run status of that terminal, and refuse any
 other pairing. The parsed deterministic and packed-project results must match
 exactly except for the recovery job UUID and the depth `package_sha256`.
 That digest is provenance of the tarball this replay packed (README lives
-inside the npm pack): the verifier hashes the artifact beside the ledger
-and refuses a missing, malformed, or substituted digest, then compares
-behavior without requiring the committed baseline digest. A documentation-only
+inside the npm pack): the verifier requires `depth-package.json` beside the
+ledger, hashes the artifact, checks filename/size/sha512 integrity, refuses
+a missing or substituted pack, then compares behavior without requiring the
+committed baseline digest (that digest is a labelled historical ledger
+identity, not a re-hash of this run). A documentation-only
 README change retargets the digest and must still reproduce every behavioral
 verdict. The hostile comparison excludes
 `generated_at` and per-scenario duration and canonicalizes only the two ratified

@@ -1,0 +1,276 @@
+import { existsSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { inspect } from 'node:util';
+import { getEventListeners } from 'node:events';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  Nika, NikaCompatibilityError, NikaConfigurationError,
+  NikaOperationError, NikaProtocolError, NikaTransportError,
+} from '../src/index.js';
+import { healthResponse, jsonResponse, TOKEN_A } from './helpers/http-depth-harness.js';
+
+const COMPILE_ENGINE = fileURLToPath(new URL('./fixtures/fake-nika-compile.mjs', import.meta.url));
+const argvLog = path.join(tmpdir(), `nika-sdk-compile-http-${process.pid}.log`);
+const health = () => healthResponse({ supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'trace', 'compile'] });
+const outcome = (overrides: Record<string, unknown> = {}) => ({
+  compile_version: 1, status: 'ready', candidate: 'nika: candidate\n',
+  questions: [], diagnostics: [], requested_boundary: null, check_preview: null,
+  provenance: { compiler_version: '0.120.0', spec_pin: 'pin', skeleton: null, cognition: 'deterministicOnly' },
+  ...overrides,
+});
+function client(fetch: typeof globalThis.fetch, extra = {}) {
+  process.env.NIKA_FAKE_ARGV_LOG = argvLog;
+  return new Nika({ url: 'https://nika.example', token: TOKEN_A, bin: COMPILE_ENGINE, fetch, ...extra });
+}
+function respond(response: Response) {
+  return vi.fn().mockResolvedValueOnce(health()).mockResolvedValueOnce(response);
+}
+function waitingBody() {
+  const cancel = vi.fn();
+  return { cancel, response: new Response(new ReadableStream({ cancel }), {
+    headers: { 'Content-Type': 'application/json' },
+  }) };
+}
+function delayedBody(value: unknown, delayMs: number) {
+  let timer: ReturnType<typeof setTimeout>;
+  const cancel = vi.fn(() => clearTimeout(timer));
+  const response = new Response(new ReadableStream({
+    start(controller) {
+      timer = setTimeout(() => {
+        controller.enqueue(new TextEncoder().encode(JSON.stringify(value)));
+        controller.close();
+      }, delayMs);
+    },
+    cancel,
+  }), { headers: { 'Content-Type': 'application/json' } });
+  return { response, cancel };
+}
+function delayedHeaders(response: Response, delayMs: number, signal?: AbortSignal | null): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const abort = () => { clearTimeout(timer); reject(signal?.reason); };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', abort);
+      resolve(response);
+    }, delayMs);
+    signal?.addEventListener('abort', abort, { once: true });
+    if (signal?.aborted) abort();
+  });
+}
+function waitForAbort(_url: unknown, init?: RequestInit): Promise<Response> {
+  return new Promise((_resolve, reject) => {
+    if (init?.signal?.aborted) reject(init.signal.reason);
+    init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true });
+  });
+}
+
+describe('authenticated HTTP compile foundation', () => {
+  afterEach(() => {
+    delete process.env.NIKA_FAKE_ARGV_LOG;
+    const spawned = existsSync(argvLog);
+    rmSync(argvLog, { force: true });
+    expect(spawned, 'HTTP compile must never spawn a local engine').toBe(false);
+  });
+
+  it('refuses an old Serve after health alone', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(healthResponse());
+    await expect(client(fetch).compile('hello')).rejects.toMatchObject({
+      name: 'NikaCompatibilityError', capability: 'compile', transport: 'http',
+    });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['ready', 'incomplete', 'refused'])('preserves %s as data and authenticates POST', async (status) => {
+    const wire = outcome({ status, candidate: status === 'ready' ? 'source' : null });
+    const fetch = respond(jsonResponse(wire));
+    const result = await client(fetch).compile({ intent: 'hello', answers: { 'const.request': ['雪', 1.2345678901234567, false, null] } });
+    expect(result).toEqual({ ...wire, ready: status === 'ready' });
+    expect(result).not.toHaveProperty('written');
+    expect(result).not.toHaveProperty('exitCode');
+    const [url, init] = fetch.mock.calls[1];
+    expect(url).toBe('https://nika.example/v1/compile');
+    expect(init.method).toBe('POST');
+    expect(init.headers.get('Authorization')).toBe(`Bearer ${TOKEN_A}`);
+    expect(init.headers.get('Content-Type')).toBe('application/json');
+    expect(init.headers.has('Idempotency-Key')).toBe(false);
+    expect(JSON.parse(init.body)).toEqual({ compile_version: 1, mode: 'create', intent: 'hello', answers: { 'const.request': ['雪', 1.2345678901234567, false, null] } });
+  });
+
+  it.each([
+    ['Set const.request to "snow"', { text: 'Set const.request to "snow"' }],
+    [{ set_constant: { name: 'request', value: { '雪': ['"quoted"', null, true, 1.23e100] } } },
+      { set_constant: { name: 'request', value: { '雪': ['"quoted"', null, true, 1.23e100] } } }],
+  ])('sends edit source and exact change vocabulary', async (change, expected) => {
+    const fetch = respond(jsonResponse(outcome()));
+    const workflow = 'nika: base\r\nconst: { request: "é" }\n';
+    await client(fetch).compile({ workflow, change: change as any });
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toEqual({ compile_version: 1, mode: 'edit', source: workflow, change: expected });
+  });
+
+  it.each([401, 408, 413, 415, 422, 500, 503])('preserves typed HTTP %i refusal', async (status) => {
+    const fetch = respond(jsonResponse({ error: { code: 'compile_refusal', message: 'Rejected' } }, status));
+    await expect(client(fetch).compile('hello')).rejects.toMatchObject({
+      name: 'NikaOperationError', operation: 'compile', transport: 'http', status, machineCode: 'compile_refusal',
+    });
+  });
+
+  it('redacts reflected credentials in errors', async () => {
+    const fetch = respond(jsonResponse({ error: { code: 'compile_busy', message: `No ${TOKEN_A}` } }, 503));
+    await expect(client(fetch).compile('hello')).rejects.toThrow('No [REDACTED]');
+  });
+
+  it('rejects incompatible health before POST', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(healthResponse({ machineProtocolVersion: 999, supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'trace', 'compile'] }));
+    await expect(client(fetch).compile('hello')).rejects.toBeInstanceOf(NikaCompatibilityError);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a different compile generation', async () => {
+    const fetch = respond(jsonResponse(outcome({ compile_version: 2 })));
+    await expect(client(fetch).compile('hello')).rejects.toBeInstanceOf(NikaCompatibilityError);
+  });
+
+  it.each([undefined, null, false, '1', TOKEN_A, { toString: null }, [TOKEN_A], 1.5, -1, 0, Number.MAX_SAFE_INTEGER + 1])('rejects malformed compile_version case %# without reflecting the value', async (compile_version) => {
+    const fetch = respond(jsonResponse(outcome({ compile_version })));
+    const error = await client(fetch).compile('hello').catch((cause: unknown) => cause);
+    expect(error).toBeInstanceOf(NikaProtocolError);
+    expect((error as Error).message).toMatch(/compile_version/);
+    expect((error as Error).message).not.toContain(TOKEN_A);
+    expect((error as Error).message).not.toMatch(/Cannot convert object/);
+    expect(inspect(error)).not.toContain(TOKEN_A);
+    expect(inspect(error)).not.toMatch(/toString":null|toString: null/);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it.each([
+    () => jsonResponse(outcome({ status: 'other' })),
+    () => jsonResponse(outcome({ candidate: null })),
+    () => jsonResponse(outcome({ questions: [{}] })),
+    () => jsonResponse(outcome({ questions: [{ key: 'x', label: 'x', why: 'x', mandatory: true, type: 'invented' }] })),
+    () => jsonResponse(outcome({ diagnostics: [{ target: 'x', message: 'x', kind: 'invented' }] })),
+    () => jsonResponse(outcome({ check_preview: { scope: 'admission', report: {} } })),
+    () => jsonResponse(outcome({ provenance: { ...outcome().provenance, cognition: 'invented' } })),
+    () => jsonResponse(outcome({ diagnostics: [{}] })),
+    () => jsonResponse(outcome({ requested_boundary: [] })),
+    () => jsonResponse(outcome({ check_preview: {} })),
+    () => jsonResponse(outcome({ provenance: {} })),
+    () => jsonResponse(outcome({ written: null })),
+    () => jsonResponse(outcome({ error: { code: 'bad', message: 'bad' } })),
+    () => jsonResponse({ error: {} }, 422),
+    () => jsonResponse(outcome(), 202),
+    () => new Response('{bad', { headers: { 'Content-Type': 'application/json' } }),
+    () => new Response('{}'),
+    () => new Response(new Uint8Array([0xff]), { headers: { 'Content-Type': 'application/json' } }),
+  ])('rejects malformed/contradictory response %#', async (response) => {
+    await expect(client(respond(response())).compile('hello')).rejects.toBeInstanceOf(NikaProtocolError);
+  });
+
+  it('bounds streamed responses and cancels the stream on overflow', async () => {
+    const cancel = vi.fn();
+    const response = new Response(new ReadableStream({ start(c) { c.enqueue(new Uint8Array(9 * 1024 * 1024)); }, cancel }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    await expect(client(respond(response)).compile('hello')).rejects.toThrow(/exceeded/);
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+
+  it('aborts before health with no requests', async () => {
+    const fetch = vi.fn();
+    const controller = new AbortController(); controller.abort();
+    await expect(client(fetch).compile('hello', { signal: controller.signal })).rejects.toThrow(/aborted by caller/);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('aborts while waiting for health without posting', async () => {
+    const controller = new AbortController();
+    const fetch = vi.fn(waitForAbort);
+    const pending = client(fetch).compile('hello', { signal: controller.signal });
+    controller.abort();
+    await expect(pending).rejects.toThrow(/aborted by caller/);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['health', 'post', 'body'])('times out while waiting for %s', async (phase) => {
+    const fetch = phase === 'health' ? vi.fn(waitForAbort)
+      : phase === 'post' ? vi.fn().mockResolvedValueOnce(health()).mockImplementationOnce(waitForAbort)
+      : respond(waitingBody().response);
+    await expect(client(fetch).compile('hello', { timeoutMs: 30 })).rejects.toThrow(/timed out/);
+  });
+
+  it.each(['health headers', 'health body', 'post headers', 'post body'])(
+    'allows a longer compile timeout during %s', async (phase) => {
+      const controller = new AbortController();
+      const fetch = vi.fn(async (url: string, init?: RequestInit) => {
+        const isHealth = url.endsWith('/health');
+        const response = isHealth ? health() : jsonResponse(outcome());
+        const selected = phase.startsWith(isHealth ? 'health' : 'post');
+        if (!selected) return response;
+        if (phase.endsWith('headers')) return delayedHeaders(response, 100, init?.signal);
+        return delayedBody(await response.json(), 100).response;
+      });
+      await expect(client(fetch, { requestTimeout: 20 }).compile('hello', {
+        timeoutMs: 1000, signal: controller.signal,
+      })).resolves.toHaveProperty('ready', true);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
+    },
+  );
+
+  it.each(['health', 'post'])('uses a shorter compile deadline for a never-ending %s body and cancels it', async (phase) => {
+    const stalled = waitingBody();
+    const controller = new AbortController();
+    const fetch = phase === 'health' ? vi.fn().mockResolvedValueOnce(stalled.response)
+      : respond(stalled.response);
+    await expect(client(fetch, { requestTimeout: 1000 }).compile('hello', {
+      timeoutMs: 30, signal: controller.signal,
+    })).rejects.toThrow('compile timed out after 30 ms');
+    expect(stalled.cancel).toHaveBeenCalledOnce();
+    expect(fetch).toHaveBeenCalledTimes(phase === 'health' ? 1 : 2);
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
+  });
+
+  it('keeps one deadline across negotiation and POST instead of restarting it', async () => {
+    const stalled = waitingBody();
+    const controller = new AbortController();
+    const fetch = vi.fn().mockImplementationOnce((_url: unknown, init?: RequestInit) =>
+      delayedHeaders(health(), 60, init?.signal)).mockResolvedValueOnce(stalled.response);
+    await expect(client(fetch, { requestTimeout: 20 }).compile('hello', {
+      timeoutMs: 120, signal: controller.signal,
+    })).rejects.toThrow('compile timed out after 120 ms');
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch.mock.calls[1]![1]!.signal).toBe(fetch.mock.calls[0]![1]!.signal);
+    expect(stalled.cancel).toHaveBeenCalledOnce();
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
+  });
+
+  it('aborts a stalled response body, including an error body', async () => {
+    for (const status of [200, 503]) {
+      const stalled = waitingBody();
+      const controller = new AbortController();
+      const fetch = respond(new Response(stalled.response.body, { status, headers: { 'Content-Type': 'application/json' } }));
+      const pending = client(fetch).compile('hello', { signal: controller.signal });
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+      controller.abort();
+      await expect(pending).rejects.toThrow(/aborted by caller/);
+      expect(stalled.cancel).toHaveBeenCalledOnce();
+    }
+  });
+
+  it('rejects malformed signals and non-JSON answers before HTTP', async () => {
+    const fetch = vi.fn();
+    await expect(client(fetch).compile('hello', { signal: {} as AbortSignal })).rejects.toBeInstanceOf(NikaConfigurationError);
+    await expect(client(fetch).compile({ intent: 'hello', answers: { x: BigInt(1) } })).rejects.toBeInstanceOf(NikaConfigurationError);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each(['success', 'protocol', 'timeout'])('releases the caller listener after %s', async (mode) => {
+    const controller = new AbortController();
+    const fetch = mode === 'timeout' ? vi.fn(waitForAbort)
+      : respond(jsonResponse(outcome(mode === 'protocol' ? { compile_version: null } : {})));
+    const pending = client(fetch).compile('hello', { signal: controller.signal, timeoutMs: 30 });
+    if (mode === 'success') await expect(pending).resolves.toHaveProperty('ready', true);
+    else await expect(pending).rejects.toBeInstanceOf(mode === 'protocol' ? NikaProtocolError : NikaTransportError);
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
+  });
+});

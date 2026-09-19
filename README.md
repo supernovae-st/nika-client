@@ -383,6 +383,52 @@ No destination means preview only. `nika.yaml` is the project control plane
 and asks for French; the hand-written file above is enough if it keeps
 `outputs.greeting` and `model: mock/echo`.
 
+## Compile a candidate without running it
+
+`compile()` requires an engine that advertises the `compile` capability. The
+released 0.120.2 engine supports native compilation. HTTP compilation requires
+a compatible Serve built from engine commit `4334e58b` or later; the published
+0.120.2 Serve predates that route and is refused without fallback. This SDK method
+is currently an unreleased addition. This foundation resolves
+exact embedded skeleton names (including `hello`) and edits existing constants;
+unsupported intent remains `incomplete`.
+
+```ts
+const candidate = await nika.compile({
+  intent: 'classify-and-route',
+  answers: { 'const.request': 'An outage affects support customers.' },
+}, { timeoutMs: 15_000 });
+
+// The outcome is source and review data. Incomplete/refused are also outcomes.
+console.log(candidate.status, candidate.questions, candidate.diagnostics);
+if (candidate.ready && candidate.candidate !== null) {
+  const edited = await nika.compile({
+    workflow: candidate.candidate,
+    change: { set_constant: { name: 'request', value: 'One customer is affected.' } },
+  });
+  console.log(edited.candidate);
+}
+```
+
+Edits also accept a string such as `Set const.request to "One customer"`.
+Answers and structured values are strict JSON values, preserving numbers,
+booleans, null, strings, arrays and objects. The native adapter uses the engine's
+CLI; the HTTP adapter sends authenticated `POST /v1/compile`. An unavailable
+remote capability raises `NikaCompatibilityError` without local fallback.
+
+`candidate` is `.nika` source, distinct from the path accepted by `run()`.
+The caller reviews and materializes it before calling `run(path)`, which performs
+normal admission. `requested_boundary` and the source-only `check_preview` grant
+no execution authority. Compile creates no Run, job, approval or Proof, and the
+SDK writes no persistent candidate file. `signal`/`timeoutMs` stop only the
+compile request. The common outcome has no `exitCode` or `written` field.
+
+Compile accepts standard `AbortSignal`s, including `AbortSignal.any` composites.
+It rejects direct signal interface overrides and proxies before starting work.
+Composite sources must retain their standard interfaces: Node may read their
+public fields while inspecting or subscribing to a composite, so the SDK cannot
+validate a modified hidden source graph without invoking those fields.
+
 ## Verify a local trace
 
 Local terminal results carry an engine-issued receipt when tracing is enabled.

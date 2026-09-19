@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Nika.compile(request, options)` — the SDK projection of the engine's one
+  authoring capability (issue #128, engine nika#1663). The native transport
+  runs one bounded `nika compile --json` child and validates the versioned
+  `compile_version: 1` wire: `status` (`ready` / `incomplete` / `refused`),
+  `ready` derived exactly from it, `candidate` source, `questions`,
+  `diagnostics`, `requested_boundary`, `check_preview` and `provenance` are
+  preserved verbatim. Incomplete and refused are data, never exceptions; a
+  ready outcome is accepted only from a child that exited 0, and a dead,
+  truncated, malformed or wrong-version wire fails typed
+  (`NikaProtocolError` / `NikaCompatibilityError` / `NikaOperationError` with
+  the engine's own code). The engine must advertise the `compile` capability;
+  older engines are refused before any compile spawn. CREATE takes an intent
+  (or exact skeleton name) plus `answers` — strict JSON values serialized
+  once onto argv as `KEY=JSON`; EDIT takes the accepted source plus a change
+  (text or explicit `set_constant`)
+  and lends the base through a 0700 scratch dir with a 0600 file, removed on
+  every path. `signal`/`timeoutMs` stop only this child (SIGTERM, then
+  SIGKILL inside a kill grace); no Run exists to cancel. The candidate is
+  source: `run()` still takes a path, and the caller owns materialization —
+  this slice ships no `dest`/`force`. Over `{ url }` the method consumes
+  authenticated `POST /v1/compile` when Serve advertises `compile`, using the
+  same outcome without process-only `exitCode`/`written` fields. HTTP cancellation,
+  timeouts and bounded response parsing never fall back to local compilation.
+
+The HTTP compile contract is pinned to engine commit
+`4334e58bddf539a6253f448eb05d562b6919f2b7` (nika#1709), merged after
+`v0.120.2`. The released engine supports native compile; its Serve does not
+advertise HTTP compile. This SDK feature is not part of the published 0.120.2 package.
+
 ## [0.120.2]
 
 ### Changed

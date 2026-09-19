@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.120.1]
+
+### Changed
+
+- Lockstep with public engine `v0.120.1` (`9d554c84c8a63144c36e7245fee641e6bfc7349f`).
+  Package and native optional payloads follow that tag via `sync:native-versions`.
+  Served OpenAPI `info.version` is `0.120.1`; the rest of the Serve schema is
+  unchanged from 0.120.0. The public engine now accepts canonical `.nika`
+  workflow references in project-arm schemas (engine #1692). This is not
+  issue 1684 closure; the broader file-identity migration remains open.
+
 ## [0.120.0]
 
 ### Known engine limitation

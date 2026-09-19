@@ -14,7 +14,7 @@ import {
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const committedResults = path.join(ROOT, 'gauntlet', 'results');
-const ENGINE = 'nika 0.120.0 (f6155d1be)';
+const ENGINE = 'nika 0.120.1 (9d554c84c)';
 const STABLE_CANCELLED_KIND = 'execution.cancelled|execution.settled';
 // The 200 shape: the resident cancelled the job before its execution started.
 const CANCELLED_BEFORE_EXECUTION = {

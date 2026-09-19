@@ -15,21 +15,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`289a9adeae5a6937221ceac55b8080ef84c0ce69`, engine #1707). Package and
   native optional payloads follow the engine train via `sync:native-versions`;
   OpenAPI `info.version` is `0.120.2` with the Serve schema unchanged from
-  0.120.1, pending the type-drift gate against a live 0.120.2 resident.
-  `ENGINE_QUAL_PIN` / `ENGINE_CANDIDATE` name the tagged commit. Current
-  gauntlet evidence is regenerated from the verified public macOS arm64
-  archive (`verify-engine-archive`, SHA256SUMS `b46243de…`): all five current
-  reports record `nika 0.120.2 (289a9adea)`; the historical paid-provider and
-  trace ledgers are untouched. npm latest remains **0.120.0** (bundled engine
-  `0.120.0` / `f6155d1be`) until this package is published.
+  0.120.1 (the live type-drift gate is green). `ENGINE_QUAL_PIN` /
+  `ENGINE_CANDIDATE` name the tagged commit. Current gauntlet evidence is
+  regenerated from the verified public macOS arm64 archive
+  (`verify-engine-archive`, SHA256SUMS `b46243de…`): all five current reports
+  record `nika 0.120.2 (289a9adea)`; the historical paid-provider and trace
+  ledgers are untouched.
+- Install guidance is timeless: canonical `npm install @supernovae-st/nika`,
+  each SDK package bundles its own matching engine, and the standalone engine
+  CLI releases on an independent clock. Native `inputsLiteral` and
+  `isNikaRunSucceeded` are published on 0.120.0; `nika compile hello` replaces
+  retired `nika new`; admission, execution, and seal are separate facts (a
+  keyless HOME succeeds unsealed).
 - Release replay treats depth `package_sha256` as pack provenance: it must
   match the tarball beside the ledger, and documentation-only README pack
   changes may retarget it. Behavioral verdicts still compare exactly.
-- README documents the live install split: npm latest **0.120.0** (bundled
-  engine `0.120.0` / `f6155d1be`) versus public engine GitHub **v0.120.1**.
-  Native `inputsLiteral` and `isNikaRunSucceeded` are published on 0.120.0;
-  `nika compile hello` replaces retired `nika new`; admission, execution, and
-  seal are separate facts (a keyless HOME succeeds unsealed).
 
 ## [0.120.1]
 

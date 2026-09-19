@@ -98,6 +98,6 @@ but different compressed bytes.
 
 The current 0.120.2 committed depth baseline is the local macOS observation
 against public engine `nika 0.120.2 (289a9adea)`. The measured macOS package
-SHA-256 is `245f027fb43b1374f95ff4b4c929b3b1ff0a8e29aee0b712c5352e267c7ec85a`.
+SHA-256 is `2dccc1ccbbc24fea3f7d21664911f6742d657ee10b2d55004459d2b1021324ec`.
 Linux CI `release-evidence-replay` still requires its exact compressed archive
 digest; that digest is not claimed here.

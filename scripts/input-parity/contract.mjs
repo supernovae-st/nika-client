@@ -2,7 +2,7 @@
 // table, and what each case must do on BOTH transports. No model seat, no
 // network, no file effect: `nika:jq` echoes the bound inputs back as outputs.
 
-export const WORKFLOW_NAME = 'input-parity.nika.yaml';
+export const WORKFLOW_NAME = 'input-parity.nika';
 
 export const WORKFLOW = `nika: input-parity
 inputs:

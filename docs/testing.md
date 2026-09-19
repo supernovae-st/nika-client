@@ -52,7 +52,15 @@ starts is a 200 `cancelled` whose terminal is one of those two writer kinds,
 only with `status=cancelled`. The verifiers bind each cancel reply to the
 terminals it may lead to, demand the run status of that terminal, and refuse any
 other pairing. The parsed deterministic and packed-project results must match
-exactly except for the recovery job UUID. The hostile comparison excludes
+exactly except for the recovery job UUID and the depth `package_sha256`.
+That digest is provenance of the tarball this replay packed (README lives
+inside the npm pack): the verifier requires `depth-package.json` beside the
+ledger, hashes the artifact, checks filename/size/sha512 integrity, refuses
+a missing or substituted pack, then compares behavior without requiring the
+committed baseline digest (that digest is a labelled historical ledger
+identity, not a re-hash of this run). A documentation-only
+README change retargets the digest and must still reproduce every behavioral
+verdict. The hostile comparison excludes
 `generated_at` and per-scenario duration and canonicalizes only the two ratified
 writer kinds of a cancelled terminal after checking the exact pairing. This proves that the
 attested public release currently reproduces the committed behavioral claims.
@@ -193,6 +201,13 @@ round trips, incomplete questions, refused expression islands, invalid bases,
 authentication, no project-file changes and no created jobs. HTTP is given a
 nonexistent local engine path, proving that it cannot use a fallback. The report
 records binary and package hashes and is green only after owned-process cleanup.
-A compile-capable development binary is required; the bundled 0.118.7 engine
-predates this capability. This is a foundation test, not general intent authoring
+A source binary containing engine commit
+`4334e58bddf539a6253f448eb05d562b6919f2b7` is required for both doors.
+Released engine 0.120.2 supports native compile but predates HTTP compile. This is a foundation test, not general intent authoring
 or execution admission qualification.
+
+The [2026-09-19 source-build receipt](evidence/compile-4334e58b-20260919.json)
+records 14 cases across both doors and both module systems at that producer,
+with exact outcome parity and no resident-state or project-file mutation. Its
+engine is a clean source build, not the published v0.120.2 binary; its SDK
+tarball is the unreleased PR candidate. The hashes identify those tested bytes.

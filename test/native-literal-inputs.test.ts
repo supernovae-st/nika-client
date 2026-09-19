@@ -107,12 +107,12 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
         record: { name: '🦋', nothing: null },
       };
       const { result, argvs } = await spawned(async () => {
-        const run = await literal().run('echo-literal.nika.yaml', { inputs });
+        const run = await literal().run('echo-literal.nika', { inputs });
         return run.result();
       });
       expect(argvs).toEqual([
         ['--sdk-identity'],
-        ['run', 'echo-literal.nika.yaml', '--json', '--inputs-json', '-'],
+        ['run', 'echo-literal.nika', '--json', '--inputs-json', '-'],
       ]);
       expect(result.status).toBe('succeeded');
       const expected = encodeLiteralInputs(inputs);
@@ -128,7 +128,7 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
 
     it('keeps a value out of argv: the map rides stdin only', async () => {
       const { argvs } = await spawned(async () => {
-        const run = await literal().run('echo-secret.nika.yaml', {
+        const run = await literal().run('echo-secret.nika', {
           inputs: { apiKey: SECRET_LOOKING, nested: { token: SECRET_LOOKING } },
           model: 'mock/echo',
           maxCostUsd: 0.01,
@@ -136,7 +136,7 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
         return run.result();
       });
       expect(argvs.at(-1)).toEqual([
-        'run', 'echo-secret.nika.yaml', '--json', '--inputs-json', '-',
+        'run', 'echo-secret.nika', '--json', '--inputs-json', '-',
         '--model', 'mock/echo', '--max-cost-usd', '0.01',
       ]);
       expect(JSON.stringify(argvs)).not.toContain(SECRET_LOOKING);
@@ -145,10 +145,10 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
 
     it('sends an empty map as the explicit empty object, not as an absent channel', async () => {
       const { result, argvs } = await spawned(async () => {
-        const run = await literal().run('echo-empty.nika.yaml', { inputs: {} });
+        const run = await literal().run('echo-empty.nika', { inputs: {} });
         return run.result();
       });
-      expect(argvs.at(-1)).toEqual(['run', 'echo-empty.nika.yaml', '--json', '--inputs-json', '-']);
+      expect(argvs.at(-1)).toEqual(['run', 'echo-empty.nika', '--json', '--inputs-json', '-']);
       expect(result.outputs).toMatchObject({ stdin: '{}', stdin_bytes: 2 });
     });
 
@@ -157,7 +157,7 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
       const inputs = { blob: 'é'.repeat((LITERAL_INPUTS_MAX_BYTES - shell - 1) / 2) + 'x' };
       const expected = encodeLiteralInputs(inputs);
       expect(expected.bytes).toBe(LITERAL_INPUTS_MAX_BYTES);
-      const run = await literal().run('echo-exact-bound.nika.yaml', { inputs });
+      const run = await literal().run('echo-exact-bound.nika', { inputs });
       const result = await run.result();
       expect(result.outputs).toEqual({
         stdin_kind: expect.stringMatching(/^(socket|fifo)$/),
@@ -168,16 +168,16 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
 
     it('opens no stdin pipe and adds no flag for a run without inputs', async () => {
       const { result, argvs } = await spawned(async () => {
-        const run = await literal().run('echo-plain.nika.yaml');
+        const run = await literal().run('echo-plain.nika');
         return run.result();
       });
-      expect(argvs.at(-1)).toEqual(['run', 'echo-plain.nika.yaml', '--json']);
+      expect(argvs.at(-1)).toEqual(['run', 'echo-plain.nika', '--json']);
       expect(result.outputs).toMatchObject({ stdin_kind: 'character-device', stdin_bytes: 0 });
     });
 
     it('reads the measured admitted run: outputs and api-caller origins ride through', async () => {
       const client = literal();
-      const run = await client.run('wire-c1683-literal.nika.yaml', {
+      const run = await client.run('wire-c1683-literal.nika', {
         inputs: { ticket: '@env:NIKA_TEST_LITERAL', count: 42, tags: ['é', '東京'], record: { name: '🦋' } },
       });
       // The Run owns its lifecycle. Provenance is an engine fact, so it is read
@@ -217,7 +217,7 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
   describe('an engine without the channel is refused before any run', () => {
     it('rejects with the missing capability and the evidence it read', async () => {
       const { result, argvs } = await spawned(() => failure(
-        new Nika({ bin: OLD_ENGINE }).run('ok.nika.yaml', { inputs: { ticketId: '42' } }),
+        new Nika({ bin: OLD_ENGINE }).run('ok.nika', { inputs: { ticketId: '42' } }),
       ));
       expect(result).toBeInstanceOf(NikaCompatibilityError);
       expect(result).toMatchObject({
@@ -235,29 +235,29 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
 
     it('never falls back to --var, even for values --var could spell', async () => {
       const { argvs } = await spawned(() => failure(
-        new Nika({ bin: OLD_ENGINE }).run('ok.nika.yaml', { inputs: { locale: 'fr-FR', n: 1 } }),
+        new Nika({ bin: OLD_ENGINE }).run('ok.nika', { inputs: { locale: 'fr-FR', n: 1 } }),
       ));
       expect(argvs.flat()).not.toContain('--var');
       expect(argvs.flat()).not.toContain('run');
     });
 
     it('refuses an empty map too: a present map is the channel', async () => {
-      const refused = await failure(new Nika({ bin: OLD_ENGINE }).run('ok.nika.yaml', { inputs: {} }));
+      const refused = await failure(new Nika({ bin: OLD_ENGINE }).run('ok.nika', { inputs: {} }));
       expect(refused).toMatchObject({ name: 'NikaCompatibilityError', capability: 'inputsLiteral' });
     });
 
     it('still runs that engine without inputs, and with the deprecated vars alias', async () => {
       const { result, argvs } = await spawned(async () => {
         const client = new Nika({ bin: OLD_ENGINE });
-        const plain = await (await client.run('ok.nika.yaml')).result();
-        const aliased = await (await client.run('ok.nika.yaml', {
+        const plain = await (await client.run('ok.nika')).result();
+        const aliased = await (await client.run('ok.nika', {
           vars: { locale: 'fr-FR', retries: 3, dry: false },
         })).result();
         return [plain.status, aliased.status];
       });
       expect(result).toEqual(['succeeded', 'succeeded']);
       expect(argvs.at(-1)).toEqual([
-        'run', 'ok.nika.yaml', '--json',
+        'run', 'ok.nika', '--json',
         '--var', 'locale=fr-FR', '--var', 'retries=3', '--var', 'dry=false',
       ]);
     });
@@ -274,7 +274,7 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
       ['a map over 1 MiB', { inputs: { blob } }, /exceeds 1048576 bytes/],
       ['a root that is not a map', { inputs: [] as unknown as Record<string, unknown> }, /must be a plain object/],
     ])('refuses %s', async (_name, options, message) => {
-      const { result, argvs } = await spawned(() => failure(literal().run('echo.nika.yaml', options)));
+      const { result, argvs } = await spawned(() => failure(literal().run('echo.nika', options)));
       expect(result).toBeInstanceOf(NikaConfigurationError);
       expect((result as Error).message).toMatch(message);
       // Not even the identity probe ran: the caller's mistake needs no engine.
@@ -284,10 +284,10 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
 
   describe('the engine judges the map: its refusal rejects run() with its code', () => {
     it.each([
-      ['an undeclared key', 'wire-c1683-unknown-input.nika.yaml', 'unknown_input', 'input key is not declared'],
-      ['a type mismatch', 'wire-c1683-type-mismatch.nika.yaml', 'input_type_mismatch', 'declared type'],
-      ['a missing required input', 'wire-c1683-missing-required.nika.yaml', 'NIKA-1708', '`ticket`'],
-      ['a duplicate key', 'wire-c1683-duplicate-key.nika.yaml', 'invalid_inputs_json', 'duplicate object key'],
+      ['an undeclared key', 'wire-c1683-unknown-input.nika', 'unknown_input', 'input key is not declared'],
+      ['a type mismatch', 'wire-c1683-type-mismatch.nika', 'input_type_mismatch', 'declared type'],
+      ['a missing required input', 'wire-c1683-missing-required.nika', 'NIKA-1708', '`ticket`'],
+      ['a duplicate key', 'wire-c1683-duplicate-key.nika', 'invalid_inputs_json', 'duplicate object key'],
     ])('%s', async (_name, workflow, code, said) => {
       const refused = await failure(literal().run(workflow, { inputs: { ticket: 't' } }));
       expect(refused).toBeInstanceOf(NikaOperationError);
@@ -307,7 +307,7 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
     const big = { blob: 'x'.repeat(LITERAL_INPUTS_MAX_BYTES - 64) };
 
     it('yields the refusal of an engine that exits with most of the map unread', async () => {
-      const refused = await failure(literal().run('hostile-exits-before-reading.nika.yaml', { inputs: big }));
+      const refused = await failure(literal().run('hostile-exits-before-reading.nika', { inputs: big }));
       expect(refused).toBeInstanceOf(NikaOperationError);
       expect(refused).toMatchObject({ code: 'input_read_failed', status: 3 });
     });
@@ -317,7 +317,7 @@ describe.skipIf(!posix)('native literal inputs (issue #116 · engine #1683)', ()
       process.env.NIKA_FAKE_PID_FILE = pidFile;
       try {
         const client = literal();
-        const run = await client.run('hostile-never-reads.nika.yaml', { inputs: big });
+        const run = await client.run('hostile-never-reads.nika', { inputs: big });
         const pid = Number(readFileSync(pidFile, 'utf8'));
         expect(processIsGone(pid)).toBe(false);
         await expect(run.cancel()).resolves.toMatchObject({

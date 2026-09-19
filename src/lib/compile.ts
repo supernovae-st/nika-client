@@ -163,7 +163,13 @@ function normalizeChange(change: unknown): string | NikaCompileSetConstant {
   return object as unknown as NikaCompileSetConstant;
 }
 
-/** Caller-facing options validation: a bad timeout is a configuration error. */
+/**
+ * Caller-facing options validation: reject direct signal overrides before use.
+ * Standard AbortSignals, including composites, are supported. Their hidden
+ * source graph remains Node's responsibility: on some Node versions even an
+ * intrinsic state getter reads public fields of composite sources. Sources
+ * with caller-modified interfaces are outside the no-accessor guarantee.
+ */
 export function normalizeCompileOptions(options: NikaCompileOptions): NikaCompileOptions {
   const record = dataRecord(options, 'options');
   for (const key of Reflect.ownKeys(record)) {
@@ -213,10 +219,10 @@ export function compileSignal(options: NikaCompileOptions): {
   let abort: (() => void) | undefined;
   if (caller !== undefined) {
     bridge = new AbortController();
-    // Never give a caller composite to AbortSignal.any: Node may read public
-    // fields on its source signals, which our direct validation cannot inspect.
-    // addAbortListener sees only the validated signal and resists an earlier
-    // listener's stopImmediatePropagation. Downstream code sees our own signal.
+    // Give downstream code our own signal so it does not traverse the caller's
+    // source graph. Reading/subscribing here still uses Node's composite
+    // semantics (see normalizeCompileOptions). addAbortListener resists an
+    // earlier listener's stopImmediatePropagation.
     const controller = bridge;
     abort = () => controller.abort();
     if (signalAborted.call(caller)) abort();

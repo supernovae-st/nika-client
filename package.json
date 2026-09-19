@@ -1,6 +1,6 @@
 {
   "name": "@supernovae-st/nika",
-  "version": "0.118.7",
+  "version": "0.120.2",
   "description": "One TypeScript SDK for local and remote Nika execution",
   "repository": {
     "type": "git",
@@ -48,7 +48,7 @@
   ],
   "scripts": {
     "build": "tsup",
-    "test": "vitest run --maxWorkers=4",
+    "test": "vitest run --maxWorkers=4 && node scripts/file-identity-ratchet.mjs && node scripts/file-identity-ratchet.mjs --selftest",
     "test:watch": "vitest",
     "check:package-surface": "node scripts/verify-packed-module-surfaces.mjs",
     "check:coverage": "node scripts/check-sdk-coverage.js",
@@ -69,10 +69,10 @@
     "prepublishOnly": "npm run build"
   },
   "optionalDependencies": {
-    "@supernovae-st/nika-darwin-arm64": "0.118.7",
-    "@supernovae-st/nika-darwin-x64": "0.118.7",
-    "@supernovae-st/nika-linux-arm64": "0.118.7",
-    "@supernovae-st/nika-linux-x64": "0.118.7"
+    "@supernovae-st/nika-darwin-arm64": "0.120.2",
+    "@supernovae-st/nika-darwin-x64": "0.120.2",
+    "@supernovae-st/nika-linux-arm64": "0.120.2",
+    "@supernovae-st/nika-linux-x64": "0.120.2"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",

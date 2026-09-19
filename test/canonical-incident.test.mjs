@@ -163,5 +163,5 @@ test.each([
     workflows.push(workflow); return { done: Promise.resolve(result) };
   } };
   await assert.rejects(exerciseIncident(client, { arm() { assert.fail('cancellation must not start'); } }));
-  assert.deepEqual(workflows, ['workflow.nika.yaml']);
+  assert.deepEqual(workflows, ['workflow.nika']);
 });

@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { pathToFileURL } from "node:url";
@@ -84,12 +84,95 @@ export function stableCancellationTerminalKind(kind) {
   return CANCELLED_TERMINAL_KINDS.has(kind) ? STABLE_CANCELLED_TERMINAL_KIND : kind;
 }
 
+const PACK_SHA256 = /^[0-9a-f]{64}$/;
+const PACK_LEAF = /^supernovae-st-nika-\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\.tgz$/;
+
+export function sha256File(filePath) {
+  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
+export function sha512Integrity(filePath) {
+  return `sha512-${createHash("sha512").update(readFileSync(filePath)).digest("base64")}`;
+}
+
+export function assertPackBasename(name) {
+  if (typeof name !== "string" || name.length === 0) {
+    throw new Error("depth evidence lacks a packed tarball filename");
+  }
+  if (name !== path.basename(name) || path.isAbsolute(name)
+    || name.includes("..") || name.includes("/") || name.includes("\\") || name.includes("\0")) {
+    throw new Error(`packed tarball filename is not a plain basename: ${name}`);
+  }
+  if (!PACK_LEAF.test(name)) {
+    throw new Error(`packed tarball filename is not the expected package leaf: ${name}`);
+  }
+  return name;
+}
+
+export function depthPackProvenance(report) {
+  const name = assertPackBasename(report?.package);
+  const digest = report?.package_sha256;
+  if (typeof digest !== "string" || !PACK_SHA256.test(digest)) {
+    throw new Error("depth evidence lacks a 64-hex package_sha256 provenance digest");
+  }
+  return { package: name, package_sha256: digest };
+}
+
+// The digest names the exact tarball this ledger measured. Documentation-only
+// pack changes (README in the npm tarball) retarget it. Compare it to the
+// artifact bytes, never to committed behavior. The committed digest is a
+// historical ledger identity, not a claim that this replay re-hashed that pack.
+export function assertReplayPackProvenance(report, replayResults) {
+  const provenance = depthPackProvenance(report);
+  const replayRoot = path.resolve(replayResults);
+  const artifact = path.join(replayRoot, provenance.package);
+  if (!existsSync(artifact)) {
+    throw new Error(
+      `replay pack artifact missing: expected ${provenance.package} beside the depth ledger`,
+    );
+  }
+  const actual = sha256File(artifact);
+  if (actual !== provenance.package_sha256) {
+    throw new Error(
+      `replay package_sha256 ${provenance.package_sha256} does not match packed tarball ${actual}`,
+    );
+  }
+  const manifestPath = path.join(replayRoot, "depth-package.json");
+  if (!existsSync(manifestPath)) {
+    throw new Error("replay pack manifest missing: expected depth-package.json beside the depth ledger");
+  }
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  if (manifest.filename !== provenance.package) {
+    throw new Error(
+      `depth-package.json filename ${String(manifest.filename)} does not match ledger ${provenance.package}`,
+    );
+  }
+  const size = statSync(artifact).size;
+  if (manifest.size !== size) {
+    throw new Error(
+      `depth-package.json size ${String(manifest.size)} does not match packed tarball ${size}`,
+    );
+  }
+  const integrity = sha512Integrity(artifact);
+  if (manifest.integrity !== integrity) {
+    throw new Error("depth-package.json integrity does not match packed tarball");
+  }
+  if (manifest.name !== undefined && manifest.name !== "@supernovae-st/nika") {
+    throw new Error(`depth-package.json name ${String(manifest.name)} is not @supernovae-st/nika`);
+  }
+  const versionFromLeaf = provenance.package.slice("supernovae-st-nika-".length, -".tgz".length);
+  if (manifest.version !== undefined && manifest.version !== versionFromLeaf) {
+    throw new Error(
+      `depth-package.json version ${String(manifest.version)} does not match ${versionFromLeaf}`,
+    );
+  }
+  return { ...provenance, artifact, size, integrity, historical: false };
+}
+
 export function stableDepthEvidence(report) {
-  // Each source change builds a different development tarball. Its digest is
-  // verified against this replay's retained bytes, not against a previous build.
-  const { package_sha256: _artifactDigest, ...behavior } = report;
+  const { package_sha256: _packageSha256, ...rest } = report;
   return {
-    ...behavior,
+    ...rest,
     projects: report.projects.map((project) => {
       if (project.project !== "incident-response-controller") return project;
       const kinds = project.sse_event_kinds;
@@ -104,8 +187,23 @@ export function stableDepthEvidence(report) {
           "depth cancellation project lacks the exact cancellation terminal its cancel reply leads to",
         );
       }
+      // The app binds this journal identity to the actual run receipt and
+      // rejects a substituted trace before recording evidence. A fresh run
+      // necessarily has a new trace id; retain it in the raw ledger but compare
+      // its verified shape and every behavioral verdict across replays.
+      let receipt = project.remote_receipt_verdict;
+      if (receipt !== undefined) {
+        const { trace_id: traceId, ...verdict } = receipt;
+        if (typeof traceId !== "string" || !/^[0-9a-f]{32}$/.test(traceId)
+          || /^0+$/.test(traceId) || verdict.verified !== true
+          || project.mismatched_trace_rejected !== true) {
+          throw new Error("depth receipt evidence lacks a verified trace identity and substitution refusal");
+        }
+        receipt = verdict;
+      }
       return {
         ...project,
+        ...(receipt === undefined ? {} : { remote_receipt_verdict: receipt }),
         sse_event_kinds: kinds.map(stableCancellationTerminalKind),
         sse_terminal: {
           ...terminal,
@@ -114,24 +212,6 @@ export function stableDepthEvidence(report) {
       };
     }),
   };
-}
-
-function verifyDepthPackage(report, directory, repositoryRoot) {
-  if (typeof report.package !== "string" || path.basename(report.package) !== report.package
-    || !report.package.endsWith(".tgz") || !/^[a-f0-9]{64}$/.test(report.package_sha256 ?? "")) {
-    throw new Error("depth replay lacks a valid package identity");
-  }
-  const bytes = readFileSync(path.join(directory, report.package));
-  const metadata = readJson(directory, "depth-package.json");
-  const manifest = readJson(repositoryRoot, "package.json");
-  const digest = (algorithm, encoding = "hex") => createHash(algorithm).update(bytes).digest(encoding);
-  if (digest("sha256") !== report.package_sha256
-    || metadata.filename !== report.package || metadata.name !== manifest.name
-    || metadata.version !== manifest.version || metadata.size !== bytes.length
-    || metadata.shasum !== digest("sha1")
-    || metadata.integrity !== `sha512-${digest("sha512", "base64")}`) {
-    throw new Error("depth replay package bytes do not match their recorded identity");
-  }
 }
 
 export function stableRecoveryEvidence({ job_id: _jobId, ...report }) {
@@ -187,13 +267,15 @@ export function verifyReleaseReplay(repositoryRoot, replayResults) {
     throw new Error("mini-SaaS replay does not match committed behavioral evidence");
   }
 
-  const committedDepth = stableDepthEvidence(readJson(
+  const committedDepthRaw = readJson(
     path.join(repositoryRoot, "gauntlet", "projects-depth"),
     "results.json",
-  ));
-  const replayedDepthReport = readJson(replayResults, "depth-projects.json");
-  verifyDepthPackage(replayedDepthReport, replayResults, repositoryRoot);
-  const replayedDepth = stableDepthEvidence(replayedDepthReport);
+  );
+  const replayedDepthRaw = readJson(replayResults, "depth-projects.json");
+  const committedPack = depthPackProvenance(committedDepthRaw);
+  const replayedPack = assertReplayPackProvenance(replayedDepthRaw, replayResults);
+  const committedDepth = stableDepthEvidence(committedDepthRaw);
+  const replayedDepth = stableDepthEvidence(replayedDepthRaw);
   if (!isDeepStrictEqual(replayedDepth, committedDepth)) {
     throw new Error("depth-project replay does not match committed stable behavioral evidence");
   }
@@ -213,6 +295,10 @@ export function verifyReleaseReplay(repositoryRoot, replayResults) {
     miniSaasProjects: replayedMiniSaas.projects.length,
     depthProjects: replayedDepth.projects.length,
     recoveryProcesses: replayedRecovery.process_count,
+    committedPackageSha256: committedPack.package_sha256,
+    historicalLedgerPackageSha256: committedPack.package_sha256,
+    replayedPackageSha256: replayedPack.package_sha256,
+    packDigestChanged: committedPack.package_sha256 !== replayedPack.package_sha256,
   };
 }
 
@@ -228,6 +314,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       + `${result.distinctOutputHashes} hashes, ${result.hostileScenarios} hostile scenarios, `
       + `${result.realEngineRuns} real engine runs, ${result.miniSaasProjects} mini-SaaS, `
       + `${result.depthProjects} depth projects, ${result.recoveryProcesses} recovery processes, `
-      + result.engine,
+      + result.engine
+      + (result.packDigestChanged
+        ? `; historical ledger pack ${result.historicalLedgerPackageSha256}; this replay ${result.replayedPackageSha256} (artifact+manifest matched)`
+        : `; pack digest ${result.replayedPackageSha256} (matches historical ledger)`),
   );
 }

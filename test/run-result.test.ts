@@ -27,8 +27,8 @@ describe('run success guard', () => {
 
 describe.skipIf(process.platform === 'win32')('native admitted result', () => {
   it.each([
-    ['ok.nika.yaml', 'succeeded', true],
-    ['fields-failure.nika.yaml', 'failed', false],
+    ['ok.nika', 'succeeded', true],
+    ['fields-failure.nika', 'failed', false],
   ] as const)('%s resolves and is classified by its engine status', async (workflow, status, succeeded) => {
     const client = new Nika({ bin: path.join(import.meta.dirname, 'fixtures/fake-nika.mjs') });
     const run = await client.run<{ answer: number; boom: null }>(workflow);

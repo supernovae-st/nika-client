@@ -82,14 +82,14 @@ describe('run by served name carries literal inputs (issue #116 · engine #1642)
         receipt: RECEIPT,
       }]));
     const nika = remote(fetch);
-    const run = await nika.run('triage.nika.yaml', { inputs, idempotencyKey: 'triage-42' });
+    const run = await nika.run('triage.nika', { inputs, idempotencyKey: 'triage-42' });
 
     const { url, init } = request(fetch, 1);
     expect(url).toBe('https://nika.example/v1/jobs');
     expect(init.method).toBe('POST');
     // The same bytes the native transport writes to stdin ride the envelope.
-    expect(init.body).toBe(`{"workflow":"triage.nika.yaml","inputs":${encodeLiteralInputs(inputs).json}}`);
-    expect(JSON.parse(String(init.body))).toEqual({ workflow: 'triage.nika.yaml', inputs });
+    expect(init.body).toBe(`{"workflow":"triage.nika","inputs":${encodeLiteralInputs(inputs).json}}`);
+    expect(JSON.parse(String(init.body))).toEqual({ workflow: 'triage.nika', inputs });
     const headers = new Headers(init.headers);
     expect(headers.get('Idempotency-Key')).toBe('triage-42');
     expect(headers.get('Content-Type')).toBe('application/json');
@@ -110,8 +110,8 @@ describe('run by served name carries literal inputs (issue #116 · engine #1642)
       .mockResolvedValueOnce(sseResponse([
         { sequence: 1, kind: 'execution.settled', status: 'succeeded', receipt: RECEIPT },
       ]));
-    const run = await remote(fetch).run('triage.nika.yaml', { inputs: {}, idempotencyKey: 'k' });
-    expect(request(fetch, 1).init.body).toBe('{"workflow":"triage.nika.yaml","inputs":{}}');
+    const run = await remote(fetch).run('triage.nika', { inputs: {}, idempotencyKey: 'k' });
+    expect(request(fetch, 1).init.body).toBe('{"workflow":"triage.nika","inputs":{}}');
     await run.result();
   });
 
@@ -122,21 +122,23 @@ describe('run by served name carries literal inputs (issue #116 · engine #1642)
       .mockResolvedValueOnce(sseResponse([
         { sequence: 1, kind: 'execution.settled', status: 'succeeded', receipt: RECEIPT },
       ]));
-    const run = await remote(fetch).run('triage.nika.yaml', { idempotencyKey: 'k' });
-    expect(request(fetch, 1).init.body).toBe('{"workflow":"triage.nika.yaml"}');
+    const run = await remote(fetch).run('triage.nika', { idempotencyKey: 'k' });
+    expect(request(fetch, 1).init.body).toBe('{"workflow":"triage.nika"}');
     await run.result();
   });
 
-  it('escapes the workflow name itself as JSON', async () => {
+  it('JSON-encodes input values that require escaping on a legal contained name', async () => {
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse({ supportedCapabilities: WITH_JOB_INPUTS }))
       .mockResolvedValueOnce(jsonResponse({ id: 'job-1', status: 'queued' }, 202))
       .mockResolvedValueOnce(sseResponse([
         { sequence: 1, kind: 'execution.settled', status: 'succeeded', receipt: RECEIPT },
       ]));
-    const name = 'équipe/"quoted".nika.yaml';
-    const run = await remote(fetch).run(name, { inputs: { a: 1 }, idempotencyKey: 'k' });
-    expect(JSON.parse(String(request(fetch, 1).init.body))).toEqual({ workflow: name, inputs: { a: 1 } });
+    const inputs = { note: 'say "hello" \\ and more' };
+    const run = await remote(fetch).run('triage.nika', { inputs, idempotencyKey: 'k' });
+    const { init } = request(fetch, 1);
+    expect(init.body).toBe(`{"workflow":"triage.nika","inputs":${encodeLiteralInputs(inputs).json}}`);
+    expect(JSON.parse(String(init.body))).toEqual({ workflow: 'triage.nika', inputs });
     await run.result();
   });
 });
@@ -144,7 +146,7 @@ describe('run by served name carries literal inputs (issue #116 · engine #1642)
 describe('a resident that does not advertise jobInputs is refused before admission', () => {
   it('rejects after /health alone, with the capability and the evidence it read', async () => {
     const fetch = vi.fn().mockResolvedValueOnce(healthResponse());
-    const refused = await failure(remote(fetch).run('triage.nika.yaml', {
+    const refused = await failure(remote(fetch).run('triage.nika', {
       inputs: { ticketId: '42' },
       idempotencyKey: 'triage-42',
     }));
@@ -165,7 +167,7 @@ describe('a resident that does not advertise jobInputs is refused before admissi
 
   it('refuses an empty map on that resident too', async () => {
     const fetch = vi.fn().mockResolvedValueOnce(healthResponse());
-    await expect(remote(fetch).run('triage.nika.yaml', { inputs: {}, idempotencyKey: 'k' }))
+    await expect(remote(fetch).run('triage.nika', { inputs: {}, idempotencyKey: 'k' }))
       .rejects.toMatchObject({ name: 'NikaCompatibilityError', capability: 'jobInputs' });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
@@ -174,7 +176,7 @@ describe('a resident that does not advertise jobInputs is refused before admissi
     const fetch = vi.fn().mockResolvedValueOnce(healthResponse({
       supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'inputsLiteral'],
     }));
-    await expect(remote(fetch).run('triage.nika.yaml', { inputs: { a: 1 }, idempotencyKey: 'k' }))
+    await expect(remote(fetch).run('triage.nika', { inputs: { a: 1 }, idempotencyKey: 'k' }))
       .rejects.toMatchObject({ name: 'NikaCompatibilityError', capability: 'jobInputs' });
     expect(fetch).toHaveBeenCalledTimes(1);
   });
@@ -194,9 +196,9 @@ describe('an execution snapshot takes no input overlay', () => {
   }
 
   it.each([
-    ['a relative path', './flow.nika.yaml', { a: 1 }],
-    ['an absolute path', '/srv/flow.nika.yaml', { a: 1 }],
-    ['an empty map', './flow.nika.yaml', {}],
+    ['a relative path', './flow.nika', { a: 1 }],
+    ['an absolute path', '/srv/flow.nika', { a: 1 }],
+    ['an empty map', './flow.nika', {}],
   ])('refuses inputs for %s before any capture or request', async (_name, workflow, inputs) => {
     const fetch = vi.fn();
     const resolveEngine = vi.fn(() => {
@@ -228,7 +230,7 @@ describe('a map the SDK cannot send is refused before any request', () => {
     ['a map over 1 MiB', { inputs: { blob } }, /exceeds 1048576 bytes/],
   ])('refuses %s', async (_name, options, message) => {
     const fetch = vi.fn();
-    const refused = await failure(remote(fetch).run('triage.nika.yaml', {
+    const refused = await failure(remote(fetch).run('triage.nika', {
       ...options,
       idempotencyKey: 'k',
     }));
@@ -246,10 +248,10 @@ describe('a map the SDK cannot send is refused before any request', () => {
       .mockResolvedValueOnce(sseResponse([
         { sequence: 1, kind: 'execution.settled', status: 'succeeded', receipt: RECEIPT },
       ]));
-    const run = await remote(fetch).run('triage.nika.yaml', { inputs, idempotencyKey: 'k' });
+    const run = await remote(fetch).run('triage.nika', { inputs, idempotencyKey: 'k' });
     const body = String(request(fetch, 1).init.body);
     expect(Buffer.byteLength(body))
-      .toBe('{"workflow":"triage.nika.yaml","inputs":}'.length + LITERAL_INPUTS_MAX_BYTES);
+      .toBe('{"workflow":"triage.nika","inputs":}'.length + LITERAL_INPUTS_MAX_BYTES);
     await run.result();
   });
 });
@@ -259,15 +261,15 @@ describe('vars, model and maxCostUsd still have no HTTP envelope', () => {
     const fetch = vi.fn();
     const nika = remote(fetch);
     for (const options of [{ vars: { x: 1 } }, { model: 'mock/echo' }, { maxCostUsd: 1 }]) {
-      await expect(nika.run('triage.nika.yaml', { ...options, idempotencyKey: 'k' }))
+      await expect(nika.run('triage.nika', { ...options, idempotencyKey: 'k' }))
         .rejects.toMatchObject({ name: 'NikaCompatibilityError', capability: 'runOptions' });
     }
     // Neither is smuggled in beside a valid map.
     for (const options of [{ model: 'mock/echo' }, { maxCostUsd: 1 }]) {
-      await expect(nika.run('triage.nika.yaml', { ...options, inputs: { a: 1 }, idempotencyKey: 'k' }))
+      await expect(nika.run('triage.nika', { ...options, inputs: { a: 1 }, idempotencyKey: 'k' }))
         .rejects.toMatchObject({ name: 'NikaCompatibilityError', capability: 'runOptions' });
     }
-    const vars = await failure(nika.run('triage.nika.yaml', { vars: { x: 1 }, idempotencyKey: 'k' }));
+    const vars = await failure(nika.run('triage.nika', { vars: { x: 1 }, idempotencyKey: 'k' }));
     expect((vars as Error).message).toContain('inputs');
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -283,7 +285,7 @@ describe('the resident judges the map: its 422 rejects run() with its code', () 
     const fetch = vi.fn()
       .mockResolvedValueOnce(healthResponse({ supportedCapabilities: WITH_JOB_INPUTS }))
       .mockResolvedValueOnce(jsonResponse({ error: { code, message } }, 422));
-    const refused = await failure(remote(fetch).run('triage.nika.yaml', {
+    const refused = await failure(remote(fetch).run('triage.nika', {
       inputs: { ticketId: '42', ninja: true },
       idempotencyKey: 'triage-42',
     }));

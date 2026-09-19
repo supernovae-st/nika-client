@@ -76,7 +76,7 @@ describe('the settlement rides run.done (engine 0.118+ · ADR-128)', () => {
 
   it('carries the settlement on run.done over the native transport', async () => {
     const client = new Nika({ bin: FIXTURE });
-    const run = await client.run('settled.nika.yaml');
+    const run = await client.run('settled.nika');
     const result = await run.done;
     expect(result.status).toBe('succeeded');
     expect(result.settlement).toEqual({

@@ -83,7 +83,7 @@ describe('compile request validation (no engine involved)', () => {
   it('refuses unknown request fields — dest/force are not this slice', async () => {
     const cause = await refusal(client().compile({
       intent: 'x',
-      dest: 'out.nika.yaml',
+      dest: 'out.nika',
     } as unknown as NikaCompileRequest));
     expect(cause).toBeInstanceOf(NikaConfigurationError);
     expect((cause as Error).message).toMatch(/unknown request field dest/);

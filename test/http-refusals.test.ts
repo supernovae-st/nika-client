@@ -56,7 +56,7 @@ describe('typed HTTP refusals', () => {
         { error: { code: 'NIKA-AUTH-006', message: 'effect under an absent permits block' } },
         422,
       ));
-    const refused = await failure(client(fetch as typeof globalThis.fetch).run('flow.nika.yaml', { idempotencyKey: 'test-admission' }));
+    const refused = await failure(client(fetch as typeof globalThis.fetch).run('flow.nika', { idempotencyKey: 'test-admission' }));
     expect(refused).toMatchObject({
       name: 'NikaOperationError',
       operation: 'run',
@@ -103,7 +103,7 @@ describe('typed HTTP refusals', () => {
         { error: { code: 'unauthorized', message: `bad bearer ${TOKEN_A}\n\ttry again` } },
         401,
       ));
-    const refused = await failure(client(fetch as typeof globalThis.fetch).workflow('flow.nika.yaml'));
+    const refused = await failure(client(fetch as typeof globalThis.fetch).workflow('flow.nika'));
     expect(refused).toBeInstanceOf(NikaOperationError);
     expect(String(refused)).toContain('[REDACTED]');
     expect(String(refused)).not.toContain(TOKEN_A);

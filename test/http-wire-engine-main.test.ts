@@ -82,7 +82,7 @@ async function observed(frames: Record<string, unknown>[]) {
     .mockResolvedValueOnce(healthResponse())
     .mockResolvedValueOnce(jsonResponse({ id: JOB, status: 'queued' }, 202))
     .mockResolvedValueOnce(sseResponse(frames as never));
-  const run = await remote(fetch).run('flow.nika.yaml', { idempotencyKey: 'engine-main' });
+  const run = await remote(fetch).run('flow.nika', { idempotencyKey: 'engine-main' });
   return run;
 }
 
@@ -183,7 +183,7 @@ describe('a run can succeed while its journal mirror is lost (`evidence`)', () =
       if (pathname === `/v1/jobs/${JOB}`) return jsonResponse({ ...DURABLE, evidence: MIRROR_LOST });
       throw new Error(`unexpected ${pathname}`);
     });
-    const run = await remote(fetch as never).run('flow.nika.yaml', { idempotencyKey: 'engine-main' });
+    const run = await remote(fetch as never).run('flow.nika', { idempotencyKey: 'engine-main' });
     await expect(run.result()).resolves.toMatchObject({ status: 'succeeded', evidence: MIRROR_LOST });
   });
 
@@ -275,7 +275,7 @@ describe('nothing is invented where the engine said nothing', () => {
 
   it('adds no evidence to a native run: a direct process reports no journal mirror', async () => {
     const fixture = path.join(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fake-nika.mjs');
-    const result: NikaRunResult = await (await new Nika({ bin: fixture }).run('ok.nika.yaml')).result();
+    const result: NikaRunResult = await (await new Nika({ bin: fixture }).run('ok.nika')).result();
     expect(result.status).toBe('succeeded');
     expect(Object.hasOwn(result, 'evidence')).toBe(false);
   });

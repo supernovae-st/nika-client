@@ -1,9 +1,9 @@
 import { Nika } from '@supernovae-st/nika';
 
 const nika = new Nika({ cwd: process.cwd() });
-const checked = await nika.check('workflow.nika.yaml', { nativeStrict: true });
+const checked = await nika.check('workflow.nika', { nativeStrict: true });
 if (!checked.clean) throw new Error('operator workflow is not clean');
-const run = await nika.run('workflow.nika.yaml', { maxCostUsd: 0 });
+const run = await nika.run('workflow.nika', { maxCostUsd: 0 });
 const kinds = [];
 for await (const event of nika.events(run)) kinds.push(event.kind ?? 'unknown');
 const result = await run.done;

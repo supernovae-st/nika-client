@@ -68,7 +68,7 @@ async function exerciseScenarios({ scratch, nikaBin, scenario, start, signal }) 
     return address.port;
   }
 
-  const deterministic = writeWorkflow('deterministic.nika.yaml', `
+  const deterministic = writeWorkflow('deterministic.nika', `
 nika: hostile-deterministic
 permits:
   tools: ["nika:hash"]
@@ -81,13 +81,13 @@ outputs:
   digest: \${{ tasks.digest.output }}
 `);
 
-  const malformed = writeWorkflow('malformed.nika.yaml', `
+  const malformed = writeWorkflow('malformed.nika', `
 nika: hostile-malformed
 tasks:
   broken: [this is not a task]
 `);
 
-  const cancellable = writeWorkflow('wait-cancellable.nika.yaml', `
+  const cancellable = writeWorkflow('wait-cancellable.nika', `
 nika: hostile-cancellable
 permits:
   tools: ["nika:wait"]
@@ -103,7 +103,7 @@ tasks:
     invoke:
       tool: "nika:hash"
       args: { content: "${index}", algo: sha256, encoding: hex }`).join('');
-  const burst = writeWorkflow('burst.nika.yaml', `
+  const burst = writeWorkflow('burst.nika', `
 nika: hostile-burst
 permits:
   tools: ["nika:hash"]
@@ -111,7 +111,7 @@ tasks:${burstTasks}
 `);
 
   const canaryValue = 'NIKA_CANARY_8c8901a4_DO_NOT_LEAK';
-  const canary = writeWorkflow('canary.nika.yaml', `
+  const canary = writeWorkflow('canary.nika', `
 nika: hostile-canary
 secrets:
   canary:
@@ -173,7 +173,7 @@ if (process.argv.includes('--sdk-identity')) {
   });
 
   await scenario('oversize-machine-line', async () => {
-    const workflow = writeWorkflow('oversize.nika.yaml', 'nika: fake');
+    const workflow = writeWorkflow('oversize.nika', 'nika: fake');
     const error = await bounded(
       new Nika({ bin: fakeBin, machineBufferBytes: 1024 }).run(workflow),
       2_000, 'oversize admission refusal',
@@ -186,7 +186,7 @@ if (process.argv.includes('--sdk-identity')) {
   });
 
   await scenario('malformed-machine-frame', async () => {
-    const workflow = writeWorkflow('malformed-machine.nika.yaml', 'nika: fake');
+    const workflow = writeWorkflow('malformed-machine.nika', 'nika: fake');
     const error = await bounded(
       new Nika({ bin: fakeBin }).run(workflow),
       2_000, 'malformed admission refusal',
@@ -199,7 +199,7 @@ if (process.argv.includes('--sdk-identity')) {
   });
 
   await scenario('child-crash-settlement', async () => {
-    const workflow = writeWorkflow('crash.nika.yaml', 'nika: fake');
+    const workflow = writeWorkflow('crash.nika', 'nika: fake');
     const client = new Nika({ bin: fakeBin });
     const run = await client.run(workflow);
     const events = [];
@@ -249,7 +249,7 @@ if (process.argv.includes('--sdk-identity')) {
     const controlled = await (async () => {
       const gate = await CancellationRendezvous.listen();
       try {
-        const workflow = writeWorkflow('cancellable.nika.yaml', cancellationFixture(gate.url));
+        const workflow = writeWorkflow('cancellable.nika', cancellationFixture(gate.url));
         gate.arm('hostile native cancellation');
         const client = new Nika({ bin: nikaBin, cwd: scratch });
         const run = await client.run(workflow, { maxCostUsd: 0 });
@@ -306,9 +306,9 @@ if (process.argv.includes('--sdk-identity')) {
       const remote = path.join(scratch, 'remote-cancel');
       mkdirSync(remote);
       writeFileSync(path.join(remote, 'nika.yaml'), 'nika: hostile-remote\n');
-      writeFileSync(path.join(remote, 'slow.nika.yaml'), cancellationFixture(gate.url));
-      writeFileSync(path.join(remote, 'wait-cancel.nika.yaml'), readFileSync(cancellable));
-      writeFileSync(path.join(remote, 'broken.nika.yaml'), readFileSync(malformed, 'utf8'));
+      writeFileSync(path.join(remote, 'slow.nika'), cancellationFixture(gate.url));
+      writeFileSync(path.join(remote, 'wait-cancel.nika'), readFileSync(cancellable));
+      writeFileSync(path.join(remote, 'broken.nika'), readFileSync(malformed, 'utf8'));
       const token = 'hostile-remote-token-0123456789abcdef0123456789';
       const tokenFile = path.join(remote, 'serve.token');
       writeFileSync(tokenFile, `${token}\n`);
@@ -330,11 +330,11 @@ if (process.argv.includes('--sdk-identity')) {
         fetch: (input, init) => fetch(input, { ...init,
           signal: AbortSignal.any([remoteSignal, ...(init?.signal ? [init.signal] : [])]) }),
       });
-      const parseFatal = await bounded(client.check('./broken.nika.yaml', { signal: remoteSignal }), 5_000, 'remote check', remoteSignal);
+      const parseFatal = await bounded(client.check('./broken.nika', { signal: remoteSignal }), 5_000, 'remote check', remoteSignal);
       assert.equal(parseFatal.clean, false);
       assert.notEqual(parseFatal.exitCode, 0);
       gate.arm('hostile remote cancellation');
-      const run = await bounded(client.run('slow.nika.yaml', { idempotencyKey: 'hostile-cancel-1' }),
+      const run = await bounded(client.run('slow.nika', { idempotencyKey: 'hostile-cancel-1' }),
         5_000, 'remote admission', remoteSignal);
       const { cancellation, result, rendezvous } = await cancelHeldRun(client, run, gate, remoteSignal);
       realEngineRuns += 1;
@@ -352,9 +352,14 @@ if (process.argv.includes('--sdk-identity')) {
       );
       const trace = await bounded(client.traceVerify(result.receipt, { signal: remoteSignal }),
         5_000, 'remote trace verification', remoteSignal);
-      assert.equal(trace.verified, false);
-      assert.equal(trace.verdict, 'unavailable');
-      assert.equal(trace.reason, 'trace_journal_unavailable');
+      assert.equal(trace.verified, true);
+      assert.equal(trace.trace_id, result.receipt.trace_id);
+      assert.notEqual(trace.verdict, 'unavailable');
+      const mismatchedTrace = await bounded(client.traceVerify({
+        ...result.receipt,
+        trace_id: '0'.repeat(32),
+      }, { signal: remoteSignal }), 5_000, 'remote mismatched trace', remoteSignal);
+      assert.equal(mismatchedTrace.verified, false);
       const controlled = {
         cancel_status: cancellation.status,
         run_status: result.status,
@@ -369,7 +374,7 @@ if (process.argv.includes('--sdk-identity')) {
       };
       // Preserve main's separate grace-expiry scenario: its actual interrupted
       // observation is not replaced by the controlled task-boundary fixture.
-      const waitRun = await bounded(client.run('./wait-cancel.nika.yaml',
+      const waitRun = await bounded(client.run('./wait-cancel.nika',
         { idempotencyKey: 'hostile-wait-cancel-1' }), 5_000, 'wait admission', remoteSignal);
       await bounded((async () => {
         for (;;) {
@@ -397,9 +402,9 @@ if (process.argv.includes('--sdk-identity')) {
       assert.equal(cancellationTerminalMatches(waitCancellation.status, waitTerminal), true);
       const waitTrace = await bounded(client.traceVerify(waitResult.receipt, { signal: remoteSignal }),
         5_000, 'wait receipt verdict', remoteSignal);
-      assert.equal(waitTrace.verified, false);
-      assert.equal(waitTrace.verdict, 'unavailable');
-      assert.equal(waitTrace.reason, 'trace_journal_unavailable');
+      assert.equal(waitTrace.verified, true);
+      assert.equal(waitTrace.trace_id, waitResult.receipt.trace_id);
+      assert.notEqual(waitTrace.verdict, 'unavailable');
       return {
         status_before_cancellation: statusBeforeCancellation,
         cancel_status: waitCancellation.status, run_status: waitResult.status,

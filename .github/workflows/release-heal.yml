@@ -31,7 +31,7 @@ jobs:
           tag="$(gh release view --repo supernovae-st/nika --json tagName --jq .tagName)"
           [[ "$tag" =~ ^v[0-9][0-9.]*$ ]] || { echo "::error::unexpected tag: $tag"; exit 1; }
           ver="${tag#v}"
-          npm_v="$(curl -fsSL https://registry.npmjs.org/@supernovae-st%2Fnika-client | python3 -c 'import json,sys;print(json.load(sys.stdin)["dist-tags"]["latest"])')"
+          npm_v="$(curl -fsSL https://registry.npmjs.org/@supernovae-st%2Fnika | python3 -c 'import json,sys;print(json.load(sys.stdin)["dist-tags"]["latest"])')"
           if [ "$npm_v" = "$ver" ]; then echo "npm already $ver — nothing to heal"; exit 0; fi
           repo_v="$(node -p "require('./package.json').version")"
           if [ "$repo_v" != "$ver" ]; then

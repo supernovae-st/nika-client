@@ -1,13 +1,17 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  assertReplayPackProvenance,
   cancellationTerminalMatches,
+  depthPackProvenance,
   isDurableCancellationTerminal,
   isInterruptedCancellationTerminal,
   isOperatorCancelledTerminal,
+  sha256File,
+  sha512Integrity,
   stableDepthEvidence,
   stableHostileEvidence,
   verifyReleaseReplay,
@@ -15,7 +19,7 @@ import {
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const committedResults = path.join(ROOT, 'gauntlet', 'results');
-const ENGINE = 'nika 0.118.7 (f3a31a6ee)';
+const ENGINE = 'nika 0.120.2 (289a9adea)';
 const STABLE_CANCELLED_KIND = 'execution.cancelled|execution.settled';
 // The 200 shape: the resident cancelled the job before its execution started.
 const CANCELLED_BEFORE_EXECUTION = {
@@ -334,8 +338,142 @@ describe('public release evidence replay', () => {
       workflows: 100,
       hostileScenarios: 14,
       realEngineRuns: 72,
+      packDigestChanged: true,
     });
   });
+
+  it('accepts a documentation-only pack digest change when the artifact matches', () => {
+    const replay = createReplay();
+    const committed = depthPackProvenance(
+      JSON.parse(readFileSync(path.join(ROOT, 'gauntlet', 'projects-depth', 'results.json'), 'utf8')),
+    );
+    const result = verifyReleaseReplay(ROOT, replay);
+    expect(result.committedPackageSha256).toBe(committed.package_sha256);
+    expect(result.replayedPackageSha256).not.toBe(committed.package_sha256);
+    expect(result.packDigestChanged).toBe(true);
+  });
+
+  it('refuses a missing package_sha256', () => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    delete depth.package_sha256;
+    writeJson(replay, 'depth-projects.json', depth);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'depth evidence lacks a 64-hex package_sha256 provenance digest',
+    );
+  });
+
+  it('refuses a wrong package_sha256 that does not match the packed tarball', () => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    depth.package_sha256 = 'a'.repeat(64);
+    writeJson(replay, 'depth-projects.json', depth);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      /replay package_sha256 a{64} does not match packed tarball/,
+    );
+  });
+
+  it('refuses a substituted tarball whose bytes do not match the ledger digest', () => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    writeFileSync(path.join(replay, depth.package), 'substituted-bytes');
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      /does not match packed tarball/,
+    );
+  });
+
+  it('refuses a missing packed tarball beside the depth ledger', () => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    rmSync(path.join(replay, depth.package));
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      `replay pack artifact missing: expected ${depth.package} beside the depth ledger`,
+    );
+  });
+
+  it('refuses a missing pack manifest', () => {
+    const replay = createReplay();
+    rmSync(path.join(replay, 'depth-package.json'));
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'replay pack manifest missing: expected depth-package.json beside the depth ledger',
+    );
+  });
+
+  it('refuses a depth-package.json that names a different archive', () => {
+    const replay = createReplay();
+    const manifest = readJson(replay, 'depth-package.json');
+    manifest.filename = 'supernovae-st-nika-0.0.0.tgz';
+    writeJson(replay, 'depth-package.json', manifest);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'depth-package.json filename supernovae-st-nika-0.0.0.tgz does not match ledger',
+    );
+  });
+
+  it('refuses a manifest whose integrity does not match the tarball bytes', () => {
+    const replay = createReplay();
+    const manifest = readJson(replay, 'depth-package.json');
+    manifest.integrity = 'sha512-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
+    writeJson(replay, 'depth-package.json', manifest);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'depth-package.json integrity does not match packed tarball',
+    );
+  });
+
+  it('refuses a pack filename that is not a plain basename', () => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    depth.package = '../supernovae-st-nika-0.120.2.tgz';
+    writeJson(replay, 'depth-projects.json', depth);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'packed tarball filename is not a plain basename',
+    );
+  });
+
+  it('still refuses altered depth behavioral verdicts when the pack digest is honest', () => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    depth.projects[0].status = 'failed';
+    writeJson(replay, 'depth-projects.json', depth);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'depth-project replay does not match committed stable behavioral evidence',
+    );
+  });
+
+  it('binds replay package_sha256 to the artifact bytes, not to the committed digest', () => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    const proven = assertReplayPackProvenance(depth, replay);
+    expect(proven.package_sha256).toBe(sha256File(proven.artifact));
+    expect(proven.package_sha256).not.toBe(
+      depthPackProvenance(
+        JSON.parse(readFileSync(path.join(ROOT, 'gauntlet', 'projects-depth', 'results.json'), 'utf8')),
+      ).package_sha256,
+    );
+  });
+
+  const ciReplay = process.env.NIKA_RELEASE_REPLAY_DIR;
+  it.skipIf(!ciReplay || !existsSync(path.join(ciReplay, 'depth-projects.json')))(
+    'accepts the downloaded CI replay whose README retargeted the pack digest',
+    () => {
+      const result = verifyReleaseReplay(ROOT, ciReplay as string);
+      expect(result.packDigestChanged).toBe(true);
+      expect(result.committedPackageSha256).toBe(
+        'a6ef6fc417c9f935c7fc623256015846aa7be049bbed7d368e58b284330608a2',
+      );
+      expect(result.replayedPackageSha256).toBe(
+        'a602ff98df14a0f8c385443ae242306386f14d1ee5b7fd4ac7cf62fee3862a27',
+      );
+    },
+  );
 
   it('refuses a replayed cancellation whose reply and terminal disagree', () => {
     const replay = createReplay();
@@ -416,31 +554,52 @@ describe('public release evidence replay', () => {
     );
   });
 
-  it('accepts equal behavior from a different, independently verified package build', () => {
-    const replay = createReplay();
-    const committed = readJson(path.join(ROOT, 'gauntlet', 'projects-depth'), 'results.json');
-    expect(readJson(replay, 'depth-projects.json').package_sha256).not.toBe(committed.package_sha256);
-    expect(verifyReleaseReplay(ROOT, replay).depthProjects).toBe(5);
-  });
-
-  it.each(['tarball', 'digest', 'metadata', 'version'])('refuses tampered depth package %s', (field) => {
-    const replay = createReplay();
-    const depth = readJson(replay, 'depth-projects.json');
-    if (field === 'tarball') writeFileSync(path.join(replay, depth.package), 'tampered');
-    if (field === 'digest') { depth.package_sha256 = '0'.repeat(64); writeJson(replay, 'depth-projects.json', depth); }
-    if (field === 'metadata' || field === 'version') {
-      const meta = readJson(replay, 'depth-package.json');
-      if (field === 'metadata') meta.integrity = 'sha512-invalid';
-      else meta.version = '0.0.0';
-      writeJson(replay, 'depth-package.json', meta);
-    }
-    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow('depth replay package bytes do not match');
-  });
-
   it('refuses a failed depth-project replay summary', () => {
     const replay = createReplay();
     const depth = readJson(replay, 'depth-projects.json');
     depth.summary = { total: 5, succeeded: 0, result: 'red' };
+    writeJson(replay, 'depth-projects.json', depth);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'depth-project replay does not match committed stable behavioral evidence',
+    );
+  });
+
+  it('compares fresh verified trace identities without changing the raw ledger', () => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    const incident = depth.projects.find((project: any) => project.project === 'incident-response-controller');
+    incident.remote_receipt_verdict.trace_id = '1234567890abcdef1234567890abcdef';
+    writeJson(replay, 'depth-projects.json', depth);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).not.toThrow();
+    expect(incident.remote_receipt_verdict.trace_id).toBe('1234567890abcdef1234567890abcdef');
+  });
+
+  it.each([
+    ['missing trace', { trace_id: undefined }, true],
+    ['malformed trace', { trace_id: 'not-a-trace' }, true],
+    ['substituted zero trace', { trace_id: '0'.repeat(32) }, true],
+    ['unverified trace', { verified: false }, true],
+    ['missing substitution refusal', {}, false],
+  ])('refuses depth receipt evidence with %s', (_label, changes, rejected) => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    const incident = depth.projects.find((project: any) => project.project === 'incident-response-controller');
+    Object.assign(incident.remote_receipt_verdict, changes);
+    incident.mismatched_trace_rejected = rejected;
+    writeJson(replay, 'depth-projects.json', depth);
+
+    expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
+      'depth receipt evidence lacks a verified trace identity and substitution refusal',
+    );
+  });
+
+  it('still refuses changed depth receipt verdicts', () => {
+    const replay = createReplay();
+    const depth = readJson(replay, 'depth-projects.json');
+    const incident = depth.projects.find((project: any) => project.project === 'incident-response-controller');
+    incident.remote_receipt_verdict.reason = 'changed';
     writeJson(replay, 'depth-projects.json', depth);
 
     expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
@@ -547,14 +706,21 @@ function createReplay(): string {
   ]) {
     writeFileSync(path.join(replay, name), readFileSync(path.join(committedResults, name)));
   }
-  const depth = readJson(path.join(ROOT, 'gauntlet', 'projects-depth'), 'results.json');
-  const bytes = Buffer.from('hermetic replay package bytes');
-  const digest = (algorithm: string, encoding: 'hex' | 'base64' = 'hex') => createHash(algorithm).update(bytes).digest(encoding);
-  depth.package_sha256 = digest('sha256');
-  writeFileSync(path.join(replay, depth.package), bytes);
+  const depth = JSON.parse(
+    readFileSync(path.join(ROOT, 'gauntlet', 'projects-depth', 'results.json'), 'utf8'),
+  );
+  const artifact = path.join(replay, depth.package);
+  writeFileSync(artifact, `documentation-only-pack-fixture:${replay}\n`);
+  const bytes = readFileSync(artifact);
+  depth.package_sha256 = createHash('sha256').update(bytes).digest('hex');
   writeJson(replay, 'depth-projects.json', depth);
-  writeJson(replay, 'depth-package.json', { filename: depth.package, name: '@supernovae-st/nika',
-    version: '0.118.7', size: bytes.length, shasum: digest('sha1'), integrity: `sha512-${digest('sha512', 'base64')}` });
+  writeJson(replay, 'depth-package.json', {
+    name: '@supernovae-st/nika',
+    version: '0.120.2',
+    filename: depth.package,
+    size: bytes.length,
+    integrity: sha512Integrity(artifact),
+  });
   return replay;
 }
 

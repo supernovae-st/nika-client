@@ -1,10 +1,10 @@
 import { Nika } from '@supernovae-st/nika';
 
 const nika = new Nika({ cwd: process.cwd() });
-const checked = await nika.check('workflow.nika.yaml', { nativeStrict: true });
+const checked = await nika.check('workflow.nika', { nativeStrict: true });
 if (!checked.clean) throw new Error('research workflow is not clean');
-const first = await nika.run('workflow.nika.yaml', { maxCostUsd: 0 });
-const second = await nika.run('workflow.nika.yaml', { maxCostUsd: 0 });
+const first = await nika.run('workflow.nika', { maxCostUsd: 0 });
+const second = await nika.run('workflow.nika', { maxCostUsd: 0 });
 const [a, b] = await Promise.all([first.done, second.done]);
 if (a.status !== b.status) throw new Error('repeat runs diverged');
 console.log(JSON.stringify({

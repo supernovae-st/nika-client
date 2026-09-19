@@ -77,7 +77,9 @@ Some operations deliberately have one authority:
 
 1. `run()` resolves only after stable admission and returns an immutable
    `NikaRun` handle: `id`, `events()`, `result()`, `status()`, `cancel()`, and
-   `done`, the compatibility alias of `result()`. Its members are closures
+   `done`, the compatibility alias of `result()`. Admission is not execution;
+   a succeeded `result()` is not a sealed receipt (`traceVerify` can return
+   `receipt_mismatch` on an UNSEALED journal). Its members are closures
    over the run's one session, so an extracted method still works. The handle
    owns the lifecycle and nothing else: checking, proof, catalogs and
    authoring stay on the facade. A run handle never means "maybe a run": a refusal

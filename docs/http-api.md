@@ -54,14 +54,16 @@ Any other non-2xx body is discarded and reported as a redacted
   paths. Absolute paths, backslashes, empty segments, `.` and `..` are
   rejected before network I/O.
 
-A contained `.nika.yaml` name uses the resident registry without a local
+A contained `.nika` name uses the resident registry without a local
 engine. Prefix a local file with `./` to capture and submit its snapshot.
 A successful by-name check returns `clean: true` and the compact resident
 acknowledgement; no local check report or exit code is fabricated.
 
 ## Compile foundation
 
-Serve must advertise `compile` in `/health`. The SDK then posts a v1 create
+Serve must advertise `compile` in `/health`. This route was added in engine
+commit `4334e58bddf539a6253f448eb05d562b6919f2b7`, after release 0.120.2.
+The bundled OpenAPI and generated types preserve that exact producer contract. The SDK then posts a v1 create
 intent or inline edit source to `/v1/compile`, with bearer authentication and
 JSON content type. A string change becomes `{text: change}`; a structured change
 preserves `{set_constant: {name, value}}`. Literal answers retain their JSON

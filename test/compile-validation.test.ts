@@ -11,12 +11,30 @@ vi.mock('node:child_process', async (original) => {
 });
 
 describe('Compile owns its cancellation signal', () => {
-  it('does not inspect public fields on sources of a caller composite', () => {
+  it.each(['direct', 'composite', 'nested composite'])('propagates ordinary %s cancellation', (kind) => {
+    for (const alreadyAborted of [false, true]) {
+      const controller = new AbortController();
+      let caller = controller.signal;
+      if (kind !== 'direct') caller = AbortSignal.any([caller]);
+      if (kind === 'nested composite') caller = AbortSignal.any([caller, new AbortController().signal]);
+      if (alreadyAborted) controller.abort();
+      const composed = compileSignal(normalizeCompileOptions({ signal: caller }));
+      try {
+        expect(composed.signal).not.toBe(caller);
+        expect(composed.signal?.aborted).toBe(alreadyAborted);
+        controller.abort();
+        expect(composed.signal?.aborted).toBe(true);
+        expect(composed.timedOut()).toBe(false);
+      } finally { composed.dispose(); }
+      expect(getEventListeners(caller, 'abort')).toHaveLength(0);
+    }
+  });
+  it('keeps downstream state independent of source getters installed after bridging', () => {
     const controller = new AbortController();
     const caller = AbortSignal.any([controller.signal]);
+    const composed = compileSignal(normalizeCompileOptions({ signal: caller }));
     const get = vi.fn(() => { throw new Error('nested caller getter ran'); });
     Object.defineProperty(controller.signal, 'aborted', { get });
-    const composed = compileSignal(normalizeCompileOptions({ signal: caller }));
     try {
       expect(composed.signal?.aborted).toBe(false);
       controller.abort();
@@ -49,7 +67,18 @@ describe('Compile owns its cancellation signal', () => {
 const binary = fileURLToPath(new URL('./fixtures/fake-nika-compile.mjs', import.meta.url));
 afterEach(() => { vi.clearAllMocks(); });
 
-describe.each(['native', 'http'])('compile %s never runs caller accessors or Proxy traps', (door) => {
+// Node versions differ in whether reading a composite refreshes its sources.
+// Such hidden source overrides are outside our direct-input safety guarantee.
+const refreshesCompositeSources = (() => {
+  const source = new AbortController().signal;
+  const composite = AbortSignal.any([source]);
+  let reads = 0;
+  Object.defineProperty(source, 'aborted', { get: () => { reads++; return false; } });
+  Object.getOwnPropertyDescriptor(AbortSignal.prototype, 'aborted')!.get!.call(composite);
+  return reads > 0;
+})();
+
+describe.each(['native', 'http'])('compile %s validates direct inputs without caller accessors or Proxy traps', (door) => {
   const setup = () => {
     const fetch = vi.fn();
     const client = new Nika(door === 'native' ? { bin: binary } : {
@@ -57,6 +86,17 @@ describe.each(['native', 'http'])('compile %s never runs caller accessors or Pro
     });
     return { client, fetch };
   };
+  it.runIf(refreshesCompositeSources)('fails before effects when Node reads a throwing hidden source getter', async () => {
+    const source = new AbortController().signal;
+    const caller = AbortSignal.any([source]);
+    const get = vi.fn(() => { throw new Error('Node read the hidden source'); });
+    Object.defineProperty(source, 'aborted', { get });
+    const { client, fetch } = setup();
+    await expect(client.compile('hello', { signal: caller })).rejects.toBeInstanceOf(NikaConfigurationError);
+    expect(get).toHaveBeenCalled();
+    expect(spawn).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it.each(['intent', 'workflow', 'change', 'answers', 'unknown'])('refuses a request accessor on %s', async (key) => {
     const get = vi.fn(() => { throw new Error('caller getter ran'); });
     const { client, fetch } = setup();

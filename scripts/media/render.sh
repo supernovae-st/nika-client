@@ -16,7 +16,7 @@ command -v nika >/dev/null || { echo "nika not on PATH" >&2; exit 1; }
 # local checkout, the workflow, and the complete lifecycle driver script.
 rm -rf /tmp/sdk-demo
 mkdir -p /tmp/sdk-demo
-cat > /tmp/sdk-demo/flow.nika.yaml <<'EOF'
+cat > /tmp/sdk-demo/flow.nika <<'EOF'
 # a two-step launch brief · outline first, then the brief written from it
 nika: brief
 model: mock/echo
@@ -37,10 +37,10 @@ cat > /tmp/sdk-demo/demo.mjs <<'EOF'
 import { Nika } from '@supernovae-st/nika';
 
 const nika = new Nika({ cwd: process.cwd() });
-const report = await nika.check('flow.nika.yaml');
+const report = await nika.check('flow.nika');
 console.log('clean:', report.clean, '· findings:', report.findings.length);
 
-const run = await nika.run('flow.nika.yaml', { maxCostUsd: 0.25 });
+const run = await nika.run('flow.nika', { maxCostUsd: 0.25 });
 let eventCount = 0;
 const watching = (async () => {
   for await (const _event of nika.events(run)) {
@@ -52,7 +52,7 @@ await watching;
 console.log('ok:', result.status === 'succeeded', '· events:', eventCount);
 EOF
 (cd /tmp/sdk-demo && npm init -y >/dev/null 2>&1 && npm install "$ROOT" >/dev/null 2>&1)
-nika check /tmp/sdk-demo/flow.nika.yaml >/dev/null || {
+nika check /tmp/sdk-demo/flow.nika >/dev/null || {
   echo "the demo workflow must check clean before it is shown" >&2
   exit 1
 }

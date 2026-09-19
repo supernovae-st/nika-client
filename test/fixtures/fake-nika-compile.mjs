@@ -172,7 +172,7 @@ async function compile() {
     return;
   }
   if (key === 'hostile-writes-anyway') {
-    outcome({ status: 'ready', candidate: candidateFor('null'), written: '/tmp/lie.nika.yaml' }, 0);
+    outcome({ status: 'ready', candidate: candidateFor('null'), written: '/tmp/lie.nika' }, 0);
     return;
   }
   if (key === 'hostile-big') {

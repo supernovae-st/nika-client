@@ -7,7 +7,7 @@ test('controlled incident output satisfies the current replay judge without chan
   const settlement = { status: 'cancelled', cause: 'operator', elapsed_ms: 9,
     tasks: { total: 2, ok: 1, failed: 0, recovered: 0, skipped: 0, cancelled: 1, never_started: 1 },
     spend: { pricing_as_of: null, total_cost_usd: null, qualifier: 'unmetered' } };
-  const result = { id: 'controlled-job', status: 'cancelled', settlement, receipt: { trace_id: 'controlled-trace' } };
+  const result = { id: 'controlled-job', status: 'cancelled', settlement, receipt: { trace_id: '1234567890abcdef1234567890abcdef' } };
   const event = { kind: 'execution.settled', status: 'cancelled', settlement, receipt: result.receipt };
   const action = Promise.resolve({ accepted: true, status: 'cancellation_requested' });
   let release;
@@ -18,8 +18,8 @@ test('controlled incident output satisfies the current replay judge without chan
     check: async () => ({ clean: true }),
     run: async (workflow) => {
       workflows.push(workflow);
-      if (workflow === 'controlled-cancel.nika.yaml') return controlled;
-      assert.equal(workflow, 'workflow.nika.yaml');
+      if (workflow === 'controlled-cancel.nika') return controlled;
+      assert.equal(workflow, 'workflow.nika');
       return { done: Promise.resolve({ status: 'succeeded', outputs: {
         plan: { incident: { id: 'inc-2042' }, breached: 3 },
         completion: { state: 'reassessed' }, plan_digest: 'a'.repeat(64),
@@ -28,12 +28,17 @@ test('controlled incident output satisfies the current replay judge without chan
     cancel: () => action,
     async *events(run) { await run.done; yield structuredClone(event); },
     attachRun: async (id) => { assert.equal(id, result.id); return controlled; },
-    traceVerify: async () => ({ verified: false, verdict: 'unavailable', reason: 'trace_journal_unavailable' }),
+    traceVerify: async (receipt) => {
+      if (receipt?.trace_id === '0'.repeat(32)) {
+        return { verified: false, verdict: 'SEALED', trace_id: '1234567890abcdef1234567890abcdef' };
+      }
+      return { verified: true, verdict: 'SEALED', trace_id: receipt.trace_id };
+    },
   };
   const gate = { arm() {}, arrived: Promise.resolve(), release: async () => release(),
     finish: () => ({ requests: { hold: 1, dependent: 0 } }) };
   const project = await exerciseIncident(client, gate);
-  assert.deepEqual(workflows, ['workflow.nika.yaml', 'controlled-cancel.nika.yaml']);
+  assert.deepEqual(workflows, ['workflow.nika', 'controlled-cancel.nika']);
   assert.equal(project.sse_terminal.settlement_cause, 'operator');
   assert.equal(project.settlement.spend.pricing_as_of, null);
   assert.doesNotThrow(() => stableDepthEvidence({ projects: [project] }));

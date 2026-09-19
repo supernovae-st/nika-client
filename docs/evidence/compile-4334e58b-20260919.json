@@ -1,0 +1,386 @@
+{
+  "result": "green",
+  "scope": "compile foundation; no general authoring or execution grant",
+  "engine": {
+    "version": "nika 0.120.2 (4334e58bd)",
+    "binary_sha256": "ca35474f6c615f6030bef6f9030a4f6ba24bd103f7a79adfdfb5bfd0cc9129b6",
+    "identity": {
+      "engine_version": "0.120.2",
+      "build_sha": "4334e58bd",
+      "spec_sha": "4b6eaadde483bcc9db9c05b022afbedfb107f37e",
+      "api_version": "v1",
+      "engineVersion": "0.120.2",
+      "buildSha": "4334e58bd",
+      "specSha": "4b6eaadde483bcc9db9c05b022afbedfb107f37e",
+      "machineProtocolVersion": 1,
+      "snapshotFormatVersion": 1,
+      "checkReportVersion": 1,
+      "eventFormatVersion": 1,
+      "traceFormatVersion": 2,
+      "supportedCapabilities": [
+        "check",
+        "executionSnapshot",
+        "eventStream",
+        "trace",
+        "inputsLiteral",
+        "compile"
+      ]
+    },
+    "health": {
+      "status": "ok",
+      "service": "nika-serve",
+      "storeFormatVersion": {
+        "jobs": 3,
+        "schedules": 1
+      },
+      "engine_version": "0.120.2",
+      "build_sha": "4334e58bd",
+      "spec_sha": "4b6eaadde483bcc9db9c05b022afbedfb107f37e",
+      "api_version": "v1",
+      "engineVersion": "0.120.2",
+      "buildSha": "4334e58bd",
+      "specSha": "4b6eaadde483bcc9db9c05b022afbedfb107f37e",
+      "machineProtocolVersion": 1,
+      "snapshotFormatVersion": 1,
+      "checkReportVersion": 1,
+      "eventFormatVersion": 1,
+      "traceFormatVersion": 2,
+      "supportedCapabilities": [
+        "check",
+        "executionSnapshot",
+        "eventStream",
+        "cancel",
+        "jobInputs",
+        "compile",
+        "schedule"
+      ]
+    }
+  },
+  "sdk": {
+    "version": "0.120.2",
+    "package_sha256": "a330c420ca6bc05e622bd3d09b2871720f7d785d0bc0ec5408f1350854272b16"
+  },
+  "compile_openapi": {
+    "post": {
+      "description": "The HTTP transport of the same Compile core as `nika compile`. Foundation scope: CREATE resolves an exact embedded skeleton name (or `hello`), EDIT changes one existing constant, answers are explicit JSON literals; any other intent is answered `incomplete` with no substitute workflow. Creates no job, run, approval or trace, writes no file, contacts no provider: ambient keys are never consent. `check_preview` is a REVIEW of the source only, never admission: POST /v1/jobs judges a candidate again. Questions carry stable keys; answering is a new request, not a session.",
+      "requestBody": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/CompileRequest"
+            }
+          }
+        },
+        "required": true
+      },
+      "responses": {
+        "200": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompileOutcome"
+              }
+            }
+          },
+          "description": "Authoring outcome — ready, incomplete and refused are all data"
+        },
+        "401": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          },
+          "description": "Error envelope"
+        },
+        "408": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          },
+          "description": "Request deadline"
+        },
+        "413": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          },
+          "description": "Encoded body above the compile ceiling"
+        },
+        "415": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          },
+          "description": "Content-Type or Content-Encoding refused"
+        },
+        "422": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          },
+          "description": "malformed_compile_request · compile_version_unsupported · compile_mode_unsupported · compile_cognition_unsupported · compile_limit"
+        },
+        "500": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          },
+          "description": "Compiler machinery failure; nothing is echoed"
+        },
+        "503": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Error"
+              }
+            }
+          },
+          "description": "compile_busy — every compile slot is in use"
+        }
+      },
+      "summary": "Author a candidate workflow without running it (stateless · source-only)"
+    }
+  },
+  "resident_state_unchanged": true,
+  "results": [
+    {
+      "module_system": "cjs",
+      "rows": [
+        {
+          "name": "hello",
+          "status": "ready",
+          "candidate_sha256": "cfe6d8c3c09173716fc31be95ec7e6c8d74085a0cff08b3d05f7e1ee96c6f828",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "unknown-intent",
+          "status": "incomplete",
+          "candidate_sha256": null,
+          "questions": [],
+          "preview_scope": null
+        },
+        {
+          "name": "pending-question",
+          "status": "incomplete",
+          "candidate_sha256": "4528338b033f53a849ca0c7fa7f0151792442ace3789f890b3ef230beb3d737c",
+          "questions": [
+            "const.request"
+          ],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "answered-question",
+          "status": "ready",
+          "candidate_sha256": "97294960a1fd57bdd4e40608ff2517abba6773c7bd58785019c03acce2be46ce",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "text-edit",
+          "status": "ready",
+          "candidate_sha256": "e938ceacd2050529234c99bf65706004f87d47004bda7160e4c1e656acdafb57",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "invalid-base",
+          "status": "incomplete",
+          "candidate_sha256": "5da99a130d2e3c9edff0d6176b27fd34b82712a71378d59925e068cccbbb6486",
+          "questions": [],
+          "preview_scope": null
+        },
+        {
+          "name": "expression-island",
+          "status": "refused",
+          "candidate_sha256": "0c4e5b5e0fd265fc719387e8775abcc94d80595b2349a472e00e23e1ef9fec12",
+          "questions": [
+            "const.payload"
+          ],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "constant-0",
+          "status": "ready",
+          "candidate_sha256": "24a79a5db1d0d77c508af1e2223bf7baece351ecc9e12da56b8933986911deb9",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "constant-1",
+          "status": "ready",
+          "candidate_sha256": "c55a9dbd55e85a237a9704a7283178cd06e1a2f5f2d02add59c3ccbabdb93ca6",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "constant-2",
+          "status": "ready",
+          "candidate_sha256": "f14730351ef6dc41697d3d2a16a362df63ccd09adafa41b8cd8cee0a7b88447c",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "constant-3",
+          "status": "ready",
+          "candidate_sha256": "4f8953cb15f9ddf339e0e271b7662db83b550a375c9fe56d2ad30da66fc05df4",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "constant-4",
+          "status": "ready",
+          "candidate_sha256": "6db4ea595421e15171f6656bab17ce6ec57c6f712c5cd4fb7ec1923fc7603530",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "constant-5",
+          "status": "ready",
+          "candidate_sha256": "7b34c89752a416a73214f8433f58c01794bbf95f53964b7ceba0b0db53a346c7",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "constant-6",
+          "status": "ready",
+          "candidate_sha256": "24cd0e7a954c6a4d5417ef5fb936a14a21d32f85004c8c463c92af0903c24f04",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        }
+      ],
+      "project_file_effects": 0,
+      "unauthorized_status": 401,
+      "http_local_engine": "nonexistent",
+      "outcome_parity": "exact"
+    },
+    {
+      "module_system": "esm",
+      "rows": [
+        {
+          "name": "hello",
+          "status": "ready",
+          "candidate_sha256": "cfe6d8c3c09173716fc31be95ec7e6c8d74085a0cff08b3d05f7e1ee96c6f828",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "unknown-intent",
+          "status": "incomplete",
+          "candidate_sha256": null,
+          "questions": [],
+          "preview_scope": null
+        },
+        {
+          "name": "pending-question",
+          "status": "incomplete",
+          "candidate_sha256": "4528338b033f53a849ca0c7fa7f0151792442ace3789f890b3ef230beb3d737c",
+          "questions": [
+            "const.request"
+          ],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "answered-question",
+          "status": "ready",
+          "candidate_sha256": "97294960a1fd57bdd4e40608ff2517abba6773c7bd58785019c03acce2be46ce",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "text-edit",
+          "status": "ready",
+          "candidate_sha256": "e938ceacd2050529234c99bf65706004f87d47004bda7160e4c1e656acdafb57",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "invalid-base",
+          "status": "incomplete",
+          "candidate_sha256": "5da99a130d2e3c9edff0d6176b27fd34b82712a71378d59925e068cccbbb6486",
+          "questions": [],
+          "preview_scope": null
+        },
+        {
+          "name": "expression-island",
+          "status": "refused",
+          "candidate_sha256": "0c4e5b5e0fd265fc719387e8775abcc94d80595b2349a472e00e23e1ef9fec12",
+          "questions": [
+            "const.payload"
+          ],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "constant-0",
+          "status": "ready",
+          "candidate_sha256": "24a79a5db1d0d77c508af1e2223bf7baece351ecc9e12da56b8933986911deb9",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "constant-1",
+          "status": "ready",
+          "candidate_sha256": "c55a9dbd55e85a237a9704a7283178cd06e1a2f5f2d02add59c3ccbabdb93ca6",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "constant-2",
+          "status": "ready",
+          "candidate_sha256": "f14730351ef6dc41697d3d2a16a362df63ccd09adafa41b8cd8cee0a7b88447c",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "constant-3",
+          "status": "ready",
+          "candidate_sha256": "4f8953cb15f9ddf339e0e271b7662db83b550a375c9fe56d2ad30da66fc05df4",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "constant-4",
+          "status": "ready",
+          "candidate_sha256": "6db4ea595421e15171f6656bab17ce6ec57c6f712c5cd4fb7ec1923fc7603530",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "constant-5",
+          "status": "ready",
+          "candidate_sha256": "7b34c89752a416a73214f8433f58c01794bbf95f53964b7ceba0b0db53a346c7",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        },
+        {
+          "name": "constant-6",
+          "status": "ready",
+          "candidate_sha256": "24cd0e7a954c6a4d5417ef5fb936a14a21d32f85004c8c463c92af0903c24f04",
+          "questions": [],
+          "preview_scope": "sourceOnly"
+        }
+      ],
+      "project_file_effects": 0,
+      "unauthorized_status": 401,
+      "http_local_engine": "nonexistent",
+      "outcome_parity": "exact"
+    }
+  ]
+}

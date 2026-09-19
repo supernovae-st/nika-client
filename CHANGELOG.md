@@ -33,6 +33,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   same outcome without process-only `exitCode`/`written` fields. HTTP cancellation,
   timeouts and bounded response parsing never fall back to local compilation.
 
+The HTTP compile contract is pinned to engine commit
+`4334e58bddf539a6253f448eb05d562b6919f2b7` (nika#1709), merged after
+`v0.120.2`. The released engine supports native compile; its Serve does not
+advertise HTTP compile. This SDK feature is not part of the published 0.120.2 package.
+
+## [0.120.2]
+
+### Changed
+
+- Lockstep with public engine `v0.120.2`
+  (`289a9adeae5a6937221ceac55b8080ef84c0ce69`, engine #1707). Package and
+  native optional payloads follow the engine train via `sync:native-versions`;
+  OpenAPI `info.version` is `0.120.2` with the Serve schema unchanged from
+  0.120.1 (the live type-drift gate is green). `ENGINE_QUAL_PIN` /
+  `ENGINE_CANDIDATE` name the tagged commit. Current gauntlet evidence is
+  regenerated from the verified public macOS arm64 archive
+  (`verify-engine-archive`, SHA256SUMS `b46243de…`): all five current reports
+  record `nika 0.120.2 (289a9adea)`; the historical paid-provider and trace
+  ledgers are untouched.
+- Install guidance is timeless: canonical `npm install @supernovae-st/nika`,
+  each SDK package bundles its own matching engine, and the standalone engine
+  CLI releases on an independent clock. Native `inputsLiteral` and
+  `isNikaRunSucceeded` are published on 0.120.0; `nika compile hello` replaces
+  retired `nika new`; admission, execution, and seal are separate facts (a
+  keyless HOME succeeds unsealed).
+- Release replay treats depth `package_sha256` as pack provenance: it must
+  match the tarball beside the ledger, and documentation-only README pack
+  changes may retarget it. Behavioral verdicts still compare exactly.
+
+## [0.120.1]
+
+### Changed
+
+- Lockstep with public engine `v0.120.1` (`9d554c84c8a63144c36e7245fee641e6bfc7349f`).
+  Package and native optional payloads follow that tag via `sync:native-versions`.
+  Served OpenAPI `info.version` is `0.120.1`; the rest of the Serve schema is
+  unchanged from 0.120.0. The public engine now accepts canonical `.nika`
+  workflow references in project-arm schemas (engine #1692). This is not
+  issue 1684 closure; the broader file-identity migration remains open.
+
+## [0.120.0]
+
+### Known engine limitation
+
+The public 0.120.0 project schema still rejects canonical `.nika` paths in
+`nika.yaml` arm bindings. The correction belongs to
+[engine #1692](https://github.com/supernovae-st/nika/pull/1692) and
+[Spec #345](https://github.com/supernovae-st/nika-spec/pull/345), for a later
+engine release. This SDK aligns with the current public engine; the broader
+file-identity migration remains open.
+
+### Changed
+
+- Canonical live workflow files are lowercase `.nika`. HTTP by-name
+  admission (`isContainedWorkflowName`) keeps contained-relative shape and
+  refuses retired `.nika.yaml` / `.nika.yml` names instead of falling back
+  to local capture. Project `nika.yaml` and runtime `.nika/` are unchanged.
+  Generated OpenAPI was regenerated from the engine Serve schema (`info.version`
+  0.120.0). Lockstep with public engine `v0.120.0`.
+
+### Added
+
 - The Run owns its lifecycle (#120). `NikaRun` now carries `events()`,
   `result()`, `status()` and `cancel()` next to `id`; `run.result()` is the
   documented settlement read and `run.done` stays as its compatibility alias

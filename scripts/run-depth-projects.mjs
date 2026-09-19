@@ -108,8 +108,8 @@ export async function runDepthProjects() {
           for (const [label, file] of [
             ['committed-app.mjs', path.join(source, 'app.mjs')],
             ['executed-app.mjs', path.join(project, 'app.mjs')],
-            ['workflow.nika.yaml', path.join(project, 'workflow.nika.yaml')],
-            ['controlled-cancel.nika.yaml', path.join(project, 'controlled-cancel.nika.yaml')],
+            ['workflow.nika', path.join(project, 'workflow.nika')],
+            ['controlled-cancel.nika', path.join(project, 'controlled-cancel.nika')],
           ]) {
             const bytes = readFileSync(file);
             writeFileSync(path.join(audit, label), bytes);

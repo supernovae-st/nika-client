@@ -255,7 +255,7 @@ Three different facts. Do not collapse them.
 
 | Fact | How you see it | What it is not |
 |---|---|---|
-| **Admission** | `check().clean`, or `run()` resolving a handle. A red file throws `NikaOperationError` (`NIKA-PARSE-005`, `NIKA-1708`, …) before any run exists. | Not a successful execution. |
+| **Admission** | `check()` returns `clean: false` and findings. `run()` **throws** `NikaOperationError` (`NIKA-PARSE-005`, `NIKA-1708`, …) and yields no handle. | Not a successful execution. |
 | **Execution** | `run.result()` / `isNikaRunSucceeded(result)`. Admitted failure is **data** (`status: "failed"`). A human gate is `paused` (`run.waiting`), not success. | Not proof the journal is sealed. |
 | **Seal** | `result.receipt.sealed` and `traceVerify(receipt)`. Tamper-evident, not tamper-proof; not replayed unless you pass `--replay`; not anchored without a sidecar. | Not “the workflow was correct” and not “a human read the output”. |
 
@@ -266,9 +266,11 @@ returned `{ verified: true, verdict: "verified" }`. With an isolated `HOME`
 and no key files (keychain skipped: stderr not a TTY), the same file
 **succeeded**, `sealed: false`, and `traceVerify` returned
 `{ verified: false, verdict: "invalid", reason: "receipt_mismatch" }` while
-the engine still said the journal chain was OK and **UNSEALED**. Treat
-`receipt_mismatch` as “no signed binding”, not as a failed run. The CLI
-verify line that counts journal events is not `run.events()`.
+the engine still said the journal chain was OK and **UNSEALED**. In this
+keyless case that reason means no signed binding, not a failed workflow.
+`receipt_mismatch` is also the engine's word for a tampered or
+field-mismatched receipt — do not treat every occurrence as merely unsigned.
+The CLI verify line that counts journal events is not `run.events()`.
 
 ## One vocabulary
 
@@ -380,10 +382,10 @@ Pass that receipt back unchanged:
 if (!result.receipt) throw new Error('run did not issue a receipt');
 const proof = await nika.traceVerify(result.receipt);
 // proof.verified is the seal/binding, not the workflow outcome.
-// A succeeded mock run is UNSEALED on a keyless machine
-// (verdict invalid, reason receipt_mismatch, journal chain still OK).
 if (isNikaRunSucceeded(result) && proof.verified) {
   // run succeeded and the journal is sealed
+} else if (isNikaRunSucceeded(result) && !proof.verified) {
+  // succeeded, unsigned or otherwise unverified — read proof.reason
 }
 ```
 

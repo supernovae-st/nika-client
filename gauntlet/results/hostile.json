@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-09-18T23:10:21.217Z",
-  "engine": "nika 0.120.1 (9d554c84c)",
+  "generated_at": "2026-09-19T17:49:44.614Z",
+  "engine": "nika 0.120.2 (289a9adea)",
   "scenarios": [
     {
       "name": "unsafe-http-refusal",
       "result": "green",
-      "duration_ms": 74,
+      "duration_ms": 142,
       "evidence": {
         "refusal": "NikaConfigurationError",
         "network_requests": 0
@@ -15,7 +15,7 @@
     {
       "name": "missing-engine-refusal",
       "result": "green",
-      "duration_ms": 96,
+      "duration_ms": 169,
       "evidence": {
         "error": "NikaCompatibilityError",
         "bounded": true
@@ -24,7 +24,7 @@
     {
       "name": "oversize-machine-line",
       "result": "green",
-      "duration_ms": 1546,
+      "duration_ms": 468,
       "evidence": {
         "error": "NikaProtocolError",
         "limit_bytes": 1024
@@ -33,7 +33,7 @@
     {
       "name": "malformed-machine-frame",
       "result": "green",
-      "duration_ms": 219,
+      "duration_ms": 303,
       "evidence": {
         "error": "NikaProtocolError"
       }
@@ -41,7 +41,7 @@
     {
       "name": "child-crash-settlement",
       "result": "green",
-      "duration_ms": 161,
+      "duration_ms": 368,
       "evidence": {
         "status": "failed",
         "exit_code": 23
@@ -50,7 +50,7 @@
     {
       "name": "malformed-workflow-domain-report",
       "result": "green",
-      "duration_ms": 103,
+      "duration_ms": 194,
       "evidence": {
         "clean": false,
         "exit_code": 2
@@ -59,7 +59,7 @@
     {
       "name": "explicit-bin-empty-path",
       "result": "green",
-      "duration_ms": 410,
+      "duration_ms": 390,
       "evidence": {
         "check": "clean",
         "status": "succeeded"
@@ -68,7 +68,7 @@
     {
       "name": "parallel-run-load",
       "result": "green",
-      "duration_ms": 7106,
+      "duration_ms": 3252,
       "evidence": {
         "runs": 24,
         "succeeded": 24,
@@ -78,7 +78,7 @@
     {
       "name": "real-cancellation-race",
       "result": "green",
-      "duration_ms": 13430,
+      "duration_ms": 12266,
       "evidence": {
         "cancel_status": "cancellation_requested",
         "run_status": "cancelled",
@@ -128,7 +128,7 @@
     {
       "name": "remote-durable-cancellation",
       "result": "green",
-      "duration_ms": 7995,
+      "duration_ms": 6306,
       "evidence": {
         "status_before_cancellation": "running",
         "cancel_status": "cancellation_requested",
@@ -199,7 +199,7 @@
     {
       "name": "trace-corruption-detection",
       "result": "green",
-      "duration_ms": 2798,
+      "duration_ms": 488,
       "evidence": {
         "intact": true,
         "forged_receipt": false,
@@ -209,7 +209,7 @@
     {
       "name": "secret-canary-redaction",
       "result": "green",
-      "duration_ms": 2596,
+      "duration_ms": 458,
       "evidence": {
         "result_redacted": true,
         "trace_redacted": true
@@ -218,7 +218,7 @@
     {
       "name": "slow-subscriber-overflow-isolation",
       "result": "green",
-      "duration_ms": 2918,
+      "duration_ms": 468,
       "evidence": {
         "run_status": "succeeded",
         "subscriber_error": "NikaEventBufferOverflowError",
@@ -228,7 +228,7 @@
     {
       "name": "sequential-soak",
       "result": "green",
-      "duration_ms": 113420,
+      "duration_ms": 16508,
       "evidence": {
         "runs": 40,
         "succeeded": 40

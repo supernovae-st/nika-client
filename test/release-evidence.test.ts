@@ -5,9 +5,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { verifyReleaseEvidence } from '../scripts/verify-release-evidence.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const VERSION = '0.120.1';
-const ENGINE = 'nika 0.120.1 (9d554c84c)';
-const PACKAGE = 'supernovae-st-nika-0.120.1.tgz';
+const VERSION = '0.120.2';
+const ENGINE = 'nika 0.120.2 (289a9adea)';
+const PACKAGE = 'supernovae-st-nika-0.120.2.tgz';
 const currentEvidence = [
   'gauntlet/projects-depth/results.json',
   'gauntlet/results/hostile.json',

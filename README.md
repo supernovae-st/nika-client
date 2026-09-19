@@ -37,7 +37,7 @@ result. No server and no API key for the first run: `mock/echo` is a
 **local simulation** (output is prefixed `mock(echo) ·`, not a model answer).
 
 ```sh
-npm install @supernovae-st/nika@0.120.0
+npm install @supernovae-st/nika
 ```
 
 Save as `hello.nika`:
@@ -77,8 +77,8 @@ node demo.mjs
 
 `run()` already admits: a red file throws `NikaOperationError` and never
 returns a handle. The `.nika` file is the contract; the SDK does not parse
-YAML. Pin the version you tested — see [Install](#install) for npm 0.120.0 vs
-engine GitHub v0.120.1.
+YAML. Pin the version you tested — see [Install](#install): the SDK and the
+standalone engine CLI release on independent clocks.
 
 `check()`, `run.events()`, and `traceVerify()` are the next steps. They stay
 taught and tested; they are not required to see the first result.
@@ -324,24 +324,31 @@ not parse YAML or reconstruct proof in TypeScript.
   migration to the smaller durable client surface
 - [docs.nika.sh](https://docs.nika.sh) · language and engine
 - [SDK quickstart](https://docs.nika.sh/sdk/start/quickstart) · app walkthrough
-  (install **npm `@supernovae-st/nika@0.120.0`**, matching this README)
+  (install **npm `@supernovae-st/nika`**, matching this README)
 
 ## Install
 
-Pin the version you tested, then verify the package the project actually
-resolved. Channels differ (2026-09-19):
+```sh
+npm install @supernovae-st/nika
+```
 
-| Channel | Version |
-|---|---|
-| npm `@supernovae-st/nika` **latest** | **0.120.0**, bundled engine **0.120.0 (`f6155d1be`)** |
-| Engine GitHub latest / brew / install script | **v0.120.1** (`9d554c84c`) |
-| This repository `package.json` | **0.120.1** (unreleased; not on npm) |
+Every SDK package bundles its own matching engine: the `nika` binary under
+`node_modules/.bin` is the exact engine that package was qualified against.
+The standalone engine CLI (GitHub releases, brew, install script) releases on
+an independent clock, so its newest tag can be ahead of or behind the engine
+bundled in the latest npm package. The
+[npm registry](https://www.npmjs.com/package/@supernovae-st/nika?activeTab=versions)
+lists current published versions. Pin the version you tested, then verify the
+package the project actually resolved:
 
 ```sh
-npm install @supernovae-st/nika@0.120.0
 node -p "require('@supernovae-st/nika/package.json').version"
-./node_modules/.bin/nika --version    # nika 0.120.0 (f6155d1be)
+./node_modules/.bin/nika --version
 ```
+
+This repository's source train is **0.120.2** (`package.json`), lockstep with
+public engine tag `v0.120.2` (`289a9adea`). A source train is not a published
+npm version until the release workflow publishes it.
 
 This package metadata subpath is exported for CommonJS, ESM build tools and CI
 pin checks. It reports the installed dependency, not a moving registry tag.

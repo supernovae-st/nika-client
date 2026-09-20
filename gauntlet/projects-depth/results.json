@@ -2,7 +2,7 @@
   "schema_version": 1,
   "engine": "nika 0.120.3 (578352a31)",
   "package": "supernovae-st-nika-0.120.3.tgz",
-  "package_sha256": "5ec8e52e8f8562768b4ba97e0b0537f61d9f9a1ffe0b4754c94ffb0b68c1c443",
+  "package_sha256": "d32c6eec85f603635cd4644c75a4a0ef04502102f3b53c6cf679025249dc17a8",
   "install_mode": "npm pack + isolated npm install --omit=optional + explicit NIKA_BIN",
   "projects": [
     {
@@ -112,7 +112,7 @@
         "verdict": "sealed",
         "reason": "sealed",
         "verified": true,
-        "trace_id": "01a0be525ed3726c9ac1495f9eff0fee"
+        "trace_id": "01a0c0057f0672b49bbb60067c9c5d1b"
       },
       "mismatched_trace_rejected": true,
       "deterministic_cost_cap_usd": 0,
@@ -172,11 +172,46 @@
         "executed_sha256": "e4017fdf8e49a69a0a28e6a8da6af4a646d5ad23b78981ff67f2e2b69441f718",
         "byte_identical": true
       }
+    },
+    {
+      "project": "signed-webhook-intake",
+      "status": "succeeded",
+      "transport": "http",
+      "trigger": "app-owned-signed-webhook-http",
+      "signature": "standard-webhooks hmac-sha256 over raw bytes, 300s tolerance, app-owned",
+      "duplicate_deliveries": 2,
+      "idempotent_job_identity": true,
+      "refusals": {
+        "tampered": "INGRESS_AUTH",
+        "stale": "INGRESS_REPLAY",
+        "malformed": "INGRESS_PARSE",
+        "mistyped": "INPUT_MAPPING"
+      },
+      "admitted_deliveries": 1,
+      "same_program_triggers": [
+        "webhook",
+        "manual",
+        "schedule"
+      ],
+      "distinct_job_identities": 3,
+      "scheduled_decision_tier": "heartbeat",
+      "sse_event_kinds": [
+        "engine.event",
+        "run.settled",
+        "run.started"
+      ],
+      "deterministic_cost_cap_usd": 0,
+      "installed_from_pack": true,
+      "app_identity": {
+        "source_sha256": "ffc4b55065e2526d932747de5ae3b149acd398bdb96ee16520c7f07a1bc3adec",
+        "executed_sha256": "ffc4b55065e2526d932747de5ae3b149acd398bdb96ee16520c7f07a1bc3adec",
+        "byte_identical": true
+      }
     }
   ],
   "summary": {
-    "total": 5,
-    "succeeded": 5,
+    "total": 6,
+    "succeeded": 6,
     "result": "green"
   }
 }

@@ -125,17 +125,18 @@ describe('release evidence identity', () => {
       'incident-response-controller',
       'multi-tenant-webhook-router',
       'scheduled-research-monitor',
+      'signed-webhook-intake',
     ]);
     writeJson(fixture, 'gauntlet/projects-depth/results.json', {
       schema_version: 1,
       engine: ENGINE,
       package: PACKAGE,
       projects,
-      summary: { total: 5, succeeded: 0, result: 'red' },
+      summary: { total: 6, succeeded: 0, result: 'red' },
     });
 
     expect(() => verifyReleaseEvidence(fixture)).toThrow(
-      'does not record a 5/5 green summary',
+      'does not record a 6/6 green summary',
     );
   });
 
@@ -301,6 +302,7 @@ function depthEvidence(incident: Record<string, unknown>): object {
     'incident-response-controller',
     'multi-tenant-webhook-router',
     'scheduled-research-monitor',
+    'signed-webhook-intake',
   ]).map((project: any) => project.project === 'incident-response-controller'
     ? { ...project, ...structuredClone(incident) }
     : project);
@@ -309,7 +311,7 @@ function depthEvidence(incident: Record<string, unknown>): object {
     engine: ENGINE,
     package: PACKAGE,
     projects,
-    summary: { total: 5, succeeded: 5, result: 'green' },
+    summary: { total: 6, succeeded: 6, result: 'green' },
   };
 }
 

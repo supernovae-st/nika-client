@@ -128,6 +128,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/compile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Author a candidate workflow without running it (stateless · source-only)
+         * @description The HTTP transport of the same Compile core as `nika compile`. Foundation scope: CREATE resolves an exact embedded skeleton name (or `hello`), EDIT changes one existing constant, answers are explicit JSON literals; any other intent is answered `incomplete` with no substitute workflow. Creates no job, run, approval or trace, writes no file, contacts no provider: ambient keys are never consent. `check_preview` is a REVIEW of the source only, never admission: POST /v1/jobs judges a candidate again. Questions carry stable keys; answering is a new request, not a session.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CompileRequest"];
+                };
+            };
+            responses: {
+                /** @description Authoring outcome — ready, incomplete and refused are all data */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CompileOutcome"];
+                    };
+                };
+                /** @description Error envelope */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Request deadline */
+                408: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Encoded body above the compile ceiling */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Content-Type or Content-Encoding refused */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description malformed_compile_request · compile_version_unsupported · compile_mode_unsupported · compile_cognition_unsupported · compile_limit */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Compiler machinery failure; nothing is echoed */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description compile_busy — every compile slot is in use */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/jobs": {
         parameters: {
             query?: never;
@@ -875,6 +981,88 @@ export interface components {
             /** @description Access pin, same vocabulary as `--access` (class or harness id). A pin never silently substitutes a metered seat. */
             access?: string;
             workflow: string;
+        };
+        /** @description The engine-owned machine document of one authoring result — the document `nika compile --json` prints, without the CLI-only `written`. No field grants authority, writes or executes source. */
+        CompileOutcome: {
+            /** @description Ordinary `.nika` source; may still be incomplete */
+            candidate: string | null;
+            /** @description The engine's pure Check report over the source only. No child file, skill, credential probe, access plan or admission was evaluated */
+            check_preview: {
+                report: {
+                    [key: string]: unknown;
+                };
+                /** @constant */
+                scope: "sourceOnly";
+            } | null;
+            /** @constant */
+            compile_version: 1;
+            diagnostics: {
+                /** @enum {string} */
+                kind: "applied" | "missed" | "unknown" | "requiresHuman" | "refused";
+                /** @description For a reader; never parsed to recover compiler state */
+                message: string;
+                target: string;
+            }[];
+            /** @description Reproduction metadata; neither program identity nor run evidence */
+            provenance: {
+                /** @constant */
+                cognition: "deterministicOnly";
+                compiler_version: string;
+                skeleton: string | null;
+                spec_pin: string;
+            };
+            questions: {
+                /** @description Stable semantic hole path such as `const.request`, never a session id */
+                key: string;
+                label: string;
+                mandatory: boolean;
+                /** @enum {string} */
+                type: "text" | "literal";
+                why: string;
+            }[];
+            /** @description The candidate's requested permits, derived by Check. Requested, never granted */
+            requested_boundary: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * @description Completeness of authoring, never permission to execute
+             * @enum {string}
+             */
+            status: "ready" | "incomplete" | "refused";
+        };
+        /** @description Generation 1 of the compile request. The encoded body is limited to 1048576 bytes (or the listener's lower ceiling). Byte bounds below are UTF-8 bytes. Unknown fields, a present null, duplicate keys (including inside `answers`) and positional arrays are refused. No field names a host path: an EDIT base travels inline in `source`. */
+        CompileRequest: {
+            /** @description Question key → one JSON literal with its type preserved, judged exactly as sent (at most 65536 bytes each) */
+            answers?: {
+                [key: string]: unknown;
+            };
+            change?: {
+                set_constant?: {
+                    /** @description Bare constant name, not a path */
+                    name: string;
+                    /** @description One JSON literal, judged exactly as sent (at most 65536 bytes) */
+                    value: unknown;
+                };
+                /** @description `Set const.NAME to JSON_LITERAL`, or `Set const.NAME` answered through `answers` */
+                text?: string;
+            };
+            /**
+             * @description The only authoring cognition of this build. Any other value is refused; no authoring model is contacted
+             * @constant
+             */
+            cognition?: "deterministicOnly";
+            /** @constant */
+            compile_version: 1;
+            intent?: string;
+            /**
+             * @description create requires `intent` and forbids `source`/`change`; edit requires `source` and `change` and forbids `intent`
+             * @enum {string}
+             */
+            mode: "create" | "edit";
+            /** @description Accepted `.nika` source, inline. The caller owns source selection, revision checks and materialization */
+            source?: string;
+            /** @description Names a created workflow. On edit the core refuses it as data: an edit cannot rename its accepted base */
+            workflow_id?: string;
         };
         Error: {
             error: {

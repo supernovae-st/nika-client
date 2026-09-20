@@ -92,6 +92,16 @@ jobs:
           test "$(./nika --version | awk '{print $2}')" = "$version"
           ./nika key init --plain
 
+      - name: Gate packed compile parity against the exact public engine
+        env:
+          NIKA_BIN: ${{ runner.temp }}/nika-release-asset/nika
+          NIKA_COMPILE_PARITY_REPORT: ${{ runner.temp }}/nika-release-replay/compile-parity.json
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$NIKA_COMPILE_PARITY_REPORT")"
+          test -x "$NIKA_BIN"
+          node scripts/run-compile-parity-e2e.mjs
+
       - name: Replay every current behavioral evidence family
         env:
           NIKA_BIN: ${{ runner.temp }}/nika-release-asset/nika

@@ -346,8 +346,8 @@ node -p "require('@supernovae-st/nika/package.json').version"
 ./node_modules/.bin/nika --version
 ```
 
-This repository's source train is **0.120.2** (`package.json`), lockstep with
-public engine tag `v0.120.2` (`289a9adea`). A source train is not a published
+This repository's source train is **0.120.3** (`package.json`), lockstep with
+public engine tag `v0.120.3` (`578352a31`). A source train is not a published
 npm version until the release workflow publishes it.
 
 This package metadata subpath is exported for CommonJS, ESM build tools and CI
@@ -382,6 +382,52 @@ No destination means preview only. `nika.yaml` is the project control plane
 `check()` and `run()`. The engine's `hello` skeleton names its task `greet`
 and asks for French; the hand-written file above is enough if it keeps
 `outputs.greeting` and `model: mock/echo`.
+
+## Compile a candidate without running it
+
+`compile()` requires an engine that advertises the `compile` capability. The
+released 0.120.3 engine supports native compilation and its Serve advertises
+HTTP compilation (the route landed in engine commit `4334e58b`, first published
+in v0.120.3); a 0.120.2 or older Serve predates that route and is refused
+without fallback. This SDK method first publishes with 0.120.3. This foundation resolves
+exact embedded skeleton names (including `hello`) and edits existing constants;
+unsupported intent remains `incomplete`.
+
+```ts
+const candidate = await nika.compile({
+  intent: 'classify-and-route',
+  answers: { 'const.request': 'An outage affects support customers.' },
+}, { timeoutMs: 15_000 });
+
+// The outcome is source and review data. Incomplete/refused are also outcomes.
+console.log(candidate.status, candidate.questions, candidate.diagnostics);
+if (candidate.ready && candidate.candidate !== null) {
+  const edited = await nika.compile({
+    workflow: candidate.candidate,
+    change: { set_constant: { name: 'request', value: 'One customer is affected.' } },
+  });
+  console.log(edited.candidate);
+}
+```
+
+Edits also accept a string such as `Set const.request to "One customer"`.
+Answers and structured values are strict JSON values, preserving numbers,
+booleans, null, strings, arrays and objects. The native adapter uses the engine's
+CLI; the HTTP adapter sends authenticated `POST /v1/compile`. An unavailable
+remote capability raises `NikaCompatibilityError` without local fallback.
+
+`candidate` is `.nika` source, distinct from the path accepted by `run()`.
+The caller reviews and materializes it before calling `run(path)`, which performs
+normal admission. `requested_boundary` and the source-only `check_preview` grant
+no execution authority. Compile creates no Run, job, approval or Proof, and the
+SDK writes no persistent candidate file. `signal`/`timeoutMs` stop only the
+compile request. The common outcome has no `exitCode` or `written` field.
+
+Compile accepts standard `AbortSignal`s, including `AbortSignal.any` composites.
+It rejects direct signal interface overrides and proxies before starting work.
+Composite sources must retain their standard interfaces: Node may read their
+public fields while inspecting or subscribing to a composite, so the SDK cannot
+validate a modified hidden source graph without invoking those fields.
 
 ## Verify a local trace
 

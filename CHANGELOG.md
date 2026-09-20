@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.120.3]
+
+### Added
+
+- `Nika.compile(request, options)` — the SDK projection of the engine's one
+  authoring capability (issue #128, engine nika#1663). The native transport
+  runs one bounded `nika compile --json` child and validates the versioned
+  `compile_version: 1` wire: `status` (`ready` / `incomplete` / `refused`),
+  `ready` derived exactly from it, `candidate` source, `questions`,
+  `diagnostics`, `requested_boundary`, `check_preview` and `provenance` are
+  preserved verbatim. Incomplete and refused are data, never exceptions; a
+  ready outcome is accepted only from a child that exited 0, and a dead,
+  truncated, malformed or wrong-version wire fails typed
+  (`NikaProtocolError` / `NikaCompatibilityError` / `NikaOperationError` with
+  the engine's own code). The engine must advertise the `compile` capability;
+  older engines are refused before any compile spawn. CREATE takes an intent
+  (or exact skeleton name) plus `answers` — strict JSON values serialized
+  once onto argv as `KEY=JSON`; EDIT takes the accepted source plus a change
+  (text or explicit `set_constant`)
+  and lends the base through a 0700 scratch dir with a 0600 file, removed on
+  every path. `signal`/`timeoutMs` stop only this child (SIGTERM, then
+  SIGKILL inside a kill grace); no Run exists to cancel. The candidate is
+  source: `run()` still takes a path, and the caller owns materialization —
+  this slice ships no `dest`/`force`. Over `{ url }` the method consumes
+  authenticated `POST /v1/compile` when Serve advertises `compile`, using the
+  same outcome without process-only `exitCode`/`written` fields. HTTP cancellation,
+  timeouts and bounded response parsing never fall back to local compilation.
+
+The HTTP compile contract is pinned to engine commit
+`4334e58bddf539a6253f448eb05d562b6919f2b7` (nika#1709), merged after
+`v0.120.2` and first published in engine `v0.120.3`, whose Serve advertises
+HTTP compile. This SDK feature first publishes with 0.120.3.
+
+### Changed
+
+- Lockstep with public engine `v0.120.3`
+  (`578352a31254ff04025ac6207bcf6f40d3911613`, engine #1711). Package and
+  native optional payloads follow the engine train via `sync:native-versions`;
+  OpenAPI `info.version` is `0.120.3`. `ENGINE_QUAL_PIN` / `ENGINE_CANDIDATE`
+  name the tagged commit. Current gauntlet evidence is regenerated from the
+  verified public macOS arm64 archive; the historical paid-provider and trace
+  ledgers are untouched.
+
 ## [0.120.2]
 
 ### Changed

@@ -22,14 +22,20 @@ interface PayloadIntegrity {
   };
 }
 
+interface ProbeOptions {
+  signal?: AbortSignal;
+  killGraceMs?: number;
+}
+
 /** Verify package bytes and negotiate the engine contract before any workflow effect. */
 export async function verifyNikaEngine(
   engine: ResolvedNikaEngine,
+  options: ProbeOptions = {},
 ): Promise<NikaEngineIdentity> {
   const expectedVersion = engine.packageRoot
     ? await verifyManagedPayload(engine)
     : undefined;
-  const identity = await probeIdentity(engine.bin);
+  const identity = await probeIdentity(engine.bin, options);
 
   if (expectedVersion !== undefined && identity.engineVersion !== expectedVersion) {
     throw incompatible(
@@ -77,17 +83,19 @@ async function verifyManagedPayload(engine: ResolvedNikaEngine): Promise<string>
   return manifest.version;
 }
 
-async function probeIdentity(bin: string): Promise<NikaEngineIdentity> {
+async function probeIdentity(bin: string, options: ProbeOptions): Promise<NikaEngineIdentity> {
   // The probe is version negotiation with whatever executable sits at `bin`;
   // it authenticates nothing. When it fails, the likeliest cause is the path
   // (a wrong NIKA_BIN, a script that is not the engine), so every refusal
   // names the path and the one command that settles the question.
   const notAnEngine = `is ${bin} a nika engine? (run "${bin} --sdk-identity" by hand)`;
   const captured = await captureEngine(bin, ['--sdk-identity'], {
+    ...options,
     bufferBytes: IDENTITY_BUFFER_BYTES,
     transport: 'native-process',
     label: 'Engine identity probe',
   }).catch((cause: unknown) => {
+    if (options.signal?.aborted) throw cause;
     throw incompatible(
       `Engine identity probe of ${bin} failed`,
       cause,

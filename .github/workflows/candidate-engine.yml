@@ -203,6 +203,15 @@ jobs:
           assert_server_live "after generated-type fetch"
           git diff --exit-code -- src/generated/openapi.d.ts
           echo "Pinned OpenAPI and generated types match the candidate engine (not a release receipt)"
+      - name: Gate packed compile parity against the exact candidate
+        env:
+          NIKA_BIN: ${{ runner.temp }}/nika-candidate/nika
+          NIKA_COMPILE_PARITY_REPORT: ${{ runner.temp }}/nika-candidate-replay/compile-parity.json
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$NIKA_COMPILE_PARITY_REPORT")"
+          test -x "$NIKA_BIN"
+          node scripts/run-compile-parity-e2e.mjs
       - name: Candidate behavioral replay
         env:
           NIKA_BIN: ${{ runner.temp }}/nika-candidate/nika

@@ -179,3 +179,40 @@ cleanup before emitting green evidence. The corpus runs in a fresh project and
 HOME. Changed fixtures require new measured results: old committed ledgers
 remain historical observations until a successful exact-version replay replaces
 them. Never relabel an old binary or weaken the replay comparison.
+
+## Compile foundation parity
+
+Hermetic compile cases run with `npm test`, including strict request literals,
+capability/version refusal, native exit and signal laws, temporary-file failure
+cleanup, authenticated HTTP responses and cancellation. `npm run check:package-surface`
+checks both packed module faces and their public TypeScript contracts.
+
+For a frozen engine that advertises `compile` on both native and Serve doors:
+
+```sh
+NIKA_BIN=/absolute/path/to/frozen/nika \
+NIKA_COMPILE_PARITY_REPORT=/absolute/path/to/compile-parity.json \
+node scripts/run-compile-parity-e2e.mjs
+```
+
+This installs the SDK tarball into an isolated consumer and compares the full
+common authoring outcomes across native/HTTP and ESM/CommonJS. It checks literal
+round trips, incomplete questions, refused expression islands, invalid bases,
+authentication, no project-file changes and no created jobs. HTTP is given a
+nonexistent local engine path, proving that it cannot use a fallback. The report
+records binary and package hashes and is green only after owned-process cleanup.
+A source binary containing engine commit
+`4334e58bddf539a6253f448eb05d562b6919f2b7` is required for both doors.
+Released engine 0.120.3 supports native compile and its Serve advertises HTTP
+compile; 0.120.2 and older predate the route. This is a foundation test, not general intent authoring
+or execution admission qualification.
+
+The [2026-09-19 source-build receipt](../evidence/compile-4334e58b-20260919.json)
+records 14 cases across both doors and both module systems at that producer,
+with exact outcome parity and no resident-state or project-file mutation. Its
+engine is a clean source build predating the published v0.120.3 binary; its SDK
+tarball is the unreleased PR candidate. The hashes identify those tested bytes.
+
+Compile source-build receipts live outside the published package, so recording
+a tarball hash does not change the bytes it identifies. They do not participate
+in the released-engine behavioral ledgers.

@@ -11,6 +11,9 @@ import type {
   NikaAttachRunOptions,
   NikaCheckOptions,
   NikaCheckResult,
+  NikaCompileOptions,
+  NikaCompileOutcome,
+  NikaCompileRequest,
   NikaEvent,
   NikaReceipt,
   NikaRunId,
@@ -36,6 +39,16 @@ import {
   parseMachineObject,
   receiptTraceLocator,
 } from './machine.js';
+import {
+  COMPILE_CAPABILITY,
+  COMPILE_KILL_GRACE_MS,
+  COMPILE_RESPONSE_MAX_BYTES,
+  compileArgv,
+  compileOutcomeFrom,
+  compileSignal,
+  removeCompileScratch,
+} from './compile.js';
+import { captureEngine } from './engine-capture.js';
 import {
   verifyNikaEngine,
   type NikaEngineIdentity,
@@ -110,6 +123,69 @@ export class NativeProcessTransport implements Transport {
       );
     }
     return { ...report, exitCode: captured.exitCode } as NikaCheckResult;
+  }
+
+  /**
+   * Authoring, not execution (issue #128): one bounded `nika compile --json`
+   * invocation, projected verbatim. The engine must advertise the compile
+   * capability — an engine from before the door is refused here, before any
+   * spawn, and there is never a TypeScript fallback. No destination is passed:
+   * the candidate stays source in memory, nothing is written, and no Run
+   * exists; `signal`/`timeoutMs` only stop this one child.
+   */
+  async compile(
+    request: NikaCompileRequest,
+    options: NikaCompileOptions,
+  ): Promise<NikaCompileOutcome> {
+    const composed = compileSignal(options);
+    let invocation: Awaited<ReturnType<typeof compileArgv>> | undefined;
+    try {
+      // A caller mistake (or a caller who already gave up) needs zero processes:
+      // judge the request — and refuse — before even the identity probe exists.
+      if (composed.signal?.aborted) {
+        throw new NikaTransportError(this.kind, 'compile aborted');
+      }
+      invocation = await compileArgv(request);
+      // Compile's cancellation also bounds negotiation; an aborted probe is
+      // never cached as this client's permanent engine identity.
+      const identity = composed.signal ? await verifyNikaEngine(this.options.engine, {
+        signal: composed.signal, killGraceMs: COMPILE_KILL_GRACE_MS,
+      }) : await this.ensureReady();
+      if (!identity.supportedCapabilities.includes(COMPILE_CAPABILITY)) {
+        throw new NikaCompatibilityError(
+          COMPILE_CAPABILITY,
+          this.kind,
+          `Engine ${identity.engineVersion} at ${this.options.engine.bin} does not advertise `
+          + `${COMPILE_CAPABILITY} (advertised: ${identity.supportedCapabilities.join(', ') || 'nothing'}); `
+          + 'compile needs an engine that speaks the `compile_version: 1` wire '
+          + '(engine nika#1663). The SDK never compiles in TypeScript and never '
+          + 'falls back to another channel',
+        );
+      }
+      const captured = await captureEngine(this.options.engine.bin, invocation.args, {
+        cwd: this.options.cwd,
+        signal: composed.signal,
+        bufferBytes: COMPILE_RESPONSE_MAX_BYTES,
+        transport: this.kind,
+        label: 'compile',
+        killGraceMs: COMPILE_KILL_GRACE_MS,
+      });
+      return compileOutcomeFrom(captured, this.kind, this.options.engine.bin);
+    } catch (cause) {
+      if (composed.signal?.aborted && cause instanceof NikaTransportError) {
+        throw new NikaTransportError(
+          this.kind,
+          composed.timedOut()
+            ? `compile timed out after ${options.timeoutMs} ms`
+            : 'compile aborted by caller',
+          { cause },
+        );
+      }
+      throw cause;
+    } finally {
+      composed.dispose();
+      if (invocation) await removeCompileScratch(invocation);
+    }
   }
 
   async startRun(workflow: string, options: NikaRunOptions): Promise<TransportRun> {

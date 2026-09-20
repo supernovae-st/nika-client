@@ -1,11 +1,11 @@
 {
-  "engine": "nika 0.120.2 (289a9adea)",
-  "package": "supernovae-st-nika-0.120.2.tgz",
+  "engine": "nika 0.120.3 (578352a31)",
+  "package": "supernovae-st-nika-0.120.3.tgz",
   "process_count": 2,
   "installed_from_pack": true,
   "project": "two-process-durable-recovery",
   "status": "succeeded",
-  "job_id": "a30610c3-51d4-40df-89f4-b675a095539f",
+  "job_id": "71b37d18-655d-4c09-bb21-ef8b680ede2d",
   "producer_last_event_id": 1,
   "resumed_sequences": [
     2

@@ -346,8 +346,8 @@ node -p "require('@supernovae-st/nika/package.json').version"
 ./node_modules/.bin/nika --version
 ```
 
-This repository's source train is **0.120.2** (`package.json`), lockstep with
-public engine tag `v0.120.2` (`289a9adea`). A source train is not a published
+This repository's source train is **0.120.3** (`package.json`), lockstep with
+public engine tag `v0.120.3` (`578352a31`). A source train is not a published
 npm version until the release workflow publishes it.
 
 This package metadata subpath is exported for CommonJS, ESM build tools and CI
@@ -386,10 +386,10 @@ and asks for French; the hand-written file above is enough if it keeps
 ## Compile a candidate without running it
 
 `compile()` requires an engine that advertises the `compile` capability. The
-released 0.120.2 engine supports native compilation. HTTP compilation requires
-a compatible Serve built from engine commit `4334e58b` or later; the published
-0.120.2 Serve predates that route and is refused without fallback. This SDK method
-is currently an unreleased addition. This foundation resolves
+released 0.120.3 engine supports native compilation and its Serve advertises
+HTTP compilation (the route landed in engine commit `4334e58b`, first published
+in v0.120.3); a 0.120.2 or older Serve predates that route and is refused
+without fallback. This SDK method first publishes with 0.120.3. This foundation resolves
 exact embedded skeleton names (including `hello`) and edits existing constants;
 unsupported intent remains `incomplete`.
 

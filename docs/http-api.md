@@ -62,7 +62,8 @@ acknowledgement; no local check report or exit code is fabricated.
 ## Compile foundation
 
 Serve must advertise `compile` in `/health`. This route was added in engine
-commit `4334e58bddf539a6253f448eb05d562b6919f2b7`, after release 0.120.2.
+commit `4334e58bddf539a6253f448eb05d562b6919f2b7`, after release 0.120.2, and
+first published in release 0.120.3.
 The bundled OpenAPI and generated types preserve that exact producer contract. The SDK then posts a v1 create
 intent or inline edit source to `/v1/compile`, with bearer authentication and
 JSON content type. A string change becomes `{text: change}`; a structured change

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.120.3]
+
 ### Added
 
 - `Nika.compile(request, options)` — the SDK projection of the engine's one
@@ -35,8 +37,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 The HTTP compile contract is pinned to engine commit
 `4334e58bddf539a6253f448eb05d562b6919f2b7` (nika#1709), merged after
-`v0.120.2`. The released engine supports native compile; its Serve does not
-advertise HTTP compile. This SDK feature is not part of the published 0.120.2 package.
+`v0.120.2` and first published in engine `v0.120.3`, whose Serve advertises
+HTTP compile. This SDK feature first publishes with 0.120.3.
+
+### Changed
+
+- Lockstep with public engine `v0.120.3`
+  (`578352a31254ff04025ac6207bcf6f40d3911613`, engine #1711). Package and
+  native optional payloads follow the engine train via `sync:native-versions`;
+  OpenAPI `info.version` is `0.120.3`. `ENGINE_QUAL_PIN` / `ENGINE_CANDIDATE`
+  name the tagged commit. Current gauntlet evidence is regenerated from the
+  verified public macOS arm64 archive; the historical paid-provider and trace
+  ledgers are untouched.
 
 ## [0.120.2]
 

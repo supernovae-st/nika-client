@@ -31,7 +31,7 @@ must remain labelled as non-gating evidence.
 
 CI adds a behavioral provenance replay. It downloads the Linux x64 asset for
 the exact root package version, verifies its GitHub attestation and published
-`SHA256SUMS` entry, then reruns all 100 deterministic workflows, the hostile suite, all five mini-SaaS projects, all five depth projects,
+`SHA256SUMS` entry, then reruns all 100 deterministic workflows, the hostile suite, all five mini-SaaS projects, all six depth projects,
 the two-process recovery scenario, and five scenarios through six execution
 doors from a freshly packed SDK. The runner
 mints an ephemeral run-signing key. Its

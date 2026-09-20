@@ -35,6 +35,7 @@ const DEPTH_PROJECTS = new Set([
   "incident-response-controller",
   "multi-tenant-webhook-router",
   "scheduled-research-monitor",
+  "signed-webhook-intake",
 ]);
 const UUID_PATTERN = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 
@@ -121,10 +122,11 @@ function verifyBehavior(relativePath, evidence) {
   }
   if (relativePath === "gauntlet/projects-depth/results.json") {
     verifyProjects(relativePath, evidence.projects, DEPTH_PROJECTS);
-    if (evidence.summary?.total !== 5
-      || evidence.summary?.succeeded !== 5
+    const depthCount = DEPTH_PROJECTS.size;
+    if (evidence.summary?.total !== depthCount
+      || evidence.summary?.succeeded !== depthCount
       || evidence.summary?.result !== "green") {
-      throw new Error(`${relativePath} does not record a 5/5 green summary`);
+      throw new Error(`${relativePath} does not record a ${depthCount}/${depthCount} green summary`);
     }
     const incident = evidence.projects.find(
       (project) => project.project === "incident-response-controller",

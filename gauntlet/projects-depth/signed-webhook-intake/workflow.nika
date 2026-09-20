@@ -1,0 +1,53 @@
+# One program, three triggers. An app-owned signed webhook admits it with
+# `inputs.event`; a manual SDK run admits it the same way; a resident schedule
+# fires it with the declared default (a heartbeat). The file owns no listener,
+# no signature scheme, no hook URL and no secret: those live at the boundary
+# that receives the event, never in the portable program.
+nika: depth-signed-webhook-intake
+model: mock/echo
+run:
+  entropy: none
+  clock: virtual
+inputs:
+  event:
+    type: { object: { id: string, type: string, amount: integer, currency: string, customer: { optional: string } } }
+    required: false
+    default: { id: "heartbeat", type: "intake.heartbeat", amount: 0, currency: "eur" }
+permits:
+  tools: ["nika:hash", "nika:jq", "nika:validate"]
+tasks:
+  validate_event:
+    invoke:
+      tool: "nika:validate"
+      args:
+        data: ${{ inputs.event }}
+        schema:
+          type: object
+          required: [id, type, amount, currency]
+          properties:
+            id: { type: string, minLength: 1 }
+            type: { type: string, minLength: 1 }
+            amount: { type: integer, minimum: 0 }
+            currency: { type: string, minLength: 3, maxLength: 3 }
+            customer: { type: string }
+  classify:
+    after: { validate_event: success }
+    invoke:
+      tool: "nika:jq"
+      args:
+        input: ${{ inputs.event }}
+        expression: |
+          { id, type, currency,
+            tier: (if .type == "intake.heartbeat" then "heartbeat"
+                   elif .amount >= 10000 then "large"
+                   else "standard" end),
+            review_required: (.amount >= 10000) }
+  seal:
+    with:
+      decision: ${{ tasks.classify.output }}
+    invoke:
+      tool: "nika:hash"
+      args: { content: "${{ with.decision }}", algo: sha256, encoding: hex }
+outputs:
+  decision: ${{ tasks.classify.output }}
+  digest: ${{ tasks.seal.output }}

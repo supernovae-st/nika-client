@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Packed depth project `signed-webhook-intake` — the app-owned webhook
+  qualification (engine nika#1719 names it as the path that stays
+  first-class). A loopback receiver verifies a Standard Webhooks
+  HMAC-SHA256 signature over the raw bytes with a 300 s timestamp window
+  using `node:crypto` only (the SDK still exports no verifier), normalizes
+  the payload into the workflow's declared `inputs` and admits it through
+  `run()` with the sender's delivery id as `idempotencyKey` against a real
+  `nika serve`. Measured on engine 0.120.3: a concurrently retried delivery
+  reuses one durable job; tampered, stale, malformed and mistyped deliveries
+  are refused as `INGRESS_AUTH`, `INGRESS_REPLAY`, `INGRESS_PARSE` and
+  `INPUT_MAPPING` before or at admission; `attachRun` and `run.events()`
+  observe the admitted job; and the same `workflow.nika` is started by the
+  webhook, a manual `run()` and a `once` schedule that fires the declared
+  default. The depth ledger, evidence gate and replay fixtures now count six
+  projects; the new row records behavioral verdicts only, never a job id.
+
 ## [0.120.3]
 
 ### Added

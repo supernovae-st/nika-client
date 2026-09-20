@@ -2,10 +2,11 @@
 
 ## Outcome
 
-Five isolated Node consumers install `@supernovae-st/nika-client` from the tarball produced by `npm pack`; none imports repository source or build output. The runner executes every consumer against an explicit compatible `NIKA_BIN` and writes the machine-readable evidence to `gauntlet/projects-depth/results.json`.
+Six isolated Node consumers install `@supernovae-st/nika` from the tarball produced by `npm pack`; none imports repository source or build output. The runner executes every consumer against an explicit compatible `NIKA_BIN` and writes the machine-readable evidence to `gauntlet/projects-depth/results.json`.
 
 | Consumer | Depth exercised |
 |---|---|
+| Signed webhook intake | App-owned Standard Webhooks HMAC-SHA256 verification over the raw bytes with a 300 s timestamp window (no SDK verifier), normalized payload admitted as declared `inputs`, sender delivery id as `idempotencyKey`, concurrent retried delivery reusing one durable job, four typed refusals (`INGRESS_AUTH`, `INGRESS_REPLAY`, `INGRESS_PARSE`, `INPUT_MAPPING`), `attachRun` on the admitted job, SSE observation, and the same `workflow.nika` started by the webhook, a manual `run()` and a resident `once` schedule that fires the declared default |
 | Multi-tenant webhook router | Real loopback webhook ingress, authenticated loopback `nika serve`, duplicate HTTP delivery, idempotent job identity, concurrent workflow routing, SSE observation |
 | Scheduled research monitor | Resident cadence declaration, exact-revision CAS update, typed stale-writer conflict, server restart with durable state, client reconnect, SSE sequence observation |
 | Evidence/provenance pipeline | Concurrent native runs, bounded workflow fan-out, deterministic source and root hashes, two verified receipts, forged receipt rejection |
@@ -16,9 +17,9 @@ All workflows use the public envelope and task-map form, the canonical `invoke` 
 
 ## Verification
 
-- `NIKA_BIN=/path/to/compatible/nika node scripts/run-depth-projects.mjs` — 5/5 succeeded from isolated packed installs.
+- `NIKA_BIN=/path/to/compatible/nika node scripts/run-depth-projects.mjs` — 6/6 succeeded from isolated packed installs.
 - `npm test` — the full repository suite passed.
-- `node --check` — all five consumer entry points and the runner passed.
+- `node --check` — all six consumer entry points and the runner passed.
 - `git diff --check` — passed.
 
 The previous release-candidate replay used the public release engine `nika 0.118.7 (f3a31a6ee)`
@@ -50,10 +51,16 @@ not release gates for the current candidate.
 ## Public 0.120.3 replay
 
 The current replay uses public release engine `nika 0.120.3 (578352a31)`
-with `supernovae-st-nika-0.120.3.tgz`. All five projects passed with canonical
+with `supernovae-st-nika-0.120.3.tgz`. All six projects passed with canonical
 `.nika` files, including the incident controller's HTTP check and run, sealed
 journal verification, substituted-trace refusal, controlled cancellation, and
-graceful resident shutdown. Raw trace identifiers remain in the ledger; replay
+graceful resident shutdown. The sixth project, signed webhook intake, is the
+app-owned webhook qualification: the application verifies a Standard
+Webhooks signature over the raw bytes and admits the normalized payload as
+declared `inputs` under the sender's delivery id; the engine owns replay,
+typed input refusal, the durable job, SSE and the once schedule that starts
+the same program with its declared default. Its ledger row carries behavioral
+verdicts only, never a job id. Raw trace identifiers remain in the ledger; replay
 comparison validates their shape and compares the behavioral verdicts because
 each execution creates a fresh identity.
 
@@ -106,7 +113,8 @@ Both platforms produced byte-identical uncompressed tar data (SHA-256
 but different compressed bytes.
 
 The current 0.120.3 committed depth baseline is the local macOS observation
-against public engine `nika 0.120.3 (578352a31)`. The measured macOS package
-SHA-256 is `5ec8e52e8f8562768b4ba97e0b0537f61d9f9a1ffe0b4754c94ffb0b68c1c443`.
+against public engine `nika 0.120.3 (578352a31)`, regenerated when the sixth
+project landed. The measured macOS package
+SHA-256 is `d32c6eec85f603635cd4644c75a4a0ef04502102f3b53c6cf679025249dc17a8`.
 Linux CI `release-evidence-replay` still requires its exact compressed archive
 digest; that digest is not claimed here.

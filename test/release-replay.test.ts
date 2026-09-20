@@ -557,7 +557,7 @@ describe('public release evidence replay', () => {
   it('refuses a failed depth-project replay summary', () => {
     const replay = createReplay();
     const depth = readJson(replay, 'depth-projects.json');
-    depth.summary = { total: 5, succeeded: 0, result: 'red' };
+    depth.summary = { total: 6, succeeded: 0, result: 'red' };
     writeJson(replay, 'depth-projects.json', depth);
 
     expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(

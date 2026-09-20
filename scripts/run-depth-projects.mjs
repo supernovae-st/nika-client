@@ -9,7 +9,7 @@ import { OwnedProcesses } from './one-door/process.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const expected = ['deployment-gate', 'evidence-provenance-pipeline', 'incident-response-controller',
-  'multi-tenant-webhook-router', 'scheduled-research-monitor'];
+  'multi-tenant-webhook-router', 'scheduled-research-monitor', 'signed-webhook-intake'];
 
 export function assertAppIdentity(source, project) {
   const committed = readFileSync(path.join(source, 'app.mjs'));

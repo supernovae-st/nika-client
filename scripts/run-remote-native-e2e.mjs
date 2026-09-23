@@ -142,6 +142,7 @@ try {
     return fetch(url, init);
   };
   const nika = new Nika({ url: base, token: bearer, fetch: observedFetch,
+    allowInsecureHttp: true, // Explicit isolated loopback transport; never an external endpoint.
     machineBufferBytes: 2 * 1024 * 1024, requestTimeout: 15000 });
   const legacy = await nika.compile('hello');
   assert.equal(legacy.compile_version, 1); assert.equal(receipt.providerCalls.length, 0);

@@ -20,6 +20,7 @@ import type {
   NikaCompileProvenance,
   NikaCompileQuestion,
   NikaCompileRequest,
+  NikaCompileRemoteAuthoring,
   NikaCompileStatus,
   NikaCompileSetConstant,
   NikaCompileTrigger,
@@ -53,8 +54,10 @@ import { machineObject } from './machine.js';
 /** The capability token an engine advertises once it speaks the compile wire. */
 export const COMPILE_CAPABILITY = 'compile';
 
-/** The deterministic wire generation (HTTP requests remain generation 1). */
+/** The deterministic request generation; remote native requests explicitly use 2. */
 export const COMPILE_WIRE_VERSION = 1;
+export const COMPILE_NATIVE_CAPABILITY = 'compileNativeV2';
+export const COMPILE_REPLAY_HEADER = 'Nika-Compile-Replay';
 
 /**
  * Finite bound for one compile response (the candidate plus its full Check
@@ -180,7 +183,7 @@ function normalizeChange(change: unknown): string | NikaCompileSetConstant {
 export function normalizeCompileOptions(options: NikaCompileOptions): NikaCompileOptions {
   const record = dataRecord(options, 'options');
   for (const key of Reflect.ownKeys(record)) {
-    if (key !== 'signal' && key !== 'timeoutMs' && key !== 'authoring') {
+    if (key !== 'signal' && key !== 'timeoutMs' && key !== 'authoring' && key !== 'remoteAuthoring') {
       throw new NikaConfigurationError(`compile: unknown option ${String(key)}`);
     }
   }
@@ -210,7 +213,44 @@ export function normalizeCompileOptions(options: NikaCompileOptions): NikaCompil
     } catch { throw invalidSignal(); }
   }
   if (record.authoring !== undefined) record.authoring = normalizeAuthoring(record.authoring);
+  if (record.remoteAuthoring !== undefined) {
+    if (record.authoring !== undefined) {
+      throw new NikaConfigurationError('compile: authoring and remoteAuthoring cannot be combined');
+    }
+    record.remoteAuthoring = normalizeRemoteAuthoring(record.remoteAuthoring);
+  }
   return record as NikaCompileOptions;
+}
+
+function normalizeRemoteAuthoring(value: unknown): NikaCompileRemoteAuthoring {
+  const remote = dataRecord(value, 'remoteAuthoring');
+  if (Object.keys(remote).some((key) => !['cognition', 'limits', 'replayToken'].includes(key))) {
+    throw new NikaConfigurationError('compile: unknown remoteAuthoring option; provider and context are server-owned');
+  }
+  if (remote.cognition === 'deterministicOnly') {
+    if ('limits' in remote || typeof remote.replayToken !== 'string'
+      || !/^[0-9a-f]{64}$/.test(remote.replayToken)) {
+      throw new NikaConfigurationError('compile: deterministic replay needs a server-issued token and forbids limits');
+    }
+  } else if (remote.cognition === 'explicitProvider') {
+    if ('replayToken' in remote) throw new NikaConfigurationError('compile: fresh authoring cannot carry a replay token');
+    if ('limits' in remote) {
+      const limits = dataRecord(remote.limits, 'remoteAuthoring.limits');
+      const bounds = { repairs: [0, 5], maxTokens: [1, 32768], callTimeoutMs: [1, 600000], deadlineMs: [1, 3600000] } as const;
+      for (const key of Object.keys(limits)) {
+        const bound = bounds[key as keyof typeof bounds];
+        const value = limits[key];
+        if (!Object.hasOwn(bounds, key) || typeof value !== 'number' || !Number.isSafeInteger(value)
+          || value < bound[0] || value > bound[1]) {
+          throw new NikaConfigurationError('compile: invalid remote authoring limit');
+        }
+      }
+      remote.limits = limits;
+    }
+  } else {
+    throw new NikaConfigurationError('compile: remoteAuthoring needs explicitProvider or deterministicOnly cognition');
+  }
+  return remote as unknown as NikaCompileRemoteAuthoring;
 }
 
 function compileText(value: unknown, label: string): asserts value is string {
@@ -306,6 +346,10 @@ export interface CompileInvocation {
  * involved (the capture spawns argv directly).
  */
 export async function compileArgv(request: NikaCompileRequest, options: NikaCompileOptions = {}): Promise<CompileInvocation> {
+  if (options.remoteAuthoring !== undefined) {
+    throw new NikaCompatibilityError(COMPILE_NATIVE_CAPABILITY, 'native-process',
+      'remoteAuthoring requires an HTTP client; replay tokens never select local authoring');
+  }
   const args = ['compile', '--json'];
   const authoring = options.authoring;
   if (authoring !== undefined) {
@@ -389,12 +433,13 @@ function refuseNul(value: string): void {
   if (value.includes('\0')) throw new NikaConfigurationError('compile: text cannot contain a NUL byte');
 }
 
-/** Exact accepted Serve v1 envelope; no local capture or compiler is involved. */
+/** Exact accepted Serve v1/v2 envelopes; no local capture or compiler is involved. */
 export function compileBody(request: NikaCompileRequest, options: NikaCompileOptions = {}): string {
-  if (options.authoring !== undefined || request.originalIntent !== undefined) {
+  if (options.authoring !== undefined || (request.originalIntent !== undefined && options.remoteAuthoring === undefined)) {
     throw new NikaCompatibilityError(COMPILE_CAPABILITY, 'http',
       'HTTP Compile request wire v1 cannot honor authoring options or originalIntent; use an explicit local client');
   }
+  if (options.remoteAuthoring !== undefined) return remoteCompileBody(request, options.remoteAuthoring);
   compileAnswers(request.answers); // Keep the literal/key law identical across doors.
   const answers = request.answers === undefined ? ''
     : `,"answers":${encodeLiteralInputs(request.answers, 'compile({ answers })').json}`;
@@ -407,6 +452,50 @@ export function compileBody(request: NikaCompileRequest, options: NikaCompileOpt
     ? `{"text":${JSON.stringify(request.change)}}`
     : `{"set_constant":{"name":${JSON.stringify(request.change.set_constant.name)},"value":${literalJson(request.change.set_constant.value)}}}`;
   return `{"compile_version":1,"mode":"edit","source":${JSON.stringify(request.workflow)},"change":${change}${answers}}`;
+}
+
+/** Exact Serve v2 request. Input bytes are never trimmed, restated or inferred from answers. */
+function remoteCompileBody(request: NikaCompileRequest, remote: NikaCompileRemoteAuthoring): string {
+  compileAnswers(request.answers);
+  const bounded = (text: string, max: number) => {
+    if (Buffer.byteLength(text, 'utf8') > max) throw new NikaConfigurationError('compile: HTTP v2 input exceeds the server wire bound');
+  };
+  const body: Record<string, unknown> = { compile_version: 2,
+    mode: request.intent !== undefined ? 'create' : 'edit', cognition: remote.cognition };
+  if (request.intent !== undefined) {
+    refuseNul(request.intent); bounded(request.intent, 4096); body.intent = request.intent;
+  } else {
+    bounded(request.workflow, 512 * 1024); body.source = request.workflow;
+    if (typeof request.change === 'string') {
+      if (request.originalIntent === undefined) throw new NikaConfigurationError('compile: HTTP v2 text revision requires originalIntent');
+      refuseNul(request.change); bounded(request.change, 4096); bounded(request.originalIntent, 4096);
+      body.change = { text: request.change }; body.original_intent = request.originalIntent;
+    } else {
+      if (request.originalIntent !== undefined) throw new NikaConfigurationError('compile: a structured constant edit cannot carry originalIntent');
+      bounded(request.change.set_constant.name, 128);
+      bounded(literalJson(request.change.set_constant.value), 64 * 1024);
+      body.change = request.change;
+    }
+  }
+  if (request.answers !== undefined) {
+    const answers = JSON.parse(encodeLiteralInputs(request.answers, 'compile({ answers })').json) as Record<string, unknown>;
+    if (Object.keys(answers).length > 64) throw new NikaConfigurationError('compile: HTTP v2 accepts at most 64 answers');
+    if (Object.hasOwn(answers, 'intent.clarification')) throw new NikaConfigurationError('compile: intent.clarification requires a new intent and a fresh authoring request');
+    for (const key of Object.keys(answers)) { bounded(key, 256); bounded(literalJson(answers[key]), 64 * 1024); }
+    body.answers = answers;
+  }
+  if (remote.cognition === 'deterministicOnly') body.replay_token = remote.replayToken;
+  else if (remote.limits !== undefined) {
+    const limits: Record<string, number> = {};
+    for (const [key, wire] of [['repairs', 'repairs'], ['maxTokens', 'max_tokens'],
+      ['callTimeoutMs', 'call_timeout_ms'], ['deadlineMs', 'deadline_ms']] as const) {
+      if (remote.limits[key] !== undefined) limits[wire] = remote.limits[key];
+    }
+    body.limits = limits;
+  }
+  // Use the bounded iterative encoder even after validation: JSON.stringify
+  // would throw an untyped RangeError for a deeply nested, otherwise JSON value.
+  return encodeLiteralInputs(body, 'compile({ answers })').json;
 }
 
 /**

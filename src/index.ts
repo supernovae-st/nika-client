@@ -390,6 +390,8 @@ export type {
   NikaCompileProvenance,
   NikaCompileQuestion,
   NikaCompileRequest,
+  NikaCompileRemoteAuthoring,
+  NikaCompileRemoteLimits,
   NikaCompileStatus,
   NikaCompileSetConstant,
   NikaConfig,

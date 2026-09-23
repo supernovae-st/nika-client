@@ -847,8 +847,8 @@ export interface NikaScheduleApplyResult {
  * - EDIT: `{ workflow, change }` — the accepted workflow's SOURCE plus the
  *   change request — optionally with `answers`.
  *
- * The two shapes never mix, and there is no session: every call is a fresh
- * request carrying everything the engine needs.
+ * The two shapes never mix. The SDK keeps no authoring session: each call
+ * carries its original input and answers, plus explicit replay options if used.
  */
 export type NikaCompileRequest = NikaCompileCreateRequest | NikaCompileEditRequest;
 
@@ -858,8 +858,8 @@ export interface NikaCompileCreateRequest {
   /**
    * Answers to engine questions, by stable question key (`const.request`),
    * as strict JSON values — never pre-serialized text. The SDK serializes
-   * each value exactly once onto the argv `KEY=JSON` channel; a value JSON
-   * cannot carry refuses with `NikaConfigurationError` before any spawn.
+   * each value onto the CLI `KEY=JSON` channel or HTTP JSON body; a value JSON
+   * cannot carry refuses with `NikaConfigurationError` before any I/O.
    */
   answers?: Record<string, unknown>;
   workflow?: never;
@@ -879,7 +879,7 @@ export interface NikaCompileEditRequest {
   change: string | NikaCompileSetConstant;
   answers?: Record<string, unknown>;
   intent?: never;
-  /** Local CLI only: the original intent the accepted workflow answered. */
+  /** Original intent the base answered; required for an HTTP v2 text revision. */
   originalIntent?: string;
 }
 
@@ -895,7 +895,8 @@ export interface NikaCompileSetConstant {
 
 export interface NikaCompileOptions {
   /**
-   * Aborts this authoring process only. Compile owns no Run: this never
+   * Stops the local authoring process or HTTP observation. A remote server
+   * retains its own work deadline. Compile owns no Run: this never
    * touches `run.cancel()` semantics (client#126), and no workflow effect
    * exists to interrupt.
    */
@@ -904,6 +905,25 @@ export interface NikaCompileOptions {
   timeoutMs?: number;
   /** Local CLI only. Explicit opt-in; answers and ambient credentials never select a model. */
   authoring?: NikaCompileAuthoringOptions;
+  /** HTTP only. Explicit server-native authoring or zero-call replay; never combined with authoring. */
+  remoteAuthoring?: NikaCompileRemoteAuthoring;
+}
+
+/** Server owns the provider, model, credentials, strategy and knowledge. */
+export type NikaCompileRemoteAuthoring =
+  | { cognition: 'explicitProvider'; limits?: NikaCompileRemoteLimits; replayToken?: never }
+  | { cognition: 'deterministicOnly'; replayToken: string; limits?: never };
+
+/** Narrower than the operator's bounds; the server refuses widening, never clamps it. */
+export interface NikaCompileRemoteLimits {
+  /** Logical repair rounds, 0..5. A provider transport may retry a logical call. */
+  repairs?: number;
+  /** Output tokens per logical call, 1..32768. */
+  maxTokens?: number;
+  /** Per-call milliseconds, 1..600000. */
+  callTimeoutMs?: number;
+  /** Whole server round milliseconds, 1..3600000; distinct from SDK timeoutMs. */
+  deadlineMs?: number;
 }
 
 /** A thin projection of the engine's explicit authoring CLI flags. */
@@ -1036,4 +1056,6 @@ export interface NikaCompileOutcome {
   requested_trigger?: NikaCompileTrigger | null;
   check_preview: NikaCompilePreview | null;
   provenance: NikaCompileProvenance;
+  /** HTTP Nika-Compile-Replay header, when issued. Sensitive, server-bound, expiring; no Run authority. */
+  replayToken?: string;
 }

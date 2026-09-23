@@ -454,9 +454,50 @@ read its knowledge environment configuration and record replay plans under
 `.nika/compile`. The SDK supplies no destination and writes no persistent candidate.
 
 HTTP request wire v1 has no native authoring or original-intent fields.
-An HTTP client rejects `authoring` and edit `originalIntent` with
+Without a remote opt-in, an HTTP client rejects `authoring` and edit `originalIntent` with
 `NikaCompatibilityError` before any request, including health negotiation.
-It never forwards local paths or switches to a local engine.
+Local `authoring` is always rejected over HTTP; paths and model selection belong
+to the server operator.
+
+Servers implementing engine commit `fc6f3241` can advertise both `compile` and
+`compileNativeV2`. On those servers, `remoteAuthoring` explicitly requests native
+authoring under the operator's provider, model, knowledge and access settings:
+
+```ts
+const remote = new Nika({ url: 'https://nika.example', token: process.env.NIKA_TOKEN! });
+const request = { intent: 'Read ./a.md and rewrite it, then write ./b.md.' };
+const draft = await remote.compile(request, {
+  remoteAuthoring: { cognition: 'explicitProvider', limits: { repairs: 0, maxTokens: 2048 } },
+  timeoutMs: 360_000,
+});
+// When the server kept a plan and asks for a runtime model, replay that same input.
+// Use the returned question's stable key and the user's answer; never log the token.
+if (draft.replayToken && draft.questions.some(q => q.key === 'model')) {
+  const answered = await remote.compile({ ...request, answers: { model: 'mistral/mistral-small-latest' } }, {
+    remoteAuthoring: { cognition: 'deterministicOnly', replayToken: draft.replayToken },
+  });
+  console.log(answered.status);
+}
+```
+
+Replay makes no provider calls and repeats the original input exactly. For text
+revisions, keep `workflow`, `change` and required `originalIntent` unchanged;
+add the complete typed answer map. Replay tokens are sensitive, server-bound,
+expiring and optional. Missing or expired tokens require a caller decision;
+the SDK never retries with paid authoring. `intent.clarification` requires a new
+intent and explicit fresh authoring. A structured `set_constant` edit forbids
+`originalIntent` and remains deterministic.
+
+Optional `limits` narrow the operator's bounds: `repairs` 0–5, `maxTokens`
+1–32768, `callTimeoutMs` 1–600000 and `deadlineMs` 1–3600000. The server rejects
+values above its own limits; the SDK cannot discover those private limits from
+health. Logical calls are bounded by one opening plus repairs; provider transport
+retries can add HTTP attempts. These are operation bounds, not monetary caps.
+`timeoutMs` bounds SDK observation, while `deadlineMs` bounds the server round;
+disconnecting does not promise that billing stops immediately. No native POST
+is sent unless health advertises both capabilities, and no local fallback runs.
+See [the HTTP contract](docs/http-api.md#remote-native-compile) and
+[the controlled real-server check](docs/http-api.md#controlled-real-server-check).
 
 Both transports decode known Compile response versions 1 and 2 and refuse
 unknown versions. Version 2 preserves the full `provenance.authoring` receipt,

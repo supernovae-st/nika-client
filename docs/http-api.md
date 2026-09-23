@@ -82,6 +82,79 @@ boundary, source-only Check preview and provenance. It carries no process exit
 code or materialized destination. A candidate and its requested boundary grant
 nothing: execution needs a separate caller decision and normal `run` admission.
 
+## Remote native Compile
+
+This optional surface consumes the implemented contract at engine commit
+`fc6f324119fd900b7952bd893f39630ed6371d0a`; it does not change the pinned release
+OpenAPI. Both `compile` and `compileNativeV2` must appear in health. Without
+`remoteAuthoring`, the SDK sends the original v1 request exactly as before.
+
+`remoteAuthoring: { cognition: 'explicitProvider', limits? }` sends v2 to the
+same authenticated route. Create carries `intent`; text revision carries
+`source`, `change: {text}` and required `original_intent`. Structured constant
+edits carry `source` and `change: {set_constant}` without `original_intent`.
+`answers` retain strict JSON types. Provider, endpoint, model, credentials,
+strategy, knowledge paths and execution grants are not caller fields. Existing
+local `authoring` options cannot be forwarded over HTTP or combined with the
+remote option; remote options cannot be used on a local client.
+
+The optional `NikaCompileRemoteLimits` fields map as follows:
+
+| SDK | Wire | Hard range |
+| --- | --- | --- |
+| `repairs` | `repairs` | 0–5 |
+| `maxTokens` | `max_tokens` | 1–32768 |
+| `callTimeoutMs` | `call_timeout_ms` | 1–600000 |
+| `deadlineMs` | `deadline_ms` | 1–3600000 |
+
+Every supplied value must also be within the operator's private bounds. A
+widening is a typed server refusal, never a clamp. Omission keeps the operator's
+value. Limits bound an operation, not monetary cost; one opening plus repairs
+bounds logical calls, whose transport may retry transient errors. SDK timeout
+and cancellation stop observation; the server round retains its own deadline.
+
+A fresh response may include `Nika-Compile-Replay`; the SDK exposes it as
+`outcome.replayToken`. Treat it as sensitive and do not log the whole outcome
+without removing that field. To answer a kept plan, repeat the exact original
+create or revision fields and supply the complete typed answer map, with
+`remoteAuthoring: { cognition: 'deterministicOnly', replayToken }`. The wire
+contains `replay_token` and no `limits`. This makes zero provider calls. The
+server checks token lifetime, context and input identity; it may return 409
+`compile_replay_unavailable`, `compile_replay_input_changed` or
+`compile_context_changed`. The SDK never buys a fresh round on refusal and
+never automatically retries a fresh POST. Tokens confer no Run authority and
+are not renewed by replay; retain the original token for subsequent answers.
+An `intent.clarification` answer needs a new explicit fresh request instead.
+
+SDK v2 input bounds match the server wire: 4 KiB intent/change/original intent,
+512 KiB source, 64 answers, 256-byte answer keys, 64 KiB per literal and 1 MiB
+total body. Operator limits can be smaller. Unsupported shapes and values fail
+before health; a missing capability fails after health but before POST. Both
+response versions are preserved: an actual native round uses v2 with its full
+authoring receipt, while a deterministic operation or replay can return v1.
+Unknown response versions, malformed receipts or replay headers fail typed.
+Unknown usage, actual model and cost are never inferred from a requested model.
+
+## Controlled real-server check
+
+After `npm run build`, run the repository's bounded harness with a binary hash
+and source commit supplied by its build receipt:
+
+```sh
+node scripts/run-remote-native-e2e.mjs \
+  --bin /absolute/path/to/nika --sha256 "$NIKA_BINARY_SHA256" \
+  --source "$NIKA_SOURCE_COMMIT" --out .local/remote-native-attempt-1
+```
+
+The output directory must be new. The harness verifies the binary before and
+after, starts real Serve with an isolated HOME and a controlled loopback vLLM
+wire, then drives the built public SDK through v1, native authoring, typed answer
+replay and changed-input refusal. It counts actual provider requests and writes
+redacted receipts. The scripted candidate and synthetic usage prove transport
+integration only, not live model generation, billing accuracy, workflow Run or
+release qualification. No user credentials or paid provider are used. A socket
+denial is a failed, preserved attempt to rerun in an authorized environment.
+
 ## Settlement
 
 The terminal `execution.settled` frame and the durable job nest the run's

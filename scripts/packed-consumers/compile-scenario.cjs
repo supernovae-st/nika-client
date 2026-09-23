@@ -37,15 +37,16 @@ async function refusal(sdk, action) {
   return { admitted: true };
 }
 
-/** A resident that records every request; it has no authoring door. */
-function resident(candidate) {
+/** Protocol double recording requests; never evidence of provider intelligence. */
+function resident(candidate, native = false) {
   const requests = [];
   const fetch = async (url, init = {}) => {
     const { pathname } = new URL(String(url));
     requests.push({ path: pathname, method: init.method ?? 'GET', body: init.body ?? null });
     if (pathname === '/v1/compile' && candidate) {
       if (init.headers.get('Authorization') !== `Bearer ${TOKEN}`) throw new Error('compile lacked bearer');
-      return Response.json(candidate);
+      const fresh = native && JSON.parse(init.body).cognition === 'explicitProvider';
+      return Response.json(candidate, { headers: fresh ? { 'Nika-Compile-Replay': 'c'.repeat(64) } : {} });
     }
     if (pathname === '/health') {
       return new Response(JSON.stringify({
@@ -57,7 +58,7 @@ function resident(candidate) {
         checkReportVersion: 1,
         eventFormatVersion: 1,
         traceFormatVersion: 2,
-        supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'trace', ...(candidate ? ['compile'] : [])],
+        supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'trace', ...(candidate ? ['compile'] : []), ...(native ? ['compileNativeV2'] : [])],
       }), { status: 200, headers: { 'Content-Type': 'application/json' } });
     }
     throw new Error(`unexpected request ${pathname}`);
@@ -163,6 +164,16 @@ module.exports = async function compileScenario(sdk, engines) {
     const remoteV2 = new sdk.Nika({ url: 'https://nika.example', token: TOKEN, bin: engines.compile, fetch: v2Server.fetch });
     assert.deepEqual(await remoteV2.compile('original'), nativeV2);
     assert.deepEqual(JSON.parse(v2Server.requests[1].body), { compile_version: 1, mode: 'create', intent: 'original' });
+    const nativeServer = resident(nativeV2, true);
+    const remoteNative = new sdk.Nika({ url: 'https://nika.example', token: TOKEN, bin: engines.compile, fetch: nativeServer.fetch });
+    const authored = await remoteNative.compile('original', { remoteAuthoring: { cognition: 'explicitProvider', limits: { repairs: 0 } } });
+    assert.deepEqual(authored, { ...nativeV2, replayToken: 'c'.repeat(64) });
+    assert.deepEqual(JSON.parse(nativeServer.requests[1].body), { compile_version: 2, mode: 'create', cognition: 'explicitProvider', intent: 'original', limits: { repairs: 0 } });
+    assert.deepEqual(await remoteNative.compile({ intent: 'original', answers: { model: 'runtime/choice' } }, {
+      remoteAuthoring: { cognition: 'deterministicOnly', replayToken: authored.replayToken },
+    }), nativeV2);
+    assert.deepEqual(JSON.parse(nativeServer.requests[2].body), { compile_version: 2, mode: 'create', cognition: 'deterministicOnly', intent: 'original', answers: { model: 'runtime/choice' }, replay_token: 'c'.repeat(64) });
+    assert.equal(nativeServer.requests.length, 3);
     const noCall = resident(nativeV2);
     const unsupported = new sdk.Nika({ url: 'https://nika.example', token: TOKEN, bin: engines.compile, fetch: noCall.fetch });
     for (const action of [() => unsupported.compile('original', { authoring }),

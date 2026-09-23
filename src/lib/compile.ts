@@ -13,6 +13,7 @@ import {
 import type {
   NikaCheckResult,
   NikaCompileDiagnostic,
+  NikaCompileAuthoringOptions,
   NikaCompileOptions,
   NikaCompileOutcome,
   NikaCompilePreview,
@@ -21,6 +22,7 @@ import type {
   NikaCompileRequest,
   NikaCompileStatus,
   NikaCompileSetConstant,
+  NikaCompileTrigger,
   NikaTransportKind,
 } from '../types.js';
 import type { EngineCapture } from './engine-capture.js';
@@ -30,15 +32,15 @@ import { machineObject } from './machine.js';
 /**
  * The native compile adapter (issue #128): a thin projection over the engine's
  * one authoring capability, reached through `nika compile --json` — the
- * versioned `compile_version: 1` wire the CLI adapter renders from the typed
+ * versioned `compile_version: 1 | 2` wire the CLI adapter renders from the typed
  * `CompileOutcome` core (engine nika#1663). There is no compiler in this file:
  * no intent parsing, no YAML work, no policy judgment. The SDK validates the
  * envelope, preserves the engine's fields verbatim, and classifies failures.
  *
  * The wire law (engine `nika-cli-host/src/compile/render.rs`):
  *
- * - exit 0 + `{compile_version:1, status:'ready', …}` — a complete candidate.
- * - exit 2 + `{compile_version:1, status:'incomplete'|'refused', …}` — DATA:
+ * - exit 0 + `{compile_version:1|2, status:'ready', …}` — a complete candidate.
+ * - exit 2 + `{compile_version:1|2, status:'incomplete'|'refused', …}` — DATA:
  *   questions and diagnostics, never an exception.
  * - exit 2 or 3 + `{compile_version:1, error:{code,message}}` — an
  *   engine-stamped failure (usage or environment/machinery).
@@ -51,7 +53,7 @@ import { machineObject } from './machine.js';
 /** The capability token an engine advertises once it speaks the compile wire. */
 export const COMPILE_CAPABILITY = 'compile';
 
-/** The only compile wire generation this SDK reads. */
+/** The deterministic wire generation (HTTP requests remain generation 1). */
 export const COMPILE_WIRE_VERSION = 1;
 
 /**
@@ -83,7 +85,8 @@ export function normalizeCompileRequest(
   }
   const record = dataRecord(input, 'request');
   for (const key of Reflect.ownKeys(record)) {
-    if (key !== 'intent' && key !== 'workflow' && key !== 'change' && key !== 'answers') {
+    if (key !== 'intent' && key !== 'workflow' && key !== 'change' && key !== 'answers'
+      && key !== 'originalIntent') {
       throw new NikaConfigurationError(
         `compile: unknown request field ${String(key)}; the request is refused `
         + 'rather than silently reinterpreted',
@@ -95,8 +98,9 @@ export function normalizeCompileRequest(
   const intent = record.intent;
   const workflow = record.workflow;
   const change = record.change;
+  const originalIntent = record.originalIntent;
   if (intent !== undefined) {
-    if (workflow !== undefined || change !== undefined) {
+    if (workflow !== undefined || change !== undefined || originalIntent !== undefined) {
       throw new NikaConfigurationError(
         'compile: intent (create) never mixes with workflow/change (edit) in one request',
       );
@@ -119,9 +123,12 @@ export function normalizeCompileRequest(
     );
   }
   const normalizedChange = normalizeChange(change);
-  return answers === undefined
-    ? { workflow, change: normalizedChange }
-    : { workflow, change: normalizedChange, answers: answers as Record<string, unknown> };
+  if (originalIntent !== undefined) compileText(originalIntent, 'originalIntent');
+  return {
+    workflow, change: normalizedChange,
+    ...(originalIntent === undefined ? {} : { originalIntent: originalIntent as string }),
+    ...(answers === undefined ? {} : { answers: answers as Record<string, unknown> }),
+  };
 }
 
 /** Inspect descriptors only: no request getter, Proxy trap or coercion runs. */
@@ -173,7 +180,7 @@ function normalizeChange(change: unknown): string | NikaCompileSetConstant {
 export function normalizeCompileOptions(options: NikaCompileOptions): NikaCompileOptions {
   const record = dataRecord(options, 'options');
   for (const key of Reflect.ownKeys(record)) {
-    if (key !== 'signal' && key !== 'timeoutMs') {
+    if (key !== 'signal' && key !== 'timeoutMs' && key !== 'authoring') {
       throw new NikaConfigurationError(`compile: unknown option ${String(key)}`);
     }
   }
@@ -202,7 +209,48 @@ export function normalizeCompileOptions(options: NikaCompileOptions): NikaCompil
       signalAborted.call(signal);
     } catch { throw invalidSignal(); }
   }
+  if (record.authoring !== undefined) record.authoring = normalizeAuthoring(record.authoring);
   return record as NikaCompileOptions;
+}
+
+function compileText(value: unknown, label: string): asserts value is string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new NikaConfigurationError(`compile: ${label} must be a non-empty string`);
+  }
+  refuseNul(value);
+}
+
+function normalizeAuthoring(value: unknown): NikaCompileAuthoringOptions {
+  const authoring = dataRecord(value, 'authoring');
+  const fields = ['model', 'strategy', 'repairs', 'maxTokens', 'timeoutSeconds', 'knowledge'];
+  if (Object.keys(authoring).some((key) => !fields.includes(key))) {
+    throw new NikaConfigurationError('compile: unknown authoring option');
+  }
+  compileText(authoring.model, 'authoring.model');
+  if (authoring.strategy !== undefined
+    && !['escalate', 'only', 'sketch', 'off'].includes(authoring.strategy as string)) {
+    throw new NikaConfigurationError('compile: authoring.strategy must be escalate, only, sketch or off');
+  }
+  for (const [key, min, max] of [['repairs', 0, 5], ['maxTokens', 1, 32768], ['timeoutSeconds', 1, 600]] as const) {
+    const limit = authoring[key];
+    if (limit !== undefined && (typeof limit !== 'number' || !Number.isSafeInteger(limit)
+      || limit < min || limit > max)) {
+      throw new NikaConfigurationError(`compile: authoring.${key} must be an integer between ${min} and ${max}`);
+    }
+  }
+  if (authoring.knowledge !== undefined) {
+    const knowledge = dataRecord(authoring.knowledge, 'authoring.knowledge');
+    if (Object.keys(knowledge).some((key) => !['snapshot', 'pack', 'excludeCorpus'].includes(key))
+      || (knowledge.snapshot === undefined) === (knowledge.pack === undefined)
+      || (knowledge.pack !== undefined && knowledge.excludeCorpus !== undefined)) {
+      throw new NikaConfigurationError('compile: knowledge needs either snapshot (with optional excludeCorpus) or pack');
+    }
+    for (const key of ['snapshot', 'pack', 'excludeCorpus']) {
+      if (knowledge[key] !== undefined) compileText(knowledge[key], `authoring.knowledge.${key}`);
+    }
+    authoring.knowledge = knowledge;
+  }
+  return authoring as unknown as NikaCompileAuthoringOptions;
 }
 
 /**
@@ -257,8 +305,22 @@ export interface CompileInvocation {
  * the intent positional always follows an explicit `--`, and no shell is ever
  * involved (the capture spawns argv directly).
  */
-export async function compileArgv(request: NikaCompileRequest): Promise<CompileInvocation> {
+export async function compileArgv(request: NikaCompileRequest, options: NikaCompileOptions = {}): Promise<CompileInvocation> {
   const args = ['compile', '--json'];
+  const authoring = options.authoring;
+  if (authoring !== undefined) {
+    args.push(`--authoring-model=${authoring.model}`);
+    for (const [key, flag] of [
+      ['strategy', 'strategy'], ['repairs', 'repairs'], ['maxTokens', 'max-tokens'],
+      ['timeoutSeconds', 'timeout'],
+    ] as const) {
+      if (authoring[key] !== undefined) args.push(`--authoring-${flag}=${authoring[key]}`);
+    }
+    const knowledge = authoring.knowledge;
+    if (knowledge?.snapshot !== undefined) args.push(`--knowledge=${knowledge.snapshot}`);
+    if (knowledge?.excludeCorpus !== undefined) args.push(`--knowledge-exclude=${knowledge.excludeCorpus}`);
+    if (knowledge?.pack !== undefined) args.push(`--knowledge-pack=${knowledge.pack}`);
+  }
   for (const answer of compileAnswers(request.answers)) {
     args.push(`--answer=${answer}`);
   }
@@ -286,6 +348,7 @@ export async function compileArgv(request: NikaCompileRequest): Promise<CompileI
     });
   }
   args.push('--base', base, `--change=${change}`);
+  if (request.originalIntent !== undefined) args.push('--', request.originalIntent);
   return { args, scratchDir };
 }
 
@@ -327,7 +390,11 @@ function refuseNul(value: string): void {
 }
 
 /** Exact accepted Serve v1 envelope; no local capture or compiler is involved. */
-export function compileBody(request: NikaCompileRequest): string {
+export function compileBody(request: NikaCompileRequest, options: NikaCompileOptions = {}): string {
+  if (options.authoring !== undefined || request.originalIntent !== undefined) {
+    throw new NikaCompatibilityError(COMPILE_CAPABILITY, 'http',
+      'HTTP Compile request wire v1 cannot honor authoring options or originalIntent; use an explicit local client');
+  }
   compileAnswers(request.answers); // Keep the literal/key law identical across doors.
   const answers = request.answers === undefined ? ''
     : `,"answers":${encodeLiteralInputs(request.answers, 'compile({ answers })').json}`;
@@ -423,7 +490,7 @@ export function compilePayloadFrom(
     throw protocol('a ready outcome carries no candidate');
   }
   const outcome: NikaCompileOutcome = {
-    compile_version: COMPILE_WIRE_VERSION,
+    compile_version: payload.compile_version as 1 | 2,
     status: status as NikaCompileStatus,
     ready: status === 'ready',
     candidate,
@@ -431,8 +498,9 @@ export function compilePayloadFrom(
     diagnostics: diagnosticsFrom(payload.diagnostics, protocol),
     requested_boundary: nullableObject(payload.requested_boundary, 'requested_boundary', protocol),
     check_preview: previewFrom(payload.check_preview, protocol),
-    provenance: provenanceFrom(payload.provenance, protocol),
+    provenance: provenanceFrom(payload.provenance, payload.compile_version as 1 | 2, protocol),
   };
+  if ('requested_trigger' in payload) outcome.requested_trigger = triggerFrom(payload.requested_trigger, protocol);
   return outcome;
 }
 
@@ -447,9 +515,9 @@ function validateCompileVersion(
   if (typeof version !== 'number' || !Number.isSafeInteger(version) || version < 1) {
     throw protocol('compile_version must be a positive safe integer');
   }
-  if (version !== COMPILE_WIRE_VERSION) {
+  if (version !== 1 && version !== 2) {
     throw new NikaCompatibilityError(COMPILE_CAPABILITY, transport,
-      `Engine at ${engine} speaks compile wire ${version}; expected ${COMPILE_WIRE_VERSION}`);
+      `Engine at ${engine} speaks compile wire ${version}; expected 1 or 2`);
   }
 }
 
@@ -490,12 +558,17 @@ function questionsFrom(
       !question
       || typeof question.key !== 'string'
       || typeof question.label !== 'string'
-      || (question.type !== 'text' && question.type !== 'literal')
+      || !['text', 'literal', 'choice'].includes(question.type as string)
       || typeof question.why !== 'string'
       || typeof question.mandatory !== 'boolean'
     ) {
       throw protocol('a question lacks its key/label/type/why/mandatory shape');
     }
+    if ('options' in question && (!Array.isArray(question.options)
+      || question.options.some((entry) => {
+        const option = machineObject(entry);
+        return !option || typeof option.key !== 'string' || typeof option.label !== 'string';
+      }))) throw protocol('question options must contain key/label objects');
     return question as unknown as NikaCompileQuestion;
   });
 }
@@ -534,6 +607,7 @@ function previewFrom(
 
 function provenanceFrom(
   value: unknown,
+  version: 1 | 2,
   protocol: (message: string) => NikaProtocolError,
 ): NikaCompileProvenance {
   const provenance = machineObject(value);
@@ -542,11 +616,43 @@ function provenanceFrom(
     || typeof provenance.compiler_version !== 'string'
     || typeof provenance.spec_pin !== 'string'
     || (provenance.skeleton !== null && typeof provenance.skeleton !== 'string')
-    || provenance.cognition !== 'deterministicOnly'
+    || !['deterministicOnly', 'explicitProvider', 'explicitDecision'].includes(provenance.cognition as string)
   ) {
     throw protocol('provenance lacks its compiler_version/spec_pin/skeleton/cognition shape');
   }
+  if ('suggested_file' in provenance && provenance.suggested_file !== null
+    && typeof provenance.suggested_file !== 'string') throw protocol('invalid suggested_file');
+  if ('strategy' in provenance && !['skeleton', 'support', 'hot', 'warm', 'cold', 'native'].includes(provenance.strategy as string)) {
+    throw protocol('invalid compile strategy');
+  }
+  if (version === 1 && 'authoring' in provenance) throw protocol('wire v1 cannot carry an authoring receipt');
+  if (version === 2) {
+    const receipt = machineObject(provenance.authoring);
+    const count = (n: unknown) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
+    const sampling = machineObject(receipt?.sampling);
+    if (!receipt || typeof receipt.model !== 'string' || !count(receipt.calls) || receipt.calls > 0xffffffff
+      || !count(receipt.elapsed_ms)
+      || (receipt.input_tokens !== null && !count(receipt.input_tokens))
+      || (receipt.output_tokens !== null && !count(receipt.output_tokens))
+      || !sampling || sampling.temperature !== null || sampling.seed !== null
+      || sampling.effective !== 'providerDefaultUnknown'
+      || !Array.isArray(receipt.context) || !('backend' in receipt)) {
+      throw protocol('invalid wire v2 authoring receipt');
+    }
+  }
   return provenance as unknown as NikaCompileProvenance;
+}
+
+function triggerFrom(value: unknown, protocol: (message: string) => NikaProtocolError): NikaCompileTrigger | null {
+  if (value === null) return null;
+  const trigger = machineObject(value);
+  if (!trigger || !['manual', 'schedule', 'webhook', 'event'].includes(trigger.kind as string)
+    || !['satisfied', 'requires_binding', 'unsupported'].includes(trigger.status as string)
+    || ['source_hint', 'event_hint', 'cadence', 'at', 'payload_input', 'timezone', 'missed', 'overlap', 'ceiling']
+      .some((key) => trigger[key] !== null && typeof trigger[key] !== 'string')) {
+    throw protocol('invalid requested_trigger');
+  }
+  return trigger as unknown as NikaCompileTrigger;
 }
 
 function writtenFrom(

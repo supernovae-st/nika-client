@@ -196,7 +196,7 @@ export class HttpTransport implements Transport {
     request: NikaCompileRequest,
     options: NikaCompileOptions,
   ): Promise<NikaCompileOutcome> {
-    const body = compileBody(request);
+    const body = compileBody(request, options);
     const timeoutMs = options.timeoutMs ?? this.options.requestTimeout;
     const composed = compileSignal({ ...options, timeoutMs });
     const signal = composed.signal!;

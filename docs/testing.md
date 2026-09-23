@@ -216,3 +216,32 @@ tarball is the unreleased PR candidate. The hashes identify those tested bytes.
 Compile source-build receipts live outside the published package, so recording
 a tarball hash does not change the bytes it identifies. They do not participate
 in the released-engine behavioral ledgers.
+
+## Native authoring adapter proof
+
+`test/compile-authoring.test.ts` and `test/fixtures/compile-v2.json` are labelled
+protocol doubles. They check explicit CLI options, literal argv values, original
+revision context, v1/v2 receipt decoding and HTTP rejection before I/O. Packed
+ESM/CJS consumers check the same public types and response behavior. Decoding a
+v2 HTTP response does not add a native authoring request contract to Serve.
+
+For an independent real engine subprocess with a controlled loopback provider:
+
+```sh
+npm run build
+node scripts/run-native-authoring-proof.mjs \
+  --bin /absolute/path/to/nika \
+  --sha256 "$NATIVE_SHA256" \
+  --source-commit "$NATIVE_SOURCE_COMMIT" \
+  --report /absolute/path/to/private/native-authoring.json
+```
+
+The harness verifies the binary hash and reported build identity, starts a
+loopback endpoint, and supplies deliberately canned responses. It checks a
+rejected candidate followed by a bounded repair, stable model-answer replay,
+knowledge context, revision against the original intent, and unknown usage.
+The SDK child receives a minimal environment with only the controlled endpoint
+and a dummy key. No candidate runs. This proves transport and compiler behavior;
+it measures neither live model intelligence nor final release qualification.
+A denied listener, failed assertion or incomplete run remains failed evidence.
+Keep reports private because compiler provenance can contain request context.

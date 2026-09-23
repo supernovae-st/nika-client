@@ -148,6 +148,30 @@ module.exports = async function compileScenario(sdk, engines) {
     report.httpSuccess = { sameOutcome: JSON.stringify(result) === JSON.stringify(ready),
       request: JSON.parse(capable.requests[1].body), argv: argvLog(remoteLog) };
 
+    // Synthetic v2 protocol double through both PACKED runtime faces. This
+    // proves adapter behavior, not provider intelligence or a native release.
+    const authoring = { model: '-literal/model', strategy: 'only', repairs: 0,
+      maxTokens: 8192, timeoutSeconds: 120, knowledge: { pack: '-request pack.json' } };
+    const nativeV2 = await native.compile('native-v2', { authoring });
+    assert.equal(nativeV2.compile_version, 2);
+    assert.equal(nativeV2.provenance.authoring.input_tokens, null);
+    assert.equal(nativeV2.provenance.authoring.backend.observed[0].observed_model, null);
+    assert.equal(nativeV2.provenance.strategy, 'native');
+    assert.equal(nativeV2.questions[0].type, 'choice');
+    assert.equal(nativeV2.requested_trigger.kind, 'schedule');
+    const v2Server = resident(nativeV2);
+    const remoteV2 = new sdk.Nika({ url: 'https://nika.example', token: TOKEN, bin: engines.compile, fetch: v2Server.fetch });
+    assert.deepEqual(await remoteV2.compile('original'), nativeV2);
+    assert.deepEqual(JSON.parse(v2Server.requests[1].body), { compile_version: 1, mode: 'create', intent: 'original' });
+    const noCall = resident(nativeV2);
+    const unsupported = new sdk.Nika({ url: 'https://nika.example', token: TOKEN, bin: engines.compile, fetch: noCall.fetch });
+    for (const action of [() => unsupported.compile('original', { authoring }),
+      () => unsupported.compile({ workflow: base, change: 'change', originalIntent: 'original' })]) {
+      assert.equal((await refusal(sdk, action)).compatibility, true);
+    }
+    assert.deepEqual(noCall.requests, []);
+    report.nativeV2 = { compile_version: nativeV2.compile_version, unknownUsage: nativeV2.provenance.authoring.input_tokens === null };
+
     // Independent review R1/R2: exercise the actual packed module's exported
     // error classes and full error/cause representation on both transport doors.
     report.hostileVersions = [];

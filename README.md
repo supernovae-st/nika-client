@@ -416,6 +416,56 @@ booleans, null, strings, arrays and objects. The native adapter uses the engine'
 CLI; the HTTP adapter sends authenticated `POST /v1/compile`. An unavailable
 remote capability raises `NikaCompatibilityError` without local fallback.
 
+With a local engine that supports native authoring, explicitly select its
+authoring model and limits. These options map directly to `nika compile` flags;
+the engine owns generation, checking and repair.
+
+```ts
+const local = new Nika({ bin: '/path/to/nika', cwd: '/path/to/project' });
+const intent = 'Read tickets.csv and write open tickets to open.json.';
+const options = {
+  authoring: {
+    model: 'openai/gpt-5-mini',
+    strategy: 'only' as const,
+    repairs: 2,
+    maxTokens: 8192,
+    timeoutSeconds: 120,
+    knowledge: { snapshot: './knowledge', excludeCorpus: 'held-out-corpus' },
+    // Or knowledge: { pack: './request-pack.json' }, mutually exclusive.
+  },
+  timeoutMs: 360_000,
+};
+const draft = await local.compile({ intent }, options);
+// Keep the same intent and stable question keys when supplying answers.
+// When revising accepted source, retain the intent it originally answered:
+if (draft.ready && draft.candidate !== null) {
+  await local.compile({ workflow: draft.candidate, originalIntent: intent,
+    change: 'Sort the open tickets by priority.' }, options);
+}
+```
+
+`model` is required whenever `authoring` is present; answers and credentials
+never opt into provider calls. `strategy` accepts `escalate`, `only`, `sketch`
+or `off`; omitted controls use engine defaults. `repairs` accepts 0–5,
+`maxTokens` 1–32768, and `timeoutSeconds` 1–600 per call. `timeoutMs` bounds
+the whole operation, including engine negotiation and all repair calls.
+Knowledge paths resolve in the engine's working directory; the engine may also
+read its knowledge environment configuration and record replay plans under
+`.nika/compile`. The SDK supplies no destination and writes no persistent candidate.
+
+HTTP request wire v1 has no native authoring or original-intent fields.
+An HTTP client rejects `authoring` and edit `originalIntent` with
+`NikaCompatibilityError` before any request, including health negotiation.
+It never forwards local paths or switches to a local engine.
+
+Both transports decode known Compile response versions 1 and 2 and refuse
+unknown versions. Version 2 preserves the full `provenance.authoring` receipt,
+including context, knowledge identity, backend observations and sampling, plus
+the engine's plan, decision and strategy. Its `model` is the requested model;
+unknown observed models, token usage and costs remain unknown. Choice questions
+retain their option keys, and `requested_trigger` describes a requirement that
+still needs an operator binding.
+
 `candidate` is `.nika` source, distinct from the path accepted by `run()`.
 The caller reviews and materializes it before calling `run(path)`, which performs
 normal admission. `requested_boundary` and the source-only `check_preview` grant

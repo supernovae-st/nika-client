@@ -836,7 +836,7 @@ export interface NikaScheduleApplyResult {
 /* ------------------------------------------------------------------ */
 /* Compile (issue #128) — the SDK projection of the engine's one       */
 /* authoring capability. Field names mirror the engine's               */
-/* `compile_version: 1` wire verbatim; the SDK invents none of them.   */
+/* Compile wire v1/v2 verbatim; the SDK invents none of them.         */
 /* ------------------------------------------------------------------ */
 
 /**
@@ -864,6 +864,7 @@ export interface NikaCompileCreateRequest {
   answers?: Record<string, unknown>;
   workflow?: never;
   change?: never;
+  originalIntent?: never;
 }
 
 export interface NikaCompileEditRequest {
@@ -878,6 +879,8 @@ export interface NikaCompileEditRequest {
   change: string | NikaCompileSetConstant;
   answers?: Record<string, unknown>;
   intent?: never;
+  /** Local CLI only: the original intent the accepted workflow answered. */
+  originalIntent?: string;
 }
 
 /** One structured constant edit, mirroring the engine's `set_constant`. */
@@ -899,7 +902,30 @@ export interface NikaCompileOptions {
   signal?: AbortSignal;
   /** Positive integer milliseconds before the compile child or HTTP request is stopped. */
   timeoutMs?: number;
+  /** Local CLI only. Explicit opt-in; answers and ambient credentials never select a model. */
+  authoring?: NikaCompileAuthoringOptions;
 }
+
+/** A thin projection of the engine's explicit authoring CLI flags. */
+export interface NikaCompileAuthoringOptions {
+  /** Explicit provider/model or harness/model; resolved only by the engine. */
+  model: string;
+  /** Engine default: escalate after its plan cannot settle the request. */
+  strategy?: 'escalate' | 'only' | 'sketch' | 'off';
+  /** Native repair rounds, 0..5 (engine default 3). */
+  repairs?: number;
+  /** Output tokens per call, 1..32768 (engine default 8192). */
+  maxTokens?: number;
+  /** Seconds per call, 1..600; distinct from the whole-operation timeoutMs. */
+  timeoutSeconds?: number;
+  /** Local knowledge source; paths are passed literally to the engine. */
+  knowledge?: NikaCompileKnowledge;
+}
+
+/** A snapshot directory with optional corpus exclusion, OR a composed request pack. */
+export type NikaCompileKnowledge =
+  | { snapshot: string; excludeCorpus?: string; pack?: never }
+  | { pack: string; snapshot?: never; excludeCorpus?: never };
 
 /** The engine's own completeness words; `ready` is never derived from confidence. */
 export type NikaCompileStatus = 'ready' | 'incomplete' | 'refused';
@@ -909,7 +935,8 @@ export interface NikaCompileQuestion {
   /** Stable semantic hole path (`const.request`), never a session id. */
   key: string;
   label: string;
-  type: 'text' | 'literal';
+  type: 'text' | 'literal' | 'choice';
+  options?: { key: string; label: string; [key: string]: unknown }[];
   why: string;
   mandatory: boolean;
   [key: string]: unknown;
@@ -928,7 +955,50 @@ export interface NikaCompileProvenance {
   compiler_version: string;
   spec_pin: string;
   skeleton: string | null;
-  cognition: 'deterministicOnly';
+  cognition: 'deterministicOnly' | 'explicitProvider' | 'explicitDecision';
+  suggested_file?: string | null;
+  strategy?: 'skeleton' | 'support' | 'hot' | 'warm' | 'cold' | 'native';
+  /** Engine-owned JSON, preserved without reinterpretation. */
+  plan?: unknown;
+  decision?: unknown;
+  /** Present on wire v2; authoring metadata grants no execution authority. */
+  authoring?: NikaCompileAuthoringReceipt;
+  [key: string]: unknown;
+}
+
+/** Exact wire v2 receipt. Missing provider usage remains null. */
+export interface NikaCompileAuthoringReceipt {
+  /** Requested model; not a claim about the model the backend actually used. */
+  model: string;
+  calls: number;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  elapsed_ms: number;
+  sampling: {
+    temperature: null;
+    seed: null;
+    effective: 'providerDefaultUnknown';
+    [key: string]: unknown;
+  };
+  /** Engine-owned per-call context and backend JSON, including knowledge identity. */
+  context: unknown[];
+  backend: unknown;
+  [key: string]: unknown;
+}
+
+/** A requested trigger is a requirement, never an installed binding. */
+export interface NikaCompileTrigger {
+  kind: 'manual' | 'schedule' | 'webhook' | 'event';
+  status: 'satisfied' | 'requires_binding' | 'unsupported';
+  source_hint: string | null;
+  event_hint: string | null;
+  cadence: string | null;
+  at: string | null;
+  payload_input: string | null;
+  timezone: string | null;
+  missed: string | null;
+  overlap: string | null;
+  ceiling: string | null;
   [key: string]: unknown;
 }
 
@@ -951,8 +1021,8 @@ export interface NikaCompilePreview {
  * on transport, protocol, compatibility and engine-stamped failures.
  */
 export interface NikaCompileOutcome {
-  /** The wire generation this payload was validated against. Always 1. */
-  compile_version: 1;
+  /** The engine's wire generation, validated without downgrading. */
+  compile_version: 1 | 2;
   status: NikaCompileStatus;
   /** Exactly `status === 'ready'` — the engine's word, not a client judgment. */
   ready: boolean;
@@ -962,6 +1032,8 @@ export interface NikaCompileOutcome {
   diagnostics: NikaCompileDiagnostic[];
   /** The boundary the candidate requests (from its pure report); never a grant. */
   requested_boundary: Record<string, unknown> | null;
+  /** Absent on older v1 engines; otherwise the engine's trigger requirement. */
+  requested_trigger?: NikaCompileTrigger | null;
   check_preview: NikaCompilePreview | null;
   provenance: NikaCompileProvenance;
 }

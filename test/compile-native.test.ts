@@ -328,7 +328,7 @@ describe.skipIf(!posix)('native compile (issue #128 · engine #1663)', () => {
     it('refuses a wire generation it does not speak', async () => {
       const cause = await failure(client().compile('hostile-wrong-version'));
       expect(cause).toBeInstanceOf(NikaCompatibilityError);
-      expect((cause as Error).message).toMatch(/compile wire 2/);
+      expect((cause as Error).message).toMatch(/compile wire 3/);
     });
 
     it('fails typed on an externally killed child, never accepting its output', async () => {

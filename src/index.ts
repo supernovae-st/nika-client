@@ -374,6 +374,10 @@ export {
 } from './events.js';
 
 export type {
+  NikaCompileAuthoringOptions,
+  NikaCompileAuthoringReceipt,
+  NikaCompileKnowledge,
+  NikaCompileTrigger,
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckFinding,
@@ -386,6 +390,8 @@ export type {
   NikaCompileProvenance,
   NikaCompileQuestion,
   NikaCompileRequest,
+  NikaCompileRemoteAuthoring,
+  NikaCompileRemoteLimits,
   NikaCompileStatus,
   NikaCompileSetConstant,
   NikaConfig,

@@ -39,7 +39,8 @@ import {
   type NikaEngineIdentity,
 } from './engine-identity.js';
 import { literalInputs } from './literal-inputs.js';
-import { COMPILE_CAPABILITY, COMPILE_RESPONSE_MAX_BYTES, compileBody, compilePayloadFrom, compileSignal } from './compile.js';
+import { scheduleInputs } from './schedule-inputs.js';
+import { COMPILE_CAPABILITY, COMPILE_NATIVE_CAPABILITY, COMPILE_REPLAY_HEADER, COMPILE_RESPONSE_MAX_BYTES, compileBody, compilePayloadFrom, compileSignal } from './compile.js';
 import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
 import { readSettlement } from './settlement.js';
 import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
@@ -188,7 +189,7 @@ export class HttpTransport implements Transport {
   }
 
   /**
-   * Stateless authoring through the authenticated Serve compile door.
+   * Explicit authoring and server-kept replay through authenticated Serve.
    * A remote connection never falls back to a local compile — the candidate
    * must come from the server the caller connected to, or not exist.
    */
@@ -196,7 +197,8 @@ export class HttpTransport implements Transport {
     request: NikaCompileRequest,
     options: NikaCompileOptions,
   ): Promise<NikaCompileOutcome> {
-    const body = compileBody(request);
+    const body = compileBody(request, options);
+    const replayToken = options.remoteAuthoring?.replayToken;
     const timeoutMs = options.timeoutMs ?? this.options.requestTimeout;
     const composed = compileSignal({ ...options, timeoutMs });
     const signal = composed.signal!;
@@ -207,9 +209,14 @@ export class HttpTransport implements Transport {
         throw this.gap(COMPILE_CAPABILITY,
           'The connected engine does not advertise compile; the SDK never compiles locally as a substitute');
       }
+      if (options.remoteAuthoring !== undefined && !identity.supportedCapabilities.includes(COMPILE_NATIVE_CAPABILITY)) {
+        throw this.gap(COMPILE_NATIVE_CAPABILITY, 'The connected engine does not advertise compileNativeV2; no native request was sent');
+      }
       const path = '/v1/compile';
       const response = await this.fetchResponse(path, {
         method: 'POST',
+        // A redirect could disclose the replay token carried in the JSON body.
+        redirect: 'error',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body,
         signal,
@@ -225,19 +232,37 @@ export class HttpTransport implements Transport {
         const error = machineObject(object.error);
         if (response.ok || !error || typeof error.code !== 'string'
           || !/^[A-Za-z][A-Za-z0-9_.:-]{0,63}$/.test(error.code)
-          || error.code.includes(this.options.token) || typeof error.message !== 'string'
+          || error.code.includes(this.options.token) || (replayToken !== undefined && error.code.includes(replayToken))
+          || typeof error.message !== 'string'
           || Object.keys(object).some((key) => key !== 'error')) {
           throw new NikaProtocolError(this.kind, 'HTTP compile returned a malformed refusal or non-contract status');
         }
         throw this.refused(path, { operation: 'compile', status: response.status,
-          refusal: { code: error.code, message: this.redact(error.message) } });
+          refusal: { code: error.code, message: this.redact(replayToken === undefined
+            ? error.message : error.message.split(replayToken).join('[REDACTED]')) } });
       }
-      return compilePayloadFrom(object, this.kind, this.options.url);
+      const outcome = compilePayloadFrom(object, this.kind, this.options.url);
+      const kept = response.headers.get(COMPILE_REPLAY_HEADER);
+      if (kept !== null) {
+        if (options.remoteAuthoring?.cognition !== 'explicitProvider' || !/^[0-9a-f]{64}$/.test(kept)) {
+          throw new NikaProtocolError(this.kind, 'HTTP compile returned an invalid or unexpected replay header');
+        }
+        outcome.replayToken = kept;
+      }
+      return outcome;
     } catch (cause) {
       if (signal.aborted) {
         throw new NikaTransportError(this.kind, composed.timedOut()
-          ? `compile timed out after ${timeoutMs} ms` : 'compile aborted by caller',
-        { cause: cause instanceof Error ? cause : undefined });
+          ? `compile timed out after ${timeoutMs} ms` : 'compile aborted by caller');
+      }
+      // Fetch implementations may include the request body or credentials in a cause.
+      // Compile never exposes that chain, especially a server-kept replay token.
+      if (cause instanceof NikaProtocolError) {
+        throw new NikaProtocolError(this.kind, this.redact(replayToken === undefined
+          ? cause.message : cause.message.split(replayToken).join('[REDACTED]')));
+      }
+      if (cause instanceof NikaTransportError) {
+        throw new NikaTransportError(this.kind, 'HTTP compile transport failed');
       }
       throw cause;
     } finally {
@@ -398,6 +423,7 @@ export class HttpTransport implements Transport {
     options: NikaScheduleOptions,
   ): Promise<NikaScheduleApplyResult> {
     refuseLegacyContainedName(workflow);
+    const inputs = scheduleInputs(options.inputs);
     await this.ensureScheduleCapability();
     const path = `/v1/schedules/${encodeURIComponent(options.id)}`;
     const headers = new Headers({ 'Content-Type': 'application/json' });
@@ -409,7 +435,7 @@ export class HttpTransport implements Transport {
     const object = await this.operationJson('schedule', path, {
       method: 'PUT',
       headers,
-      body: JSON.stringify(scheduleBody(workflow, options)),
+      body: JSON.stringify(scheduleBody(workflow, options, inputs)),
     });
     if (
       object.applied !== true
@@ -1518,9 +1544,11 @@ function workflowPath(name: string): string {
 function scheduleBody(
   workflow: string,
   options: NikaScheduleOptions,
+  inputs: NikaScheduleOptions['inputs'],
 ): Record<string, unknown> {
   return {
     workflow,
+    ...(inputs !== undefined ? { inputs } : {}),
     when: options.when,
     maxCostUsd: options.maxCostUsd,
     missed: options.missed,
@@ -1543,10 +1571,12 @@ function scheduleStatusProjection(value: unknown): value is Record<string, unkno
   const when = machineObject(definition?.when);
   const due = machineObject(status?.due);
   const finding = machineObject(status?.finding);
+  const inputs = machineObject(definition?.inputs);
   return !!status
     && !!definition
     && typeof definition.id === 'string'
     && typeof definition.workflow === 'string'
+    && (definition.inputs === undefined || (!!inputs && Object.values(inputs).every((value) => typeof value === 'string')))
     && !!when
     && typeof when.kind === 'string'
     && typeof definition.maxCostUsd === 'number'

@@ -120,6 +120,12 @@ async function compile() {
   // The log is the test's readiness handshake: PID and signal handlers exist.
   logInvocation();
 
+  if (key === 'native-v2') {
+    // Synthetic protocol double only: no provider was called or source authored.
+    outcome(JSON.parse(readFileSync(new URL('./compile-v2.json', import.meta.url), 'utf8')), 2);
+    return;
+  }
+
   if (key === 'hostile-wedged') {
     // Ignores SIGTERM: only SIGKILL ends it. Pins the kill-grace escalation.
     sleepForever();
@@ -152,7 +158,7 @@ async function compile() {
     return;
   }
   if (key === 'hostile-wrong-version') {
-    process.stdout.write(JSON.stringify({ compile_version: 2, status: 'ready' }) + '\n');
+    process.stdout.write(JSON.stringify({ compile_version: 3, status: 'ready' }) + '\n');
     process.exit(0);
     return;
   }

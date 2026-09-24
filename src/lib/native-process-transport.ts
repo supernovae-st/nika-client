@@ -130,8 +130,8 @@ export class NativeProcessTransport implements Transport {
    * invocation, projected verbatim. The engine must advertise the compile
    * capability — an engine from before the door is refused here, before any
    * spawn, and there is never a TypeScript fallback. No destination is passed:
-   * the candidate stays source in memory, nothing is written, and no Run
-   * exists; `signal`/`timeoutMs` only stop this one child.
+   * the candidate stays source in memory and no Run exists. The engine may
+   * record its replay plan; `signal`/`timeoutMs` only stop this one child.
    */
   async compile(
     request: NikaCompileRequest,
@@ -145,7 +145,7 @@ export class NativeProcessTransport implements Transport {
       if (composed.signal?.aborted) {
         throw new NikaTransportError(this.kind, 'compile aborted');
       }
-      invocation = await compileArgv(request);
+      invocation = await compileArgv(request, options);
       // Compile's cancellation also bounds negotiation; an aborted probe is
       // never cached as this client's permanent engine identity.
       const identity = composed.signal ? await verifyNikaEngine(this.options.engine, {
@@ -157,7 +157,7 @@ export class NativeProcessTransport implements Transport {
           this.kind,
           `Engine ${identity.engineVersion} at ${this.options.engine.bin} does not advertise `
           + `${COMPILE_CAPABILITY} (advertised: ${identity.supportedCapabilities.join(', ') || 'nothing'}); `
-          + 'compile needs an engine that speaks the `compile_version: 1` wire '
+          + 'compile needs an engine that speaks Compile wire v1 or v2 '
           + '(engine nika#1663). The SDK never compiles in TypeScript and never '
           + 'falls back to another channel',
         );

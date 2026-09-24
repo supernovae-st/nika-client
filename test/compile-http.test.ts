@@ -127,7 +127,7 @@ describe('authenticated HTTP compile foundation', () => {
   });
 
   it('rejects a different compile generation', async () => {
-    const fetch = respond(jsonResponse(outcome({ compile_version: 2 })));
+    const fetch = respond(jsonResponse(outcome({ compile_version: 3 })));
     await expect(client(fetch).compile('hello')).rejects.toBeInstanceOf(NikaCompatibilityError);
   });
 

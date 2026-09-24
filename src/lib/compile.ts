@@ -13,14 +13,17 @@ import {
 import type {
   NikaCheckResult,
   NikaCompileDiagnostic,
+  NikaCompileAuthoringOptions,
   NikaCompileOptions,
   NikaCompileOutcome,
   NikaCompilePreview,
   NikaCompileProvenance,
   NikaCompileQuestion,
   NikaCompileRequest,
+  NikaCompileRemoteAuthoring,
   NikaCompileStatus,
   NikaCompileSetConstant,
+  NikaCompileTrigger,
   NikaTransportKind,
 } from '../types.js';
 import type { EngineCapture } from './engine-capture.js';
@@ -30,15 +33,15 @@ import { machineObject } from './machine.js';
 /**
  * The native compile adapter (issue #128): a thin projection over the engine's
  * one authoring capability, reached through `nika compile --json` — the
- * versioned `compile_version: 1` wire the CLI adapter renders from the typed
+ * versioned `compile_version: 1 | 2` wire the CLI adapter renders from the typed
  * `CompileOutcome` core (engine nika#1663). There is no compiler in this file:
  * no intent parsing, no YAML work, no policy judgment. The SDK validates the
  * envelope, preserves the engine's fields verbatim, and classifies failures.
  *
  * The wire law (engine `nika-cli-host/src/compile/render.rs`):
  *
- * - exit 0 + `{compile_version:1, status:'ready', …}` — a complete candidate.
- * - exit 2 + `{compile_version:1, status:'incomplete'|'refused', …}` — DATA:
+ * - exit 0 + `{compile_version:1|2, status:'ready', …}` — a complete candidate.
+ * - exit 2 + `{compile_version:1|2, status:'incomplete'|'refused', …}` — DATA:
  *   questions and diagnostics, never an exception.
  * - exit 2 or 3 + `{compile_version:1, error:{code,message}}` — an
  *   engine-stamped failure (usage or environment/machinery).
@@ -51,8 +54,10 @@ import { machineObject } from './machine.js';
 /** The capability token an engine advertises once it speaks the compile wire. */
 export const COMPILE_CAPABILITY = 'compile';
 
-/** The only compile wire generation this SDK reads. */
+/** The deterministic request generation; remote native requests explicitly use 2. */
 export const COMPILE_WIRE_VERSION = 1;
+export const COMPILE_NATIVE_CAPABILITY = 'compileNativeV2';
+export const COMPILE_REPLAY_HEADER = 'Nika-Compile-Replay';
 
 /**
  * Finite bound for one compile response (the candidate plus its full Check
@@ -83,7 +88,8 @@ export function normalizeCompileRequest(
   }
   const record = dataRecord(input, 'request');
   for (const key of Reflect.ownKeys(record)) {
-    if (key !== 'intent' && key !== 'workflow' && key !== 'change' && key !== 'answers') {
+    if (key !== 'intent' && key !== 'workflow' && key !== 'change' && key !== 'answers'
+      && key !== 'originalIntent') {
       throw new NikaConfigurationError(
         `compile: unknown request field ${String(key)}; the request is refused `
         + 'rather than silently reinterpreted',
@@ -95,8 +101,9 @@ export function normalizeCompileRequest(
   const intent = record.intent;
   const workflow = record.workflow;
   const change = record.change;
+  const originalIntent = record.originalIntent;
   if (intent !== undefined) {
-    if (workflow !== undefined || change !== undefined) {
+    if (workflow !== undefined || change !== undefined || originalIntent !== undefined) {
       throw new NikaConfigurationError(
         'compile: intent (create) never mixes with workflow/change (edit) in one request',
       );
@@ -119,9 +126,12 @@ export function normalizeCompileRequest(
     );
   }
   const normalizedChange = normalizeChange(change);
-  return answers === undefined
-    ? { workflow, change: normalizedChange }
-    : { workflow, change: normalizedChange, answers: answers as Record<string, unknown> };
+  if (originalIntent !== undefined) compileText(originalIntent, 'originalIntent');
+  return {
+    workflow, change: normalizedChange,
+    ...(originalIntent === undefined ? {} : { originalIntent: originalIntent as string }),
+    ...(answers === undefined ? {} : { answers: answers as Record<string, unknown> }),
+  };
 }
 
 /** Inspect descriptors only: no request getter, Proxy trap or coercion runs. */
@@ -173,7 +183,8 @@ function normalizeChange(change: unknown): string | NikaCompileSetConstant {
 export function normalizeCompileOptions(options: NikaCompileOptions): NikaCompileOptions {
   const record = dataRecord(options, 'options');
   for (const key of Reflect.ownKeys(record)) {
-    if (key !== 'signal' && key !== 'timeoutMs') {
+    if (key !== 'signal' && key !== 'timeoutMs' && key !== 'authoring' && key !== 'remoteAuthoring'
+      && key !== 'decisionModel') {
       throw new NikaConfigurationError(`compile: unknown option ${String(key)}`);
     }
   }
@@ -202,7 +213,86 @@ export function normalizeCompileOptions(options: NikaCompileOptions): NikaCompil
       signalAborted.call(signal);
     } catch { throw invalidSignal(); }
   }
+  if (record.authoring !== undefined) record.authoring = normalizeAuthoring(record.authoring);
+  if (record.decisionModel !== undefined) compileText(record.decisionModel, 'decisionModel');
+  if (record.remoteAuthoring !== undefined) {
+    if (record.authoring !== undefined || record.decisionModel !== undefined) {
+      throw new NikaConfigurationError('compile: local authoring or decisionModel cannot be combined with remoteAuthoring');
+    }
+    record.remoteAuthoring = normalizeRemoteAuthoring(record.remoteAuthoring);
+  }
   return record as NikaCompileOptions;
+}
+
+function normalizeRemoteAuthoring(value: unknown): NikaCompileRemoteAuthoring {
+  const remote = dataRecord(value, 'remoteAuthoring');
+  if (Object.keys(remote).some((key) => !['cognition', 'limits', 'replayToken'].includes(key))) {
+    throw new NikaConfigurationError('compile: unknown remoteAuthoring option; provider and context are server-owned');
+  }
+  if (remote.cognition === 'deterministicOnly') {
+    if ('limits' in remote || typeof remote.replayToken !== 'string'
+      || !/^[0-9a-f]{64}$/.test(remote.replayToken)) {
+      throw new NikaConfigurationError('compile: deterministic replay needs a server-issued token and forbids limits');
+    }
+  } else if (remote.cognition === 'explicitProvider') {
+    if ('replayToken' in remote) throw new NikaConfigurationError('compile: fresh authoring cannot carry a replay token');
+    if ('limits' in remote) {
+      const limits = dataRecord(remote.limits, 'remoteAuthoring.limits');
+      const bounds = { repairs: [0, 5], maxTokens: [1, 32768], callTimeoutMs: [1, 600000], deadlineMs: [1, 3600000] } as const;
+      for (const key of Object.keys(limits)) {
+        const bound = bounds[key as keyof typeof bounds];
+        const value = limits[key];
+        if (!Object.hasOwn(bounds, key) || typeof value !== 'number' || !Number.isSafeInteger(value)
+          || value < bound[0] || value > bound[1]) {
+          throw new NikaConfigurationError('compile: invalid remote authoring limit');
+        }
+      }
+      remote.limits = limits;
+    }
+  } else {
+    throw new NikaConfigurationError('compile: remoteAuthoring needs explicitProvider or deterministicOnly cognition');
+  }
+  return remote as unknown as NikaCompileRemoteAuthoring;
+}
+
+function compileText(value: unknown, label: string): asserts value is string {
+  if (typeof value !== 'string' || value.trim().length === 0) {
+    throw new NikaConfigurationError(`compile: ${label} must be a non-empty string`);
+  }
+  refuseNul(value);
+}
+
+function normalizeAuthoring(value: unknown): NikaCompileAuthoringOptions {
+  const authoring = dataRecord(value, 'authoring');
+  const fields = ['model', 'samples', 'strategy', 'repairs', 'maxTokens', 'timeoutSeconds', 'knowledge'];
+  if (Object.keys(authoring).some((key) => !fields.includes(key))) {
+    throw new NikaConfigurationError('compile: unknown authoring option');
+  }
+  compileText(authoring.model, 'authoring.model');
+  if (authoring.strategy !== undefined
+    && !['escalate', 'only', 'sketch', 'off'].includes(authoring.strategy as string)) {
+    throw new NikaConfigurationError('compile: authoring.strategy must be escalate, only, sketch or off');
+  }
+  for (const [key, min, max] of [['samples', 1, 5], ['repairs', 0, 5], ['maxTokens', 1, 32768], ['timeoutSeconds', 1, 600]] as const) {
+    const limit = authoring[key];
+    if (limit !== undefined && (typeof limit !== 'number' || !Number.isSafeInteger(limit)
+      || limit < min || limit > max)) {
+      throw new NikaConfigurationError(`compile: authoring.${key} must be an integer between ${min} and ${max}`);
+    }
+  }
+  if (authoring.knowledge !== undefined) {
+    const knowledge = dataRecord(authoring.knowledge, 'authoring.knowledge');
+    if (Object.keys(knowledge).some((key) => !['snapshot', 'pack', 'excludeCorpus'].includes(key))
+      || (knowledge.snapshot === undefined) === (knowledge.pack === undefined)
+      || (knowledge.pack !== undefined && knowledge.excludeCorpus !== undefined)) {
+      throw new NikaConfigurationError('compile: knowledge needs either snapshot (with optional excludeCorpus) or pack');
+    }
+    for (const key of ['snapshot', 'pack', 'excludeCorpus']) {
+      if (knowledge[key] !== undefined) compileText(knowledge[key], `authoring.knowledge.${key}`);
+    }
+    authoring.knowledge = knowledge;
+  }
+  return authoring as unknown as NikaCompileAuthoringOptions;
 }
 
 /**
@@ -257,8 +347,32 @@ export interface CompileInvocation {
  * the intent positional always follows an explicit `--`, and no shell is ever
  * involved (the capture spawns argv directly).
  */
-export async function compileArgv(request: NikaCompileRequest): Promise<CompileInvocation> {
+export async function compileArgv(request: NikaCompileRequest, options: NikaCompileOptions = {}): Promise<CompileInvocation> {
+  if (options.remoteAuthoring !== undefined) {
+    throw new NikaCompatibilityError(COMPILE_NATIVE_CAPABILITY, 'native-process',
+      'remoteAuthoring requires an HTTP client; replay tokens never select local authoring');
+  }
   const args = ['compile', '--json'];
+  if (options.decisionModel !== undefined) {
+    if (request.intent === undefined) {
+      throw new NikaConfigurationError('compile: decisionModel is only supported for CREATE; the CLI refuses it with --base');
+    }
+    args.push(`--decision-model=${options.decisionModel}`);
+  }
+  const authoring = options.authoring;
+  if (authoring !== undefined) {
+    args.push(`--authoring-model=${authoring.model}`);
+    for (const [key, flag] of [
+      ['strategy', 'strategy'], ['repairs', 'repairs'], ['maxTokens', 'max-tokens'],
+      ['timeoutSeconds', 'timeout'], ['samples', 'samples'],
+    ] as const) {
+      if (authoring[key] !== undefined) args.push(`--authoring-${flag}=${authoring[key]}`);
+    }
+    const knowledge = authoring.knowledge;
+    if (knowledge?.snapshot !== undefined) args.push(`--knowledge=${knowledge.snapshot}`);
+    if (knowledge?.excludeCorpus !== undefined) args.push(`--knowledge-exclude=${knowledge.excludeCorpus}`);
+    if (knowledge?.pack !== undefined) args.push(`--knowledge-pack=${knowledge.pack}`);
+  }
   for (const answer of compileAnswers(request.answers)) {
     args.push(`--answer=${answer}`);
   }
@@ -286,6 +400,7 @@ export async function compileArgv(request: NikaCompileRequest): Promise<CompileI
     });
   }
   args.push('--base', base, `--change=${change}`);
+  if (request.originalIntent !== undefined) args.push('--', request.originalIntent);
   return { args, scratchDir };
 }
 
@@ -326,8 +441,17 @@ function refuseNul(value: string): void {
   if (value.includes('\0')) throw new NikaConfigurationError('compile: text cannot contain a NUL byte');
 }
 
-/** Exact accepted Serve v1 envelope; no local capture or compiler is involved. */
-export function compileBody(request: NikaCompileRequest): string {
+/** Exact accepted Serve v1/v2 envelopes; no local capture or compiler is involved. */
+export function compileBody(request: NikaCompileRequest, options: NikaCompileOptions = {}): string {
+  if (options.decisionModel !== undefined) {
+    throw new NikaCompatibilityError(COMPILE_CAPABILITY, 'http',
+      'decisionModel is a local CLI option; the HTTP server owns model selection');
+  }
+  if (options.authoring !== undefined || (request.originalIntent !== undefined && options.remoteAuthoring === undefined)) {
+    throw new NikaCompatibilityError(COMPILE_CAPABILITY, 'http',
+      'HTTP Compile request wire v1 cannot honor authoring options or originalIntent; use an explicit local client');
+  }
+  if (options.remoteAuthoring !== undefined) return remoteCompileBody(request, options.remoteAuthoring);
   compileAnswers(request.answers); // Keep the literal/key law identical across doors.
   const answers = request.answers === undefined ? ''
     : `,"answers":${encodeLiteralInputs(request.answers, 'compile({ answers })').json}`;
@@ -340,6 +464,50 @@ export function compileBody(request: NikaCompileRequest): string {
     ? `{"text":${JSON.stringify(request.change)}}`
     : `{"set_constant":{"name":${JSON.stringify(request.change.set_constant.name)},"value":${literalJson(request.change.set_constant.value)}}}`;
   return `{"compile_version":1,"mode":"edit","source":${JSON.stringify(request.workflow)},"change":${change}${answers}}`;
+}
+
+/** Exact Serve v2 request. Input bytes are never trimmed, restated or inferred from answers. */
+function remoteCompileBody(request: NikaCompileRequest, remote: NikaCompileRemoteAuthoring): string {
+  compileAnswers(request.answers);
+  const bounded = (text: string, max: number) => {
+    if (Buffer.byteLength(text, 'utf8') > max) throw new NikaConfigurationError('compile: HTTP v2 input exceeds the server wire bound');
+  };
+  const body: Record<string, unknown> = { compile_version: 2,
+    mode: request.intent !== undefined ? 'create' : 'edit', cognition: remote.cognition };
+  if (request.intent !== undefined) {
+    refuseNul(request.intent); bounded(request.intent, 4096); body.intent = request.intent;
+  } else {
+    bounded(request.workflow, 512 * 1024); body.source = request.workflow;
+    if (typeof request.change === 'string') {
+      if (request.originalIntent === undefined) throw new NikaConfigurationError('compile: HTTP v2 text revision requires originalIntent');
+      refuseNul(request.change); bounded(request.change, 4096); bounded(request.originalIntent, 4096);
+      body.change = { text: request.change }; body.original_intent = request.originalIntent;
+    } else {
+      if (request.originalIntent !== undefined) throw new NikaConfigurationError('compile: a structured constant edit cannot carry originalIntent');
+      bounded(request.change.set_constant.name, 128);
+      bounded(literalJson(request.change.set_constant.value), 64 * 1024);
+      body.change = request.change;
+    }
+  }
+  if (request.answers !== undefined) {
+    const answers = JSON.parse(encodeLiteralInputs(request.answers, 'compile({ answers })').json) as Record<string, unknown>;
+    if (Object.keys(answers).length > 64) throw new NikaConfigurationError('compile: HTTP v2 accepts at most 64 answers');
+    if (Object.hasOwn(answers, 'intent.clarification')) throw new NikaConfigurationError('compile: intent.clarification requires a new intent and a fresh authoring request');
+    for (const key of Object.keys(answers)) { bounded(key, 256); bounded(literalJson(answers[key]), 64 * 1024); }
+    body.answers = answers;
+  }
+  if (remote.cognition === 'deterministicOnly') body.replay_token = remote.replayToken;
+  else if (remote.limits !== undefined) {
+    const limits: Record<string, number> = {};
+    for (const [key, wire] of [['repairs', 'repairs'], ['maxTokens', 'max_tokens'],
+      ['callTimeoutMs', 'call_timeout_ms'], ['deadlineMs', 'deadline_ms']] as const) {
+      if (remote.limits[key] !== undefined) limits[wire] = remote.limits[key];
+    }
+    body.limits = limits;
+  }
+  // Use the bounded iterative encoder even after validation: JSON.stringify
+  // would throw an untyped RangeError for a deeply nested, otherwise JSON value.
+  return encodeLiteralInputs(body, 'compile({ answers })').json;
 }
 
 /**
@@ -423,7 +591,7 @@ export function compilePayloadFrom(
     throw protocol('a ready outcome carries no candidate');
   }
   const outcome: NikaCompileOutcome = {
-    compile_version: COMPILE_WIRE_VERSION,
+    compile_version: payload.compile_version as 1 | 2,
     status: status as NikaCompileStatus,
     ready: status === 'ready',
     candidate,
@@ -431,8 +599,9 @@ export function compilePayloadFrom(
     diagnostics: diagnosticsFrom(payload.diagnostics, protocol),
     requested_boundary: nullableObject(payload.requested_boundary, 'requested_boundary', protocol),
     check_preview: previewFrom(payload.check_preview, protocol),
-    provenance: provenanceFrom(payload.provenance, protocol),
+    provenance: provenanceFrom(payload.provenance, payload.compile_version as 1 | 2, protocol),
   };
+  if ('requested_trigger' in payload) outcome.requested_trigger = triggerFrom(payload.requested_trigger, protocol);
   return outcome;
 }
 
@@ -447,9 +616,9 @@ function validateCompileVersion(
   if (typeof version !== 'number' || !Number.isSafeInteger(version) || version < 1) {
     throw protocol('compile_version must be a positive safe integer');
   }
-  if (version !== COMPILE_WIRE_VERSION) {
+  if (version !== 1 && version !== 2) {
     throw new NikaCompatibilityError(COMPILE_CAPABILITY, transport,
-      `Engine at ${engine} speaks compile wire ${version}; expected ${COMPILE_WIRE_VERSION}`);
+      `Engine at ${engine} speaks compile wire ${version}; expected 1 or 2`);
   }
 }
 
@@ -490,12 +659,17 @@ function questionsFrom(
       !question
       || typeof question.key !== 'string'
       || typeof question.label !== 'string'
-      || (question.type !== 'text' && question.type !== 'literal')
+      || !['text', 'literal', 'choice'].includes(question.type as string)
       || typeof question.why !== 'string'
       || typeof question.mandatory !== 'boolean'
     ) {
       throw protocol('a question lacks its key/label/type/why/mandatory shape');
     }
+    if ('options' in question && (!Array.isArray(question.options)
+      || question.options.some((entry) => {
+        const option = machineObject(entry);
+        return !option || typeof option.key !== 'string' || typeof option.label !== 'string';
+      }))) throw protocol('question options must contain key/label objects');
     return question as unknown as NikaCompileQuestion;
   });
 }
@@ -534,6 +708,7 @@ function previewFrom(
 
 function provenanceFrom(
   value: unknown,
+  version: 1 | 2,
   protocol: (message: string) => NikaProtocolError,
 ): NikaCompileProvenance {
   const provenance = machineObject(value);
@@ -542,11 +717,44 @@ function provenanceFrom(
     || typeof provenance.compiler_version !== 'string'
     || typeof provenance.spec_pin !== 'string'
     || (provenance.skeleton !== null && typeof provenance.skeleton !== 'string')
-    || provenance.cognition !== 'deterministicOnly'
+    || !['deterministicOnly', 'explicitProvider', 'explicitDecision'].includes(provenance.cognition as string)
   ) {
     throw protocol('provenance lacks its compiler_version/spec_pin/skeleton/cognition shape');
   }
+  if ('suggested_file' in provenance && provenance.suggested_file !== null
+    && typeof provenance.suggested_file !== 'string') throw protocol('invalid suggested_file');
+  if ('strategy' in provenance && !['skeleton', 'support', 'hot', 'warm', 'cold', 'native'].includes(provenance.strategy as string)) {
+    throw protocol('invalid compile strategy');
+  }
+  if (version === 1 && 'authoring' in provenance) throw protocol('wire v1 cannot carry an authoring receipt');
+  if (version === 2) {
+    const receipt = machineObject(provenance.authoring);
+    const count = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
+    const sampling = machineObject(receipt?.sampling);
+    if (!receipt || typeof receipt.model !== 'string' || !count(receipt.calls) || receipt.calls > 0xffffffff
+      || !count(receipt.elapsed_ms)
+      || (receipt.input_tokens !== null && !count(receipt.input_tokens))
+      || (receipt.output_tokens !== null && !count(receipt.output_tokens))
+      || !sampling || sampling.temperature !== null || sampling.seed !== null
+      || sampling.effective !== 'providerDefaultUnknown'
+      || !Array.isArray(receipt.context) || !('backend' in receipt)) {
+      throw protocol('invalid wire v2 authoring receipt');
+    }
+  }
   return provenance as unknown as NikaCompileProvenance;
+}
+
+function triggerFrom(value: unknown, protocol: (message: string) => NikaProtocolError): NikaCompileTrigger | null {
+  if (value === null) return null;
+  const trigger = machineObject(value);
+  if (!trigger || !['manual', 'schedule', 'webhook', 'event'].includes(trigger.kind as string)
+    || !['satisfied', 'requires_binding', 'unsupported'].includes(trigger.status as string)
+    || ('cron' in trigger && trigger.cron !== null && typeof trigger.cron !== 'string')
+    || ['source_hint', 'event_hint', 'cadence', 'at', 'payload_input', 'timezone', 'missed', 'overlap', 'ceiling']
+      .some((key) => trigger[key] !== null && typeof trigger[key] !== 'string')) {
+    throw protocol('invalid requested_trigger');
+  }
+  return trigger as unknown as NikaCompileTrigger;
 }
 
 function writtenFrom(

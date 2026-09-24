@@ -718,6 +718,8 @@ export type NikaScheduleWhen =
 export interface NikaScheduleOptions {
   /** Stable path identity for the resident schedule. */
   id: string;
+  /** Scalar declarations; Serve coerces them against the workflow inputs and refuses @env: values. */
+  inputs?: Record<string, string | number | boolean>;
   when: NikaScheduleWhen;
   maxCostUsd: number;
   missed: 'catch-up' | 'catch-up-once' | 'skip';
@@ -749,6 +751,8 @@ export type NikaScheduleAfterSkip =
 export interface NikaScheduleDefinition {
   id: string;
   workflow: string;
+  /** Engine-normalized scalar text. Older residents may omit this field. */
+  inputs?: Record<string, string>;
   when: NikaScheduleWhen | { kind: string; [key: string]: unknown };
   maxCostUsd: number;
   missed: NikaScheduleMissed;
@@ -836,7 +840,7 @@ export interface NikaScheduleApplyResult {
 /* ------------------------------------------------------------------ */
 /* Compile (issue #128) — the SDK projection of the engine's one       */
 /* authoring capability. Field names mirror the engine's               */
-/* `compile_version: 1` wire verbatim; the SDK invents none of them.   */
+/* Compile wire v1/v2 verbatim; the SDK invents none of them.         */
 /* ------------------------------------------------------------------ */
 
 /**
@@ -847,8 +851,8 @@ export interface NikaScheduleApplyResult {
  * - EDIT: `{ workflow, change }` — the accepted workflow's SOURCE plus the
  *   change request — optionally with `answers`.
  *
- * The two shapes never mix, and there is no session: every call is a fresh
- * request carrying everything the engine needs.
+ * The two shapes never mix. The SDK keeps no authoring session: each call
+ * carries its original input and answers, plus explicit replay options if used.
  */
 export type NikaCompileRequest = NikaCompileCreateRequest | NikaCompileEditRequest;
 
@@ -858,12 +862,13 @@ export interface NikaCompileCreateRequest {
   /**
    * Answers to engine questions, by stable question key (`const.request`),
    * as strict JSON values — never pre-serialized text. The SDK serializes
-   * each value exactly once onto the argv `KEY=JSON` channel; a value JSON
-   * cannot carry refuses with `NikaConfigurationError` before any spawn.
+   * each value onto the CLI `KEY=JSON` channel or HTTP JSON body; a value JSON
+   * cannot carry refuses with `NikaConfigurationError` before any I/O.
    */
   answers?: Record<string, unknown>;
   workflow?: never;
   change?: never;
+  originalIntent?: never;
 }
 
 export interface NikaCompileEditRequest {
@@ -878,6 +883,8 @@ export interface NikaCompileEditRequest {
   change: string | NikaCompileSetConstant;
   answers?: Record<string, unknown>;
   intent?: never;
+  /** Original intent the base answered; required for an HTTP v2 text revision. */
+  originalIntent?: string;
 }
 
 /** One structured constant edit, mirroring the engine's `set_constant`. */
@@ -892,14 +899,61 @@ export interface NikaCompileSetConstant {
 
 export interface NikaCompileOptions {
   /**
-   * Aborts this authoring process only. Compile owns no Run: this never
+   * Stops the local authoring process or HTTP observation. A remote server
+   * retains its own work deadline. Compile owns no Run: this never
    * touches `run.cancel()` semantics (client#126), and no workflow effect
    * exists to interrupt.
    */
   signal?: AbortSignal;
   /** Positive integer milliseconds before the compile child or HTTP request is stopped. */
   timeoutMs?: number;
+  /** Local CLI only. Explicit opt-in; answers and ambient credentials never select a model. */
+  authoring?: NikaCompileAuthoringOptions;
+  /** Local CREATE only. Explicit bounded decision model; independent of the authoring model. */
+  decisionModel?: string;
+  /** HTTP only. Never combined with local authoring or decisionModel. */
+  remoteAuthoring?: NikaCompileRemoteAuthoring;
 }
+
+/** Server owns the provider, model, credentials, strategy and knowledge. */
+export type NikaCompileRemoteAuthoring =
+  | { cognition: 'explicitProvider'; limits?: NikaCompileRemoteLimits; replayToken?: never }
+  | { cognition: 'deterministicOnly'; replayToken: string; limits?: never };
+
+/** Narrower than the operator's bounds; the server refuses widening, never clamps it. */
+export interface NikaCompileRemoteLimits {
+  /** Logical repair rounds, 0..5. A provider transport may retry a logical call. */
+  repairs?: number;
+  /** Output tokens per logical call, 1..32768. */
+  maxTokens?: number;
+  /** Per-call milliseconds, 1..600000. */
+  callTimeoutMs?: number;
+  /** Whole server round milliseconds, 1..3600000; distinct from SDK timeoutMs. */
+  deadlineMs?: number;
+}
+
+/** A thin projection of the engine's explicit authoring CLI flags. */
+export interface NikaCompileAuthoringOptions {
+  /** Explicit provider/model or harness/model; resolved only by the engine. */
+  model: string;
+  /** Independent COLD proposals, 1..5 (engine default 1); requires this explicit model. */
+  samples?: number;
+  /** Engine default: escalate after its plan cannot settle the request. */
+  strategy?: 'escalate' | 'only' | 'sketch' | 'off';
+  /** Native repair rounds, 0..5 (engine default 3). */
+  repairs?: number;
+  /** Output tokens per call, 1..32768 (engine default 8192). */
+  maxTokens?: number;
+  /** Seconds per call, 1..600; distinct from the whole-operation timeoutMs. */
+  timeoutSeconds?: number;
+  /** Local knowledge source; paths are passed literally to the engine. */
+  knowledge?: NikaCompileKnowledge;
+}
+
+/** A snapshot directory with optional corpus exclusion, OR a composed request pack. */
+export type NikaCompileKnowledge =
+  | { snapshot: string; excludeCorpus?: string; pack?: never }
+  | { pack: string; snapshot?: never; excludeCorpus?: never };
 
 /** The engine's own completeness words; `ready` is never derived from confidence. */
 export type NikaCompileStatus = 'ready' | 'incomplete' | 'refused';
@@ -909,7 +963,8 @@ export interface NikaCompileQuestion {
   /** Stable semantic hole path (`const.request`), never a session id. */
   key: string;
   label: string;
-  type: 'text' | 'literal';
+  type: 'text' | 'literal' | 'choice';
+  options?: { key: string; label: string; [key: string]: unknown }[];
   why: string;
   mandatory: boolean;
   [key: string]: unknown;
@@ -928,7 +983,52 @@ export interface NikaCompileProvenance {
   compiler_version: string;
   spec_pin: string;
   skeleton: string | null;
-  cognition: 'deterministicOnly';
+  cognition: 'deterministicOnly' | 'explicitProvider' | 'explicitDecision';
+  suggested_file?: string | null;
+  strategy?: 'skeleton' | 'support' | 'hot' | 'warm' | 'cold' | 'native';
+  /** Engine-owned JSON, preserved without reinterpretation. */
+  plan?: unknown;
+  decision?: unknown;
+  /** Present on wire v2; authoring metadata grants no execution authority. */
+  authoring?: NikaCompileAuthoringReceipt;
+  [key: string]: unknown;
+}
+
+/** Exact wire v2 receipt. Missing provider usage remains null. */
+export interface NikaCompileAuthoringReceipt {
+  /** Requested model; not a claim about the model the backend actually used. */
+  model: string;
+  calls: number;
+  input_tokens: number | null;
+  output_tokens: number | null;
+  elapsed_ms: number;
+  sampling: {
+    temperature: null;
+    seed: null;
+    effective: 'providerDefaultUnknown';
+    [key: string]: unknown;
+  };
+  /** Engine-owned per-call context and backend JSON, including knowledge identity. */
+  context: unknown[];
+  backend: unknown;
+  [key: string]: unknown;
+}
+
+/** A requested trigger is a requirement, never an installed binding. */
+export interface NikaCompileTrigger {
+  kind: 'manual' | 'schedule' | 'webhook' | 'event';
+  status: 'satisfied' | 'requires_binding' | 'unsupported';
+  source_hint: string | null;
+  event_hint: string | null;
+  cadence: string | null;
+  /** Exact five cron fields, without a timezone or activation authority. Absent in older engines. */
+  cron?: string | null;
+  at: string | null;
+  payload_input: string | null;
+  timezone: string | null;
+  missed: string | null;
+  overlap: string | null;
+  ceiling: string | null;
   [key: string]: unknown;
 }
 
@@ -951,8 +1051,8 @@ export interface NikaCompilePreview {
  * on transport, protocol, compatibility and engine-stamped failures.
  */
 export interface NikaCompileOutcome {
-  /** The wire generation this payload was validated against. Always 1. */
-  compile_version: 1;
+  /** The engine's wire generation, validated without downgrading. */
+  compile_version: 1 | 2;
   status: NikaCompileStatus;
   /** Exactly `status === 'ready'` — the engine's word, not a client judgment. */
   ready: boolean;
@@ -962,6 +1062,10 @@ export interface NikaCompileOutcome {
   diagnostics: NikaCompileDiagnostic[];
   /** The boundary the candidate requests (from its pure report); never a grant. */
   requested_boundary: Record<string, unknown> | null;
+  /** Absent on older v1 engines; otherwise the engine's trigger requirement. */
+  requested_trigger?: NikaCompileTrigger | null;
   check_preview: NikaCompilePreview | null;
   provenance: NikaCompileProvenance;
+  /** HTTP Nika-Compile-Replay header, when issued. Sensitive, server-bound, expiring; no Run authority. */
+  replayToken?: string;
 }

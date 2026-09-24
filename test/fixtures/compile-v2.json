@@ -1,0 +1,30 @@
+{
+  "compile_version": 2,
+  "status": "incomplete",
+  "candidate": null,
+  "questions": [{ "key": "trigger.overlap", "label": "Overlap policy", "type": "choice", "why": "Operator choice", "mandatory": true, "options": [{ "key": "skip", "label": "Skip" }, { "key": "queue", "label": "Queue" }] }],
+  "diagnostics": [{ "kind": "requiresHuman", "target": "trigger.overlap", "message": "Choose a policy" }],
+  "requested_boundary": null,
+  "requested_trigger": { "kind": "schedule", "status": "requires_binding", "source_hint": "every morning", "event_hint": null, "cadence": "daily", "at": "09:00", "payload_input": null, "timezone": null, "missed": null, "overlap": null, "ceiling": null },
+  "check_preview": null,
+  "provenance": {
+    "compiler_version": "0.120.3",
+    "spec_pin": "protocol-double-not-release-evidence",
+    "skeleton": null,
+    "cognition": "explicitProvider",
+    "suggested_file": "fixture.nika",
+    "strategy": "native",
+    "plan": { "intent_sha256": "synthetic", "strategy": "native", "unknown_extension": [1, null] },
+    "decision": { "route": "synthetic native receipt" },
+    "authoring": {
+      "model": "fixture/requested-model",
+      "calls": 1,
+      "input_tokens": null,
+      "output_tokens": null,
+      "elapsed_ms": 2,
+      "sampling": { "temperature": null, "seed": null, "effective": "providerDefaultUnknown" },
+      "context": [{ "role": "native", "knowledge": { "identity": { "version": "fixture", "digest": "synthetic", "builder": "protocol-double" }, "selection": [{ "id": "example:fixture", "reason": "synthetic" }] } }],
+      "backend": { "kind": "acp_harness", "requested_model": "requested-model", "observed": [{ "observed_model": null, "usage_reported": false }], "cost_basis": "subscription-backed/unknown" }
+    }
+  }
+}

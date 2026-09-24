@@ -70,10 +70,10 @@ const PATH_LIMIT = 240;
 
 export function encodeLiteralInputs(
   inputs: unknown,
-  label: 'run({ inputs })' | 'compile({ answers })' | 'compile({ change })' = 'run({ inputs })',
+  label: 'run({ inputs })' | 'schedule({ inputs })' | 'compile({ answers })' | 'compile({ change })' = 'run({ inputs })',
 ): LiteralInputs {
   if (containerKind(inputs) !== 'object') {
-    const subject = label === 'run({ inputs })'
+    const subject = label === 'run({ inputs })' || label === 'schedule({ inputs })'
       ? 'inputs must be a plain object mapping declared workflow input names'
       : 'answers must be a plain object mapping stable question keys';
     throw new NikaConfigurationError(
@@ -197,7 +197,10 @@ export function encodeLiteralInputs(
   return { json: parts.join(''), bytes };
 }
 
-function tooLarge(label: 'run({ inputs })' | 'compile({ answers })' | 'compile({ change })'): NikaConfigurationError {
+function tooLarge(label: 'run({ inputs })' | 'schedule({ inputs })' | 'compile({ answers })' | 'compile({ change })'): NikaConfigurationError {
+  if (label === 'schedule({ inputs })') {
+    return new NikaConfigurationError(`schedule({ inputs }): the serialized inputs map exceeds ${LITERAL_INPUTS_MAX_BYTES} bytes (1 MiB)`);
+  }
   if (label === 'compile({ change })') {
     return new NikaConfigurationError(
       `compile({ change }): the serialized literal exceeds ${LITERAL_INPUTS_MAX_BYTES} bytes (1 MiB)`,

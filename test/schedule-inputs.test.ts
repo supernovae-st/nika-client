@@ -70,6 +70,17 @@ describe('resident schedule input declarations', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it('preserves the resident machine-shaped input refusal', async () => {
+    const message = 'inputs.limit: expected a number (input_type_mismatch)';
+    const fetch = vi.fn().mockResolvedValueOnce(health()).mockResolvedValueOnce(
+      jsonResponse({ error: { code: 'schedule.inputs', message } }, 422),
+    );
+    await expect(client(fetch).schedule('flow.nika', { ...options, inputs: { limit: 'many' } }))
+      .rejects.toMatchObject({ name: 'NikaOperationError', operation: 'schedule',
+        code: 'schedule.inputs', machineCode: 'schedule.inputs', status: 422, message });
+    expect(JSON.parse(fetch.mock.calls[1][1].body).inputs).toEqual({ limit: 'many' });
+  });
+
   it('keeps the schedule capability gate without inventing an inputs capability', async () => {
     const fetch = vi.fn().mockResolvedValueOnce(healthResponse());
     await expect(client(fetch).schedule('flow.nika', { ...options, inputs: { x: 1 } }))

@@ -718,6 +718,8 @@ export type NikaScheduleWhen =
 export interface NikaScheduleOptions {
   /** Stable path identity for the resident schedule. */
   id: string;
+  /** Scalar declarations; Serve coerces them against the workflow inputs and refuses @env: values. */
+  inputs?: Record<string, string | number | boolean>;
   when: NikaScheduleWhen;
   maxCostUsd: number;
   missed: 'catch-up' | 'catch-up-once' | 'skip';
@@ -749,6 +751,8 @@ export type NikaScheduleAfterSkip =
 export interface NikaScheduleDefinition {
   id: string;
   workflow: string;
+  /** Engine-normalized scalar text. Older residents may omit this field. */
+  inputs?: Record<string, string>;
   when: NikaScheduleWhen | { kind: string; [key: string]: unknown };
   maxCostUsd: number;
   missed: NikaScheduleMissed;
@@ -905,7 +909,9 @@ export interface NikaCompileOptions {
   timeoutMs?: number;
   /** Local CLI only. Explicit opt-in; answers and ambient credentials never select a model. */
   authoring?: NikaCompileAuthoringOptions;
-  /** HTTP only. Explicit server-native authoring or zero-call replay; never combined with authoring. */
+  /** Local CREATE only. Explicit bounded decision model; independent of the authoring model. */
+  decisionModel?: string;
+  /** HTTP only. Never combined with local authoring or decisionModel. */
   remoteAuthoring?: NikaCompileRemoteAuthoring;
 }
 
@@ -930,6 +936,8 @@ export interface NikaCompileRemoteLimits {
 export interface NikaCompileAuthoringOptions {
   /** Explicit provider/model or harness/model; resolved only by the engine. */
   model: string;
+  /** Independent COLD proposals, 1..5 (engine default 1); requires this explicit model. */
+  samples?: number;
   /** Engine default: escalate after its plan cannot settle the request. */
   strategy?: 'escalate' | 'only' | 'sketch' | 'off';
   /** Native repair rounds, 0..5 (engine default 3). */

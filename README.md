@@ -346,9 +346,11 @@ node -p "require('@supernovae-st/nika/package.json').version"
 ./node_modules/.bin/nika --version
 ```
 
-This repository's source train is **0.120.3** (`package.json`), lockstep with
-public engine tag `v0.120.3` (`578352a31`). A source train is not a published
-npm version until the release workflow publishes it.
+Read this repository's source version from `package.json`. The release
+baseline referenced here is `v0.120.3` (`578352a31`). Development authoring
+features below can require a newer engine source build; a version label alone
+does not qualify them. A candidate is not downloadable as a new npm version
+until its release workflow publishes it.
 
 This package metadata subpath is exported for CommonJS, ESM build tools and CI
 pin checks. It reports the installed dependency, not a moving registry tag.
@@ -389,9 +391,10 @@ and asks for French; the hand-written file above is enough if it keeps
 released 0.120.3 engine supports native compilation and its Serve advertises
 HTTP compilation (the route landed in engine commit `4334e58b`, first published
 in v0.120.3); a 0.120.2 or older Serve predates that route and is refused
-without fallback. This SDK method first publishes with 0.120.3. This foundation resolves
-exact embedded skeleton names (including `hello`) and edits existing constants;
-unsupported intent remains `incomplete`.
+without fallback. The released foundation resolves exact embedded skeleton
+names (including `hello`) and edits existing constants. Newer source builds
+also have a bounded deterministic intent reader; support depends on the exact
+engine build, and unresolved intent remains `incomplete`.
 
 ```ts
 const candidate = await nika.compile({
@@ -428,9 +431,11 @@ const options = {
     model: 'openai/gpt-5-mini',
     strategy: 'only' as const,
     repairs: 2,
+    samples: 1,
     maxTokens: 8192,
     timeoutSeconds: 120,
-    knowledge: { snapshot: './knowledge', excludeCorpus: 'held-out-corpus' },
+    // Optional: name an existing, valid knowledge snapshot or request pack.
+    // knowledge: { snapshot: './knowledge', excludeCorpus: 'held-out-corpus' },
     // Or knowledge: { pack: './request-pack.json' }, mutually exclusive.
   },
   timeoutMs: 360_000,
@@ -446,17 +451,42 @@ if (draft.ready && draft.candidate !== null) {
 
 `model` is required whenever `authoring` is present; answers and credentials
 never opt into provider calls. `strategy` accepts `escalate`, `only`, `sketch`
-or `off`; omitted controls use engine defaults. `repairs` accepts 0–5,
+or `off`; omitted controls use engine defaults. `samples` accepts integers 1–5
+(independent COLD proposals, engine default 1); the SDK refuses out-of-range
+values rather than relying on the CLI's clamping. `repairs` accepts 0–5,
 `maxTokens` 1–32768, and `timeoutSeconds` 1–600 per call. `timeoutMs` bounds
 the whole operation, including engine negotiation and all repair calls.
+`only` bounds one native proposal to an opening plus repairs; multiple samples
+request independent proposals. `sketch` has separate sketch and fill calls
+sharing the repair allowance. `escalate` may do plan authoring before a native
+round, so `1 + repairs` is not a universal bound. `off` disables native
+authoring, not all provider calls through plan authoring. These controls are
+not a monetary budget.
 Knowledge paths resolve in the engine's working directory; the engine may also
 read its knowledge environment configuration and record replay plans under
 `.nika/compile`. The SDK supplies no destination and writes no persistent candidate.
 
+For CREATE, `decisionModel` explicitly selects the CLI's bounded decision seat,
+independently of `authoring.model`:
+
+```ts
+await local.compile({ intent }, { decisionModel: 'typesafe/jev-1.13.0' });
+// To seat both, explicitly add authoring: { model: 'provider/model', samples: 2 }.
+```
+
+This requires a local engine build with `--decision-model` and, for `samples`,
+`--authoring-samples`; check that build's `nika compile --help`. These source
+options do not imply a newly published SDK or downloadable engine release.
+The engine resolves the selected model and its credentials; the SDK supplies
+neither a default model nor implicit consent. Provider calls may incur costs.
+`decisionModel` is refused for edits, matching the CLI's `--base` conflict.
+No `samples` flag is sent unless supplied under an explicit `authoring.model`.
+
 HTTP request wire v1 has no native authoring or original-intent fields.
 Without a remote opt-in, an HTTP client rejects `authoring` and edit `originalIntent` with
 `NikaCompatibilityError` before any request, including health negotiation.
-Local `authoring` is always rejected over HTTP; paths and model selection belong
+Local `authoring` (including `samples`) and `decisionModel` are always rejected
+over HTTP and cannot be combined with `remoteAuthoring`; paths and model selection belong
 to the server operator.
 
 Servers implementing engine commit `fc6f3241` can advertise both `compile` and
@@ -744,6 +774,19 @@ Creates use `If-None-Match: *`; updates use the exact prior revision through
 by the engine; callers must not invent placeholders. Stale well-formed writers
 receive a typed operation error with the current revision. Returned planning
 facts are engine-owned and additive.
+
+Schedules can bind declared workflow inputs through `inputs`, for example
+`inputs: { ticketId: '42', limit: 10, enabled: true }` when the served workflow
+declares those names. Schedule values are strings, finite numbers or booleans;
+unlike run inputs, arrays, objects and null are refused. Serve converts scalars
+to text, coerces them against the workflow's declared types, and validates at
+PUT and at each fire. An `@env:` value is refused by Serve; no SDK environment
+substitution occurs. Omission or `{}` supplies no bindings, so workflow defaults
+and required inputs still apply. Treat PUT as a full declaration: include the
+bindings again when updating. New residents return normalized strings in
+`status.definition.inputs`; older residents may omit this field. The SDK keeps
+the `schedule` capability gate; a resident without SchedulePut input support
+may refuse the request. Use a compatible source build until it is published.
 
 Treat any `status.finding` recovered from older state as non-runnable. New active
 declarations the current engine cannot plan are refused before durable mutation.
@@ -1154,8 +1197,10 @@ under `gauntlet/`.
 
 ## Keeping it fresh
 
-The client and engine follow one release train. `nika doctor` reports installed
-drift without treating it as a workflow failure.
+Each published SDK version carries matching native engine payloads. SDK and
+standalone engine publication run on independent clocks; upgrading one does not
+prove that the other changed. `nika doctor` reports installed drift without
+treating it as a workflow failure.
 
 ```sh
 nika doctor

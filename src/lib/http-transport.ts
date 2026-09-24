@@ -39,6 +39,7 @@ import {
   type NikaEngineIdentity,
 } from './engine-identity.js';
 import { literalInputs } from './literal-inputs.js';
+import { scheduleInputs } from './schedule-inputs.js';
 import { COMPILE_CAPABILITY, COMPILE_NATIVE_CAPABILITY, COMPILE_REPLAY_HEADER, COMPILE_RESPONSE_MAX_BYTES, compileBody, compilePayloadFrom, compileSignal } from './compile.js';
 import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
 import { readSettlement } from './settlement.js';
@@ -422,6 +423,7 @@ export class HttpTransport implements Transport {
     options: NikaScheduleOptions,
   ): Promise<NikaScheduleApplyResult> {
     refuseLegacyContainedName(workflow);
+    const inputs = scheduleInputs(options.inputs);
     await this.ensureScheduleCapability();
     const path = `/v1/schedules/${encodeURIComponent(options.id)}`;
     const headers = new Headers({ 'Content-Type': 'application/json' });
@@ -433,7 +435,7 @@ export class HttpTransport implements Transport {
     const object = await this.operationJson('schedule', path, {
       method: 'PUT',
       headers,
-      body: JSON.stringify(scheduleBody(workflow, options)),
+      body: JSON.stringify(scheduleBody(workflow, options, inputs)),
     });
     if (
       object.applied !== true
@@ -1542,9 +1544,11 @@ function workflowPath(name: string): string {
 function scheduleBody(
   workflow: string,
   options: NikaScheduleOptions,
+  inputs: NikaScheduleOptions['inputs'],
 ): Record<string, unknown> {
   return {
     workflow,
+    ...(inputs !== undefined ? { inputs } : {}),
     when: options.when,
     maxCostUsd: options.maxCostUsd,
     missed: options.missed,
@@ -1567,10 +1571,12 @@ function scheduleStatusProjection(value: unknown): value is Record<string, unkno
   const when = machineObject(definition?.when);
   const due = machineObject(status?.due);
   const finding = machineObject(status?.finding);
+  const inputs = machineObject(definition?.inputs);
   return !!status
     && !!definition
     && typeof definition.id === 'string'
     && typeof definition.workflow === 'string'
+    && (definition.inputs === undefined || (!!inputs && Object.values(inputs).every((value) => typeof value === 'string')))
     && !!when
     && typeof when.kind === 'string'
     && typeof definition.maxCostUsd === 'number'

@@ -86,8 +86,12 @@ nothing: execution needs a separate caller decision and normal `run` admission.
 
 This optional surface consumes the implemented contract at engine commit
 `fc6f324119fd900b7952bd893f39630ed6371d0a`; it does not change the pinned release
-OpenAPI. Both `compile` and `compileNativeV2` must appear in health. Without
+OpenAPI. Both `compile` and `compileNativeV2` must appear in health. Here v1
+and v2 name the `compile_version` request envelope at `POST /v1/compile`,
+not separate HTTP routes: there is no `/v2/compile` endpoint. Without
 `remoteAuthoring`, the SDK sends the original v1 request exactly as before.
+The server operator must start the HTTP listener with `--authoring-model`
+to seat this capability; the SDK opt-in and ambient credentials cannot add it.
 
 `remoteAuthoring: { cognition: 'explicitProvider', limits? }` sends v2 to the
 same authenticated route. Create carries `intent`; text revision carries
@@ -255,3 +259,18 @@ names.
 Schedules use compare-and-swap semantics. Create omits `revision`; update must
 carry the exact previous `sha256:...` revision. The SDK never fabricates or
 normalizes schedule facts.
+
+`schedule(workflow, { ..., inputs })` sends the declared input map unchanged in
+`SchedulePut.inputs`. Values must be strings, finite numbers or booleans, not
+arbitrary run-input JSON. Serve converts them to text and coerces the workflow's
+declared types at PUT and each fire; unknown names, missing required bindings
+and `@env:` values are server refusals. The SDK captures the map before health
+negotiation, refuses invalid JSON/scalars before sending, and limits the map to
+1 MiB. Include bindings on each replacement PUT. Returned
+`status.definition.inputs`, when present, contains the engine's normalized
+strings. This needs a resident implementing SchedulePut inputs; the existing
+`schedule` capability alone does not prove that schema revision is deployed.
+
+Native `decisionModel` and `authoring.samples` are CLI controls. They are never
+sent in either HTTP compile envelope; `remoteAuthoring` keeps its server-owned
+provider/model contract.

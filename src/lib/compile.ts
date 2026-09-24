@@ -183,7 +183,8 @@ function normalizeChange(change: unknown): string | NikaCompileSetConstant {
 export function normalizeCompileOptions(options: NikaCompileOptions): NikaCompileOptions {
   const record = dataRecord(options, 'options');
   for (const key of Reflect.ownKeys(record)) {
-    if (key !== 'signal' && key !== 'timeoutMs' && key !== 'authoring' && key !== 'remoteAuthoring') {
+    if (key !== 'signal' && key !== 'timeoutMs' && key !== 'authoring' && key !== 'remoteAuthoring'
+      && key !== 'decisionModel') {
       throw new NikaConfigurationError(`compile: unknown option ${String(key)}`);
     }
   }
@@ -213,9 +214,10 @@ export function normalizeCompileOptions(options: NikaCompileOptions): NikaCompil
     } catch { throw invalidSignal(); }
   }
   if (record.authoring !== undefined) record.authoring = normalizeAuthoring(record.authoring);
+  if (record.decisionModel !== undefined) compileText(record.decisionModel, 'decisionModel');
   if (record.remoteAuthoring !== undefined) {
-    if (record.authoring !== undefined) {
-      throw new NikaConfigurationError('compile: authoring and remoteAuthoring cannot be combined');
+    if (record.authoring !== undefined || record.decisionModel !== undefined) {
+      throw new NikaConfigurationError('compile: local authoring or decisionModel cannot be combined with remoteAuthoring');
     }
     record.remoteAuthoring = normalizeRemoteAuthoring(record.remoteAuthoring);
   }
@@ -262,7 +264,7 @@ function compileText(value: unknown, label: string): asserts value is string {
 
 function normalizeAuthoring(value: unknown): NikaCompileAuthoringOptions {
   const authoring = dataRecord(value, 'authoring');
-  const fields = ['model', 'strategy', 'repairs', 'maxTokens', 'timeoutSeconds', 'knowledge'];
+  const fields = ['model', 'samples', 'strategy', 'repairs', 'maxTokens', 'timeoutSeconds', 'knowledge'];
   if (Object.keys(authoring).some((key) => !fields.includes(key))) {
     throw new NikaConfigurationError('compile: unknown authoring option');
   }
@@ -271,7 +273,7 @@ function normalizeAuthoring(value: unknown): NikaCompileAuthoringOptions {
     && !['escalate', 'only', 'sketch', 'off'].includes(authoring.strategy as string)) {
     throw new NikaConfigurationError('compile: authoring.strategy must be escalate, only, sketch or off');
   }
-  for (const [key, min, max] of [['repairs', 0, 5], ['maxTokens', 1, 32768], ['timeoutSeconds', 1, 600]] as const) {
+  for (const [key, min, max] of [['samples', 1, 5], ['repairs', 0, 5], ['maxTokens', 1, 32768], ['timeoutSeconds', 1, 600]] as const) {
     const limit = authoring[key];
     if (limit !== undefined && (typeof limit !== 'number' || !Number.isSafeInteger(limit)
       || limit < min || limit > max)) {
@@ -351,12 +353,18 @@ export async function compileArgv(request: NikaCompileRequest, options: NikaComp
       'remoteAuthoring requires an HTTP client; replay tokens never select local authoring');
   }
   const args = ['compile', '--json'];
+  if (options.decisionModel !== undefined) {
+    if (request.intent === undefined) {
+      throw new NikaConfigurationError('compile: decisionModel is only supported for CREATE; the CLI refuses it with --base');
+    }
+    args.push(`--decision-model=${options.decisionModel}`);
+  }
   const authoring = options.authoring;
   if (authoring !== undefined) {
     args.push(`--authoring-model=${authoring.model}`);
     for (const [key, flag] of [
       ['strategy', 'strategy'], ['repairs', 'repairs'], ['maxTokens', 'max-tokens'],
-      ['timeoutSeconds', 'timeout'],
+      ['timeoutSeconds', 'timeout'], ['samples', 'samples'],
     ] as const) {
       if (authoring[key] !== undefined) args.push(`--authoring-${flag}=${authoring[key]}`);
     }
@@ -435,6 +443,10 @@ function refuseNul(value: string): void {
 
 /** Exact accepted Serve v1/v2 envelopes; no local capture or compiler is involved. */
 export function compileBody(request: NikaCompileRequest, options: NikaCompileOptions = {}): string {
+  if (options.decisionModel !== undefined) {
+    throw new NikaCompatibilityError(COMPILE_CAPABILITY, 'http',
+      'decisionModel is a local CLI option; the HTTP server owns model selection');
+  }
   if (options.authoring !== undefined || (request.originalIntent !== undefined && options.remoteAuthoring === undefined)) {
     throw new NikaCompatibilityError(COMPILE_CAPABILITY, 'http',
       'HTTP Compile request wire v1 cannot honor authoring options or originalIntent; use an explicit local client');
@@ -717,7 +729,7 @@ function provenanceFrom(
   if (version === 1 && 'authoring' in provenance) throw protocol('wire v1 cannot carry an authoring receipt');
   if (version === 2) {
     const receipt = machineObject(provenance.authoring);
-    const count = (n: unknown) => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
+    const count = (n: unknown): n is number => typeof n === 'number' && Number.isSafeInteger(n) && n >= 0;
     const sampling = machineObject(receipt?.sampling);
     if (!receipt || typeof receipt.model !== 'string' || !count(receipt.calls) || receipt.calls > 0xffffffff
       || !count(receipt.elapsed_ms)

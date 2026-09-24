@@ -749,6 +749,7 @@ function triggerFrom(value: unknown, protocol: (message: string) => NikaProtocol
   const trigger = machineObject(value);
   if (!trigger || !['manual', 'schedule', 'webhook', 'event'].includes(trigger.kind as string)
     || !['satisfied', 'requires_binding', 'unsupported'].includes(trigger.status as string)
+    || ('cron' in trigger && trigger.cron !== null && typeof trigger.cron !== 'string')
     || ['source_hint', 'event_hint', 'cadence', 'at', 'payload_input', 'timezone', 'missed', 'overlap', 'ceiling']
       .some((key) => trigger[key] !== null && typeof trigger[key] !== 'string')) {
     throw protocol('invalid requested_trigger');

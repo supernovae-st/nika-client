@@ -135,6 +135,25 @@ describe('explicit native authoring options', () => {
 });
 
 describe('Compile wire v2 decoding on both transports (protocol doubles)', () => {
+  it('preserves exact unbound cron fields and accepts older trigger documents', () => {
+    for (const transport of ['native-process', 'http'] as const) {
+      const legacy = wire();
+      delete legacy.requested_trigger.cron;
+      expect(compilePayloadFrom(legacy, transport, 'double').requested_trigger)
+        .not.toHaveProperty('cron');
+      for (const cron of [null, '0 */2 * * *', '15 9 * * 2']) {
+        const payload = wire();
+        payload.requested_trigger.cron = cron;
+        expect(compilePayloadFrom(payload, transport, 'double').requested_trigger?.cron).toBe(cron);
+      }
+      for (const cron of [5, false, [], {}]) {
+        const payload = wire();
+        payload.requested_trigger.cron = cron;
+        expect(() => compilePayloadFrom(payload, transport, 'double')).toThrow(NikaProtocolError);
+      }
+    }
+  });
+
   it('also preserves expanded v1 provenance without an authoring receipt', () => {
     const payload = { ...wire(), compile_version: 1 };
     delete payload.provenance.authoring;

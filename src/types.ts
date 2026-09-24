@@ -1021,6 +1021,8 @@ export interface NikaCompileTrigger {
   source_hint: string | null;
   event_hint: string | null;
   cadence: string | null;
+  /** Exact five cron fields, without a timezone or activation authority. Absent in older engines. */
+  cron?: string | null;
   at: string | null;
   payload_input: string | null;
   timezone: string | null;

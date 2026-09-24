@@ -535,7 +535,11 @@ including context, knowledge identity, backend observations and sampling, plus
 the engine's plan, decision and strategy. Its `model` is the requested model;
 unknown observed models, token usage and costs remain unknown. Choice questions
 retain their option keys, and `requested_trigger` describes a requirement that
-still needs an operator binding.
+still needs an operator binding. Its optional `cron` field preserves an exact
+five-field cadence when the engine can derive one; it is `null` when unresolved
+and absent in older responses. These fields have no timezone or activation
+authority. Bind the explicit timezone and required policies through the schedule
+API; the coarse `cadence` label alone is insufficient to create a schedule.
 
 `candidate` is `.nika` source, distinct from the path accepted by `run()`.
 The caller reviews and materializes it before calling `run(path)`, which performs

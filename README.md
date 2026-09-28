@@ -454,7 +454,9 @@ Remote-only options:
 
 - `url`, `token`
 - `allowInsecureHttp`
-- `requestTimeout`, default 30 seconds
+- `requestTimeout`, default 30 seconds; compile waits for the server response
+  under the server's compile deadline instead. Use an explicit `AbortSignal` to
+  stop waiting sooner. The ordinary timeout still bounds the response body.
 - `fetch`, for a custom standards-compatible implementation
 
 ### Methods

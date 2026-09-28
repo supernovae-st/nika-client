@@ -79,6 +79,16 @@ describe('compile over the engine-owned HTTP contract', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it('preserves decision and plan evidence in generation-one outcomes without another request', async () => {
+    const evidence = { ...outcome, provenance: { ...outcome.provenance,
+      decision: { grounding: [{ field: 'status', grade: 'observed_partial' }] },
+      plan: { source: './orders.csv' }, strategy: 'native', suggested_file: 'paid.nika',
+    } };
+    const { nika, fetch } = client(() => json(evidence));
+    expect(await nika.compile(request)).toEqual({ outcome: evidence });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it('returns a replay token without replaying, answering or running automatically', async () => {
     // Generation-2 requests can return generation 1 when no provider call was needed.
     const replay = 'a'.repeat(64);
@@ -109,6 +119,11 @@ describe('compile over the engine-owned HTTP contract', () => {
     { ...outcome, check_preview: { scope: 'admitted', report: {} } },
     { ...outcome, diagnostics: [{ kind: 'passed', target: 'cost', message: 'free' }] },
     { ...outcome, provenance: { ...outcome.provenance, skeleton: 42 } },
+    { ...outcome, provenance: { ...outcome.provenance, decision: false } },
+    { ...outcome, provenance: { ...outcome.provenance, decision: [] } },
+    { ...outcome, provenance: { ...outcome.provenance, plan: 'authority' } },
+    { ...outcome, provenance: { ...outcome.provenance, strategy: 3 } },
+    { ...outcome, provenance: { ...outcome.provenance, suggested_file: true } },
     { ...outcome, compile_version: 2, provenance: { ...outcome.provenance, cognition: 'explicitProvider', authoring: {} } },
   ])('does not promote a malformed document to authoring evidence', async (bad) => {
     const { nika } = client(() => json(bad));

@@ -33,6 +33,11 @@ export function readCompileOutcome(value: Record<string, unknown>): NikaCompileO
     && typeof provenance?.compiler_version === 'string'
     && typeof provenance.spec_pin === 'string'
     && (provenance.skeleton === null || typeof provenance.skeleton === 'string')
+    && (provenance.decision === undefined || !!machineObject(provenance.decision))
+    && (provenance.plan === undefined || !!machineObject(provenance.plan))
+    && (provenance.strategy === undefined || typeof provenance.strategy === 'string')
+    && (provenance.suggested_file === undefined || provenance.suggested_file === null
+      || typeof provenance.suggested_file === 'string')
     && (value.compile_version === 1
       ? provenance.cognition === 'deterministicOnly'
       : provenance.cognition === 'explicitProvider' && validAuthoring(provenance.authoring));

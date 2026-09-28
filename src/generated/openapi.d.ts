@@ -1021,8 +1021,20 @@ export interface components {
                 /** @constant */
                 cognition: "deterministicOnly";
                 compiler_version: string;
+                /** @description Bounded compiler decision evidence, including deterministic and replay outcomes; it grants no execution or spending authority. */
+                decision?: {
+                    [key: string]: unknown;
+                };
+                /** @description The compiler record retained in this outcome; a server replay uses its opaque token rather than accepting this object as authority. */
+                plan?: {
+                    [key: string]: unknown;
+                };
                 skeleton: string | null;
                 spec_pin: string;
+                /** @description The compiler strategy that produced this outcome. */
+                strategy?: string;
+                /** @description A suggested candidate file name, never a file written by compilation. */
+                suggested_file?: string | null;
             };
             questions: {
                 /** @description Stable semantic hole path such as `const.request`, never a session id */
@@ -1119,11 +1131,11 @@ export interface components {
                         [key: string]: unknown;
                     }[];
                     elapsed_ms: number;
-                    /** @description As the provider reported them; null when it reported none */
+                    /** @description Sum of reported counters from calls with complete base usage; null when no call reported both counters. If backend.usage_complete is false this is a partial observed sum, not the whole round. */
                     input_tokens: number | null;
                     /** @description The operator-seated authoring model (`provider/name`), never a caller's choice */
                     model: string;
-                    /** @description As the provider reported them; null when it reported none */
+                    /** @description Sum of reported counters from calls with complete base usage; null when no call reported both counters. If backend.usage_complete is false this is a partial observed sum, not the whole round. */
                     output_tokens: number | null;
                     /** @description Provider-default sampling: `temperature` and `seed` null, `effective` providerDefaultUnknown */
                     sampling: {

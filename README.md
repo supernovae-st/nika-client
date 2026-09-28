@@ -28,14 +28,15 @@
 </p>
 
 <!-- engine media (this hero and the clips below) is served from supernovae-st/nika main (media/), not from a release tag: re-pin it to the first engine release tag that carries these clips, then on lockstep bumps -->
-<!-- motion: a TypeScript program running a .nika workflow and verifying its receipt -->
+**Watch a Node app run this README's quick start: checked, run, typed, verified.**
+
 <p align="center">
-  <a href="https://raw.githubusercontent.com/supernovae-st/nika/main/media/gifs/full-loop.optimized.gif">
-    <img src="https://raw.githubusercontent.com/supernovae-st/nika/main/media/gifs/full-loop.optimized.gif"
-         alt="The four steps on the real command line: nika compile writes hello.nika, nika check passes it, nika run rehearses it offline with mock/echo, and nika trace verify reads back the same chain head the run printed" width="960">
+  <a href="https://raw.githubusercontent.com/supernovae-st/nika/main/media/gifs/typescript-client.optimized.gif">
+    <img src="https://raw.githubusercontent.com/supernovae-st/nika/main/media/gifs/typescript-client.optimized.gif"
+         alt="A TypeScript app calls run() on hello.nika through @supernovae-st/nika: the bundled engine checks the file (run ready), runs it as a mock/echo rehearsal and records six hash-chained events, the typed result comes back, and traceVerify() checks the receipt and the terminal prints receipt verified" width="960">
   </a>
 </p>
-<p align="center"><sub>Write, check, run, verify: the loop your code drives, shown here on the command line. At the end, <code>nika trace verify</code> reads back the chain head the run printed. All four commands are captured from the real CLI; the run is a <code>mock/echo</code> rehearsal.</sub></p>
+<p align="center"><sub><code>demo.mts</code> from the quick start calls <code>run()</code>. The engine the package bundles checks <code>hello.nika</code>, runs it and records it; the result comes back typed, and <code>traceVerify()</code> prints <code>receipt verified</code>. Captured from this quick start with <code>@supernovae-st/nika</code> 0.120.3 and its bundled engine; the run is a <code>mock/echo</code> rehearsal, and the editor, the lanes and the motion are illustration.</sub></p>
 
 ## What is Nika?
 
@@ -146,6 +147,10 @@ nika check · hello.nika
  ✔ audited · 1 task · 1 wave · permits {} · est out ≤$0.0000 · 0 hints · risk low
  layers · valid ✔ · access ready ✔ · capacity fit ✔ · run ready ✔
 ```
+
+▶ [Watch compile, check, run and verify on the command line](https://raw.githubusercontent.com/supernovae-st/nika/main/media/gifs/full-loop.optimized.gif):
+the same loop your code drives, all four commands captured from the real
+CLI, the run a `mock/echo` rehearsal.
 
 </details>
 

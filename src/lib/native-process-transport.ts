@@ -1,3 +1,4 @@
+import { costReviewProtocol } from './cost-review.js';
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import type { Readable } from 'node:stream';
@@ -79,15 +80,15 @@ export class NativeProcessTransport implements Transport {
   }
 
   async prepareCostReview(_request: NikaCostReviewRequest, _options: NikaPrepareCostReviewOptions): Promise<NikaCostReviewResult> {
-    throw new NikaCompatibilityError('costReviewV1', this.kind, 'Cost review requires a resident HTTP authority');
+    throw new NikaCompatibilityError(costReviewProtocol(_options.version).capability, this.kind, 'Cost review requires a resident HTTP authority');
   }
 
   async costReview(_id: string, _options: NikaCostReviewOptions): Promise<NikaCostReview> {
-    throw new NikaCompatibilityError('costReviewV1', this.kind, 'Cost review requires a resident HTTP authority');
+    throw new NikaCompatibilityError(costReviewProtocol(_options.version).capability, this.kind, 'Cost review requires a resident HTTP authority');
   }
 
   async decideCostReview(_id: string, _decision: NikaCostReviewDecision, _options: NikaCostReviewOptions): Promise<NikaCostReview> {
-    throw new NikaCompatibilityError('costReviewV1', this.kind, 'Cost review requires a resident HTTP authority');
+    throw new NikaCompatibilityError(costReviewProtocol(_options.version).capability, this.kind, 'Cost review requires a resident HTTP authority');
   }
 
   async check(workflow: string, options: NikaCheckOptions): Promise<NikaCheckResult> {

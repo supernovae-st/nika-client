@@ -8,6 +8,8 @@ import {
 } from '../errors.js';
 import type {
   NikaCostReview,
+  NikaCostReviewV2,
+  NikaCostReviewResultV2,
   NikaCostReviewRequest,
   NikaCostReviewDecision,
   NikaCostReviewOptions,
@@ -47,7 +49,7 @@ import {
 import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
 import { readSettlement } from './settlement.js';
 import { readCompileOutcome } from './compile.js';
-import { admissionKey, costReviewId, readCostReviewResult, reviewReference, reviewWitness } from './cost-review.js';
+import { admissionKey, costReviewProtocol, costReviewId, readCostReviewResult, reviewReference, reviewWitness } from './cost-review.js';
 import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
 import type { Transport, TransportRun } from './transport.js';
 
@@ -225,35 +227,38 @@ export class HttpTransport implements Transport {
     return captured.report;
   }
 
-  async prepareCostReview(request: NikaCostReviewRequest, options: NikaPrepareCostReviewOptions): Promise<NikaCostReviewResult> {
+  async prepareCostReview(request: NikaCostReviewRequest, options: NikaPrepareCostReviewOptions): Promise<NikaCostReviewResult | NikaCostReviewResultV2> {
+    const protocol = costReviewProtocol(options.version);
     options.signal?.throwIfAborted();
     if (!machineObject(request) || !isContainedWorkflowName(request.workflow)) {
       throw new TypeError('cost review requires a contained served workflow name');
     }
     const body = JSON.stringify(request);
     const key = admissionKey(options.idempotencyKey ?? randomUUID());
-    await this.requireCostReview(options.signal);
-    const { object, status } = await this.jsonWithStatus('/v1/cost-reviews', {
+    await this.requireCostReview(protocol.capability, options.signal);
+    const { object, status } = await this.jsonWithStatus(protocol.create, {
       method: 'POST', body, signal: options.signal, redirect: 'error',
       headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
     }, true, [200, 201], 'prepareCostReview');
-    const result = readCostReviewResult(object, status === 200);
+    const result = readCostReviewResult(object, status === 200, undefined, protocol.version);
     if (status === 201 && (!('state' in result) || result.state !== 'pending')) {
       throw new NikaProtocolError(this.kind, 'A newly created cost review must be pending');
     }
     return result;
   }
 
-  async costReview(id: string, options: NikaCostReviewOptions): Promise<NikaCostReview> {
+  async costReview(id: string, options: NikaCostReviewOptions): Promise<NikaCostReview | NikaCostReviewV2> {
+    const protocol = costReviewProtocol(options.version);
     id = costReviewId(id);
-    await this.requireCostReview(options.signal);
-    const object = await this.json(`/v1/cost-reviews/${id}`, {
+    await this.requireCostReview(protocol.capability, options.signal);
+    const object = await this.json(protocol.read(id), {
       method: 'GET', signal: options.signal, redirect: 'error', headers: { Accept: 'application/json' },
     }, true, [200], 'costReview');
-    return readCostReviewResult(object, false, id) as NikaCostReview;
+    return readCostReviewResult(object, false, id, protocol.version) as NikaCostReview | NikaCostReviewV2;
   }
 
-  async decideCostReview(id: string, decision: NikaCostReviewDecision, options: NikaCostReviewOptions): Promise<NikaCostReview> {
+  async decideCostReview(id: string, decision: NikaCostReviewDecision, options: NikaCostReviewOptions): Promise<NikaCostReview | NikaCostReviewV2> {
+    const protocol = costReviewProtocol(options.version);
     id = costReviewId(id);
     if (!machineObject(decision) || !['approve_once', 'decline'].includes(decision.decision)
       || Object.keys(decision).some(key => key !== 'decision' && key !== 'witness_sha256')) {
@@ -261,20 +266,24 @@ export class HttpTransport implements Transport {
     }
     reviewWitness(decision.witness_sha256);
     const body = JSON.stringify(decision);
-    await this.requireCostReview(options.signal);
-    const object = await this.json(`/v1/cost-reviews/${id}/decision`, {
+    await this.requireCostReview(protocol.capability, options.signal);
+    const object = await this.json(protocol.decide(id), {
       method: 'POST', body, signal: options.signal, redirect: 'error',
       headers: { 'Content-Type': 'application/json' },
     }, true, [200], 'decideCostReview');
-    return readCostReviewResult(object, false, id) as NikaCostReview;
+    return readCostReviewResult(object, false, id, protocol.version) as NikaCostReview | NikaCostReviewV2;
   }
 
-  private async requireCostReview(signal?: AbortSignal): Promise<void> {
+  private async requireCostReview(capability?: string, signal?: AbortSignal): Promise<void> {
     signal?.throwIfAborted();
     await this.ensureServerIdentity();
     signal?.throwIfAborted();
-    if (!this.remoteIdentity?.supportedCapabilities.includes('costReviewV1')) {
-      throw this.gap('costReviewV1', 'The connected server did not advertise explicit cost review');
+    const capabilities = this.remoteIdentity?.supportedCapabilities ?? [];
+    const supported = capability === undefined
+      ? capabilities.includes('costReviewV1') || capabilities.includes('costReviewV2')
+      : capabilities.includes(capability);
+    if (!supported) {
+      throw this.gap(capability ?? 'costReviewV1', 'The connected server did not advertise explicit cost review');
     }
   }
 

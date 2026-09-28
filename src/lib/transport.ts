@@ -1,5 +1,7 @@
 import type {
   NikaCostReview,
+  NikaCostReviewV2,
+  NikaCostReviewResultV2,
   NikaCostReviewRequest,
   NikaCostReviewDecision,
   NikaCostReviewOptions,
@@ -42,9 +44,9 @@ export interface Transport {
   readonly kind: NikaTransportKind;
   serverIdentity(): Promise<NikaEngineIdentity>;
   compile(request: NikaCompileRequest, options: NikaCompileOptions): Promise<NikaCompileResult>;
-  prepareCostReview(request: NikaCostReviewRequest, options: NikaPrepareCostReviewOptions): Promise<NikaCostReviewResult>;
-  costReview(id: string, options: NikaCostReviewOptions): Promise<NikaCostReview>;
-  decideCostReview(id: string, decision: NikaCostReviewDecision, options: NikaCostReviewOptions): Promise<NikaCostReview>;
+  prepareCostReview(request: NikaCostReviewRequest, options: NikaPrepareCostReviewOptions): Promise<NikaCostReviewResult | NikaCostReviewResultV2>;
+  costReview(id: string, options: NikaCostReviewOptions): Promise<NikaCostReview | NikaCostReviewV2>;
+  decideCostReview(id: string, decision: NikaCostReviewDecision, options: NikaCostReviewOptions): Promise<NikaCostReview | NikaCostReviewV2>;
   check(workflow: string, options: NikaCheckOptions): Promise<NikaCheckResult>;
   startRun(workflow: string, options: NikaRunOptions): Promise<TransportRun>;
   attachRun(id: string, options: NikaAttachRunOptions): Promise<TransportRun>;

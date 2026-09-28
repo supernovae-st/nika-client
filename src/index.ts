@@ -11,6 +11,8 @@ import type { NikaEngineIdentity } from './lib/engine-identity.js';
 export type { NikaEngineIdentity } from './lib/engine-identity.js';
 import type {
   NikaCostReview,
+  NikaCostReviewV2,
+  NikaCostReviewResultV2,
   NikaCostReviewRequest,
   NikaCostReviewDecision,
   NikaCostReviewOptions,
@@ -121,17 +123,26 @@ export class Nika {
   }
 
   /** Prepare a review; this can hold the project cost lease, but never starts a job. */
-  prepareCostReview(request: NikaCostReviewRequest, options: NikaPrepareCostReviewOptions = {}): Promise<NikaCostReviewResult> {
+  prepareCostReview(request: NikaCostReviewRequest, options: NikaPrepareCostReviewOptions & { version: 2 }): Promise<NikaCostReviewResultV2>;
+  prepareCostReview(request: NikaCostReviewRequest, options?: NikaPrepareCostReviewOptions & { version?: 1 }): Promise<NikaCostReviewResult>;
+  prepareCostReview(request: NikaCostReviewRequest, options: NikaPrepareCostReviewOptions): Promise<NikaCostReviewResult | NikaCostReviewResultV2>;
+  prepareCostReview(request: NikaCostReviewRequest, options: NikaPrepareCostReviewOptions = {}): Promise<NikaCostReviewResult | NikaCostReviewResultV2> {
     return this.transport.prepareCostReview(request, options);
   }
 
   /** Observe a review without approving, renewing, or executing it. */
-  costReview(id: string, options: NikaCostReviewOptions = {}): Promise<NikaCostReview> {
+  costReview(id: string, options: NikaCostReviewOptions & { version: 2 }): Promise<NikaCostReviewV2>;
+  costReview(id: string, options?: NikaCostReviewOptions & { version?: 1 }): Promise<NikaCostReview>;
+  costReview(id: string, options: NikaCostReviewOptions): Promise<NikaCostReview | NikaCostReviewV2>;
+  costReview(id: string, options: NikaCostReviewOptions = {}): Promise<NikaCostReview | NikaCostReviewV2> {
     return this.transport.costReview(id, options);
   }
 
   /** Send exactly one explicit caller decision; a separate run() admits the job. */
-  decideCostReview(id: string, decision: NikaCostReviewDecision, options: NikaCostReviewOptions = {}): Promise<NikaCostReview> {
+  decideCostReview(id: string, decision: NikaCostReviewDecision, options: NikaCostReviewOptions & { version: 2 }): Promise<NikaCostReviewV2>;
+  decideCostReview(id: string, decision: NikaCostReviewDecision, options?: NikaCostReviewOptions & { version?: 1 }): Promise<NikaCostReview>;
+  decideCostReview(id: string, decision: NikaCostReviewDecision, options: NikaCostReviewOptions): Promise<NikaCostReview | NikaCostReviewV2>;
+  decideCostReview(id: string, decision: NikaCostReviewDecision, options: NikaCostReviewOptions = {}): Promise<NikaCostReview | NikaCostReviewV2> {
     return this.transport.decideCostReview(id, decision, options);
   }
 
@@ -333,6 +344,8 @@ export type {
   NikaJournalEvidence,
   NikaCostReviewReference,
   NikaCostReview,
+  NikaCostReviewV2,
+  NikaCostReviewResultV2,
   NikaCostReviewRequest,
   NikaCostReviewDecision,
   NikaCostReviewOptions,

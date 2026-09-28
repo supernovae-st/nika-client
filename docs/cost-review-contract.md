@@ -25,9 +25,43 @@ must match the reviewed request. Inputs use the HTTP engine’s typed JSON
 world observations cannot silently re-grant authority. Refusals retain the
 engine code and HTTP status in `NikaOperationError`.
 
-These methods require a server advertising `costReviewV1`; typed HTTP inputs
+Without an explicit version these methods require `costReviewV1`; typed HTTP inputs
 require `jobInputs`. Native processes and snapshot admission reject these
 HTTP-only options. Cancellation stops waiting, not necessarily server effects.
 A transport failure may leave a review or job admitted: observe the known id,
 or explicitly replay the same idempotency key and exact request. The SDK
 never infers that a lost response means no effect.
+
+## Explicit dispatch-bound V2
+
+Pass `{ version: 2 }` to `prepareCostReview`, `costReview`, and
+`decideCostReview` to use `/v2/cost-reviews`. The resident must advertise
+`costReviewV2`; an absent capability, a refusal, or a lost response never
+causes a retry or a fallback to V1. Read and decide at the version that created
+the review. The job reference remains `{ review_id, witness_sha256 }` on the
+existing job door. A V1 review request remains V1 even on a V2-capable server.
+
+The V2 types are `NikaCostReviewV2` and `NikaCostReviewResultV2`. Their
+`dispatch` reports the engine's total requests, maximum in flight, authored
+retry flag and per-task bound. `bounds.transport_retries` is zero. The SDK
+validates their wire shape and agreement between the repeated total and width;
+it does not recalculate the engine's bound or turn observations into billing
+proof. A `review_required: false` result has no review reference or approval.
+
+```ts
+const result = await nika.prepareCostReview(
+  { workflow: 'survey', inputs: { items: ['a', 'b', 'c'] } },
+  { version: 2, idempotencyKey: 'survey-review-1' },
+);
+if ('review_id' in result) {
+  console.log(result.question, result.dispatch);
+  // The application obtains the caller's explicit decision separately.
+}
+```
+
+The V2 OpenAPI addition is the engine-owned RFC 7386 patch
+`crates/nika-serve/src/server/cost_review/openapi-v2.json` at engine
+`6196415d99d91cae7e2b0654204775f134ecb1b5`, SHA-256
+`4b2febc74fe147555af320651ba5557eba8621e19266d56e4d7515686d74035f`.
+It adds three routes and four schemas while preserving the pinned V1 routes
+and schemas. This contract pin alone is not qualification of a release artifact.

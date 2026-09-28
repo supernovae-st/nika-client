@@ -58,11 +58,21 @@ try {
   run(process.execPath, ['--input-type=module', '--eval', esm], { cwd: consumer });
 
   const typedConsumer = [
-    `import { Nika, type NikaConfig, type NikaEngineIdentity } from '${packageName}';`,
+    `import { Nika, type NikaConfig, type NikaEngineIdentity, type NikaCostReview, type NikaCostReviewV2, type NikaCostReviewResultV2, type NikaCostReviewOptions } from '${packageName}';`,
     "const config: NikaConfig = { bin: '/tmp/nika' };",
     'const client: Nika = new Nika(config);',
     'const identity: Promise<NikaEngineIdentity> = client.serverIdentity();',
     'void identity;',
+    "const id = 'rev-01234567-89ab-cdef-0123-456789abcdef';",
+    'const one: Promise<NikaCostReview> = client.costReview(id);',
+    'const two: Promise<NikaCostReviewV2> = client.costReview(id, { version: 2 });',
+    "const prepared: Promise<NikaCostReviewResultV2> = client.prepareCostReview({ workflow: 'fan' }, { version: 2 });",
+    "const decision: Promise<NikaCostReviewV2> = client.decideCostReview(id, { decision: 'decline', witness_sha256: 'a'.repeat(64) }, { version: 2 });",
+    'const dynamic: NikaCostReviewOptions = { version: Math.random() > 0.5 ? 1 : 2 };',
+    'const either: Promise<NikaCostReview | NikaCostReviewV2> = client.costReview(id, dynamic);',
+    '// @ts-expect-error An explicit V2 result is not a V1 result.',
+    'const wrong: Promise<NikaCostReview> = client.costReview(id, { version: 2 });',
+    'void [one, two, prepared, decision, either, wrong];',
     '',
   ].join('\n');
   await writeFile(path.join(consumer, 'consumer.mts'), typedConsumer);

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add explicit cost review V2 for finite fan-out and authored retries, with
+  versioned result types and strict capability admission. V1 remains the default;
+  the SDK never falls back, approves, runs, or retries a review automatically.
+
 - Expose `serverIdentity()` and `NikaEngineIdentity` for HTTP consumers to
   inspect the validated cached protocol and capability snapshot without a
   local binary. Returned objects cannot mutate the SDK's admission state.

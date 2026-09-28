@@ -2,11 +2,16 @@ import type { components } from './generated/openapi.js';
 
 /** Engine-owned, single-use HTTP review; approval alone never runs a workflow. */
 export type NikaCostReview = components['schemas']['CostReview'];
+/** Explicit V2 review with the engine-owned finite dispatch bound. */
+export type NikaCostReviewV2 = components['schemas']['CostReviewV2'];
+export type NikaCostReviewResultV2 = NikaCostReviewV2 | components['schemas']['CostReviewNotRequiredV2'];
 export type NikaCostReviewRequest = components['schemas']['CostReviewRequest'];
 export type NikaCostReviewDecision = components['schemas']['CostReviewDecision'];
 export type NikaCostReviewReference = components['schemas']['CostReviewReference'];
 export type NikaCostReviewResult = NikaCostReview | components['schemas']['CostReviewNotRequired'];
 export interface NikaCostReviewOptions {
+  /** Wire version to create/read/decide. Defaults to 1; never falls back. */
+  version?: 1 | 2;
   /** Stops waiting; a sent decision may already have taken effect. */
   signal?: AbortSignal;
 }

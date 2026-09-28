@@ -417,13 +417,20 @@ export interface NikaWorkflowMetadata {
 }
 
 export interface NikaTraceVerifyResult {
+  /**
+   * Transport-specific compatibility result. Native verification requires the
+   * engine's signed receipt binding. HTTP accepts a positive journal verdict
+   * bound to this receipt's trace_id, including an intact unsealed journal.
+   * Inspect the engine's seal/anchor/replay facts for those separate claims;
+   * this boolean alone proves neither signature, billing nor business outcome.
+   */
   verified: boolean;
   /**
    * Engine-owned trace verdict. The native path answers `verified` or
-   * `invalid`; the resident's door answers `unavailable` while it has no
-   * trace-journal authority (engine 0.118), and will speak the CLI's tiers
-   * (`OK` · `SEALED` · `ANCHORED` · `REPLAYED` hold · `INCOMPLETE` ·
-   * `TAMPERED` do not) once it does. Open to additive future vocabulary.
+   * `invalid`; the resident answers its CLI journal tiers or `unavailable`
+   * when no journal is available. HTTP recognizes positive tiers without
+   * regard to case (`OK`, `SEALED`, `ANCHORED`, `REPLAYED`); incomplete and
+   * tampered journals do not hold. Open to additive future vocabulary.
    */
   verdict?:
     | 'verified'
@@ -436,7 +443,7 @@ export interface NikaTraceVerifyResult {
     | 'INCOMPLETE'
     | 'TAMPERED'
     | (string & {});
-  /** Engine-owned explanation for a negative or unavailable verdict; a verdict that holds carries none. */
+  /** Engine-owned explanation or attained tier, including `unsealed` beside a positive `ok`. */
   reason?:
     | 'trace_invalid'
     | 'receipt_mismatch'

@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Clarify the existing `traceVerify` claims: native verification requires a signed
+  receipt binding, while HTTP `verified` also accepts an intact unsealed journal
+  bound to the receipt's trace id. Preserve the distinction in API documentation.
+
 - The package is published as `@supernovae-st/nika`, the product's name: one
   namespace for the owner, one artifact name per registry. The native payloads
   were already `@supernovae-st/nika-<os>-<arch>`; the repository keeps its

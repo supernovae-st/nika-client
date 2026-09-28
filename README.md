@@ -230,18 +230,22 @@ engine to verify the receipt and its signed binding. A receipt from a native
 run carries the proof-bearing fields (`chain_head`, `chain_len`, `sealed`,
 `trace_path`) and verifies locally. A receipt from a `nika serve` job carries
 identity only (`job_id`, `execution_id`, `trace_id`, `snapshot_digest`,
-`origin`): the resident writes no trace journal yet, so that receipt verifies
-through no door today, and the same `NikaReceipt` type covers both shapes.
-Persist it as the job's identity, not as evidence. The remote endpoint
-currently returns `{ verified: false, verdict: "unavailable", reason:
-"trace_journal_unavailable" }` because the server has no path-free journal
-authority; the typed verdict is preserved instead of being hidden as a 404.
-`/health.supportedCapabilities` names authorities that can currently complete
-their operation. It therefore does not advertise remote trace verification
-while this diagnostic route can only return the typed unavailable verdict.
-A resident with journal authority will answer the CLI's tiers (`OK`, `SEALED`,
-`ANCHORED`, `REPLAYED` hold; `INCOMPLETE`, `TAMPERED` do not), with no
-`reason` on a verdict that holds; `verified` reads them the same way.
+`origin`). The same `NikaReceipt` type covers both shapes, but their verification
+claims differ. A resident with journal authority returns its CLI verdict and
+the separate chain, seal, anchor and replay facts. HTTP `verified` is true for
+a positive verdict bound to the receipt's `trace_id`, including `ok` with
+`reason: "unsealed"`. It does not require a signature or prove the receipt's
+other identity fields. Inspect the returned engine facts when your application
+requires signing, anchoring, complete execution or replay; the boolean alone
+establishes none of those stronger claims or business correctness.
+
+Older residents, or jobs without an available journal, can return
+`{ verified: false, verdict: "unavailable", reason: "trace_journal_unavailable" }`.
+The SDK preserves this diagnostic rather than inventing proof. The server's
+`/health.supportedCapabilities` describes its available authorities. Positive
+HTTP tiers (`OK`, `SEALED`, `ANCHORED`, `REPLAYED`) are recognized without regard
+to case; `INCOMPLETE` and `TAMPERED` do not hold. A positive tier may carry a
+`reason`, and the original verdict and reason remain available.
 
 Run-signing keys remain engine-owned. `nika key init`, `nika key trust`, and
 `nika key rotate` manage their lifecycle. Nika prefers the OS keychain and uses
@@ -433,7 +437,7 @@ it; a scheduled budget is always a real number.
 | `status` | typed refusal; await `run.done` | durable status projection |
 | `events` | raw engine lifecycle frames | sequenced SSE frames with bounded replay |
 | `cancel` | signal-backed, idempotent | 200 settles the job; 202 accepts the request and `run.done` settles on the resident's terminal |
-| `traceVerify` | engine verification + signed receipt binding | typed verdict: `unavailable` until remote journal authority exists, then the CLI's tiers |
+| `traceVerify` | engine verification + signed receipt binding | journal verdict bound to `trace_id`; integrity and sealing remain separate; typed `unavailable` when no journal exists |
 | `schedule` / `scheduleStatus` | typed refusal | resident schedule authority |
 | `listWorkflows` / `workflow` | typed refusal | contained path-free workflow catalog |
 

@@ -466,8 +466,8 @@ export class HttpTransport implements Transport {
       [200],
       'traceVerify',
     );
-    // A verdict that holds carries no reason; `unavailable` and the negative
-    // tiers name theirs. Either is typed when present, neither is demanded.
+    // A positive verdict may carry a tier such as `unsealed` in reason.
+    // Preserve that independent fact; reason is typed when present, not required.
     if (
       typeof object.verdict !== 'string'
       || (object.reason !== undefined && typeof object.reason !== 'string')

@@ -144,9 +144,10 @@ anything but `succeeded` as its own failure, or a red run passes silently.
 
 ## One vocabulary
 
-`Nika` exposes one lifecycle vocabulary: `check`, `run`, `attachRun`, `status`, `events`,
-`cancel`, `traceVerify`, `listWorkflows`, `workflow`, `schedule`, and
-`scheduleStatus`.
+`Nika` exposes one lifecycle vocabulary: `compile`, `check`, `run`, `attachRun`,
+`status`, `events`, `cancel`, `traceVerify`, `listWorkflows`, `workflow`, `schedule`,
+and `scheduleStatus`. Optional HTTP cost review adds `prepareCostReview`,
+`costReview`, and `decideCostReview`.
 The engine remains authoritative for parsing, admission, execution, receipts,
 traces, permits, scheduling, and cost. The SDK transports those facts; it does
 not parse YAML or reconstruct proof in TypeScript.
@@ -426,7 +427,8 @@ it; a scheduled budget is always a real number.
 |---|---|---|
 | `compile` | typed capability refusal | engine-owned authoring request and outcome, optional kept-round token |
 | `check` | yes; `model` and `nativeStrict` allowed | yes; those two overrides refused |
-| `run` | yes; `vars`, `model`, `maxCostUsd` allowed | yes; `idempotencyKey` allowed |
+| `run` | yes; `vars`, `model`, `maxCostUsd` allowed | `idempotencyKey`; by-name admission also accepts typed `inputs`, `access`, and an explicit `costReview` reference |
+| cost review | typed capability refusal | explicit preparation, observation, and decision when `costReviewV1` is advertised |
 | `attachRun` | typed refusal | reattach to a durable job with an optional SSE cursor |
 | `status` | typed refusal; await `run.done` | durable status projection |
 | `events` | raw engine lifecycle frames | sequenced SSE frames with bounded replay |
@@ -464,6 +466,9 @@ Remote-only options:
 | Method | Result |
 |---|---|
 | `compile(request, options?)` | `{ outcome, replayToken? }`; ready, incomplete and refused are data |
+| `prepareCostReview(request, options?)` | review or `review_required: false`; never starts a job |
+| `costReview(id, options?)` | current review; never renews it |
+| `decideCostReview(id, decision, options?)` | explicit `approve_once` or `decline`; never starts a job |
 | `check(workflow, options?)` | `clean` plus the native check report or resident acknowledgement/refusal |
 | `run(workflow, options?)` | admitted `NikaRun` |
 | `attachRun(id, options?)` | reattached durable HTTP `NikaRun` |
@@ -475,6 +480,12 @@ Remote-only options:
 | `scheduleStatus(id)` | fresh engine schedule projection |
 | `listWorkflows()` | contained resident workflow names |
 | `workflow(name)` | path-free resident workflow metadata |
+
+Cost review can hold the project's cost lease and create or reconcile its cost
+journal. Approval lasts within the original 300-second review lifetime and
+requires a separate `run()` with the same workflow, inputs, access and witness.
+The SDK never approves or retries automatically. See the
+[cost review contract](docs/cost-review-contract.md) for capability and recovery rules.
 
 ### Authoring through the resident
 

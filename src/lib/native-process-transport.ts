@@ -8,6 +8,12 @@ import {
   NikaTransportError,
 } from '../errors.js';
 import type {
+  NikaCostReview,
+  NikaCostReviewRequest,
+  NikaCostReviewDecision,
+  NikaCostReviewOptions,
+  NikaCostReviewResult,
+  NikaPrepareCostReviewOptions,
   NikaCompileRequest,
   NikaCompileOptions,
   NikaCompileResult,
@@ -66,6 +72,18 @@ export class NativeProcessTransport implements Transport {
       'Authoring requires the resident HTTP compile contract; connect to nika serve');
   }
 
+  async prepareCostReview(_request: NikaCostReviewRequest, _options: NikaPrepareCostReviewOptions): Promise<NikaCostReviewResult> {
+    throw new NikaCompatibilityError('costReviewV1', this.kind, 'Cost review requires a resident HTTP authority');
+  }
+
+  async costReview(_id: string, _options: NikaCostReviewOptions): Promise<NikaCostReview> {
+    throw new NikaCompatibilityError('costReviewV1', this.kind, 'Cost review requires a resident HTTP authority');
+  }
+
+  async decideCostReview(_id: string, _decision: NikaCostReviewDecision, _options: NikaCostReviewOptions): Promise<NikaCostReview> {
+    throw new NikaCompatibilityError('costReviewV1', this.kind, 'Cost review requires a resident HTTP authority');
+  }
+
   async check(workflow: string, options: NikaCheckOptions): Promise<NikaCheckResult> {
     await this.ensureReady();
     const args = ['check', workflow, '--json'];
@@ -90,6 +108,9 @@ export class NativeProcessTransport implements Transport {
   }
 
   async startRun(workflow: string, options: NikaRunOptions): Promise<TransportRun> {
+    if (options.inputs !== undefined || options.access !== undefined || options.costReview !== undefined) {
+      throw new NikaCompatibilityError('runOptions', this.kind, 'inputs, access and costReview require HTTP by-name admission');
+    }
     await this.ensureReady();
     if (options.idempotencyKey !== undefined) {
       throw new NikaCompatibilityError(

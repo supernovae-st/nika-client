@@ -311,6 +311,24 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
+                /** @description cost_review_unavailable */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No served workflow by that name, or review_unknown */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
                 /** @description Request deadline */
                 408: {
                     headers: {
@@ -320,8 +338,17 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description Idempotency key already bound to another request */
+                /** @description idempotency_conflict, or a cost review that cannot admit this job: review_witness_mismatch · review_not_approved · review_declined · review_busy · review_consumed · review_request_mismatch · review_witness_changed (re-observed program, route, project, journal or read files changed: the review is spent, no job) */
                 409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description review_expired */
+                410: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -985,6 +1012,353 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/cost-reviews": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prepare one fresh Run cost review for a served workflow
+         * @description Only on a server its operator started with `--cost-review` (health capability `costReviewV1`); any other server answers these routes, and a job carrying `cost_review`, with 403 cost_review_unavailable. The by-name job form only (a snapshot body has no review). The resident captures the workflow's world and resolves its plan exactly as the job would, then runs the same cost evaluator as `nika run`: no unknown-cost route answers 200 `review_required: false`; an unknown-cost route answers 201 with a pending review. Effects: preparing a review takes this project's cost lease and holds it until decline, expiry or one job admission; it may create `.nika/` and the cost journal, and may record an earlier Run whose writer the lease proves gone as UNKNOWN (which then refuses 422 cost_review_refused). It never creates a job, a run or a trace. Idempotency binds to the exact request bytes in a review-local namespace of this server run: a replay answers the same review in its current state; after a restart or eviction the key is forgotten and a replay prepares a NEW pending review (a fresh review, never an approval).
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    "Idempotency-Key": components["parameters"]["IdempotencyKey"];
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CostReviewRequest"];
+                };
+            };
+            responses: {
+                /** @description Idempotent replay (the review in its current state), or no review required */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CostReview"] | components["schemas"]["CostReviewNotRequired"];
+                    };
+                };
+                /** @description A pending review */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CostReview"];
+                    };
+                };
+                /** @description Invalid idempotency key */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Error envelope */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description cost_review_unavailable */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description No served workflow by that name */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Request deadline */
+                408: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description idempotency_conflict (the key is bound to other request bytes) */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Encoded body limit */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Content-Type or Content-Encoding refused */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Malformed request, refused capture or inputs, or cost_review_refused: the shared evaluator refused before any question (another review or unknown-cost Run holds this project's cost lease, an earlier Run is unknown or uncertain, a hard cap such as this server's per-run ceiling, a zero invocation ceiling, a refused project file, an unsupported shape or route); the message says which */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description internal_error (no fresh private witness nonce could be drawn: nothing was held) */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Stopping */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cost-reviews/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Observe one cost review in its current state
+         * @description Only on a server its operator started with `--cost-review` (health capability `costReviewV1`); any other server answers these routes, and a job carrying `cost_review`, with 403 cost_review_unavailable. Reading a review approves nothing. After a restart or eviction the id is unknown (404 review_unknown): authority held in memory is lost, never re-granted.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The review */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CostReview"];
+                    };
+                };
+                /** @description Error envelope */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description cost_review_unavailable */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description review_unknown */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/cost-reviews/{id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Record one explicit decision on a pending review
+         * @description Only on a server its operator started with `--cost-review` (health capability `costReviewV1`); any other server answers these routes, and a job carrying `cost_review`, with 403 cost_review_unavailable. `approve_once` records approval of exactly this witness for one later job admission; `decline` ends the review and releases the project's cost lease. Neither creates a job, a run, a file or an effect. The same decision again answers the review in its current state; a different one refuses 409 review_decided.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["CostReviewDecision"];
+                };
+            };
+            responses: {
+                /** @description The review after the decision */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CostReview"];
+                    };
+                };
+                /** @description Error envelope */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description cost_review_unavailable */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description review_unknown */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Request deadline */
+                408: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description review_witness_mismatch · review_decided */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description review_expired */
+                410: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Encoded body limit */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Content-Type or Content-Encoding refused */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description malformed_decision */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1314,6 +1688,7 @@ export interface components {
                 [key: string]: unknown;
             };
             workflow: string;
+            cost_review?: components["schemas"]["CostReviewReference"];
         };
         JobEvent: {
             /**
@@ -1502,6 +1877,135 @@ export interface components {
         };
         WorkflowMetadata: {
             workflow: string;
+        };
+        /** @description One approved review this job admission consumes. The request's workflow, inputs and access must be the review's; the resident re-captures the world and re-observes the route, the project directories, the cost journal and the bound read files before any job exists, and the job then runs the review's captured world under its execution identity with its account. A replay of the same Idempotency-Key and bytes answers the job before the review is read. */
+        CostReviewReference: {
+            review_id: string;
+            witness_sha256: string;
+        };
+        /** @description The job's by-name form, without `cost_review`: the exact job this review is for. */
+        CostReviewRequest: {
+            workflow: string;
+            inputs?: {
+                [key: string]: unknown;
+            };
+            access?: string;
+        };
+        CostReviewDecision: {
+            witness_sha256: string;
+            /** @enum {unknown} */
+            decision: "approve_once" | "decline";
+        };
+        CostReviewNotRequired: {
+            /** @constant */
+            cost_review_version: 1;
+            /** @constant */
+            review_required: false;
+            /** @description true: exact declared-free or run-time routes; the job binds a per-Run observer account, as `nika run` does. */
+            observer: boolean;
+            reason: string;
+        };
+        /** @description One fresh, single-use Run cost review held in this server's memory. It is never a job, a run, a file save or an effect grant: approving it records one decision, and only one explicit POST /v1/jobs carrying its id and witness can use it. The review lives 300 seconds from creation (an approval never extends it); it holds this project's cost lease while pending or approved, so one unknown-cost review or Run holds the project at a time. Terminal reviews are retained for lookup (the newest 256); after a restart or eviction every id is unknown and nothing is re-granted. No field carries a credential, a configured endpoint path, userinfo or query. */
+        CostReview: {
+            /** @constant */
+            cost_review_version: 1;
+            review_id: string;
+            /** @description Digest of the review's private witness: the candidate (source, caller inputs, project configuration, bound read files), the exact route including its full endpoint, the execution identity, the held project and .nika directory identities, the prior journal, the bounds and the defaults. Echo it on the decision and on the job; any change refuses. */
+            witness_sha256: string;
+            /**
+             * @description pending: awaiting one decision · approved: approve_once recorded, no job yet · declined · expired (300 s from creation) · admitting: one job admission holds it now · consumed: that job exists (`job`) · refused: the admission re-observed a changed witness and created no job · failed: the admission confirmed the account but could not create the job, and settled the account. Every terminal state released the project's cost lease; none is ever refunded.
+             * @enum {unknown}
+             */
+            state: "pending" | "approved" | "declined" | "expired" | "admitting" | "consumed" | "refused" | "failed";
+            /** Format: date-time */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @description Display projection of the 300-second monotonic lifetime; the server's monotonic clock decides.
+             */
+            expires_at: string;
+            /** Format: date-time */
+            decided_at?: string;
+            workflow: string;
+            access: string | null;
+            /** @description The execution identity the approved job runs as; the cost journal and the trace name it. */
+            execution_id: string;
+            project: {
+                root_fingerprint: string | null;
+                /** @description A host-local display identity of the served root's canonical path: not authenticated and not globally unique. The private witness binds the held directory identities. */
+                basis: string;
+            };
+            program: {
+                snapshot_digest: string;
+                source_sha256: string;
+            };
+            inputs: {
+                names: string[];
+                /** @constant */
+                source: "api_caller";
+                /** @description Caller input values and the bound read files. */
+                sha256: string;
+            };
+            route: {
+                provider: string;
+                model: string;
+                /** @description Scheme, host and effective port of the endpoint the server's own composition selected; never its path, query or userinfo. */
+                origin: string;
+            };
+            price: {
+                /** @constant */
+                state: "unknown";
+                native: string;
+            };
+            /** @description The decision's own words, as `nika run` asks it. */
+            question: string;
+            bounds: {
+                max_requests: number;
+                max_output_tokens: number;
+                request_timeout_seconds: number;
+                /** @constant */
+                retries: 0;
+            };
+            defaults: {
+                invocation_usd: string | null;
+                project_usd: string | null;
+                /** @description invocation: this server's per-run ceiling (the default every manual job runs under); project: the project's `ceiling:`. Approving overrides them once, as `nika run` does; a zero default refuses and no hard cap is ever overridden. */
+                basis: string;
+            };
+            host: {
+                /**
+                 * @description From the server's startup composition (`--cost-review`), never from a request.
+                 * @constant
+                 */
+                authority: "operator_started_cost_review";
+                /** @description allowed, then per layer (policy · machine · occurrence) its class (observed · not_applicable · unknown), its origin and, when observed, its cap (absent · {capped_usd} · unknown). */
+                evidence: Record<string, never>;
+                /** @enum {unknown} */
+                credential_custody: "LOCAL_PROCESS" | "HOST_SERVER_MEMORY" | "MANAGED_SECRET_STORE" | "REMOTE_PROVIDER" | "UNKNOWN";
+            };
+            /** @description The project's cost journal after this review cleared it; an admission requires the same bytes. */
+            prior_journal: {
+                length: number;
+                sha256: string;
+            };
+            effects: string[];
+            grants: string;
+            job?: {
+                /** Format: uuid */
+                id: string;
+            };
+            account?: {
+                attempts: number;
+                marked_sent: number;
+                unknown_charge_attempts: number;
+                state: string;
+                /** @constant */
+                basis: "admission-account accounting, not proof of physical dispatch";
+            };
+            refusal?: {
+                code: string;
+                message: string;
+            };
         };
     };
     responses: never;

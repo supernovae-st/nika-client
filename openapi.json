@@ -62,7 +62,7 @@
         "type": "object"
       },
       "CompileOutcome": {
-        "description": "The engine-owned machine document of one authoring result — the document `nika compile --json` prints, without the CLI-only `written`. No field grants authority, writes or executes source.",
+        "description": "The engine-owned machine document of one authoring result \u2014 the document `nika compile --json` prints, without the CLI-only `written`. No field grants authority, writes or executes source.",
         "properties": {
           "candidate": {
             "description": "Ordinary `.nika` source; may still be incomplete",
@@ -209,7 +209,7 @@
                   "type": "array"
                 },
                 "type": {
-                  "description": "text: a JSON string · literal: one JSON value · choice: a JSON string that is the `key` of one of `options`",
+                  "description": "text: a JSON string \u00b7 literal: one JSON value \u00b7 choice: a JSON string that is the `key` of one of `options`",
                   "enum": [
                     "text",
                     "literal",
@@ -242,7 +242,7 @@
           },
           "requested_trigger": {
             "additionalProperties": true,
-            "description": "The trigger the request names (kind · source_hint · event_hint · cadence · at · payload_input · status · timezone · missed · overlap · ceiling · cron), stated beside the candidate whose bytes carry no cadence, host or event. A requirement the operator binds through the schedule contract, never a grant or a schedule row. timezone, missed, overlap and ceiling are the answered binding values (null until answered). cron is the exact five-field schedule projection when supported and fully specified, otherwise null; older engines omit it. It never supplies a missing time or timezone.",
+            "description": "The trigger the request names (kind \u00b7 source_hint \u00b7 event_hint \u00b7 cadence \u00b7 at \u00b7 payload_input \u00b7 status \u00b7 timezone \u00b7 missed \u00b7 overlap \u00b7 ceiling \u00b7 cron), stated beside the candidate whose bytes carry no cadence, host or event. A requirement the operator binds through the schedule contract, never a grant or a schedule row. timezone, missed, overlap and ceiling are the answered binding values (null until answered). cron is the exact five-field schedule projection when supported and fully specified, otherwise null; older engines omit it. It never supplies a missing time or timezone.",
             "type": [
               "object",
               "null"
@@ -547,7 +547,7 @@
         "properties": {
           "answers": {
             "additionalProperties": true,
-            "description": "Question key → one JSON literal with its type preserved, judged exactly as sent (at most 65536 bytes each)",
+            "description": "Question key \u2192 one JSON literal with its type preserved, judged exactly as sent (at most 65536 bytes each)",
             "maxProperties": 64,
             "propertyNames": {
               "maxLength": 256
@@ -783,7 +783,7 @@
             "description": "Edit only, exactly one of: `text`, a revision in any wording (not only a `Set const.NAME` sentence) that the round reads beside `original_intent`; or `set_constant`, one structured constant the core applies without a provider call"
           },
           "cognition": {
-            "description": "explicitProvider: one fresh round under the operator's seat (refuses `replay_token` and an `intent.clarification` answer) · deterministicOnly: a zero-call replay of a round this server kept (requires `replay_token`, refuses `limits`): it repeats the round's exact input, its `answers` may answer the round's questions, and it never carries `intent.clarification` (409 compile_replay_input_changed)",
+            "description": "explicitProvider: one fresh round under the operator's seat (refuses `replay_token` and an `intent.clarification` answer) \u00b7 deterministicOnly: a zero-call replay of a round this server kept (requires `replay_token`, refuses `limits`): it repeats the round's exact input, its `answers` may answer the round's questions, and it never carries `intent.clarification` (409 compile_replay_input_changed)",
             "enum": [
               "explicitProvider",
               "deterministicOnly"
@@ -800,7 +800,7 @@
           },
           "limits": {
             "additionalProperties": false,
-            "description": "This request's narrowing of the operator's ceilings (explicitProvider only). Each value is optional and must be at most the operator's own ceiling, which is at most the maximum below; above → 422 compile_limit, never clamped. Absent values take the operator's.",
+            "description": "This request's narrowing of the operator's ceilings (explicitProvider only). Each value is optional and must be at most the operator's own ceiling, which is at most the maximum below; above \u2192 422 compile_limit, never clamped. Absent values take the operator's.",
             "properties": {
               "call_timeout_ms": {
                 "description": "The wait for one model invocation; the transport does not resend automatically",
@@ -898,7 +898,7 @@
       },
       "ExecutionSnapshot": {
         "additionalProperties": false,
-        "description": "Immutable byte-owned execution world — the body `nika check <file> --json --sdk-snapshot` prints (the engine is the one producer; a client never hashes). Unit bytes are canonical lowercase hexadecimal. `digest` and every unit `digest` are OPTIONAL caller-supplied integrity digests (canonical lowercase SHA-256 · a content assertion, never a signature): absent, the resident computes them and the receipt carries the result; present, they must match the bytes or the request is refused as `snapshot_tampered`. The decoded unit aggregate is limited to 16 MiB and the complete encoded request to 33 MiB. This object is the request body itself, not a path-bearing wrapper.",
+        "description": "Immutable byte-owned execution world \u2014 the body `nika check <file> --json --sdk-snapshot` prints (the engine is the one producer; a client never hashes). Unit bytes are canonical lowercase hexadecimal. `digest` and every unit `digest` are OPTIONAL caller-supplied integrity digests (canonical lowercase SHA-256 \u00b7 a content assertion, never a signature): absent, the resident computes them and the receipt carries the result; present, they must match the bytes or the request is refused as `snapshot_tampered`. The decoded unit aggregate is limited to 16 MiB and the complete encoded request to 33 MiB. This object is the request body itself, not a path-bearing wrapper.",
         "properties": {
           "digest": {
             "description": "Optional caller-supplied integrity digest of the world (never a signature)",
@@ -928,7 +928,7 @@
                   "type": "string"
                 },
                 "kind": {
-                  "description": "0 root (the admitted workflow) · 1 child (a transitively invoked workflow) · 2 skill (an Agent Skill document) · 3 import (an opaque import the caller supplied)",
+                  "description": "0 root (the admitted workflow) \u00b7 1 child (a transitively invoked workflow) \u00b7 2 skill (an Agent Skill document) \u00b7 3 import (an opaque import the caller supplied)",
                   "maximum": 3,
                   "minimum": 0,
                   "type": "integer"
@@ -1124,7 +1124,7 @@
       },
       "JobByName": {
         "additionalProperties": false,
-        "description": "The by-name form (ADR-131): a workflow the served registry lists (GET /v1/workflows · project-root-relative, `.nika`). The resident captures its world exactly as a schedule does — the one owner of the snapshot and its digest domain. Idempotency binds to these request bytes. Optional `access` is the same pin as CLI `--access` (a pin is a pin). Absent: the resident's unpinned plan. Snapshot bodies reject both access and inputs overlays, including null or empty maps. Optional inputs are literal JSON values checked against declared keys, types and required values before a job exists; strings are never CLI @env instructions or expressions.",
+        "description": "The by-name form (ADR-131): a workflow the served registry lists (GET /v1/workflows \u00b7 project-root-relative, `.nika`). The resident captures its world exactly as a schedule does \u2014 the one owner of the snapshot and its digest domain. Idempotency binds to these request bytes. Optional `access` is the same pin as CLI `--access` (a pin is a pin). Absent: the resident's unpinned plan. Snapshot bodies reject both access and inputs overlays, including null or empty maps. Optional inputs are literal JSON values checked against declared keys, types and required values before a job exists; strings are never CLI @env instructions or expressions.",
         "properties": {
           "access": {
             "description": "Access pin, same vocabulary as `--access` (class or harness id). A pin never silently substitutes a metered seat.",
@@ -1141,6 +1141,9 @@
             "maxLength": 4096,
             "minLength": 1,
             "type": "string"
+          },
+          "cost_review": {
+            "$ref": "#/components/schemas/CostReviewReference"
           }
         },
         "required": [
@@ -1152,7 +1155,7 @@
         "additionalProperties": false,
         "properties": {
           "at": {
-            "description": "When the resident admitted the event (RFC 3339 · UTC). Outside the event's hash chain; absent on an event written before the journal was dated.",
+            "description": "When the resident admitted the event (RFC 3339 \u00b7 UTC). Outside the event's hash chain; absent on an event written before the journal was dated.",
             "format": "date-time",
             "type": "string"
           },
@@ -1183,7 +1186,7 @@
                 "type": "null"
               }
             ],
-            "description": "The resident's event vocabulary: execution.<word> (queued · started · prepared · requeued · settled · cancelled · interrupted · refused · aborted_before_claim), plus the approval_decided frame the journal admits. Null on a payload that carries no kind."
+            "description": "The resident's event vocabulary: execution.<word> (queued \u00b7 started \u00b7 prepared \u00b7 requeued \u00b7 settled \u00b7 cancelled \u00b7 interrupted \u00b7 refused \u00b7 aborted_before_claim), plus the approval_decided frame the journal admits. Null on a payload that carries no kind."
           },
           "message": {
             "type": "string"
@@ -1335,7 +1338,7 @@
         "type": "object"
       },
       "JobStatus": {
-        "description": "queued and running: the resident owns the execution. interrupted: execution ownership was lost and effect settlement is unknown — an EVIDENCE state (the journal is INCOMPLETE), never a run state (ADR-129). paused, succeeded, failed and cancelled: the run's own settlement, the words its terminal frame carries (ADR-128).",
+        "description": "queued and running: the resident owns the execution. interrupted: execution ownership was lost and effect settlement is unknown \u2014 an EVIDENCE state (the journal is INCOMPLETE), never a run state (ADR-129). paused, succeeded, failed and cancelled: the run's own settlement, the words its terminal frame carries (ADR-128).",
         "enum": [
           "queued",
           "running",
@@ -1412,7 +1415,7 @@
                 "type": "string"
               },
               "task": {
-                "description": "The task that failed · absent for a run-level cause",
+                "description": "The task that failed \u00b7 absent for a run-level cause",
                 "type": "string"
               }
             },
@@ -1706,7 +1709,7 @@
       },
       "TraceVerification": {
         "additionalProperties": false,
-        "description": "Run-scoped verdict on the journal the resident wrote for the job, through the ONE verifier `nika trace verify --json` runs. `verdict` is the CLI's headline word: the attained tier (ok · sealed · anchored · replayed), incomplete for a journal with no terminal frame (the writer's liveness rides `reason`), tampered for a buried seal, broken for an edited chain, and the CLI's refusal classes; `unavailable` only when no journal exists for the job (refused before its first event · queued · a backend keeping none). `reason` is the machine class beside it (the seal tier under a ladder verdict). The CLI's own document rides verbatim (exit · chain · seal · anchor · replay · lines); a filesystem path is never returned.",
+        "description": "Run-scoped verdict on the journal the resident wrote for the job, through the ONE verifier `nika trace verify --json` runs. `verdict` is the CLI's headline word: the attained tier (ok \u00b7 sealed \u00b7 anchored \u00b7 replayed), incomplete for a journal with no terminal frame (the writer's liveness rides `reason`), tampered for a buried seal, broken for an edited chain, and the CLI's refusal classes; `unavailable` only when no journal exists for the job (refused before its first event \u00b7 queued \u00b7 a backend keeping none). `reason` is the machine class beside it (the seal tier under a ladder verdict). The CLI's own document rides verbatim (exit \u00b7 chain \u00b7 seal \u00b7 anchor \u00b7 replay \u00b7 lines); a filesystem path is never returned.",
         "properties": {
           "anchor": {
             "additionalProperties": true,
@@ -1714,11 +1717,11 @@
           },
           "chain": {
             "additionalProperties": true,
-            "description": "events · head · headline (intact · torn · incomplete) · liveness (alive · dead · unknown · null)",
+            "description": "events \u00b7 head \u00b7 headline (intact \u00b7 torn \u00b7 incomplete) \u00b7 liveness (alive \u00b7 dead \u00b7 unknown \u00b7 null)",
             "type": "object"
           },
           "exit": {
-            "description": "The CLI's exit class: 0 the reported tier holds · 2 a forged or edited journal · 3 the environment (unchained · unreadable · a missing input) · 5 incomplete lifecycle evidence",
+            "description": "The CLI's exit class: 0 the reported tier holds \u00b7 2 a forged or edited journal \u00b7 3 the environment (unchained \u00b7 unreadable \u00b7 a missing input) \u00b7 5 incomplete lifecycle evidence",
             "enum": [
               0,
               2,
@@ -1763,7 +1766,7 @@
           },
           "seal": {
             "additionalProperties": true,
-            "description": "tier (unsealed · sealed · forged · buried · unattributable) and the tier's facts",
+            "description": "tier (unsealed \u00b7 sealed \u00b7 forged \u00b7 buried \u00b7 unattributable) and the tier's facts",
             "type": "object"
           },
           "trace_id": {
@@ -1828,6 +1831,453 @@
           "workflow"
         ],
         "type": "object"
+      },
+      "CostReviewReference": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "review_id",
+          "witness_sha256"
+        ],
+        "description": "One approved review this job admission consumes. The request's workflow, inputs and access must be the review's; the resident re-captures the world and re-observes the route, the project directories, the cost journal and the bound read files before any job exists, and the job then runs the review's captured world under its execution identity with its account. A replay of the same Idempotency-Key and bytes answers the job before the review is read.",
+        "properties": {
+          "review_id": {
+            "type": "string",
+            "pattern": "^rev-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "witness_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      },
+      "CostReviewRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "workflow"
+        ],
+        "description": "The job's by-name form, without `cost_review`: the exact job this review is for.",
+        "properties": {
+          "workflow": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "inputs": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "access": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        }
+      },
+      "CostReviewDecision": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "witness_sha256",
+          "decision"
+        ],
+        "properties": {
+          "witness_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "decision": {
+            "enum": [
+              "approve_once",
+              "decline"
+            ]
+          }
+        }
+      },
+      "CostReviewNotRequired": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "cost_review_version",
+          "review_required",
+          "observer",
+          "reason"
+        ],
+        "properties": {
+          "cost_review_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "review_required": {
+            "const": false
+          },
+          "observer": {
+            "type": "boolean",
+            "description": "true: exact declared-free or run-time routes; the job binds a per-Run observer account, as `nika run` does."
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "CostReview": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "One fresh, single-use Run cost review held in this server's memory. It is never a job, a run, a file save or an effect grant: approving it records one decision, and only one explicit POST /v1/jobs carrying its id and witness can use it. The review lives 300 seconds from creation (an approval never extends it); it holds this project's cost lease while pending or approved, so one unknown-cost review or Run holds the project at a time. Terminal reviews are retained for lookup (the newest 256); after a restart or eviction every id is unknown and nothing is re-granted. No field carries a credential, a configured endpoint path, userinfo or query.",
+        "required": [
+          "cost_review_version",
+          "review_id",
+          "witness_sha256",
+          "state",
+          "created_at",
+          "expires_at",
+          "workflow",
+          "access",
+          "execution_id",
+          "project",
+          "program",
+          "inputs",
+          "route",
+          "price",
+          "question",
+          "bounds",
+          "defaults",
+          "host",
+          "prior_journal",
+          "effects",
+          "grants"
+        ],
+        "properties": {
+          "cost_review_version": {
+            "type": "integer",
+            "const": 1
+          },
+          "review_id": {
+            "type": "string",
+            "pattern": "^rev-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+          },
+          "witness_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "Digest of the review's private witness: the candidate (source, caller inputs, project configuration, bound read files), the exact route including its full endpoint, the execution identity, the held project and .nika directory identities, the prior journal, the bounds and the defaults. Echo it on the decision and on the job; any change refuses."
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "approved",
+              "declined",
+              "expired",
+              "admitting",
+              "consumed",
+              "refused",
+              "failed"
+            ],
+            "description": "pending: awaiting one decision \u00b7 approved: approve_once recorded, no job yet \u00b7 declined \u00b7 expired (300 s from creation) \u00b7 admitting: one job admission holds it now \u00b7 consumed: that job exists (`job`) \u00b7 refused: the admission re-observed a changed witness and created no job \u00b7 failed: the admission confirmed the account but could not create the job, and settled the account. Every terminal state released the project's cost lease; none is ever refunded."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Display projection of the 300-second monotonic lifetime; the server's monotonic clock decides."
+          },
+          "decided_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "workflow": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          },
+          "access": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 64
+          },
+          "execution_id": {
+            "type": "string",
+            "description": "The execution identity the approved job runs as; the cost journal and the trace name it."
+          },
+          "project": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "root_fingerprint",
+              "basis"
+            ],
+            "properties": {
+              "root_fingerprint": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "basis": {
+                "type": "string",
+                "description": "A host-local display identity of the served root's canonical path: not authenticated and not globally unique. The private witness binds the held directory identities."
+              }
+            }
+          },
+          "program": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "snapshot_digest",
+              "source_sha256"
+            ],
+            "properties": {
+              "snapshot_digest": {
+                "type": "string"
+              },
+              "source_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          },
+          "inputs": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "names",
+              "source",
+              "sha256"
+            ],
+            "properties": {
+              "names": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "source": {
+                "const": "api_caller"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$",
+                "description": "Caller input values and the bound read files."
+              }
+            }
+          },
+          "route": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "provider",
+              "model",
+              "origin"
+            ],
+            "properties": {
+              "provider": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "origin": {
+                "type": "string",
+                "description": "Scheme, host and effective port of the endpoint the server's own composition selected; never its path, query or userinfo."
+              }
+            }
+          },
+          "price": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "state",
+              "native"
+            ],
+            "properties": {
+              "state": {
+                "const": "unknown"
+              },
+              "native": {
+                "type": "string"
+              }
+            }
+          },
+          "question": {
+            "type": "string",
+            "description": "The decision's own words, as `nika run` asks it."
+          },
+          "bounds": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "max_requests",
+              "max_output_tokens",
+              "request_timeout_seconds",
+              "retries"
+            ],
+            "properties": {
+              "max_requests": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_output_tokens": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "request_timeout_seconds": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "retries": {
+                "const": 0
+              }
+            }
+          },
+          "defaults": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "invocation_usd",
+              "project_usd",
+              "basis"
+            ],
+            "properties": {
+              "invocation_usd": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "project_usd": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "basis": {
+                "type": "string",
+                "description": "invocation: this server's per-run ceiling (the default every manual job runs under); project: the project's `ceiling:`. Approving overrides them once, as `nika run` does; a zero default refuses and no hard cap is ever overridden."
+              }
+            }
+          },
+          "host": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "authority",
+              "evidence",
+              "credential_custody"
+            ],
+            "properties": {
+              "authority": {
+                "const": "operator_started_cost_review",
+                "description": "From the server's startup composition (`--cost-review`), never from a request."
+              },
+              "evidence": {
+                "type": "object",
+                "description": "allowed, then per layer (policy \u00b7 machine \u00b7 occurrence) its class (observed \u00b7 not_applicable \u00b7 unknown), its origin and, when observed, its cap (absent \u00b7 {capped_usd} \u00b7 unknown)."
+              },
+              "credential_custody": {
+                "enum": [
+                  "LOCAL_PROCESS",
+                  "HOST_SERVER_MEMORY",
+                  "MANAGED_SECRET_STORE",
+                  "REMOTE_PROVIDER",
+                  "UNKNOWN"
+                ]
+              }
+            }
+          },
+          "prior_journal": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "length",
+              "sha256"
+            ],
+            "properties": {
+              "length": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            },
+            "description": "The project's cost journal after this review cleared it; an admission requires the same bytes."
+          },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "grants": {
+            "type": "string"
+          },
+          "job": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          "account": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "attempts",
+              "marked_sent",
+              "unknown_charge_attempts",
+              "state",
+              "basis"
+            ],
+            "properties": {
+              "attempts": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "marked_sent": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "unknown_charge_attempts": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "state": {
+                "type": "string"
+              },
+              "basis": {
+                "const": "admission-account accounting, not proof of physical dispatch"
+              }
+            }
+          },
+          "refusal": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -1865,7 +2315,7 @@
     },
     "/v1/check": {
       "post": {
-        "description": "Runs the same admission as POST /v1/jobs (ADR-131 · both forms) over the exact request body, and creates nothing.",
+        "description": "Runs the same admission as POST /v1/jobs (ADR-131 \u00b7 both forms) over the exact request body, and creates nothing.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1945,12 +2395,12 @@
             "description": "Malformed, unsupported, tampered, or semantically refused snapshot"
           }
         },
-        "summary": "Judge a workflow without creating a job — by served name, or as immutable snapshot bytes"
+        "summary": "Judge a workflow without creating a job \u2014 by served name, or as immutable snapshot bytes"
       }
     },
     "/v1/compile": {
       "post": {
-        "description": "The HTTP transport of the same Compile core as `nika compile`. Generation 1 (CompileRequest) is the foundation door, exactly as on a default server: deterministic, no provider contacted. Generation 2 (CompileRequestV2) exists only because this server's operator seated ONE native authoring model when building it (advertised by the `compileNativeV2` health capability). `cognition: explicitProvider` opts in to one fresh round under that seat: the operator chose the model, its credential, its endpoint, the knowledge snapshot and the ceilings; a request names none of them and may only narrow the ceilings through `limits` (above one → 422 compile_limit, never clamped). A round permits one physical request by default. The operator can explicitly grant max_calls and a caller may only narrow that ceiling through limits.max_calls. Invocations and physical requests are counted separately in backend.authority, including refusals; no redirect is followed, and provider retries or structured-output fallbacks consume the same physical-request grant. Repairs describe desired work, never permission to send more requests. Requested and provider-reported model identities are recorded separately; token usage is not an invoice. Its deadline is absolute from admission: a round that must already stop never begins, and nothing it produces after it is answered or kept. A fresh round that leaves a native plan the server keeps (its input and plan within 2097152 bytes) answers the header Nika-Compile-Replay; `cognition: deterministicOnly` with that token and the round's exact input replays it with zero calls for as long as this server run keeps it (never renewed, forgotten on restart). A lost first answer leaves no token and a new fresh round spends again: there is no idempotency key and nothing retries. Version negotiation: a server without the capability answers compile_version 2 with 422 compile_version_unsupported; the answer's compile_version is 2 exactly when a provider call happened. Creates no job, run, approval, trace, file or permission. `check_preview` is a REVIEW of the source only: POST /v1/jobs judges a candidate again. A document carrying the seat's own credential is refused whole (500 compile_disclosure_refused).",
+        "description": "The HTTP transport of the same Compile core as `nika compile`. Generation 1 (CompileRequest) is the foundation door, exactly as on a default server: deterministic, no provider contacted. Generation 2 (CompileRequestV2) exists only because this server's operator seated ONE native authoring model when building it (advertised by the `compileNativeV2` health capability). `cognition: explicitProvider` opts in to one fresh round under that seat: the operator chose the model, its credential, its endpoint, the knowledge snapshot and the ceilings; a request names none of them and may only narrow the ceilings through `limits` (above one \u2192 422 compile_limit, never clamped). A round permits one physical request by default. The operator can explicitly grant max_calls and a caller may only narrow that ceiling through limits.max_calls. Invocations and physical requests are counted separately in backend.authority, including refusals; no redirect is followed, and provider retries or structured-output fallbacks consume the same physical-request grant. Repairs describe desired work, never permission to send more requests. Requested and provider-reported model identities are recorded separately; token usage is not an invoice. Its deadline is absolute from admission: a round that must already stop never begins, and nothing it produces after it is answered or kept. A fresh round that leaves a native plan the server keeps (its input and plan within 2097152 bytes) answers the header Nika-Compile-Replay; `cognition: deterministicOnly` with that token and the round's exact input replays it with zero calls for as long as this server run keeps it (never renewed, forgotten on restart). A lost first answer leaves no token and a new fresh round spends again: there is no idempotency key and nothing retries. Version negotiation: a server without the capability answers compile_version 2 with 422 compile_version_unsupported; the answer's compile_version is 2 exactly when a provider call happened. Creates no job, run, approval, trace, file or permission. `check_preview` is a REVIEW of the source only: POST /v1/jobs judges a candidate again. A document carrying the seat's own credential is refused whole (500 compile_disclosure_refused).",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1984,7 +2434,7 @@
                 }
               }
             },
-            "description": "Authoring outcome — ready, incomplete and refused are all data. compile_version 2 (CompileOutcomeV2) exactly when a provider call happened; every other answer, replays included, is generation 1 (CompileOutcome)",
+            "description": "Authoring outcome \u2014 ready, incomplete and refused are all data. compile_version 2 (CompileOutcomeV2) exactly when a provider call happened; every other answer, replays included, is generation 1 (CompileOutcome)",
             "headers": {
               "Cache-Control": {
                 "description": "no-store on every answer to a generation-2 request, fresh round or replay, whatever its compile_version",
@@ -2020,7 +2470,7 @@
                 }
               }
             },
-            "description": "request_timeout — the request deadline (body intake, generation 1, replays) · compile_deadline_exceeded — a fresh round's absolute deadline passed: its work stopped or never began, nothing was kept, and a provider call in flight may still be billed"
+            "description": "request_timeout \u2014 the request deadline (body intake, generation 1, replays) \u00b7 compile_deadline_exceeded \u2014 a fresh round's absolute deadline passed: its work stopped or never began, nothing was kept, and a provider call in flight may still be billed"
           },
           "409": {
             "content": {
@@ -2030,7 +2480,7 @@
                 }
               }
             },
-            "description": "compile_replay_unavailable — this server run keeps no round under that token (unknown, expired, another run) · compile_replay_input_changed — a replay repeats its round's exact input and never replaces the intent · compile_context_changed — the pinned knowledge snapshot no longer reads as pinned; nothing was sent"
+            "description": "compile_replay_unavailable \u2014 this server run keeps no round under that token (unknown, expired, another run) \u00b7 compile_replay_input_changed \u2014 a replay repeats its round's exact input and never replaces the intent \u00b7 compile_context_changed \u2014 the pinned knowledge snapshot no longer reads as pinned; nothing was sent"
           },
           "413": {
             "content": {
@@ -2060,7 +2510,7 @@
                 }
               }
             },
-            "description": "malformed_compile_request · compile_version_unsupported · compile_mode_unsupported · compile_cognition_unsupported · compile_limit · compile_new_intent_required — an intent.clarification on a fresh generation-2 round: send the replacement as a new intent"
+            "description": "malformed_compile_request \u00b7 compile_version_unsupported \u00b7 compile_mode_unsupported \u00b7 compile_cognition_unsupported \u00b7 compile_limit \u00b7 compile_new_intent_required \u2014 an intent.clarification on a fresh generation-2 round: send the replacement as a new intent"
           },
           "500": {
             "content": {
@@ -2070,7 +2520,7 @@
                 }
               }
             },
-            "description": "internal_error — compiler machinery failure, nothing is echoed · compile_disclosure_refused — the outcome would carry a withheld credential and is refused whole"
+            "description": "internal_error \u2014 compiler machinery failure, nothing is echoed \u00b7 compile_disclosure_refused \u2014 the outcome would carry a withheld credential and is refused whole"
           },
           "503": {
             "content": {
@@ -2080,10 +2530,10 @@
                 }
               }
             },
-            "description": "compile_busy — every compile slot is in use · compile_replay_capacity — every kept answer round is in use; nothing was authored or spent · stopping — the server is stopping; the round stopped and nothing was kept"
+            "description": "compile_busy \u2014 every compile slot is in use \u00b7 compile_replay_capacity \u2014 every kept answer round is in use; nothing was authored or spent \u00b7 stopping \u2014 the server is stopping; the round stopped and nothing was kept"
           }
         },
-        "summary": "Author a candidate workflow without running it (stateless · source-only)"
+        "summary": "Author a candidate workflow without running it (stateless \u00b7 source-only)"
       }
     },
     "/v1/jobs": {
@@ -2170,7 +2620,7 @@
                 }
               }
             },
-            "description": "Idempotency key already bound to another request"
+            "description": "idempotency_conflict, or a cost review that cannot admit this job: review_witness_mismatch \u00b7 review_not_approved \u00b7 review_declined \u00b7 review_busy \u00b7 review_consumed \u00b7 review_request_mismatch \u00b7 review_witness_changed (re-observed program, route, project, journal or read files changed: the review is spent, no job)"
           },
           "413": {
             "content": {
@@ -2221,9 +2671,39 @@
               }
             },
             "description": "Durable job capacity exhausted"
+          },
+          "403": {
+            "description": "cost_review_unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No served workflow by that name, or review_unknown",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "review_expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         },
-        "summary": "Admit a workflow as a durable job — by served name, or as immutable snapshot bytes"
+        "summary": "Admit a workflow as a durable job \u2014 by served name, or as immutable snapshot bytes"
       }
     },
     "/v1/jobs/{id}": {
@@ -2746,6 +3226,354 @@
           }
         },
         "summary": "Workflow metadata without source bytes"
+      }
+    },
+    "/v1/cost-reviews": {
+      "post": {
+        "summary": "Prepare one fresh Run cost review for a served workflow",
+        "description": "Only on a server its operator started with `--cost-review` (health capability `costReviewV1`); any other server answers these routes, and a job carrying `cost_review`, with 403 cost_review_unavailable. The by-name job form only (a snapshot body has no review). The resident captures the workflow's world and resolves its plan exactly as the job would, then runs the same cost evaluator as `nika run`: no unknown-cost route answers 200 `review_required: false`; an unknown-cost route answers 201 with a pending review. Effects: preparing a review takes this project's cost lease and holds it until decline, expiry or one job admission; it may create `.nika/` and the cost journal, and may record an earlier Run whose writer the lease proves gone as UNKNOWN (which then refuses 422 cost_review_refused). It never creates a job, a run or a trace. Idempotency binds to the exact request bytes in a review-local namespace of this server run: a replay answers the same review in its current state; after a restart or eviction the key is forgotten and a replay prepares a NEW pending review (a fresh review, never an approval).",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CostReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Idempotent replay (the review in its current state), or no review required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CostReview"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CostReviewNotRequired"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "A pending review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostReview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid idempotency key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "cost_review_unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No served workflow by that name",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Request deadline",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "idempotency_conflict (the key is bound to other request bytes)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Encoded body limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Content-Type or Content-Encoding refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request, refused capture or inputs, or cost_review_refused: the shared evaluator refused before any question (another review or unknown-cost Run holds this project's cost lease, an earlier Run is unknown or uncertain, a hard cap such as this server's per-run ceiling, a zero invocation ceiling, a refused project file, an unsupported shape or route); the message says which",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Stopping",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "internal_error (no fresh private witness nonce could be drawn: nothing was held)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cost-reviews/{id}": {
+      "get": {
+        "summary": "Observe one cost review in its current state",
+        "description": "Only on a server its operator started with `--cost-review` (health capability `costReviewV1`); any other server answers these routes, and a job carrying `cost_review`, with 403 cost_review_unavailable. Reading a review approves nothing. After a restart or eviction the id is unknown (404 review_unknown): authority held in memory is lost, never re-granted.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^rev-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The review",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostReview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "cost_review_unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "review_unknown",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/cost-reviews/{id}/decision": {
+      "post": {
+        "summary": "Record one explicit decision on a pending review",
+        "description": "Only on a server its operator started with `--cost-review` (health capability `costReviewV1`); any other server answers these routes, and a job carrying `cost_review`, with 403 cost_review_unavailable. `approve_once` records approval of exactly this witness for one later job admission; `decline` ends the review and releases the project's cost lease. Neither creates a job, a run, a file or an effect. The same decision again answers the review in its current state; a different one refuses 409 review_decided.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^rev-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CostReviewDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The review after the decision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CostReview"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "cost_review_unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "review_unknown",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Request deadline",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "review_witness_mismatch \u00b7 review_decided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "review_expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Encoded body limit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Content-Type or Content-Encoding refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "malformed_decision",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     }
   },

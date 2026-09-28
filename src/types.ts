@@ -1,5 +1,20 @@
 import type { components } from './generated/openapi.js';
 
+/** Engine-owned, single-use HTTP review; approval alone never runs a workflow. */
+export type NikaCostReview = components['schemas']['CostReview'];
+export type NikaCostReviewRequest = components['schemas']['CostReviewRequest'];
+export type NikaCostReviewDecision = components['schemas']['CostReviewDecision'];
+export type NikaCostReviewReference = components['schemas']['CostReviewReference'];
+export type NikaCostReviewResult = NikaCostReview | components['schemas']['CostReviewNotRequired'];
+export interface NikaCostReviewOptions {
+  /** Stops waiting; a sent decision may already have taken effect. */
+  signal?: AbortSignal;
+}
+export interface NikaPrepareCostReviewOptions extends NikaCostReviewOptions {
+  /** Explicit replay identity. The SDK never retries a lost response. */
+  idempotencyKey?: string;
+}
+
 /** Exact engine-owned authoring request; explicitProvider is an explicit caller opt-in. */
 export type NikaCompileRequest = components['schemas']['CompileRequest'] | components['schemas']['CompileRequestV2'];
 /** Authoring completeness is review material, never execution or schedule authority. */
@@ -447,6 +462,12 @@ export interface NikaRunOptions {
   maxCostUsd?: number;
   /** Retained for HTTP admission deduplication. */
   idempotencyKey?: string;
+  /** Typed caller inputs for a served HTTP workflow (jobInputs capability). */
+  inputs?: components['schemas']['JobByName']['inputs'];
+  /** HTTP resident access profile; it must match the reviewed request. */
+  access?: components['schemas']['JobByName']['access'];
+  /** Caller-supplied approved review; never created or approved implicitly. */
+  costReview?: NikaCostReviewReference;
 }
 
 /** Resume observation of an already-admitted durable HTTP job. */
@@ -470,6 +491,9 @@ export interface NikaTraceVerifyOptions {
 /** The SDK operations whose engine refusal can be returned as a typed error. */
 export type NikaOperation =
   | 'compile'
+  | 'prepareCostReview'
+  | 'costReview'
+  | 'decideCostReview'
   | 'check'
   | 'run'
   | 'attachRun'

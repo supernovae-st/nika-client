@@ -7,6 +7,12 @@ import {
   NikaTransportError,
 } from '../errors.js';
 import type {
+  NikaCostReview,
+  NikaCostReviewRequest,
+  NikaCostReviewDecision,
+  NikaCostReviewOptions,
+  NikaCostReviewResult,
+  NikaPrepareCostReviewOptions,
   NikaCompileRequest,
   NikaCompileOptions,
   NikaCompileResult,
@@ -41,6 +47,7 @@ import {
 import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
 import { readSettlement } from './settlement.js';
 import { readCompileOutcome } from './compile.js';
+import { admissionKey, costReviewId, readCostReviewResult, reviewReference, reviewWitness } from './cost-review.js';
 import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
 import type { Transport, TransportRun } from './transport.js';
 
@@ -213,6 +220,59 @@ export class HttpTransport implements Transport {
     return captured.report;
   }
 
+  async prepareCostReview(request: NikaCostReviewRequest, options: NikaPrepareCostReviewOptions): Promise<NikaCostReviewResult> {
+    options.signal?.throwIfAborted();
+    if (!machineObject(request) || !isContainedWorkflowName(request.workflow)) {
+      throw new TypeError('cost review requires a contained served workflow name');
+    }
+    const body = JSON.stringify(request);
+    const key = admissionKey(options.idempotencyKey ?? randomUUID());
+    await this.requireCostReview(options.signal);
+    const { object, status } = await this.jsonWithStatus('/v1/cost-reviews', {
+      method: 'POST', body, signal: options.signal, redirect: 'error',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
+    }, true, [200, 201], 'prepareCostReview');
+    const result = readCostReviewResult(object, status === 200);
+    if (status === 201 && (!('state' in result) || result.state !== 'pending')) {
+      throw new NikaProtocolError(this.kind, 'A newly created cost review must be pending');
+    }
+    return result;
+  }
+
+  async costReview(id: string, options: NikaCostReviewOptions): Promise<NikaCostReview> {
+    id = costReviewId(id);
+    await this.requireCostReview(options.signal);
+    const object = await this.json(`/v1/cost-reviews/${id}`, {
+      method: 'GET', signal: options.signal, redirect: 'error', headers: { Accept: 'application/json' },
+    }, true, [200], 'costReview');
+    return readCostReviewResult(object, false, id) as NikaCostReview;
+  }
+
+  async decideCostReview(id: string, decision: NikaCostReviewDecision, options: NikaCostReviewOptions): Promise<NikaCostReview> {
+    id = costReviewId(id);
+    if (!machineObject(decision) || !['approve_once', 'decline'].includes(decision.decision)
+      || Object.keys(decision).some(key => key !== 'decision' && key !== 'witness_sha256')) {
+      throw new TypeError('cost review decision must explicitly be approve_once or decline with its witness');
+    }
+    reviewWitness(decision.witness_sha256);
+    const body = JSON.stringify(decision);
+    await this.requireCostReview(options.signal);
+    const object = await this.json(`/v1/cost-reviews/${id}/decision`, {
+      method: 'POST', body, signal: options.signal, redirect: 'error',
+      headers: { 'Content-Type': 'application/json' },
+    }, true, [200], 'decideCostReview');
+    return readCostReviewResult(object, false, id) as NikaCostReview;
+  }
+
+  private async requireCostReview(signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
+    await this.ensureServerIdentity();
+    signal?.throwIfAborted();
+    if (!this.remoteIdentity?.supportedCapabilities.includes('costReviewV1')) {
+      throw this.gap('costReviewV1', 'The connected server did not advertise explicit cost review');
+    }
+  }
+
   async startRun(workflow: string, options: NikaRunOptions): Promise<TransportRun> {
     if (
       (options.vars && Object.keys(options.vars).length > 0)
@@ -232,9 +292,24 @@ export class HttpTransport implements Transport {
       // The by-name form (ADR-131): the resident captures the world of a
       // workflow its registry lists and computes the digest its receipt
       // carries. No local engine is spawned and no digest is expected here.
+      const hasReview = options.costReview !== undefined;
+      const hasInputs = options.inputs !== undefined;
+      if (hasReview) reviewReference(options.costReview);
+      const body = JSON.stringify({ workflow,
+        ...(options.inputs === undefined ? {} : { inputs: options.inputs }),
+        ...(options.access === undefined ? {} : { access: options.access }),
+        ...(options.costReview === undefined ? {} : { cost_review: options.costReview }),
+      });
       await this.ensureServerIdentity();
-      const job = await this.admitJob(JSON.stringify({ workflow }), idempotencyKey);
+      if (hasReview) await this.requireCostReview();
+      if (hasInputs && !this.remoteIdentity?.supportedCapabilities.includes('jobInputs')) {
+        throw this.gap('jobInputs', 'The connected server did not advertise typed job inputs');
+      }
+      const job = await this.admitJob(body, idempotencyKey);
       return this.httpRun(job.id as NikaRunId, 0, job);
+    }
+    if (options.inputs !== undefined || options.access !== undefined || options.costReview !== undefined) {
+      throw this.gap('runOptions', 'inputs, access and costReview require HTTP by-name admission');
     }
     const captured = await this.captureSnapshot(workflow);
     if (captured.bytes === undefined) {
@@ -278,6 +353,7 @@ export class HttpTransport implements Transport {
   private async admitJob(body: string, idempotencyKey: string): Promise<DurableJob> {
     const admitted = await this.json('/v1/jobs', {
       method: 'POST',
+      redirect: 'error',
       headers: {
         'Content-Type': 'application/json',
         'Idempotency-Key': idempotencyKey,

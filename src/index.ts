@@ -8,6 +8,12 @@ import { NikaEngineUnavailable, resolveNikaEngine } from './lib/binary/index.js'
 import { RunSession } from './lib/run-session.js';
 import type { Transport } from './lib/transport.js';
 import type {
+  NikaCostReview,
+  NikaCostReviewRequest,
+  NikaCostReviewDecision,
+  NikaCostReviewOptions,
+  NikaCostReviewResult,
+  NikaPrepareCostReviewOptions,
   NikaCompileRequest,
   NikaCompileOptions,
   NikaCompileResult,
@@ -101,6 +107,21 @@ export class Nika {
   /** Compile through a resident HTTP authority, without saving, running, or automatic retries. */
   compile(request: NikaCompileRequest, options: NikaCompileOptions = {}): Promise<NikaCompileResult> {
     return this.transport.compile(request, options);
+  }
+
+  /** Prepare a review; this can hold the project cost lease, but never starts a job. */
+  prepareCostReview(request: NikaCostReviewRequest, options: NikaPrepareCostReviewOptions = {}): Promise<NikaCostReviewResult> {
+    return this.transport.prepareCostReview(request, options);
+  }
+
+  /** Observe a review without approving, renewing, or executing it. */
+  costReview(id: string, options: NikaCostReviewOptions = {}): Promise<NikaCostReview> {
+    return this.transport.costReview(id, options);
+  }
+
+  /** Send exactly one explicit caller decision; a separate run() admits the job. */
+  decideCostReview(id: string, decision: NikaCostReviewDecision, options: NikaCostReviewOptions = {}): Promise<NikaCostReview> {
+    return this.transport.decideCostReview(id, decision, options);
   }
 
   check(workflow: string, options: NikaCheckOptions = {}): Promise<NikaCheckResult> {
@@ -299,6 +320,13 @@ export {
 
 export type {
   NikaJournalEvidence,
+  NikaCostReviewReference,
+  NikaCostReview,
+  NikaCostReviewRequest,
+  NikaCostReviewDecision,
+  NikaCostReviewOptions,
+  NikaCostReviewResult,
+  NikaPrepareCostReviewOptions,
   NikaCompileRequest,
   NikaCompileOutcome,
   NikaCompileOptions,

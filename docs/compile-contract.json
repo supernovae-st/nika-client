@@ -1,12 +1,12 @@
 {
   "engine_repository": "https://github.com/supernovae-st/nika",
-  "engine_commit": "29b81806d0dd73f5edbeecd4f6507788e92924f0",
-  "engine_binary_sha256": "a08a67a690bd9c4471a459c34747a4108dc10f95054d8464ba527a48412a4185",
-  "openapi_sha256": "8fb616a05c257a433b24f36ccd5b280b3c453199b44277778722227635f00f58",
+  "engine_commit": "eff5153e312dbfcd1aba12677307812b90faa934",
+  "engine_binary_sha256": "a40c91fcacaffe26cc76cc16cb333808a3e2abcfe3e22515a52f34f8cdc05321",
+  "openapi_sha256": "99b55a135ee58ca925577e6cb55c074c292e6ecff1ef9d44ade5f05a8c9a004f",
   "served_contract": "GET /v1/openapi.json with explicit native authoring seat",
   "engine_contract_files": [
     "crates/nika-serve/openapi.json",
     "crates/nika-serve/src/server/compile/openapi-native.json"
   ],
-  "status": "development pin; independent review pending; full V9 consumer gates remain open"
+  "status": "development pin; E15 receipt and configured endpoint fixes pass 61 controlled wire checks; independent follow-up review and full V9 consumer gates remain open"
 }

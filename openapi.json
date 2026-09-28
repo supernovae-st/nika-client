@@ -62,7 +62,7 @@
         "type": "object"
       },
       "CompileOutcome": {
-        "description": "The engine-owned machine document of one authoring result \u2014 the document `nika compile --json` prints, without the CLI-only `written`. No field grants authority, writes or executes source.",
+        "description": "The engine-owned machine document of one authoring result — the document `nika compile --json` prints, without the CLI-only `written`. No field grants authority, writes or executes source.",
         "properties": {
           "candidate": {
             "description": "Ordinary `.nika` source; may still be incomplete",
@@ -188,7 +188,7 @@
                   "type": "array"
                 },
                 "type": {
-                  "description": "text: a JSON string \u00b7 literal: one JSON value \u00b7 choice: a JSON string that is the `key` of one of `options`",
+                  "description": "text: a JSON string · literal: one JSON value · choice: a JSON string that is the `key` of one of `options`",
                   "enum": [
                     "text",
                     "literal",
@@ -221,7 +221,7 @@
           },
           "requested_trigger": {
             "additionalProperties": true,
-            "description": "The trigger the request names (kind \u00b7 source_hint \u00b7 event_hint \u00b7 cadence \u00b7 at \u00b7 payload_input \u00b7 status \u00b7 timezone \u00b7 missed \u00b7 overlap \u00b7 ceiling \u00b7 cron), stated beside the candidate whose bytes carry no cadence, host or event. A requirement the operator binds through the schedule contract, never a grant or a schedule row. timezone, missed, overlap and ceiling are the answered binding values (null until answered). cron is the exact five-field schedule projection when supported and fully specified, otherwise null; older engines omit it. It never supplies a missing time or timezone.",
+            "description": "The trigger the request names (kind · source_hint · event_hint · cadence · at · payload_input · status · timezone · missed · overlap · ceiling · cron), stated beside the candidate whose bytes carry no cadence, host or event. A requirement the operator binds through the schedule contract, never a grant or a schedule row. timezone, missed, overlap and ceiling are the answered binding values (null until answered). cron is the exact five-field schedule projection when supported and fully specified, otherwise null; older engines omit it. It never supplies a missing time or timezone.",
             "type": [
               "object",
               "null"
@@ -338,8 +338,30 @@
                         },
                         "type": "object"
                       },
+                      "base_url_overridden": {
+                        "description": "Effective configured URL differs from the provider profile seed; null if no seed comparison is available.",
+                        "type": [
+                          "boolean",
+                          "null"
+                        ]
+                      },
                       "cost_basis": {
+                        "description": "No price or invoice is established by this authoring door: unpriced; billing_unverified. Token totals and their completeness are separate observations.",
                         "type": "string"
+                      },
+                      "endpoint_basis": {
+                        "description": "These endpoint fields describe operator configuration, independently from observed model identities.",
+                        "enum": [
+                          "operator_configuration"
+                        ],
+                        "type": "string"
+                      },
+                      "host": {
+                        "description": "Configured endpoint host and optional port only; no user info, path, query or fragment. This does not authenticate a remote peer.",
+                        "type": [
+                          "string",
+                          "null"
+                        ]
                       },
                       "kind": {
                         "type": "string"
@@ -355,6 +377,11 @@
                       },
                       "requested_model": {
                         "type": "string"
+                      },
+                      "unreported_models": {
+                        "description": "Responses that did not identify their model; never assumed to be the requested model or another invocation's observed model.",
+                        "minimum": 0,
+                        "type": "integer"
                       },
                       "usage_complete": {
                         "type": "boolean"
@@ -499,7 +526,7 @@
         "properties": {
           "answers": {
             "additionalProperties": true,
-            "description": "Question key \u2192 one JSON literal with its type preserved, judged exactly as sent (at most 65536 bytes each)",
+            "description": "Question key → one JSON literal with its type preserved, judged exactly as sent (at most 65536 bytes each)",
             "maxProperties": 64,
             "propertyNames": {
               "maxLength": 256
@@ -735,7 +762,7 @@
             "description": "Edit only, exactly one of: `text`, a revision in any wording (not only a `Set const.NAME` sentence) that the round reads beside `original_intent`; or `set_constant`, one structured constant the core applies without a provider call"
           },
           "cognition": {
-            "description": "explicitProvider: one fresh round under the operator's seat (refuses `replay_token` and an `intent.clarification` answer) \u00b7 deterministicOnly: a zero-call replay of a round this server kept (requires `replay_token`, refuses `limits`): it repeats the round's exact input, its `answers` may answer the round's questions, and it never carries `intent.clarification` (409 compile_replay_input_changed)",
+            "description": "explicitProvider: one fresh round under the operator's seat (refuses `replay_token` and an `intent.clarification` answer) · deterministicOnly: a zero-call replay of a round this server kept (requires `replay_token`, refuses `limits`): it repeats the round's exact input, its `answers` may answer the round's questions, and it never carries `intent.clarification` (409 compile_replay_input_changed)",
             "enum": [
               "explicitProvider",
               "deterministicOnly"
@@ -752,7 +779,7 @@
           },
           "limits": {
             "additionalProperties": false,
-            "description": "This request's narrowing of the operator's ceilings (explicitProvider only). Each value is optional and must be at most the operator's own ceiling, which is at most the maximum below; above \u2192 422 compile_limit, never clamped. Absent values take the operator's.",
+            "description": "This request's narrowing of the operator's ceilings (explicitProvider only). Each value is optional and must be at most the operator's own ceiling, which is at most the maximum below; above → 422 compile_limit, never clamped. Absent values take the operator's.",
             "properties": {
               "call_timeout_ms": {
                 "description": "The wait for one model invocation; the transport does not resend automatically",
@@ -850,7 +877,7 @@
       },
       "ExecutionSnapshot": {
         "additionalProperties": false,
-        "description": "Immutable byte-owned execution world \u2014 the body `nika check <file> --json --sdk-snapshot` prints (the engine is the one producer; a client never hashes). Unit bytes are canonical lowercase hexadecimal. `digest` and every unit `digest` are OPTIONAL caller-supplied integrity digests (canonical lowercase SHA-256 \u00b7 a content assertion, never a signature): absent, the resident computes them and the receipt carries the result; present, they must match the bytes or the request is refused as `snapshot_tampered`. The decoded unit aggregate is limited to 16 MiB and the complete encoded request to 33 MiB. This object is the request body itself, not a path-bearing wrapper.",
+        "description": "Immutable byte-owned execution world — the body `nika check <file> --json --sdk-snapshot` prints (the engine is the one producer; a client never hashes). Unit bytes are canonical lowercase hexadecimal. `digest` and every unit `digest` are OPTIONAL caller-supplied integrity digests (canonical lowercase SHA-256 · a content assertion, never a signature): absent, the resident computes them and the receipt carries the result; present, they must match the bytes or the request is refused as `snapshot_tampered`. The decoded unit aggregate is limited to 16 MiB and the complete encoded request to 33 MiB. This object is the request body itself, not a path-bearing wrapper.",
         "properties": {
           "digest": {
             "description": "Optional caller-supplied integrity digest of the world (never a signature)",
@@ -880,7 +907,7 @@
                   "type": "string"
                 },
                 "kind": {
-                  "description": "0 root (the admitted workflow) \u00b7 1 child (a transitively invoked workflow) \u00b7 2 skill (an Agent Skill document) \u00b7 3 import (an opaque import the caller supplied)",
+                  "description": "0 root (the admitted workflow) · 1 child (a transitively invoked workflow) · 2 skill (an Agent Skill document) · 3 import (an opaque import the caller supplied)",
                   "maximum": 3,
                   "minimum": 0,
                   "type": "integer"
@@ -1076,7 +1103,7 @@
       },
       "JobByName": {
         "additionalProperties": false,
-        "description": "The by-name form (ADR-131): a workflow the served registry lists (GET /v1/workflows \u00b7 project-root-relative, `.nika`). The resident captures its world exactly as a schedule does \u2014 the one owner of the snapshot and its digest domain. Idempotency binds to these request bytes. Optional `access` is the same pin as CLI `--access` (a pin is a pin). Absent: the resident's unpinned plan. Snapshot bodies reject both access and inputs overlays, including null or empty maps. Optional inputs are literal JSON values checked against declared keys, types and required values before a job exists; strings are never CLI @env instructions or expressions.",
+        "description": "The by-name form (ADR-131): a workflow the served registry lists (GET /v1/workflows · project-root-relative, `.nika`). The resident captures its world exactly as a schedule does — the one owner of the snapshot and its digest domain. Idempotency binds to these request bytes. Optional `access` is the same pin as CLI `--access` (a pin is a pin). Absent: the resident's unpinned plan. Snapshot bodies reject both access and inputs overlays, including null or empty maps. Optional inputs are literal JSON values checked against declared keys, types and required values before a job exists; strings are never CLI @env instructions or expressions.",
         "properties": {
           "access": {
             "description": "Access pin, same vocabulary as `--access` (class or harness id). A pin never silently substitutes a metered seat.",
@@ -1104,7 +1131,7 @@
         "additionalProperties": false,
         "properties": {
           "at": {
-            "description": "When the resident admitted the event (RFC 3339 \u00b7 UTC). Outside the event's hash chain; absent on an event written before the journal was dated.",
+            "description": "When the resident admitted the event (RFC 3339 · UTC). Outside the event's hash chain; absent on an event written before the journal was dated.",
             "format": "date-time",
             "type": "string"
           },
@@ -1135,7 +1162,7 @@
                 "type": "null"
               }
             ],
-            "description": "The resident's event vocabulary: execution.<word> (queued \u00b7 started \u00b7 prepared \u00b7 requeued \u00b7 settled \u00b7 cancelled \u00b7 interrupted \u00b7 refused \u00b7 aborted_before_claim), plus the approval_decided frame the journal admits. Null on a payload that carries no kind."
+            "description": "The resident's event vocabulary: execution.<word> (queued · started · prepared · requeued · settled · cancelled · interrupted · refused · aborted_before_claim), plus the approval_decided frame the journal admits. Null on a payload that carries no kind."
           },
           "message": {
             "type": "string"
@@ -1287,7 +1314,7 @@
         "type": "object"
       },
       "JobStatus": {
-        "description": "queued and running: the resident owns the execution. interrupted: execution ownership was lost and effect settlement is unknown \u2014 an EVIDENCE state (the journal is INCOMPLETE), never a run state (ADR-129). paused, succeeded, failed and cancelled: the run's own settlement, the words its terminal frame carries (ADR-128).",
+        "description": "queued and running: the resident owns the execution. interrupted: execution ownership was lost and effect settlement is unknown — an EVIDENCE state (the journal is INCOMPLETE), never a run state (ADR-129). paused, succeeded, failed and cancelled: the run's own settlement, the words its terminal frame carries (ADR-128).",
         "enum": [
           "queued",
           "running",
@@ -1364,7 +1391,7 @@
                 "type": "string"
               },
               "task": {
-                "description": "The task that failed \u00b7 absent for a run-level cause",
+                "description": "The task that failed · absent for a run-level cause",
                 "type": "string"
               }
             },
@@ -1658,7 +1685,7 @@
       },
       "TraceVerification": {
         "additionalProperties": false,
-        "description": "Run-scoped verdict on the journal the resident wrote for the job, through the ONE verifier `nika trace verify --json` runs. `verdict` is the CLI's headline word: the attained tier (ok \u00b7 sealed \u00b7 anchored \u00b7 replayed), incomplete for a journal with no terminal frame (the writer's liveness rides `reason`), tampered for a buried seal, broken for an edited chain, and the CLI's refusal classes; `unavailable` only when no journal exists for the job (refused before its first event \u00b7 queued \u00b7 a backend keeping none). `reason` is the machine class beside it (the seal tier under a ladder verdict). The CLI's own document rides verbatim (exit \u00b7 chain \u00b7 seal \u00b7 anchor \u00b7 replay \u00b7 lines); a filesystem path is never returned.",
+        "description": "Run-scoped verdict on the journal the resident wrote for the job, through the ONE verifier `nika trace verify --json` runs. `verdict` is the CLI's headline word: the attained tier (ok · sealed · anchored · replayed), incomplete for a journal with no terminal frame (the writer's liveness rides `reason`), tampered for a buried seal, broken for an edited chain, and the CLI's refusal classes; `unavailable` only when no journal exists for the job (refused before its first event · queued · a backend keeping none). `reason` is the machine class beside it (the seal tier under a ladder verdict). The CLI's own document rides verbatim (exit · chain · seal · anchor · replay · lines); a filesystem path is never returned.",
         "properties": {
           "anchor": {
             "additionalProperties": true,
@@ -1666,11 +1693,11 @@
           },
           "chain": {
             "additionalProperties": true,
-            "description": "events \u00b7 head \u00b7 headline (intact \u00b7 torn \u00b7 incomplete) \u00b7 liveness (alive \u00b7 dead \u00b7 unknown \u00b7 null)",
+            "description": "events · head · headline (intact · torn · incomplete) · liveness (alive · dead · unknown · null)",
             "type": "object"
           },
           "exit": {
-            "description": "The CLI's exit class: 0 the reported tier holds \u00b7 2 a forged or edited journal \u00b7 3 the environment (unchained \u00b7 unreadable \u00b7 a missing input) \u00b7 5 incomplete lifecycle evidence",
+            "description": "The CLI's exit class: 0 the reported tier holds · 2 a forged or edited journal · 3 the environment (unchained · unreadable · a missing input) · 5 incomplete lifecycle evidence",
             "enum": [
               0,
               2,
@@ -1715,7 +1742,7 @@
           },
           "seal": {
             "additionalProperties": true,
-            "description": "tier (unsealed \u00b7 sealed \u00b7 forged \u00b7 buried \u00b7 unattributable) and the tier's facts",
+            "description": "tier (unsealed · sealed · forged · buried · unattributable) and the tier's facts",
             "type": "object"
           },
           "trace_id": {
@@ -1817,7 +1844,7 @@
     },
     "/v1/check": {
       "post": {
-        "description": "Runs the same admission as POST /v1/jobs (ADR-131 \u00b7 both forms) over the exact request body, and creates nothing.",
+        "description": "Runs the same admission as POST /v1/jobs (ADR-131 · both forms) over the exact request body, and creates nothing.",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1897,12 +1924,12 @@
             "description": "Malformed, unsupported, tampered, or semantically refused snapshot"
           }
         },
-        "summary": "Judge a workflow without creating a job \u2014 by served name, or as immutable snapshot bytes"
+        "summary": "Judge a workflow without creating a job — by served name, or as immutable snapshot bytes"
       }
     },
     "/v1/compile": {
       "post": {
-        "description": "The HTTP transport of the same Compile core as `nika compile`. Generation 1 (CompileRequest) is the foundation door, exactly as on a default server: deterministic, no provider contacted. Generation 2 (CompileRequestV2) exists only because this server's operator seated ONE native authoring model when building it (advertised by the `compileNativeV2` health capability). `cognition: explicitProvider` opts in to one fresh round under that seat: the operator chose the model, its credential, its endpoint, the knowledge snapshot and the ceilings; a request names none of them and may only narrow the ceilings through `limits` (above one \u2192 422 compile_limit, never clamped). A round permits one physical request by default. The operator can explicitly grant max_calls and a caller may only narrow that ceiling through limits.max_calls. Invocations and physical requests are counted separately in backend.authority, including refusals; no redirect is followed, and provider retries or structured-output fallbacks consume the same physical-request grant. Repairs describe desired work, never permission to send more requests. Requested and provider-reported model identities are recorded separately; token usage is not an invoice. Its deadline is absolute from admission: a round that must already stop never begins, and nothing it produces after it is answered or kept. A fresh round that leaves a native plan the server keeps (its input and plan within 2097152 bytes) answers the header Nika-Compile-Replay; `cognition: deterministicOnly` with that token and the round's exact input replays it with zero calls for as long as this server run keeps it (never renewed, forgotten on restart). A lost first answer leaves no token and a new fresh round spends again: there is no idempotency key and nothing retries. Version negotiation: a server without the capability answers compile_version 2 with 422 compile_version_unsupported; the answer's compile_version is 2 exactly when a provider call happened. Creates no job, run, approval, trace, file or permission. `check_preview` is a REVIEW of the source only: POST /v1/jobs judges a candidate again. A document carrying the seat's own credential is refused whole (500 compile_disclosure_refused).",
+        "description": "The HTTP transport of the same Compile core as `nika compile`. Generation 1 (CompileRequest) is the foundation door, exactly as on a default server: deterministic, no provider contacted. Generation 2 (CompileRequestV2) exists only because this server's operator seated ONE native authoring model when building it (advertised by the `compileNativeV2` health capability). `cognition: explicitProvider` opts in to one fresh round under that seat: the operator chose the model, its credential, its endpoint, the knowledge snapshot and the ceilings; a request names none of them and may only narrow the ceilings through `limits` (above one → 422 compile_limit, never clamped). A round permits one physical request by default. The operator can explicitly grant max_calls and a caller may only narrow that ceiling through limits.max_calls. Invocations and physical requests are counted separately in backend.authority, including refusals; no redirect is followed, and provider retries or structured-output fallbacks consume the same physical-request grant. Repairs describe desired work, never permission to send more requests. Requested and provider-reported model identities are recorded separately; token usage is not an invoice. Its deadline is absolute from admission: a round that must already stop never begins, and nothing it produces after it is answered or kept. A fresh round that leaves a native plan the server keeps (its input and plan within 2097152 bytes) answers the header Nika-Compile-Replay; `cognition: deterministicOnly` with that token and the round's exact input replays it with zero calls for as long as this server run keeps it (never renewed, forgotten on restart). A lost first answer leaves no token and a new fresh round spends again: there is no idempotency key and nothing retries. Version negotiation: a server without the capability answers compile_version 2 with 422 compile_version_unsupported; the answer's compile_version is 2 exactly when a provider call happened. Creates no job, run, approval, trace, file or permission. `check_preview` is a REVIEW of the source only: POST /v1/jobs judges a candidate again. A document carrying the seat's own credential is refused whole (500 compile_disclosure_refused).",
         "requestBody": {
           "content": {
             "application/json": {
@@ -1936,7 +1963,7 @@
                 }
               }
             },
-            "description": "Authoring outcome \u2014 ready, incomplete and refused are all data. compile_version 2 (CompileOutcomeV2) exactly when a provider call happened; every other answer, replays included, is generation 1 (CompileOutcome)",
+            "description": "Authoring outcome — ready, incomplete and refused are all data. compile_version 2 (CompileOutcomeV2) exactly when a provider call happened; every other answer, replays included, is generation 1 (CompileOutcome)",
             "headers": {
               "Cache-Control": {
                 "description": "no-store on every answer to a generation-2 request, fresh round or replay, whatever its compile_version",
@@ -1972,7 +1999,7 @@
                 }
               }
             },
-            "description": "request_timeout \u2014 the request deadline (body intake, generation 1, replays) \u00b7 compile_deadline_exceeded \u2014 a fresh round's absolute deadline passed: its work stopped or never began, nothing was kept, and a provider call in flight may still be billed"
+            "description": "request_timeout — the request deadline (body intake, generation 1, replays) · compile_deadline_exceeded — a fresh round's absolute deadline passed: its work stopped or never began, nothing was kept, and a provider call in flight may still be billed"
           },
           "409": {
             "content": {
@@ -1982,7 +2009,7 @@
                 }
               }
             },
-            "description": "compile_replay_unavailable \u2014 this server run keeps no round under that token (unknown, expired, another run) \u00b7 compile_replay_input_changed \u2014 a replay repeats its round's exact input and never replaces the intent \u00b7 compile_context_changed \u2014 the pinned knowledge snapshot no longer reads as pinned; nothing was sent"
+            "description": "compile_replay_unavailable — this server run keeps no round under that token (unknown, expired, another run) · compile_replay_input_changed — a replay repeats its round's exact input and never replaces the intent · compile_context_changed — the pinned knowledge snapshot no longer reads as pinned; nothing was sent"
           },
           "413": {
             "content": {
@@ -2012,7 +2039,7 @@
                 }
               }
             },
-            "description": "malformed_compile_request \u00b7 compile_version_unsupported \u00b7 compile_mode_unsupported \u00b7 compile_cognition_unsupported \u00b7 compile_limit \u00b7 compile_new_intent_required \u2014 an intent.clarification on a fresh generation-2 round: send the replacement as a new intent"
+            "description": "malformed_compile_request · compile_version_unsupported · compile_mode_unsupported · compile_cognition_unsupported · compile_limit · compile_new_intent_required — an intent.clarification on a fresh generation-2 round: send the replacement as a new intent"
           },
           "500": {
             "content": {
@@ -2022,7 +2049,7 @@
                 }
               }
             },
-            "description": "internal_error \u2014 compiler machinery failure, nothing is echoed \u00b7 compile_disclosure_refused \u2014 the outcome would carry a withheld credential and is refused whole"
+            "description": "internal_error — compiler machinery failure, nothing is echoed · compile_disclosure_refused — the outcome would carry a withheld credential and is refused whole"
           },
           "503": {
             "content": {
@@ -2032,10 +2059,10 @@
                 }
               }
             },
-            "description": "compile_busy \u2014 every compile slot is in use \u00b7 compile_replay_capacity \u2014 every kept answer round is in use; nothing was authored or spent \u00b7 stopping \u2014 the server is stopping; the round stopped and nothing was kept"
+            "description": "compile_busy — every compile slot is in use · compile_replay_capacity — every kept answer round is in use; nothing was authored or spent · stopping — the server is stopping; the round stopped and nothing was kept"
           }
         },
-        "summary": "Author a candidate workflow without running it (stateless \u00b7 source-only)"
+        "summary": "Author a candidate workflow without running it (stateless · source-only)"
       }
     },
     "/v1/jobs": {
@@ -2175,7 +2202,7 @@
             "description": "Durable job capacity exhausted"
           }
         },
-        "summary": "Admit a workflow as a durable job \u2014 by served name, or as immutable snapshot bytes"
+        "summary": "Admit a workflow as a durable job — by served name, or as immutable snapshot bytes"
       }
     },
     "/v1/jobs/{id}": {

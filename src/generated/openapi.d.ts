@@ -1091,11 +1091,23 @@ export interface components {
                         } & {
                             [key: string]: unknown;
                         };
+                        /** @description Effective configured URL differs from the provider profile seed; null if no seed comparison is available. */
+                        base_url_overridden?: boolean | null;
+                        /** @description No price or invoice is established by this authoring door: unpriced; billing_unverified. Token totals and their completeness are separate observations. */
                         cost_basis?: string;
+                        /**
+                         * @description These endpoint fields describe operator configuration, independently from observed model identities.
+                         * @enum {string}
+                         */
+                        endpoint_basis?: "operator_configuration";
+                        /** @description Configured endpoint host and optional port only; no user info, path, query or fragment. This does not authenticate a remote peer. */
+                        host?: string | null;
                         kind?: string;
                         observed_models?: string[];
                         provider?: string;
                         requested_model?: string;
+                        /** @description Responses that did not identify their model; never assumed to be the requested model or another invocation's observed model. */
+                        unreported_models?: number;
                         usage_complete?: boolean;
                     } & {
                         [key: string]: unknown;

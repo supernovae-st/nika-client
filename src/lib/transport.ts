@@ -1,4 +1,7 @@
 import type {
+  NikaCompileRequest,
+  NikaCompileOptions,
+  NikaCompileResult,
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckOptions,
@@ -30,6 +33,7 @@ export interface TransportRun {
 /** The adapter boundary. It has exactly the native-process and HTTP implementations. */
 export interface Transport {
   readonly kind: NikaTransportKind;
+  compile(request: NikaCompileRequest, options: NikaCompileOptions): Promise<NikaCompileResult>;
   check(workflow: string, options: NikaCheckOptions): Promise<NikaCheckResult>;
   startRun(workflow: string, options: NikaRunOptions): Promise<TransportRun>;
   attachRun(id: string, options: NikaAttachRunOptions): Promise<TransportRun>;

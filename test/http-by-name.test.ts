@@ -347,7 +347,7 @@ describe('the local capture path is unchanged', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it.each([['flow.nika.yaml'], ['nested/daily.nika.yaml']])(
+  it.each([['flow.nika.yaml'], ['nested/daily.nika.yaml'], ['flow.nika'], ['nested/daily.nika']])(
     'submits %s by name without resolving an engine',
     async (workflow) => {
       const resolveEngine = vi.fn(() => {

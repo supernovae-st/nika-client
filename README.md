@@ -424,6 +424,7 @@ it; a scheduled budget is always a real number.
 
 | Operation | Native process | HTTP |
 |---|---|---|
+| `compile` | typed capability refusal | engine-owned authoring request and outcome, optional kept-round token |
 | `check` | yes; `model` and `nativeStrict` allowed | yes; those two overrides refused |
 | `run` | yes; `vars`, `model`, `maxCostUsd` allowed | yes; `idempotencyKey` allowed |
 | `attachRun` | typed refusal | reattach to a durable job with an optional SSE cursor |
@@ -460,6 +461,7 @@ Remote-only options:
 
 | Method | Result |
 |---|---|
+| `compile(request, options?)` | `{ outcome, replayToken? }`; ready, incomplete and refused are data |
 | `check(workflow, options?)` | `clean` plus the native check report or resident acknowledgement/refusal |
 | `run(workflow, options?)` | admitted `NikaRun` |
 | `attachRun(id, options?)` | reattached durable HTTP `NikaRun` |
@@ -471,6 +473,26 @@ Remote-only options:
 | `scheduleStatus(id)` | fresh engine schedule projection |
 | `listWorkflows()` | contained resident workflow names |
 | `workflow(name)` | path-free resident workflow metadata |
+
+### Authoring through the resident
+
+```ts
+const authored = await nika.compile({
+  compile_version: 1,
+  mode: 'create',
+  intent: 'Read ./orders.csv and keep the paid rows in ./paid.csv',
+});
+console.log(authored.outcome.status, authored.outcome.questions);
+```
+
+Generation 1 is deterministic. Generation 2 requires the server's
+`compileNativeV2` capability and the caller's explicit `cognition` choice.
+The operator seats the model and its request grant; `limits.max_calls` can
+only narrow that grant. The SDK returns the engine's outcome and keeps
+requested and observed model identities in its authoring receipt. It does
+not save, execute, answer questions or retry a lost authoring response.
+`ready` describes a program for review, not permission to run it or a bound
+schedule. See [the HTTP authoring contract](docs/http-api.md#authoring).
 
 ### Typed events, outputs, and identities
 

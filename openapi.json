@@ -1,1 +1,2714 @@
-{"components":{"parameters":{"IdempotencyKey":{"in":"header","name":"Idempotency-Key","required":true,"schema":{"maxLength":255,"minLength":1,"type":"string"}},"IfMatch":{"in":"header","name":"If-Match","required":false,"schema":{"maxLength":96,"type":"string"}},"IfNoneMatch":{"in":"header","name":"If-None-Match","required":false,"schema":{"const":"*","type":"string"}},"LastEventId":{"in":"header","name":"Last-Event-ID","required":false,"schema":{"pattern":"^(0|[1-9][0-9]*)$","type":"string"}}},"schemas":{"Error":{"additionalProperties":false,"properties":{"error":{"additionalProperties":false,"properties":{"code":{"type":"string"},"message":{"type":"string"}},"required":["code","message"],"type":"object"}},"required":["error"],"type":"object"},"ExecutionSnapshot":{"additionalProperties":false,"description":"Immutable byte-owned execution world — the body `nika check <file> --json --sdk-snapshot` prints (the engine is the one producer; a client never hashes). Unit bytes are canonical lowercase hexadecimal. `digest` and every unit `digest` are OPTIONAL caller-supplied integrity digests (canonical lowercase SHA-256 · a content assertion, never a signature): absent, the resident computes them and the receipt carries the result; present, they must match the bytes or the request is refused as `snapshot_tampered`. The decoded unit aggregate is limited to 16 MiB and the complete encoded request to 33 MiB. This object is the request body itself, not a path-bearing wrapper.","properties":{"digest":{"description":"Optional caller-supplied integrity digest of the world (never a signature)","pattern":"^[0-9a-f]{64}$","type":"string"},"format_version":{"const":1,"type":"integer"},"root":{"maxLength":4096,"minLength":1,"type":"string"},"units":{"items":{"additionalProperties":false,"properties":{"bytes_hex":{"pattern":"^(?:[0-9a-f]{2})*$","type":"string"},"digest":{"description":"Optional caller-supplied integrity digest of the unit (never a signature)","pattern":"^[0-9a-f]{64}$","type":"string"},"kind":{"description":"0 root (the admitted workflow) · 1 child (a transitively invoked workflow) · 2 skill (an Agent Skill document) · 3 import (an opaque import the caller supplied)","maximum":3,"minimum":0,"type":"integer"},"path":{"maxLength":4096,"minLength":1,"type":"string"}},"required":["path","kind","bytes_hex"],"type":"object"},"maxItems":256,"type":"array"}},"required":["format_version","root","units"],"type":"object"},"Health":{"additionalProperties":false,"properties":{"api_version":{"minLength":1,"type":"string"},"buildSha":{"minLength":1,"type":"string"},"build_sha":{"minLength":1,"type":"string"},"checkReportVersion":{"minimum":1,"type":"integer"},"engineVersion":{"minLength":1,"type":"string"},"engine_version":{"minLength":1,"type":"string"},"eventFormatVersion":{"minimum":1,"type":"integer"},"machineProtocolVersion":{"minimum":1,"type":"integer"},"service":{"const":"nika-serve","type":"string"},"snapshotFormatVersion":{"minimum":1,"type":"integer"},"specSha":{"minLength":1,"type":"string"},"spec_sha":{"minLength":1,"type":"string"},"status":{"const":"ok","type":"string"},"supportedCapabilities":{"items":{"type":"string"},"type":"array","uniqueItems":true},"traceFormatVersion":{"minimum":1,"type":"integer"}},"required":["status","service","engine_version","build_sha","spec_sha","api_version","engineVersion","buildSha","specSha","machineProtocolVersion","snapshotFormatVersion","checkReportVersion","eventFormatVersion","traceFormatVersion","supportedCapabilities"],"type":"object"},"Job":{"additionalProperties":false,"properties":{"error":{"additionalProperties":false,"properties":{"code":{"type":"string"},"message":{"type":"string"}},"required":["code","message"],"type":"object"},"execution_id":{"type":"string"},"id":{"format":"uuid","type":"string"},"outputs":{"additionalProperties":true,"description":"Declared workflow outputs; present only after settlement when supplied by the execution adapter","type":"object"},"receipt":{"$ref":"#/components/schemas/JobReceipt"},"settlement":{"$ref":"#/components/schemas/RunSettlement"},"status":{"$ref":"#/components/schemas/JobStatus"},"trace_id":{"type":"string"}},"required":["id","status"],"type":"object"},"JobByName":{"additionalProperties":false,"description":"The by-name form (ADR-131): a workflow the served registry lists (GET /v1/workflows · project-root-relative, `.nika.yaml`). The resident captures its world exactly as a schedule does — the one owner of the snapshot and its digest domain. Idempotency binds to these request bytes.","properties":{"workflow":{"maxLength":4096,"minLength":1,"type":"string"}},"required":["workflow"],"type":"object"},"JobEvent":{"additionalProperties":false,"properties":{"code":{"type":"string"},"kind":{"type":["string","null"]},"message":{"type":"string"},"outputs":{"additionalProperties":true,"type":"object"},"receipt":{"$ref":"#/components/schemas/JobReceipt"},"sequence":{"minimum":1,"type":"integer"},"settlement":{"$ref":"#/components/schemas/RunSettlement"},"status":{"anyOf":[{"$ref":"#/components/schemas/JobStatus"},{"type":"null"}]}},"required":["sequence","kind","status"],"type":"object"},"JobOrigin":{"oneOf":[{"additionalProperties":false,"properties":{"kind":{"const":"manual","type":"string"}},"required":["kind"],"type":"object"},{"additionalProperties":false,"properties":{"arm_generation":{"pattern":"^[0-9a-f]{64}$","type":"string"},"decision":{"enum":["scheduled","catch_up"],"type":"string"},"fired_at":{"format":"date-time","type":"string"},"kind":{"const":"schedule","type":"string"},"schedule_id":{"description":"Origin-local identifier, bounded to 255 UTF-8 bytes by the server","maxLength":255,"minLength":1,"type":"string"},"schedule_origin":{"enum":["project","api"],"type":"string"},"schedule_revision":{"pattern":"^sha256:[0-9a-f]{64}$","type":"string"},"scheduled_for":{"format":"date-time","type":"string"},"slot_id":{"pattern":"^[0-9a-f]{64}$","type":"string"}},"required":["kind","schedule_origin","schedule_id","schedule_revision","slot_id","decision","scheduled_for","fired_at","arm_generation"],"type":"object"}]},"JobReceipt":{"additionalProperties":false,"description":"Terminal binding to the exact immutable admitted execution","properties":{"chain_head":{"minLength":1,"type":"string"},"execution_id":{"minLength":1,"type":"string"},"job_id":{"format":"uuid","type":"string"},"origin":{"$ref":"#/components/schemas/JobOrigin"},"snapshot_digest":{"pattern":"^[0-9a-f]{64}$","type":"string"},"trace_id":{"minLength":1,"type":"string"}},"required":["job_id","execution_id","trace_id","snapshot_digest"],"type":"object"},"JobStatus":{"description":"queued and running: the resident owns the execution. interrupted: execution ownership was lost and effect settlement is unknown — an EVIDENCE state (the journal is INCOMPLETE), never a run state (ADR-129). paused, succeeded, failed and cancelled: the run's own settlement, the words its terminal frame carries (ADR-128).","enum":["queued","running","interrupted","paused","succeeded","failed","cancelled"],"type":"string"},"JobStatusOnly":{"additionalProperties":false,"description":"Status only. Redacted diagnosis lives on GET /v1/jobs/{id} and SSE, never here.","properties":{"status":{"$ref":"#/components/schemas/JobStatus"}},"required":["status"],"type":"object"},"RunSettlement":{"additionalProperties":false,"description":"The run's settlement (ADR-128), built once by the runtime and projected whole: the state word every door speaks, why, the elapsed time on the kernel clock, the task tally, the spend with its qualifier, the failure named. Unknown cost is never zero: `total_cost_usd` is absent when nothing was metered. Present on the terminal event and durable job response of a job whose runtime settled; absent when the resident lost the execution (interrupted) or refused it before any task. Reattachment and idempotent admission replay project the same hash-bound terminal event, never a new settlement.","properties":{"cause":{"enum":["normal","human_gate","task_failed","output_contract","budget","operator","refused"],"type":"string"},"elapsed_ms":{"minimum":0,"type":"integer"},"error":{"additionalProperties":false,"properties":{"code":{"type":"string"},"message":{"type":"string"},"task":{"description":"The task that failed · absent for a run-level cause","type":"string"}},"required":["code","message"],"type":"object"},"spend":{"additionalProperties":false,"properties":{"by_source":{"additionalProperties":{"type":"number"},"type":"object"},"priced_calls":{"minimum":0,"type":"integer"},"pricing_as_of":{"type":"string"},"qualifier":{"enum":["priced","partially_priced","unpriced","unmetered"],"type":"string"},"total_cost_usd":{"description":"Present only when at least one leaf metered real spend","minimum":0,"type":"number"},"unpriced_calls":{"minimum":0,"type":"integer"}},"required":["priced_calls","unpriced_calls","qualifier"],"type":"object"},"status":{"enum":["succeeded","failed","paused","cancelled"],"type":"string"},"tasks":{"additionalProperties":false,"properties":{"cancelled":{"minimum":0,"type":"integer"},"failed":{"minimum":0,"type":"integer"},"never_started":{"description":"Cancelled at the boundary without ever starting (counted in `cancelled` too)","minimum":0,"type":"integer"},"ok":{"description":"A recovered task IS a success (counted here too)","minimum":0,"type":"integer"},"recovered":{"minimum":0,"type":"integer"},"skipped":{"minimum":0,"type":"integer"},"total":{"minimum":0,"type":"integer"}},"required":["total","ok","failed","recovered","skipped","cancelled","never_started"],"type":"object"}},"required":["status","cause","spend"],"type":"object"},"ScheduleApply":{"additionalProperties":false,"properties":{"applied":{"const":true,"type":"boolean"},"changed":{"type":"boolean"},"status":{"$ref":"#/components/schemas/ScheduleStatus"}},"required":["applied","changed","status"],"type":"object"},"SchedulePut":{"additionalProperties":false,"properties":{"active":{"type":"boolean"},"afterSkip":{"enum":["next_slot","on_completion"],"type":"string"},"jitter":{"enum":["hash"],"type":"string"},"maxCostUsd":{"exclusiveMinimum":0,"type":"number"},"maxLatenessSeconds":{"minimum":0,"type":"integer"},"missed":{"enum":["catch-up","catch-up-once","skip"],"type":"string"},"overlap":{"enum":["skip","queue","replace"],"type":"string"},"pauseReason":{"maxLength":1024,"type":"string"},"pauseUntil":{"format":"date","type":"string"},"tolerance":{"type":"string"},"when":{"oneOf":[{"additionalProperties":false,"properties":{"at":{"format":"date-time","type":"string"},"kind":{"const":"once"}},"required":["kind","at"],"type":"object"},{"additionalProperties":false,"properties":{"expression":{"maxLength":4096,"type":"string"},"kind":{"const":"cadence"}},"required":["kind","expression"],"type":"object"}]},"workflow":{"maxLength":1024,"pattern":"^[^/].*\\.nika\\.yaml$","type":"string"}},"required":["workflow","when","maxCostUsd","missed"],"type":"object"},"ScheduleStatus":{"additionalProperties":true,"description":"Normalized definition, origin, distinct schedule revision, active/pause state, due verdict, bounded next slots with shift evidence, earliest wake hint, and last durable decision.","type":"object"},"SnapshotValidationAck":{"additionalProperties":false,"description":"Compact remote acknowledgement that the exact snapshot was revalidated. This is not the engine's public full check report; SDK callers retain the engine-owned report captured with the snapshot and return it only after this acknowledgement succeeds.","properties":{"root":{"minLength":1,"type":"string"},"snapshot_digest":{"pattern":"^[0-9a-f]{64}$","type":"string"},"status":{"const":"accepted","type":"string"},"units":{"minimum":1,"type":"integer"}},"required":["status","snapshot_digest","root","units"],"type":"object"},"TraceVerification":{"additionalProperties":false,"description":"Run-scoped typed verdict. Unavailable is an honest refusal: this server has no remote trace-journal authority and never scans or returns filesystem paths.","properties":{"reason":{"enum":["run_not_terminal","trace_journal_unavailable"],"type":"string"},"trace_id":{"minLength":1,"type":"string"},"verdict":{"enum":["unavailable"],"type":"string"}},"required":["verdict","reason"],"type":"object"},"WorkflowList":{"additionalProperties":false,"properties":{"workflows":{"items":{"minLength":1,"type":"string"},"type":"array"}},"required":["workflows"],"type":"object"},"WorkflowMetadata":{"additionalProperties":false,"properties":{"workflow":{"minLength":1,"type":"string"}},"required":["workflow"],"type":"object"}},"securitySchemes":{"bearerAuth":{"description":"Exactly one Authorization: Bearer value from the token file","scheme":"bearer","type":"http"}}},"info":{"description":"Authenticated loopback remote execution and declarative schedules. Artifacts, schedule list/delete/trigger/backfill, /v1/arm, and POST /v1/run are absent.","title":"nika serve","version":"0.118.7"},"openapi":"3.1.0","paths":{"/health":{"get":{"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Health"}}},"description":"Engine identity only"}},"security":[],"summary":"Public process liveness"}},"/v1/check":{"post":{"description":"Runs the same admission as POST /v1/jobs (ADR-131 · both forms) over the exact request body, and creates nothing.","requestBody":{"content":{"application/json":{"schema":{"oneOf":[{"$ref":"#/components/schemas/JobByName"},{"$ref":"#/components/schemas/ExecutionSnapshot"}]}}},"required":true},"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/SnapshotValidationAck"}}},"description":"Compact snapshot validation acknowledgement, not the full engine check report"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"},"408":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Request deadline"},"413":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Encoded body or decoded snapshot resource limit"},"415":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Content-Type or Content-Encoding refused"},"422":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Malformed, unsupported, tampered, or semantically refused snapshot"}},"summary":"Judge a workflow without creating a job — by served name, or as immutable snapshot bytes"}},"/v1/jobs":{"post":{"description":"Two forms, one admission (ADR-131). `{\"workflow\": \"<name>\"}` names a workflow the served registry lists: the resident captures its world through ExecutionService, exactly as a schedule does. A snapshot body is the world `nika check <file> --json --sdk-snapshot` prints, decoded and readmitted through the same ExecutionService; its digests are optional caller-supplied integrity digests (a content assertion, never a signature). The server never interprets a caller filesystem path. Idempotency binds to the exact request bytes.","parameters":[{"$ref":"#/components/parameters/IdempotencyKey"}],"requestBody":{"content":{"application/json":{"schema":{"oneOf":[{"$ref":"#/components/schemas/JobByName"},{"$ref":"#/components/schemas/ExecutionSnapshot"}]}}},"required":true},"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Job"}}},"description":"Idempotent replay"},"202":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Job"}}},"description":"Created"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Invalid idempotency key"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"},"408":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Request deadline"},"409":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Idempotency key already bound to another request"},"413":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Encoded body or decoded snapshot resource limit"},"415":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Content-Type or Content-Encoding refused"},"422":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Malformed, unsupported, tampered, or semantically refused snapshot"},"503":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Execution queue or durable store unavailable"},"507":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Durable job capacity exhausted"}},"summary":"Admit a workflow as a durable job — by served name, or as immutable snapshot bytes"}},"/v1/jobs/{id}":{"get":{"parameters":[{"in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Job"}}},"description":"Job"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"}},"summary":"Job identity and status"}},"/v1/jobs/{id}/cancel":{"post":{"description":"A queued job cancels atomically before execution claims it. An active job receives the run-scoped cancellation signal and returns 202 until its execution owner settles: the result may be success, failure or cancellation; expired grace means interrupted, never an invented cancellation. A paused or final observation returns its existing result unchanged.","parameters":[{"in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Job"}}},"description":"Cancelled before execution, or already ended observation"},"202":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Job"}}},"description":"Cancellation requested; execution has not yet settled"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"},"503":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"}},"summary":"Request cancellation or replay an ended observation"}},"/v1/jobs/{id}/events":{"get":{"parameters":[{"in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}},{"$ref":"#/components/parameters/LastEventId"}],"responses":{"200":{"content":{"text/event-stream":{"schema":{"type":"string"},"x-nika-event-schema":{"$ref":"#/components/schemas/JobEvent"}}},"description":"text/event-stream; sends bounded retry guidance and cursor-neutral heartbeat comments; Last-Event-ID replays only persisted events after that sequence; terminal data adds declared outputs and receipt when available; failures add redacted {code,message}"},"400":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"}},"summary":"Job event SSE"}},"/v1/jobs/{id}/status":{"get":{"parameters":[{"in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/JobStatusOnly"}}},"description":"Status"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"}},"summary":"Status only; diagnosis lives on GET /v1/jobs/{id} and SSE"}},"/v1/jobs/{id}/trace/verify":{"get":{"description":"Returns a typed honest refusal while no remote trace-journal authority exists. It never scans a trace directory or exposes a filesystem path.","parameters":[{"in":"path","name":"id","required":true,"schema":{"format":"uuid","type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/TraceVerification"}}},"description":"Typed trace verdict"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"}},"summary":"Return the run-scoped trace verification verdict"}},"/v1/openapi.json":{"get":{"responses":{"200":{"description":"OpenAPI 3.1"},"401":{"description":"Bearer required"}},"summary":"This document"}},"/v1/schedules/{id}":{"get":{"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ScheduleStatus"}}},"description":"Fresh planned status","headers":{"ETag":{"schema":{"type":"string"}}}},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"}},"summary":"Read one declarative resident schedule"},"parameters":[{"in":"path","name":"id","required":true,"schema":{"maxLength":255,"minLength":1,"type":"string"}}],"put":{"description":"Create requires If-None-Match: *. Update requires the exact ETag in If-Match. Identical lost-response retries are unchanged and retain the revision.","parameters":[{"$ref":"#/components/parameters/IfNoneMatch"},{"$ref":"#/components/parameters/IfMatch"}],"requestBody":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/SchedulePut"}}},"required":true},"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/ScheduleApply"}}},"description":"Applied or unchanged","headers":{"ETag":{"schema":{"type":"string"}}}},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"},"412":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"},"413":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"},"415":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"},"422":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"},"503":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"}},"summary":"Create or revision-conditionally update one resident schedule"}},"/v1/workflows":{"get":{"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/WorkflowList"}}},"description":"Project-relative .nika.yaml names under the served registry (--workflows)"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"}},"summary":"Contained workflow names"}},"/v1/workflows/{name}":{"get":{"parameters":[{"in":"path","name":"name","required":true,"schema":{"type":"string"}}],"responses":{"200":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/WorkflowMetadata"}}},"description":"Contained name"},"401":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"},"404":{"content":{"application/json":{"schema":{"$ref":"#/components/schemas/Error"}}},"description":"Error envelope"}},"summary":"Workflow metadata without source bytes"}}},"security":[{"bearerAuth":[]}],"servers":[{"url":"http://127.0.0.1"}]}
+{
+  "components": {
+    "parameters": {
+      "IdempotencyKey": {
+        "in": "header",
+        "name": "Idempotency-Key",
+        "required": true,
+        "schema": {
+          "maxLength": 255,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "IfMatch": {
+        "in": "header",
+        "name": "If-Match",
+        "required": false,
+        "schema": {
+          "maxLength": 96,
+          "type": "string"
+        }
+      },
+      "IfNoneMatch": {
+        "in": "header",
+        "name": "If-None-Match",
+        "required": false,
+        "schema": {
+          "const": "*",
+          "type": "string"
+        }
+      },
+      "LastEventId": {
+        "in": "header",
+        "name": "Last-Event-ID",
+        "required": false,
+        "schema": {
+          "pattern": "^(0|[1-9][0-9]*)$",
+          "type": "string"
+        }
+      }
+    },
+    "schemas": {
+      "CheckByName": {
+        "additionalProperties": false,
+        "description": "Source-only Check by served name. Required launch inputs may remain unsupplied; caller inputs are accepted only on POST /v1/jobs and are refused here. Check does not execute an access plan.",
+        "properties": {
+          "access": {
+            "description": "Access pin, same vocabulary as `--access` (class or harness id). A pin never silently substitutes a metered seat.",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "workflow": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow"
+        ],
+        "type": "object"
+      },
+      "CompileOutcome": {
+        "description": "The engine-owned machine document of one authoring result \u2014 the document `nika compile --json` prints, without the CLI-only `written`. No field grants authority, writes or executes source.",
+        "properties": {
+          "candidate": {
+            "description": "Ordinary `.nika` source; may still be incomplete",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "check_preview": {
+            "description": "The engine's pure Check report over the source only. No child file, skill, credential probe, access plan or admission was evaluated",
+            "properties": {
+              "report": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "scope": {
+                "const": "sourceOnly",
+                "type": "string"
+              }
+            },
+            "required": [
+              "scope",
+              "report"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "compile_version": {
+            "const": 1,
+            "type": "integer"
+          },
+          "diagnostics": {
+            "items": {
+              "properties": {
+                "kind": {
+                  "enum": [
+                    "applied",
+                    "missed",
+                    "unknown",
+                    "requiresHuman",
+                    "refused"
+                  ],
+                  "type": "string"
+                },
+                "message": {
+                  "description": "For a reader; never parsed to recover compiler state",
+                  "type": "string"
+                },
+                "target": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "target",
+                "message"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "provenance": {
+            "description": "Reproduction metadata; neither program identity nor run evidence",
+            "properties": {
+              "cognition": {
+                "const": "deterministicOnly",
+                "type": "string"
+              },
+              "compiler_version": {
+                "type": "string"
+              },
+              "skeleton": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "spec_pin": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "compiler_version",
+              "spec_pin",
+              "skeleton",
+              "cognition"
+            ],
+            "type": "object"
+          },
+          "questions": {
+            "items": {
+              "properties": {
+                "key": {
+                  "description": "Stable semantic hole path such as `const.request`, never a session id",
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "mandatory": {
+                  "description": "false: the value belongs to a binding outside the program (a schedule's timezone, missed-run and overlap policies, per-run ceiling) and never blocks a ready candidate",
+                  "type": "boolean"
+                },
+                "options": {
+                  "description": "Present on a choice question only: the admissible answers, keys spelled by the owning grammar",
+                  "items": {
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "label"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "type": {
+                  "description": "text: a JSON string \u00b7 literal: one JSON value \u00b7 choice: a JSON string that is the `key` of one of `options`",
+                  "enum": [
+                    "text",
+                    "literal",
+                    "choice"
+                  ],
+                  "type": "string"
+                },
+                "why": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "key",
+                "label",
+                "type",
+                "why",
+                "mandatory"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "requested_boundary": {
+            "additionalProperties": true,
+            "description": "The candidate's requested permits, derived by Check. Requested, never granted",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "requested_trigger": {
+            "additionalProperties": true,
+            "description": "The trigger the request names (kind \u00b7 source_hint \u00b7 event_hint \u00b7 cadence \u00b7 at \u00b7 payload_input \u00b7 status \u00b7 timezone \u00b7 missed \u00b7 overlap \u00b7 ceiling \u00b7 cron), stated beside the candidate whose bytes carry no cadence, host or event. A requirement the operator binds through the schedule contract, never a grant or a schedule row. timezone, missed, overlap and ceiling are the answered binding values (null until answered). cron is the exact five-field schedule projection when supported and fully specified, otherwise null; older engines omit it. It never supplies a missing time or timezone.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "Completeness of authoring, never permission to execute",
+            "enum": [
+              "ready",
+              "incomplete",
+              "refused"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "compile_version",
+          "status",
+          "candidate",
+          "questions",
+          "diagnostics",
+          "requested_boundary",
+          "requested_trigger",
+          "check_preview",
+          "provenance"
+        ],
+        "type": "object"
+      },
+      "CompileOutcomeV2": {
+        "description": "The same engine-owned machine document, generation 2: a provider call happened in this round and `provenance.authoring` is its receipt. A fresh round that needed no call (an exact skeleton, a structured constant, the support grammar) and every replay answer generation 1 (CompileOutcome). No field grants authority, writes or executes source.",
+        "properties": {
+          "candidate": {
+            "$ref": "#/components/schemas/CompileOutcome/properties/candidate"
+          },
+          "check_preview": {
+            "$ref": "#/components/schemas/CompileOutcome/properties/check_preview"
+          },
+          "compile_version": {
+            "const": 2,
+            "type": "integer"
+          },
+          "diagnostics": {
+            "$ref": "#/components/schemas/CompileOutcome/properties/diagnostics"
+          },
+          "provenance": {
+            "description": "Reproduction metadata; neither program identity nor run evidence",
+            "properties": {
+              "authoring": {
+                "additionalProperties": false,
+                "description": "Receipt of this round's provider calls; never workflow authority or run evidence",
+                "properties": {
+                  "backend": {
+                    "additionalProperties": true,
+                    "description": "Direct API receipt: provider and requested/observed model identities, request authority and usage completeness. Provider usage never proves an invoice. Additive fields may be absent on older servers.",
+                    "properties": {
+                      "authority": {
+                        "additionalProperties": true,
+                        "properties": {
+                          "configured": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "http_requests": {
+                            "additionalProperties": true,
+                            "properties": {
+                              "refused": {
+                                "minimum": 0,
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "sent": {
+                                "minimum": 0,
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "unknown": {
+                                "type": [
+                                  "string",
+                                  "null"
+                                ]
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "invocations": {
+                            "additionalProperties": true,
+                            "properties": {
+                              "refused": {
+                                "minimum": 0,
+                                "type": "integer"
+                              },
+                              "sent": {
+                                "minimum": 0,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "sent",
+                              "refused"
+                            ],
+                            "type": "object"
+                          },
+                          "max_calls": {
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "source": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "cost_basis": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string"
+                      },
+                      "observed_models": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "provider": {
+                        "type": "string"
+                      },
+                      "requested_model": {
+                        "type": "string"
+                      },
+                      "usage_complete": {
+                        "type": "boolean"
+                      }
+                    },
+                    "type": [
+                      "object",
+                      "null"
+                    ]
+                  },
+                  "calls": {
+                    "description": "LOGICAL calls of the round. Each provider retry or structured-output fallback also consumes the physical-request grant recorded in backend.authority.http_requests; one invocation can send more than one authorized request.",
+                    "minimum": 1,
+                    "type": "integer"
+                  },
+                  "context": {
+                    "description": "What each logical call received, in call order: its role, the sha256 of its instruction and answer schema, its message bytes",
+                    "items": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "elapsed_ms": {
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "input_tokens": {
+                    "description": "As the provider reported them; null when it reported none",
+                    "minimum": 0,
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "model": {
+                    "description": "The operator-seated authoring model (`provider/name`), never a caller's choice",
+                    "type": "string"
+                  },
+                  "output_tokens": {
+                    "description": "As the provider reported them; null when it reported none",
+                    "minimum": 0,
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  },
+                  "sampling": {
+                    "additionalProperties": true,
+                    "description": "Provider-default sampling: `temperature` and `seed` null, `effective` providerDefaultUnknown",
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "model",
+                  "calls",
+                  "input_tokens",
+                  "output_tokens",
+                  "elapsed_ms",
+                  "sampling",
+                  "context",
+                  "backend"
+                ],
+                "type": "object"
+              },
+              "cognition": {
+                "const": "explicitProvider",
+                "type": "string"
+              },
+              "compiler_version": {
+                "type": "string"
+              },
+              "decision": {
+                "additionalProperties": true,
+                "description": "Bounded decision records: the native round's references, rounds and knowledge identity (hashes and selection, no host path)",
+                "type": "object"
+              },
+              "plan": {
+                "additionalProperties": true,
+                "description": "The record the round produced. A caller never sends it back: the server keeps it behind Nika-Compile-Replay",
+                "type": "object"
+              },
+              "skeleton": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "spec_pin": {
+                "type": "string"
+              },
+              "strategy": {
+                "description": "The internal strategy that settled the request (`native` for a seat-written candidate)",
+                "type": "string"
+              },
+              "suggested_file": {
+                "description": "A file name for the candidate, never a path the compiler touched",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "compiler_version",
+              "spec_pin",
+              "skeleton",
+              "cognition",
+              "authoring"
+            ],
+            "type": "object"
+          },
+          "questions": {
+            "$ref": "#/components/schemas/CompileOutcome/properties/questions"
+          },
+          "requested_boundary": {
+            "$ref": "#/components/schemas/CompileOutcome/properties/requested_boundary"
+          },
+          "requested_trigger": {
+            "$ref": "#/components/schemas/CompileOutcome/properties/requested_trigger"
+          },
+          "status": {
+            "$ref": "#/components/schemas/CompileOutcome/properties/status"
+          }
+        },
+        "required": [
+          "compile_version",
+          "status",
+          "candidate",
+          "questions",
+          "diagnostics",
+          "requested_boundary",
+          "requested_trigger",
+          "check_preview",
+          "provenance"
+        ],
+        "type": "object"
+      },
+      "CompileRequest": {
+        "additionalProperties": false,
+        "description": "Generation 1 of the compile request. The encoded body is limited to 1048576 bytes (or the listener's lower ceiling). Byte bounds below are UTF-8 bytes. Unknown fields, a present null, duplicate keys (including inside `answers`) and positional arrays are refused. No field names a host path: an EDIT base travels inline in `source`.",
+        "properties": {
+          "answers": {
+            "additionalProperties": true,
+            "description": "Question key \u2192 one JSON literal with its type preserved, judged exactly as sent (at most 65536 bytes each)",
+            "maxProperties": 64,
+            "propertyNames": {
+              "maxLength": 256
+            },
+            "type": "object"
+          },
+          "change": {
+            "additionalProperties": false,
+            "maxProperties": 1,
+            "minProperties": 1,
+            "properties": {
+              "set_constant": {
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "description": "Bare constant name, not a path",
+                    "maxLength": 128,
+                    "type": "string"
+                  },
+                  "value": {
+                    "description": "One JSON literal, judged exactly as sent (at most 65536 bytes)"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value"
+                ],
+                "type": "object"
+              },
+              "text": {
+                "description": "`Set const.NAME to JSON_LITERAL`, or `Set const.NAME` answered through `answers`",
+                "maxLength": 4096,
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "cognition": {
+            "const": "deterministicOnly",
+            "description": "The only cognition generation 1 accepts: no authoring model is contacted. On this server the explicit provider opt-in is generation 2 (CompileRequestV2)",
+            "type": "string"
+          },
+          "compile_version": {
+            "const": 1,
+            "type": "integer"
+          },
+          "intent": {
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "mode": {
+            "description": "create requires `intent` and forbids `source`/`change`; edit requires `source` and `change` and forbids `intent`",
+            "enum": [
+              "create",
+              "edit"
+            ],
+            "type": "string"
+          },
+          "source": {
+            "description": "Accepted `.nika` source, inline. The caller owns source selection, revision checks and materialization",
+            "maxLength": 524288,
+            "type": "string"
+          },
+          "workflow_id": {
+            "description": "Names a created workflow. On edit the core refuses it as data: an edit cannot rename its accepted base",
+            "maxLength": 128,
+            "type": "string"
+          }
+        },
+        "required": [
+          "compile_version",
+          "mode"
+        ],
+        "type": "object"
+      },
+      "CompileRequestV2": {
+        "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "create"
+                }
+              },
+              "required": [
+                "mode"
+              ]
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "source"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "change"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "original_intent"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "intent"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "edit"
+                }
+              },
+              "required": [
+                "mode"
+              ]
+            },
+            "then": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "intent"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "workflow_id"
+                    ]
+                  }
+                ]
+              },
+              "required": [
+                "source",
+                "change"
+              ]
+            }
+          },
+          {
+            "else": {
+              "not": {
+                "required": [
+                  "replay_token"
+                ]
+              },
+              "properties": {
+                "answers": {
+                  "not": {
+                    "required": [
+                      "intent.clarification"
+                    ]
+                  }
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "cognition": {
+                  "const": "deterministicOnly"
+                }
+              },
+              "required": [
+                "cognition"
+              ]
+            },
+            "then": {
+              "not": {
+                "required": [
+                  "limits"
+                ]
+              },
+              "required": [
+                "replay_token"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "change": {
+                  "required": [
+                    "text"
+                  ]
+                }
+              },
+              "required": [
+                "change"
+              ]
+            },
+            "then": {
+              "required": [
+                "original_intent"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "change": {
+                  "required": [
+                    "set_constant"
+                  ]
+                }
+              },
+              "required": [
+                "change"
+              ]
+            },
+            "then": {
+              "not": {
+                "required": [
+                  "original_intent"
+                ]
+              }
+            }
+          }
+        ],
+        "description": "Generation 2 of the compile request, served only by a server whose operator seated native authoring (health `compileNativeV2`). Every generation-1 law holds: the encoded body is limited to 1048576 bytes (or the listener's lower ceiling), byte bounds are UTF-8 bytes, unknown fields, a present null, duplicate keys and positional arrays are refused. New to this generation: a literal (an `answers` value, `change.set_constant.value`) that repeats an object key at any depth, or nests 128 or more arrays/objects deep (the JSON parser's recursion ceiling), is refused. No field names a model, endpoint, credential, host path, snapshot, strategy or plan: those are the operator's, and the plan a round produced stays on the server behind its replay token. Numbers are JSON integer literals (a fraction or an exponent is refused).",
+        "properties": {
+          "answers": {
+            "$ref": "#/components/schemas/CompileRequest/properties/answers"
+          },
+          "change": {
+            "$ref": "#/components/schemas/CompileRequest/properties/change",
+            "description": "Edit only, exactly one of: `text`, a revision in any wording (not only a `Set const.NAME` sentence) that the round reads beside `original_intent`; or `set_constant`, one structured constant the core applies without a provider call"
+          },
+          "cognition": {
+            "description": "explicitProvider: one fresh round under the operator's seat (refuses `replay_token` and an `intent.clarification` answer) \u00b7 deterministicOnly: a zero-call replay of a round this server kept (requires `replay_token`, refuses `limits`): it repeats the round's exact input, its `answers` may answer the round's questions, and it never carries `intent.clarification` (409 compile_replay_input_changed)",
+            "enum": [
+              "explicitProvider",
+              "deterministicOnly"
+            ],
+            "type": "string"
+          },
+          "compile_version": {
+            "const": 2,
+            "type": "integer"
+          },
+          "intent": {
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "limits": {
+            "additionalProperties": false,
+            "description": "This request's narrowing of the operator's ceilings (explicitProvider only). Each value is optional and must be at most the operator's own ceiling, which is at most the maximum below; above \u2192 422 compile_limit, never clamped. Absent values take the operator's.",
+            "properties": {
+              "call_timeout_ms": {
+                "description": "The wait for one model invocation; the transport does not resend automatically",
+                "maximum": 600000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "deadline_ms": {
+                "description": "The whole round, absolute from admission",
+                "maximum": 3600000,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "max_calls": {
+                "description": "Physical HTTP requests and model invocations granted for this round, no more than the operator ceiling (default one). Repairs are preferences, not a grant.",
+                "maximum": 4294967295,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "max_tokens": {
+                "description": "Output tokens per logical call",
+                "maximum": 32768,
+                "minimum": 1,
+                "type": "integer"
+              },
+              "repairs": {
+                "description": "Repair preference within max_calls. An explicitly configured preference requiring more requests than granted is refused before dispatch.",
+                "maximum": 5,
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "mode": {
+            "description": "create requires `intent` and forbids `source`, `change` and `original_intent`; edit requires `source` and `change` and forbids `intent` and `workflow_id`",
+            "enum": [
+              "create",
+              "edit"
+            ],
+            "type": "string"
+          },
+          "original_intent": {
+            "description": "The request the base answered: required with `change.text` (the round reads the change beside the whole meaning), refused with `change.set_constant`",
+            "maxLength": 4096,
+            "type": "string"
+          },
+          "replay_token": {
+            "description": "The Nika-Compile-Replay header a fresh round of THIS server run answered (deterministicOnly only). Not an execution grant",
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "source": {
+            "description": "Accepted `.nika` source, inline (edit only)",
+            "maxLength": 524288,
+            "type": "string"
+          },
+          "workflow_id": {
+            "description": "Names a created workflow (create only)",
+            "maxLength": 128,
+            "type": "string"
+          }
+        },
+        "required": [
+          "compile_version",
+          "mode",
+          "cognition"
+        ],
+        "type": "object"
+      },
+      "Error": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "type": "object"
+      },
+      "ExecutionSnapshot": {
+        "additionalProperties": false,
+        "description": "Immutable byte-owned execution world \u2014 the body `nika check <file> --json --sdk-snapshot` prints (the engine is the one producer; a client never hashes). Unit bytes are canonical lowercase hexadecimal. `digest` and every unit `digest` are OPTIONAL caller-supplied integrity digests (canonical lowercase SHA-256 \u00b7 a content assertion, never a signature): absent, the resident computes them and the receipt carries the result; present, they must match the bytes or the request is refused as `snapshot_tampered`. The decoded unit aggregate is limited to 16 MiB and the complete encoded request to 33 MiB. This object is the request body itself, not a path-bearing wrapper.",
+        "properties": {
+          "digest": {
+            "description": "Optional caller-supplied integrity digest of the world (never a signature)",
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "format_version": {
+            "const": 1,
+            "type": "integer"
+          },
+          "root": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          },
+          "units": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "bytes_hex": {
+                  "pattern": "^(?:[0-9a-f]{2})*$",
+                  "type": "string"
+                },
+                "digest": {
+                  "description": "Optional caller-supplied integrity digest of the unit (never a signature)",
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                },
+                "kind": {
+                  "description": "0 root (the admitted workflow) \u00b7 1 child (a transitively invoked workflow) \u00b7 2 skill (an Agent Skill document) \u00b7 3 import (an opaque import the caller supplied)",
+                  "maximum": 3,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "path": {
+                  "maxLength": 4096,
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "path",
+                "kind",
+                "bytes_hex"
+              ],
+              "type": "object"
+            },
+            "maxItems": 256,
+            "type": "array"
+          }
+        },
+        "required": [
+          "format_version",
+          "root",
+          "units"
+        ],
+        "type": "object"
+      },
+      "Health": {
+        "additionalProperties": false,
+        "properties": {
+          "api_version": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "buildSha": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "build_sha": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "checkReportVersion": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "engineVersion": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "engine_version": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "eventFormatVersion": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "machineProtocolVersion": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "service": {
+            "const": "nika-serve",
+            "type": "string"
+          },
+          "snapshotFormatVersion": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "specSha": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "spec_sha": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "type": "string"
+          },
+          "storeFormatVersion": {
+            "additionalProperties": false,
+            "description": "Durable store formats this resident reads and writes; independent of the HTTP and event protocol versions.",
+            "properties": {
+              "jobs": {
+                "examples": [
+                  3
+                ],
+                "minimum": 1,
+                "type": "integer"
+              },
+              "schedules": {
+                "examples": [
+                  1
+                ],
+                "minimum": 1,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "jobs",
+              "schedules"
+            ],
+            "type": "object"
+          },
+          "supportedCapabilities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
+          "traceFormatVersion": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "service",
+          "engine_version",
+          "build_sha",
+          "spec_sha",
+          "api_version",
+          "engineVersion",
+          "buildSha",
+          "specSha",
+          "machineProtocolVersion",
+          "snapshotFormatVersion",
+          "checkReportVersion",
+          "eventFormatVersion",
+          "traceFormatVersion",
+          "storeFormatVersion",
+          "supportedCapabilities"
+        ],
+        "type": "object"
+      },
+      "Job": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/JournalEvidence"
+          },
+          "execution_id": {
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "outputs": {
+            "additionalProperties": true,
+            "description": "Declared workflow outputs; present only after settlement when supplied by the execution adapter",
+            "type": "object"
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/JobReceipt"
+          },
+          "settlement": {
+            "$ref": "#/components/schemas/RunSettlement"
+          },
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          },
+          "trace_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status"
+        ],
+        "type": "object"
+      },
+      "JobByName": {
+        "additionalProperties": false,
+        "description": "The by-name form (ADR-131): a workflow the served registry lists (GET /v1/workflows \u00b7 project-root-relative, `.nika`). The resident captures its world exactly as a schedule does \u2014 the one owner of the snapshot and its digest domain. Idempotency binds to these request bytes. Optional `access` is the same pin as CLI `--access` (a pin is a pin). Absent: the resident's unpinned plan. Snapshot bodies reject both access and inputs overlays, including null or empty maps. Optional inputs are literal JSON values checked against declared keys, types and required values before a job exists; strings are never CLI @env instructions or expressions.",
+        "properties": {
+          "access": {
+            "description": "Access pin, same vocabulary as `--access` (class or harness id). A pin never silently substitutes a metered seat.",
+            "maxLength": 64,
+            "minLength": 1,
+            "type": "string"
+          },
+          "inputs": {
+            "additionalProperties": true,
+            "description": "Literal JSON overrides for declared workflow inputs. Unknown keys, wrong types and missing required values refuse with 422; defaults remain authored. A present null is refused. Inputs bind exact request identity and survive durable queue recovery; workflow bytes are unchanged.",
+            "type": "object"
+          },
+          "workflow": {
+            "maxLength": 4096,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow"
+        ],
+        "type": "object"
+      },
+      "JobEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "description": "When the resident admitted the event (RFC 3339 \u00b7 UTC). Outside the event's hash chain; absent on an event written before the journal was dated.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/JournalEvidence"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "execution.queued",
+                  "execution.started",
+                  "execution.prepared",
+                  "execution.requeued",
+                  "execution.settled",
+                  "execution.cancelled",
+                  "execution.interrupted",
+                  "execution.refused",
+                  "execution.aborted_before_claim",
+                  "approval_decided"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The resident's event vocabulary: execution.<word> (queued \u00b7 started \u00b7 prepared \u00b7 requeued \u00b7 settled \u00b7 cancelled \u00b7 interrupted \u00b7 refused \u00b7 aborted_before_claim), plus the approval_decided frame the journal admits. Null on a payload that carries no kind."
+          },
+          "message": {
+            "type": "string"
+          },
+          "outputs": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "receipt": {
+            "$ref": "#/components/schemas/JobReceipt"
+          },
+          "sequence": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "settlement": {
+            "$ref": "#/components/schemas/RunSettlement"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "sequence",
+          "kind",
+          "status"
+        ],
+        "type": "object"
+      },
+      "JobOrigin": {
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "const": "manual",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "arm_generation": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "decision": {
+                "enum": [
+                  "scheduled",
+                  "catch_up"
+                ],
+                "type": "string"
+              },
+              "fired_at": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "kind": {
+                "const": "schedule",
+                "type": "string"
+              },
+              "schedule_id": {
+                "description": "Origin-local identifier, bounded to 255 UTF-8 bytes by the server",
+                "maxLength": 255,
+                "minLength": 1,
+                "type": "string"
+              },
+              "schedule_origin": {
+                "enum": [
+                  "project",
+                  "api"
+                ],
+                "type": "string"
+              },
+              "schedule_revision": {
+                "pattern": "^sha256:[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "scheduled_for": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "slot_id": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "schedule_origin",
+              "schedule_id",
+              "schedule_revision",
+              "slot_id",
+              "decision",
+              "scheduled_for",
+              "fired_at",
+              "arm_generation"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "JobReceipt": {
+        "additionalProperties": false,
+        "description": "Terminal binding to the exact immutable admitted execution",
+        "properties": {
+          "chain_head": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "execution_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "job_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "origin": {
+            "$ref": "#/components/schemas/JobOrigin"
+          },
+          "snapshot_digest": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "trace_id": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "execution_id",
+          "trace_id",
+          "snapshot_digest"
+        ],
+        "type": "object"
+      },
+      "JobStatus": {
+        "description": "queued and running: the resident owns the execution. interrupted: execution ownership was lost and effect settlement is unknown \u2014 an EVIDENCE state (the journal is INCOMPLETE), never a run state (ADR-129). paused, succeeded, failed and cancelled: the run's own settlement, the words its terminal frame carries (ADR-128).",
+        "enum": [
+          "queued",
+          "running",
+          "interrupted",
+          "paused",
+          "succeeded",
+          "failed",
+          "cancelled"
+        ],
+        "type": "string"
+      },
+      "JobStatusOnly": {
+        "additionalProperties": false,
+        "description": "Status only. Redacted diagnosis lives on GET /v1/jobs/{id} and SSE, never here.",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/JobStatus"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "JournalEvidence": {
+        "additionalProperties": false,
+        "description": "Reported journal delivery loss, independent of execution status. The reason classifies the mirror's first error without exposing OS text or paths. Absence is not a claim that a journal exists.",
+        "properties": {
+          "reason": {
+            "enum": [
+              "write_failed",
+              "record_refused"
+            ],
+            "type": "string"
+          },
+          "status": {
+            "const": "mirror_lost",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "RunSettlement": {
+        "additionalProperties": false,
+        "description": "The run's settlement (ADR-128), built once by the runtime and projected whole: the state word every door speaks, why, the elapsed time on the kernel clock, the task tally, the spend with its qualifier, the failure named. Unknown cost is never zero: `total_cost_usd` is absent when nothing was metered. Present on the terminal event and durable job response of a job whose runtime settled; absent when the resident lost the execution (interrupted) or refused it before any task. Reattachment and idempotent admission replay project the same hash-bound terminal event, never a new settlement.",
+        "properties": {
+          "cause": {
+            "enum": [
+              "normal",
+              "human_gate",
+              "task_failed",
+              "output_contract",
+              "budget",
+              "operator",
+              "refused"
+            ],
+            "type": "string"
+          },
+          "elapsed_ms": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "error": {
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "task": {
+                "description": "The task that failed \u00b7 absent for a run-level cause",
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "type": "object"
+          },
+          "spend": {
+            "additionalProperties": false,
+            "properties": {
+              "by_source": {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              "priced_calls": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "pricing_as_of": {
+                "type": "string"
+              },
+              "qualifier": {
+                "enum": [
+                  "priced",
+                  "partially_priced",
+                  "unpriced",
+                  "unmetered"
+                ],
+                "type": "string"
+              },
+              "total_cost_usd": {
+                "description": "Present only when at least one leaf metered real spend",
+                "minimum": 0,
+                "type": "number"
+              },
+              "unpriced_calls": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "priced_calls",
+              "unpriced_calls",
+              "qualifier"
+            ],
+            "type": "object"
+          },
+          "status": {
+            "enum": [
+              "succeeded",
+              "failed",
+              "paused",
+              "cancelled"
+            ],
+            "type": "string"
+          },
+          "tasks": {
+            "additionalProperties": false,
+            "properties": {
+              "cancelled": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "failed": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "never_started": {
+                "description": "Cancelled at the boundary without ever starting (counted in `cancelled` too)",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "ok": {
+                "description": "A recovered task IS a success (counted here too)",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "recovered": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "skipped": {
+                "minimum": 0,
+                "type": "integer"
+              },
+              "total": {
+                "minimum": 0,
+                "type": "integer"
+              }
+            },
+            "required": [
+              "total",
+              "ok",
+              "failed",
+              "recovered",
+              "skipped",
+              "cancelled",
+              "never_started"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "status",
+          "cause",
+          "spend"
+        ],
+        "type": "object"
+      },
+      "ScheduleApply": {
+        "additionalProperties": false,
+        "properties": {
+          "applied": {
+            "const": true,
+            "type": "boolean"
+          },
+          "changed": {
+            "type": "boolean"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ScheduleStatus"
+          }
+        },
+        "required": [
+          "applied",
+          "changed",
+          "status"
+        ],
+        "type": "object"
+      },
+      "SchedulePut": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "afterSkip": {
+            "enum": [
+              "next_slot",
+              "on_completion"
+            ],
+            "type": "string"
+          },
+          "inputs": {
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "description": "Per-fire inputs bound on every resident fire (#1370): one scalar per key the workflow declares under `inputs:`, coerced by the declared type exactly as the CLI `--var` edge does, then judged by the same literal admission validator as POST /v1/jobs. Unknown keys, values the declared type refuses, missing required inputs and the `@env:` channel are refused at PUT and again at fire.",
+            "type": "object"
+          },
+          "jitter": {
+            "enum": [
+              "hash"
+            ],
+            "type": "string"
+          },
+          "maxCostUsd": {
+            "exclusiveMinimum": 0,
+            "type": "number"
+          },
+          "maxLatenessSeconds": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "missed": {
+            "enum": [
+              "catch-up",
+              "catch-up-once",
+              "skip"
+            ],
+            "type": "string"
+          },
+          "overlap": {
+            "enum": [
+              "skip",
+              "queue",
+              "replace"
+            ],
+            "type": "string"
+          },
+          "pauseReason": {
+            "maxLength": 1024,
+            "type": "string"
+          },
+          "pauseUntil": {
+            "format": "date",
+            "type": "string"
+          },
+          "tolerance": {
+            "type": "string"
+          },
+          "when": {
+            "oneOf": [
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "once"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "at"
+                ],
+                "type": "object"
+              },
+              {
+                "additionalProperties": false,
+                "properties": {
+                  "expression": {
+                    "maxLength": 4096,
+                    "type": "string"
+                  },
+                  "kind": {
+                    "const": "cadence"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "expression"
+                ],
+                "type": "object"
+              }
+            ]
+          },
+          "workflow": {
+            "maxLength": 1024,
+            "pattern": "^[^/].*\\.nika$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow",
+          "when",
+          "maxCostUsd",
+          "missed"
+        ],
+        "type": "object"
+      },
+      "ScheduleStatus": {
+        "additionalProperties": true,
+        "description": "Normalized definition, origin, distinct schedule revision, active/pause state, due verdict, bounded next slots with shift evidence, earliest wake hint, and last durable decision.",
+        "type": "object"
+      },
+      "SnapshotValidationAck": {
+        "additionalProperties": false,
+        "description": "Compact remote acknowledgement that the exact snapshot was revalidated. This is not the engine's public full check report; SDK callers retain the engine-owned report captured with the snapshot and return it only after this acknowledgement succeeds.",
+        "properties": {
+          "root": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "snapshot_digest": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "status": {
+            "const": "accepted",
+            "type": "string"
+          },
+          "units": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "status",
+          "snapshot_digest",
+          "root",
+          "units"
+        ],
+        "type": "object"
+      },
+      "TraceVerification": {
+        "additionalProperties": false,
+        "description": "Run-scoped verdict on the journal the resident wrote for the job, through the ONE verifier `nika trace verify --json` runs. `verdict` is the CLI's headline word: the attained tier (ok \u00b7 sealed \u00b7 anchored \u00b7 replayed), incomplete for a journal with no terminal frame (the writer's liveness rides `reason`), tampered for a buried seal, broken for an edited chain, and the CLI's refusal classes; `unavailable` only when no journal exists for the job (refused before its first event \u00b7 queued \u00b7 a backend keeping none). `reason` is the machine class beside it (the seal tier under a ladder verdict). The CLI's own document rides verbatim (exit \u00b7 chain \u00b7 seal \u00b7 anchor \u00b7 replay \u00b7 lines); a filesystem path is never returned.",
+        "properties": {
+          "anchor": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "chain": {
+            "additionalProperties": true,
+            "description": "events \u00b7 head \u00b7 headline (intact \u00b7 torn \u00b7 incomplete) \u00b7 liveness (alive \u00b7 dead \u00b7 unknown \u00b7 null)",
+            "type": "object"
+          },
+          "exit": {
+            "description": "The CLI's exit class: 0 the reported tier holds \u00b7 2 a forged or edited journal \u00b7 3 the environment (unchained \u00b7 unreadable \u00b7 a missing input) \u00b7 5 incomplete lifecycle evidence",
+            "enum": [
+              0,
+              2,
+              3,
+              5
+            ],
+            "type": "integer"
+          },
+          "lines": {
+            "description": "The CLI's ladder lines, the journal path replaced by <journal>",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "reason": {
+            "enum": [
+              "run_not_terminal",
+              "trace_journal_unavailable",
+              "sealed",
+              "unsealed",
+              "forged",
+              "buried",
+              "unattributable",
+              "writer_alive",
+              "writer_dead",
+              "writer_unknown",
+              "buried_seal",
+              "broken",
+              "unchained",
+              "empty",
+              "unreadable",
+              "refused",
+              "line_over_long",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "replay": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "seal": {
+            "additionalProperties": true,
+            "description": "tier (unsealed \u00b7 sealed \u00b7 forged \u00b7 buried \u00b7 unattributable) and the tier's facts",
+            "type": "object"
+          },
+          "trace_id": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "verdict": {
+            "enum": [
+              "unavailable",
+              "ok",
+              "sealed",
+              "anchored",
+              "replayed",
+              "incomplete",
+              "tampered",
+              "broken",
+              "unchained",
+              "empty",
+              "unreadable",
+              "refused",
+              "line-over-long",
+              "unknown"
+            ],
+            "type": "string"
+          },
+          "verify_version": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "verdict",
+          "reason"
+        ],
+        "type": "object"
+      },
+      "WorkflowList": {
+        "additionalProperties": false,
+        "properties": {
+          "workflows": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "workflows"
+        ],
+        "type": "object"
+      },
+      "WorkflowMetadata": {
+        "additionalProperties": false,
+        "properties": {
+          "workflow": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow"
+        ],
+        "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "description": "Exactly one Authorization: Bearer value from the token file",
+        "scheme": "bearer",
+        "type": "http"
+      }
+    }
+  },
+  "info": {
+    "description": "Authenticated loopback remote execution, declarative schedules and stateless source-only authoring (POST /v1/compile never runs, admits or writes). This server's operator seated native authoring: POST /v1/compile also speaks compile_version 2 (health capability `compileNativeV2`). Artifacts, schedule list/delete/trigger/backfill, /v1/arm, and POST /v1/run are absent.",
+    "title": "nika serve",
+    "version": "0.121.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": "Engine identity only"
+          }
+        },
+        "security": [],
+        "summary": "Public process liveness"
+      }
+    },
+    "/v1/check": {
+      "post": {
+        "description": "Runs the same admission as POST /v1/jobs (ADR-131 \u00b7 both forms) over the exact request body, and creates nothing.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CheckByName"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecutionSnapshot"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotValidationAck"
+                }
+              }
+            },
+            "description": "Compact snapshot validation acknowledgement, not the full engine check report"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Request deadline"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Encoded body or decoded snapshot resource limit"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Content-Type or Content-Encoding refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Malformed, unsupported, tampered, or semantically refused snapshot"
+          }
+        },
+        "summary": "Judge a workflow without creating a job \u2014 by served name, or as immutable snapshot bytes"
+      }
+    },
+    "/v1/compile": {
+      "post": {
+        "description": "The HTTP transport of the same Compile core as `nika compile`. Generation 1 (CompileRequest) is the foundation door, exactly as on a default server: deterministic, no provider contacted. Generation 2 (CompileRequestV2) exists only because this server's operator seated ONE native authoring model when building it (advertised by the `compileNativeV2` health capability). `cognition: explicitProvider` opts in to one fresh round under that seat: the operator chose the model, its credential, its endpoint, the knowledge snapshot and the ceilings; a request names none of them and may only narrow the ceilings through `limits` (above one \u2192 422 compile_limit, never clamped). A round permits one physical request by default. The operator can explicitly grant max_calls and a caller may only narrow that ceiling through limits.max_calls. Invocations and physical requests are counted separately in backend.authority, including refusals; no redirect is followed, and provider retries or structured-output fallbacks consume the same physical-request grant. Repairs describe desired work, never permission to send more requests. Requested and provider-reported model identities are recorded separately; token usage is not an invoice. Its deadline is absolute from admission: a round that must already stop never begins, and nothing it produces after it is answered or kept. A fresh round that leaves a native plan the server keeps (its input and plan within 2097152 bytes) answers the header Nika-Compile-Replay; `cognition: deterministicOnly` with that token and the round's exact input replays it with zero calls for as long as this server run keeps it (never renewed, forgotten on restart). A lost first answer leaves no token and a new fresh round spends again: there is no idempotency key and nothing retries. Version negotiation: a server without the capability answers compile_version 2 with 422 compile_version_unsupported; the answer's compile_version is 2 exactly when a provider call happened. Creates no job, run, approval, trace, file or permission. `check_preview` is a REVIEW of the source only: POST /v1/jobs judges a candidate again. A document carrying the seat's own credential is refused whole (500 compile_disclosure_refused).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/CompileRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/CompileRequestV2"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/CompileOutcome"
+                    },
+                    {
+                      "$ref": "#/components/schemas/CompileOutcomeV2"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Authoring outcome \u2014 ready, incomplete and refused are all data. compile_version 2 (CompileOutcomeV2) exactly when a provider call happened; every other answer, replays included, is generation 1 (CompileOutcome)",
+            "headers": {
+              "Cache-Control": {
+                "description": "no-store on every answer to a generation-2 request, fresh round or replay, whatever its compile_version",
+                "schema": {
+                  "const": "no-store",
+                  "type": "string"
+                }
+              },
+              "Nika-Compile-Replay": {
+                "description": "Only on a fresh generation-2 round that left a native plan this server run keeps (its input and plan within 2097152 bytes; a larger round answers the same document without a token): the opaque token of that round (256 random bits, 64 lowercase hex). Present it with cognition deterministicOnly and the round's exact input; it expires on the server's clock, is never renewed, is forgotten on restart and is never reflected in a refusal. Not an execution grant and not a deduplication of paid work",
+                "schema": {
+                  "pattern": "^[0-9a-f]{64}$",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "request_timeout \u2014 the request deadline (body intake, generation 1, replays) \u00b7 compile_deadline_exceeded \u2014 a fresh round's absolute deadline passed: its work stopped or never began, nothing was kept, and a provider call in flight may still be billed"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "compile_replay_unavailable \u2014 this server run keeps no round under that token (unknown, expired, another run) \u00b7 compile_replay_input_changed \u2014 a replay repeats its round's exact input and never replaces the intent \u00b7 compile_context_changed \u2014 the pinned knowledge snapshot no longer reads as pinned; nothing was sent"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Encoded body above the compile ceiling"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Content-Type or Content-Encoding refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "malformed_compile_request \u00b7 compile_version_unsupported \u00b7 compile_mode_unsupported \u00b7 compile_cognition_unsupported \u00b7 compile_limit \u00b7 compile_new_intent_required \u2014 an intent.clarification on a fresh generation-2 round: send the replacement as a new intent"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "internal_error \u2014 compiler machinery failure, nothing is echoed \u00b7 compile_disclosure_refused \u2014 the outcome would carry a withheld credential and is refused whole"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "compile_busy \u2014 every compile slot is in use \u00b7 compile_replay_capacity \u2014 every kept answer round is in use; nothing was authored or spent \u00b7 stopping \u2014 the server is stopping; the round stopped and nothing was kept"
+          }
+        },
+        "summary": "Author a candidate workflow without running it (stateless \u00b7 source-only)"
+      }
+    },
+    "/v1/jobs": {
+      "post": {
+        "description": "Two forms, one admission (ADR-131). `{\"workflow\": \"<name>\"}` names a workflow the served registry lists: the resident captures its world through ExecutionService, exactly as a schedule does. Optional `access` on that form is CLI `--access` for this job only. A snapshot body is the world `nika check <file> --json --sdk-snapshot` prints, decoded and readmitted through the same ExecutionService; its digests are optional caller-supplied integrity digests (a content assertion, never a signature). Snapshot jobs inherit the resident's unpinned plan. The server never interprets a caller filesystem path. Idempotency binds to the exact request bytes.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/JobByName"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExecutionSnapshot"
+                  }
+                ]
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Idempotent replay"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Created"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Invalid idempotency key"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Request deadline"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Idempotency key already bound to another request"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Encoded body or decoded snapshot resource limit"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Content-Type or Content-Encoding refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Malformed, unsupported, tampered, or semantically refused snapshot"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Execution queue or durable store unavailable"
+          },
+          "507": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Durable job capacity exhausted"
+          }
+        },
+        "summary": "Admit a workflow as a durable job \u2014 by served name, or as immutable snapshot bytes"
+      }
+    },
+    "/v1/jobs/{id}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Job"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          }
+        },
+        "summary": "Job identity and status"
+      }
+    },
+    "/v1/jobs/{id}/cancel": {
+      "post": {
+        "description": "A queued job cancels atomically before execution claims it. An active job receives the run-scoped cancellation signal and returns 202 until its execution owner settles: the result may be success, failure or cancellation; expired grace means interrupted, never an invented cancellation. A paused or final observation returns its existing result unchanged.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Cancelled before execution, or already ended observation"
+          },
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            },
+            "description": "Cancellation requested; execution has not yet settled"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          }
+        },
+        "summary": "Request cancellation or replay an ended observation"
+      }
+    },
+    "/v1/jobs/{id}/events": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/LastEventId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "x-nika-event-schema": {
+                  "$ref": "#/components/schemas/JobEvent"
+                }
+              }
+            },
+            "description": "text/event-stream; sends bounded retry guidance and cursor-neutral heartbeat comments; Last-Event-ID replays only persisted events after that sequence; terminal data adds declared outputs and receipt when available; failures add redacted {code,message}"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          }
+        },
+        "summary": "Job event SSE"
+      }
+    },
+    "/v1/jobs/{id}/status": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatusOnly"
+                }
+              }
+            },
+            "description": "Status"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          }
+        },
+        "summary": "Status only; diagnosis lives on GET /v1/jobs/{id} and SSE"
+      }
+    },
+    "/v1/jobs/{id}/trace/verify": {
+      "get": {
+        "description": "Locates the journal the resident wrote for this job under the project it serves (by the job's execution and trace identity) and verifies it through the same verifier `nika trace verify` runs; the vocabulary is the CLI's. `unavailable` is the honest refusal when no journal exists. The response never exposes a filesystem path.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TraceVerification"
+                }
+              }
+            },
+            "description": "Typed trace verdict"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          }
+        },
+        "summary": "Verify the job's trace journal"
+      }
+    },
+    "/v1/openapi.json": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.1"
+          },
+          "401": {
+            "description": "Bearer required"
+          }
+        },
+        "summary": "This document"
+      }
+    },
+    "/v1/schedules/{id}": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleStatus"
+                }
+              }
+            },
+            "description": "Fresh planned status",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          }
+        },
+        "summary": "Read one declarative resident schedule"
+      },
+      "parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+          "schema": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          }
+        }
+      ],
+      "put": {
+        "description": "Create requires If-None-Match: *. Update requires the exact ETag in If-Match. Identical lost-response retries are unchanged and retain the revision.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IfNoneMatch"
+          },
+          {
+            "$ref": "#/components/parameters/IfMatch"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SchedulePut"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleApply"
+                }
+              }
+            },
+            "description": "Applied or unchanged",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "412": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          }
+        },
+        "summary": "Create or revision-conditionally update one resident schedule"
+      }
+    },
+    "/v1/workflows": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowList"
+                }
+              }
+            },
+            "description": "Project-relative .nika names under the served registry (--workflows)"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          }
+        },
+        "summary": "Contained workflow names"
+      }
+    },
+    "/v1/workflows/{name}": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowMetadata"
+                }
+              }
+            },
+            "description": "Contained name"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "Error envelope"
+          }
+        },
+        "summary": "Workflow metadata without source bytes"
+      }
+    }
+  },
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "servers": [
+    {
+      "url": "http://127.0.0.1"
+    }
+  ]
+}

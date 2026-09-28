@@ -13,6 +13,7 @@ Any other non-2xx body is discarded and reported as a redacted
 |---|---|---|
 | `GET /health` | internal identity handshake | public liveness and protocol versions |
 | `GET /v1/openapi.json` | generation only | authenticated OpenAPI 3.1 document |
+| `POST /v1/compile` | `compile()` | source-only authoring, explicit native opt-in and zero-call replay |
 | `GET /v1/workflows` | `listWorkflows()` | contained relative workflow names |
 | `GET /v1/workflows/{name}` | `workflow(name)` | path-free metadata, never source bytes |
 | `POST /v1/check` | `check()` | validates a served name or immutable snapshot bytes without a job |
@@ -40,10 +41,36 @@ Any other non-2xx body is discarded and reported as a redacted
   paths. Absolute paths, backslashes, empty segments, `.` and `..` are
   rejected before network I/O.
 
-A contained `.nika.yaml` name uses the resident registry without a local
+A contained `.nika` or legacy `.nika.yaml` name uses the resident registry without a local
 engine. Prefix a local file with `./` to capture and submit its snapshot.
 A successful by-name check returns `clean: true` and the compact resident
 acknowledgement; no local check report or exit code is fabricated.
+
+## Authoring
+
+`compile(request, { signal? })` sends the engine-owned generation-1 or
+generation-2 request unchanged. Its types come from the checked-in live
+OpenAPI contract. The SDK checks the advertised capability before the POST,
+never resolves a local engine, refuses redirects, and sends the POST once.
+A timeout or lost response may have spent the authorized model request;
+there is no automatic retry or fabricated idempotency key.
+
+The result is `{ outcome, replayToken? }`. `ready`, `incomplete`, and
+`refused` are authoring outcomes. HTTP refusals remain typed operation
+errors. A candidate and `check_preview` are review material: compiling does
+not create a job, execute effects, save source or bind a schedule.
+
+If the server returns a kept-round token, a caller can explicitly replay
+generation 2 with `cognition: 'deterministicOnly'`, `replay_token`, the exact
+original input and its answers. It must omit `limits`. Replay makes no
+model call, expires with the server's bounded store, and can fail after a
+restart. The SDK neither stores the token globally nor replays implicitly.
+
+`requestTimeout` and `machineBufferBytes` still bound the response; callers
+can configure larger bounds for long authoring rounds. Direct native-process
+authoring returns a capability error instead of introducing a subprocess
+fallback. Cost-decision and reconciliation APIs are still separate work;
+this authoring method does not claim the complete V9 consumer contract.
 
 ## Settlement
 
@@ -56,6 +83,14 @@ know, and never derives a settlement from an exit code; a job the resident
 lost (`interrupted`) carries none.
 
 ## SSE recovery
+
+An event may carry the resident's `at` timestamp and typed journal
+`evidence`. The timestamp is observation metadata outside the trace hash.
+`evidence: { status: 'mirror_lost', reason: 'write_failed' | 'record_refused' }`
+reports journal loss independently of execution success. The SDK preserves
+it on events and on `run.done`, including durable reattachment; its absence
+does not certify a sealed trace. Use `traceVerify()` for the engine's verdict.
+Unknown projection fields and malformed evidence are still refused.
 
 The client checks that SSE ids are canonical positive integers and equal
 `data.sequence`. An identical duplicate is ignored. A conflicting duplicate,

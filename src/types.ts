@@ -1,3 +1,21 @@
+import type { components } from './generated/openapi.js';
+
+/** Exact engine-owned authoring request; explicitProvider is an explicit caller opt-in. */
+export type NikaCompileRequest = components['schemas']['CompileRequest'] | components['schemas']['CompileRequestV2'];
+/** Authoring completeness is review material, never execution or schedule authority. */
+export type NikaCompileOutcome = components['schemas']['CompileOutcome'] | components['schemas']['CompileOutcomeV2'];
+/** Journal delivery loss, independent of execution success; absence proves no seal. */
+export type NikaJournalEvidence = components['schemas']['JournalEvidence'];
+export interface NikaCompileOptions {
+  /** Stops this request. A lost answer is never automatically retried. */
+  signal?: AbortSignal;
+}
+export interface NikaCompileResult {
+  outcome: NikaCompileOutcome;
+  /** Opaque kept-round token; valid only with this server and the exact original input. */
+  replayToken?: string;
+}
+
 interface NikaSharedConfig {
   /** Bound for each event subscriber. Default: 256 events. */
   eventBufferSize?: number;
@@ -82,6 +100,9 @@ export interface NikaCheckResult {
 
 /** Fields every engine event can carry, whether its kind is known or not. */
 interface NikaEventFields {
+  /** Resident event time, outside the event hash chain. */
+  at?: string;
+  evidence?: NikaJournalEvidence;
   status?: NikaRunStatus;
   sequence?: number;
   receipt?: NikaReceipt;
@@ -340,6 +361,7 @@ export interface NikaRunResult<
   exitCode?: number;
   outputs?: Outputs;
   receipt?: NikaReceipt;
+  evidence?: NikaJournalEvidence;
   error?: NikaMachineError;
   /** Engine execution identity, when the transport surface reports one. */
   execution_id?: NikaExecutionId;
@@ -447,6 +469,7 @@ export interface NikaTraceVerifyOptions {
 
 /** The SDK operations whose engine refusal can be returned as a typed error. */
 export type NikaOperation =
+  | 'compile'
   | 'check'
   | 'run'
   | 'attachRun'

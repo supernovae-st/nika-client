@@ -8,6 +8,9 @@ import { NikaEngineUnavailable, resolveNikaEngine } from './lib/binary/index.js'
 import { RunSession } from './lib/run-session.js';
 import type { Transport } from './lib/transport.js';
 import type {
+  NikaCompileRequest,
+  NikaCompileOptions,
+  NikaCompileResult,
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckOptions,
@@ -93,6 +96,11 @@ export class Nika {
       });
     }
     this.transportKind = this.transport.kind;
+  }
+
+  /** Compile through a resident HTTP authority, without saving, running, or automatic retries. */
+  compile(request: NikaCompileRequest, options: NikaCompileOptions = {}): Promise<NikaCompileResult> {
+    return this.transport.compile(request, options);
   }
 
   check(workflow: string, options: NikaCheckOptions = {}): Promise<NikaCheckResult> {
@@ -290,6 +298,11 @@ export {
 } from './events.js';
 
 export type {
+  NikaJournalEvidence,
+  NikaCompileRequest,
+  NikaCompileOutcome,
+  NikaCompileOptions,
+  NikaCompileResult,
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckOptions,

@@ -7,6 +7,10 @@ import {
   NikaTransportError,
 } from '../errors.js';
 import type {
+  NikaCompileRequest,
+  NikaCompileOptions,
+  NikaCompileResult,
+  NikaJournalEvidence,
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckOptions,
@@ -36,6 +40,7 @@ import {
 } from './engine-identity.js';
 import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
 import { readSettlement } from './settlement.js';
+import { readCompileOutcome } from './compile.js';
 import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
 import type { Transport, TransportRun } from './transport.js';
 
@@ -86,6 +91,7 @@ interface DurableJob {
   receipt?: NikaReceipt;
   error?: { code: string; message: string };
   settlement?: NikaSettlement;
+  evidence?: NikaJournalEvidence;
 }
 
 interface RetryObservation {
@@ -140,6 +146,38 @@ export class HttpTransport implements Transport {
   private remoteIdentity?: NikaEngineIdentity;
 
   constructor(private readonly options: HttpTransportOptions) {}
+
+  async compile(request: NikaCompileRequest, options: NikaCompileOptions): Promise<NikaCompileResult> {
+    options.signal?.throwIfAborted();
+    await this.ensureServerIdentity();
+    options.signal?.throwIfAborted();
+    const capability = request.compile_version === 2 ? 'compileNativeV2' : 'compile';
+    if (!this.remoteIdentity?.supportedCapabilities.includes(capability)) {
+      throw this.gap(capability, 'The connected server did not advertise this authoring contract');
+    }
+    const path = '/v1/compile';
+    // A redirect or retry can spend again; only the caller can authorize a new round.
+    const response = await this.fetchResponse(path, {
+      method: 'POST', body: JSON.stringify(request), signal: options.signal,
+      headers: { 'Content-Type': 'application/json' }, redirect: 'error',
+    }, true, true, false);
+    if (response.status !== 200) {
+      const refusal = await this.readRefusal(response, path);
+      if (refusal) throw this.refused(path, { operation: 'compile', status: response.status, refusal });
+      throw new NikaTransportError(this.kind, `HTTP ${response.status} for ${path}: [REDACTED]`);
+    }
+    if (response.headers.get('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json') {
+      await discardResponse(response);
+      throw new NikaProtocolError(this.kind, 'HTTP compile returned an invalid content-type');
+    }
+    const replayToken = response.headers.get('Nika-Compile-Replay');
+    if (replayToken !== null && !/^[a-f0-9]{64}$/.test(replayToken)) {
+      await discardResponse(response);
+      throw new NikaProtocolError(this.kind, 'HTTP compile returned an invalid replay token');
+    }
+    const outcome = readCompileOutcome(await this.readObservationObject(response, path, options.signal));
+    return { outcome, ...(replayToken === null ? {} : { replayToken }) };
+  }
 
   async check(workflow: string, options: NikaCheckOptions): Promise<NikaCheckResult> {
     if (options.model !== undefined || options.nativeStrict === true) {
@@ -431,6 +469,7 @@ export class HttpTransport implements Transport {
       // job's own error is the same failure without it.
       const error = event ? eventError(event) : durable?.settlement?.error ?? durable?.error;
       const settlement = event ? eventSettlement(event, this.kind) : durable?.settlement;
+      const evidence = event?.evidence ?? durable?.evidence;
       resolveDone({
         id,
         status: source.status!,
@@ -441,6 +480,7 @@ export class HttpTransport implements Transport {
         ...(receipt ? { receipt } : {}),
         ...(error ? { error } : {}),
         ...(settlement ? { settlement } : {}),
+        ...(evidence ? { evidence } : {}),
       });
     };
     if (attachedState && isObservationEnded(attachedState)) settle(attachedState);
@@ -670,6 +710,7 @@ export class HttpTransport implements Transport {
     // terminal frame (engine 0.118 · ADR-128).
     const allowed = new Set([
       'sequence', 'kind', 'status', 'code', 'message', 'outputs', 'receipt', 'settlement',
+      'at', 'evidence',
     ]);
     if (Object.keys(event).some((key) => !allowed.has(key))) {
       throw new NikaProtocolError(this.kind, 'SSE data contained fields outside the public projection');
@@ -680,6 +721,12 @@ export class HttpTransport implements Transport {
         `SSE id ${id} did not equal JSON data.sequence`,
       );
     }
+    if (event.at !== undefined && (typeof event.at !== 'string'
+      || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(event.at)
+      || !Number.isFinite(Date.parse(event.at)))) {
+      throw new NikaProtocolError(this.kind, 'SSE event time was not an RFC 3339 timestamp');
+    }
+    if (event.evidence !== undefined) readJournalEvidence(event.evidence);
     if (!Object.hasOwn(event, 'kind') || (event.kind !== null && typeof event.kind !== 'string')) {
       throw new NikaProtocolError(this.kind, 'SSE data.kind was not a string or null');
     }
@@ -1368,7 +1415,7 @@ function workflowPath(name: string): string {
 }
 
 function isContainedWorkflowName(value: unknown): value is string {
-  if (typeof value !== 'string' || !value.endsWith('.nika.yaml')) return false;
+  if (typeof value !== 'string' || !(value.endsWith('.nika') || value.endsWith('.nika.yaml'))) return false;
   try {
     workflowPath(value);
     return true;
@@ -1541,6 +1588,7 @@ function durableJob(
   // included (engine 0.118 · ADR-128).
   const allowed = new Set([
     'id', 'status', 'execution_id', 'trace_id', 'outputs', 'receipt', 'error', 'settlement',
+    'evidence',
   ]);
   if (Object.keys(value).some((key) => !allowed.has(key))) {
     throw new NikaProtocolError(transport, 'Durable job response contained unknown fields');
@@ -1571,6 +1619,7 @@ function durableJob(
   const settlement = value.settlement === undefined
     ? undefined
     : readSettlement(value.settlement, transport, value.status);
+  const evidence = value.evidence === undefined ? undefined : readJournalEvidence(value.evidence);
   if (value.outputs !== undefined && !outputs) {
     throw new NikaProtocolError(transport, 'Durable job response outputs were malformed');
   }
@@ -1597,7 +1646,18 @@ function durableJob(
     ...(receipt ? { receipt: Object.freeze(receipt) } : {}),
     ...(error ? { error } : {}),
     ...(settlement ? { settlement } : {}),
+    ...(evidence ? { evidence } : {}),
   };
+}
+
+function readJournalEvidence(value: unknown): NikaJournalEvidence {
+  const evidence = machineObject(value);
+  if (!evidence || Object.keys(evidence).some((key) => key !== 'status' && key !== 'reason')
+    || evidence.status !== 'mirror_lost'
+    || (evidence.reason !== 'write_failed' && evidence.reason !== 'record_refused')) {
+    throw new NikaProtocolError('http', 'Journal evidence did not match the public contract');
+  }
+  return { status: 'mirror_lost', reason: evidence.reason };
 }
 
 function assertReceiptIdentity(

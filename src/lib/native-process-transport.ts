@@ -8,6 +8,9 @@ import {
   NikaTransportError,
 } from '../errors.js';
 import type {
+  NikaCompileRequest,
+  NikaCompileOptions,
+  NikaCompileResult,
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckOptions,
@@ -57,6 +60,11 @@ export class NativeProcessTransport implements Transport {
   private ready?: Promise<void>;
 
   constructor(private readonly options: NativeProcessTransportOptions) {}
+
+  async compile(_request: NikaCompileRequest, _options: NikaCompileOptions): Promise<NikaCompileResult> {
+    throw new NikaCompatibilityError('compile', this.kind,
+      'Authoring requires the resident HTTP compile contract; connect to nika serve');
+  }
 
   async check(workflow: string, options: NikaCheckOptions): Promise<NikaCheckResult> {
     await this.ensureReady();

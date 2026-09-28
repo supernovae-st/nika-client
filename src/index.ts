@@ -7,6 +7,8 @@ import { NativeProcessTransport } from './lib/native-process-transport.js';
 import { NikaEngineUnavailable, resolveNikaEngine } from './lib/binary/index.js';
 import { RunSession } from './lib/run-session.js';
 import type { Transport } from './lib/transport.js';
+import type { NikaEngineIdentity } from './lib/engine-identity.js';
+export type { NikaEngineIdentity } from './lib/engine-identity.js';
 import type {
   NikaCostReview,
   NikaCostReviewRequest,
@@ -102,6 +104,15 @@ export class Nika {
       });
     }
     this.transportKind = this.transport.kind;
+  }
+
+  /**
+   * Detached snapshot of the HTTP identity already validated by this client.
+   * Uses the client's cached handshake; not a fresh liveness, readiness or
+   * authorization check. No local engine is resolved on this HTTP operation.
+   */
+  serverIdentity(): Promise<NikaEngineIdentity> {
+    return this.transport.serverIdentity();
   }
 
   /** Compile through a resident HTTP authority, without saving, running, or automatic retries. */

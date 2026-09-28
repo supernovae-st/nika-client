@@ -147,12 +147,17 @@ const WORKFLOW_REFUSAL_STATUSES = new Set([404, 422]);
 
 export class HttpTransport implements Transport {
   readonly kind = 'http' as const;
-  private serverIdentity?: Promise<NikaEngineIdentity>;
+  private serverIdentityPromise?: Promise<NikaEngineIdentity>;
   private localIdentity?: Promise<NikaEngineIdentity>;
   private resolvedEngine?: ResolvedNikaEngine;
   private remoteIdentity?: NikaEngineIdentity;
 
   constructor(private readonly options: HttpTransportOptions) {}
+
+  async serverIdentity(): Promise<NikaEngineIdentity> {
+    // Never let a consumer change the cached capabilities used for admission.
+    return structuredClone(await this.ensureServerIdentity());
+  }
 
   async compile(request: NikaCompileRequest, options: NikaCompileOptions): Promise<NikaCompileResult> {
     options.signal?.throwIfAborted();
@@ -1066,8 +1071,8 @@ export class HttpTransport implements Transport {
   }
 
   private ensureServerIdentity(): Promise<NikaEngineIdentity> {
-    this.serverIdentity ??= this.probeServerIdentity();
-    return this.serverIdentity;
+    this.serverIdentityPromise ??= this.probeServerIdentity();
+    return this.serverIdentityPromise;
   }
 
   private async probeServerIdentity(): Promise<NikaEngineIdentity> {

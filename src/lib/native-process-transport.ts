@@ -48,6 +48,7 @@ import {
 } from './machine.js';
 import { verifyNikaEngine, type ResolvedNikaEngine } from './binary/index.js';
 import type { Transport, TransportRun } from './transport.js';
+import type { NikaEngineIdentity } from './engine-identity.js';
 
 interface Captured {
   exitCode: number;
@@ -66,6 +67,11 @@ export class NativeProcessTransport implements Transport {
   private ready?: Promise<void>;
 
   constructor(private readonly options: NativeProcessTransportOptions) {}
+
+  async serverIdentity(): Promise<NikaEngineIdentity> {
+    throw new NikaCompatibilityError('serverIdentity', this.kind,
+      'Server discovery requires a resident HTTP authority');
+  }
 
   async compile(_request: NikaCompileRequest, _options: NikaCompileOptions): Promise<NikaCompileResult> {
     throw new NikaCompatibilityError('compile', this.kind,

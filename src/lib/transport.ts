@@ -26,6 +26,7 @@ import type {
   NikaTransportKind,
   NikaWorkflowMetadata,
 } from '../types.js';
+import type { NikaEngineIdentity } from './engine-identity.js';
 
 export interface TransportRun {
   readonly id: NikaRunId;
@@ -39,6 +40,7 @@ export interface TransportRun {
 /** The adapter boundary. It has exactly the native-process and HTTP implementations. */
 export interface Transport {
   readonly kind: NikaTransportKind;
+  serverIdentity(): Promise<NikaEngineIdentity>;
   compile(request: NikaCompileRequest, options: NikaCompileOptions): Promise<NikaCompileResult>;
   prepareCostReview(request: NikaCostReviewRequest, options: NikaPrepareCostReviewOptions): Promise<NikaCostReviewResult>;
   costReview(id: string, options: NikaCostReviewOptions): Promise<NikaCostReview>;

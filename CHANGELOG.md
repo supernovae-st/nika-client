@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Expose `serverIdentity()` and `NikaEngineIdentity` for HTTP consumers to
+  inspect the validated cached protocol and capability snapshot without a
+  local binary. Returned objects cannot mutate the SDK's admission state.
+
 - Add six-door runtime parity and bounded, owned process supervision for the
   corpus and packed application harnesses.
 
@@ -31,6 +35,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   npm after the first `@supernovae-st/nika` publication.
 
 ### Fixed
+
+- Isolate the packed module test's build output and archive inputs so parallel
+  native package tests cannot remove its TypeScript declarations mid-pack.
 
 - The publication proof waits for the registry: after `npm publish` the
   version's metadata and its archive become visible in two steps, and the

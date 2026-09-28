@@ -11,7 +11,7 @@ Any other non-2xx body is discarded and reported as a redacted
 
 | HTTP route | SDK surface | Contract |
 |---|---|---|
-| `GET /health` | internal identity handshake | public liveness and protocol versions |
+| `GET /health` | `serverIdentity()` and internal handshake | public protocol and capability identity; cached per client |
 | `GET /v1/openapi.json` | generation only | authenticated OpenAPI 3.1 document |
 | `POST /v1/compile` | `compile()` | source-only authoring, explicit native opt-in and zero-call replay |
 | `GET /v1/workflows` | `listWorkflows()` | contained relative workflow names |
@@ -22,10 +22,18 @@ Any other non-2xx body is discarded and reported as a redacted
 | `GET /v1/jobs/{id}/status` | `status(run)` | current status only |
 | `GET /v1/jobs/{id}/events` | `events(run)` / `attachRun()` | bounded, sequenced SSE with replay |
 | `POST /v1/jobs/{id}/cancel` | `cancel(run)` | 200 a settled job or its terminal replay; 202 the request accepted on a running job, settled later by observation |
-| `GET /v1/jobs/{id}/trace/verify` | `traceVerify(receipt)` | engine-owned typed trace verdict; `reason` only on a verdict that does not hold |
+| `GET /v1/jobs/{id}/trace/verify` | `traceVerify(receipt)` | engine-owned typed trace verdict; a positive verdict may carry `reason: "unsealed"` |
 | `GET/PUT /v1/schedules/{id}` | `scheduleStatus()` / `schedule()` | resident schedule projection and CAS mutation |
 
 ## Connection rules
+
+`serverIdentity()` returns a detached copy of the validated HTTP handshake,
+including `engineVersion`, protocol clocks, and `supportedCapabilities`. It
+needs no local binary or workflow file. The snapshot is cached by the client:
+it is not a fresh liveness or readiness probe, and the public endpoint does not
+authenticate the caller. Mutating the returned object cannot change the SDK's
+admission checks. Native clients refuse this HTTP-only operation with
+`NikaCompatibilityError`.
 
 - HTTPS is required for every host except loopback. Plain HTTP is accepted
   only for `localhost`, `127.0.0.0/8`, or `[::1]`, and only with an explicit

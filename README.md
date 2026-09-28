@@ -147,7 +147,8 @@ anything but `succeeded` as its own failure, or a red run passes silently.
 `Nika` exposes one lifecycle vocabulary: `compile`, `check`, `run`, `attachRun`,
 `status`, `events`, `cancel`, `traceVerify`, `listWorkflows`, `workflow`, `schedule`,
 and `scheduleStatus`. Optional HTTP cost review adds `prepareCostReview`,
-`costReview`, and `decideCostReview`.
+`costReview`, and `decideCostReview`. `serverIdentity()` exposes the HTTP
+connection's validated protocol and capability snapshot.
 The engine remains authoritative for parsing, admission, execution, receipts,
 traces, permits, scheduling, and cost. The SDK transports those facts; it does
 not parse YAML or reconstruct proof in TypeScript.
@@ -281,6 +282,12 @@ A contained workflow name such as `hello.nika.yaml` or
 `daily/report.nika.yaml` is resolved by the resident registry. `check()` and
 `run()` send that name without a local engine or a local workflow file.
 Use `listWorkflows()` to discover the served names.
+
+Use `serverIdentity()` to inspect the server's advertised capabilities before
+offering an optional operation. It returns a detached copy of the client's
+cached handshake without resolving a local engine. This is not a fresh health,
+readiness, or authorization check; an operation can still be refused. Create a
+new client to negotiate a new identity after changing the server.
 
 To capture your local file instead, pass an explicit path such as
 `./hello.nika.yaml`. The compatible local engine captures an immutable
@@ -429,6 +436,7 @@ it; a scheduled budget is always a real number.
 
 | Operation | Native process | HTTP |
 |---|---|---|
+| `serverIdentity` | typed capability refusal | detached validated identity and advertised capabilities; cached per client |
 | `compile` | typed capability refusal | engine-owned authoring request and outcome, optional kept-round token |
 | `check` | yes; `model` and `nativeStrict` allowed | yes; those two overrides refused |
 | `run` | yes; `vars`, `model`, `maxCostUsd` allowed | `idempotencyKey`; by-name admission also accepts typed `inputs`, `access`, and an explicit `costReview` reference |
@@ -469,6 +477,7 @@ Remote-only options:
 
 | Method | Result |
 |---|---|
+| `serverIdentity()` | `NikaEngineIdentity`; cached HTTP protocol and capability snapshot |
 | `compile(request, options?)` | `{ outcome, replayToken? }`; ready, incomplete and refused are data |
 | `prepareCostReview(request, options?)` | review or `review_required: false`; never starts a job |
 | `costReview(id, options?)` | current review; never renews it |

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,16 +7,24 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const scratch = await mkdtemp(path.join(tmpdir(), 'nika-package-surface-'));
 const consumer = path.join(scratch, 'consumer');
+const packageRoot = path.join(scratch, 'package');
 
 try {
-  run('npm', ['run', 'build'], { cwd: root });
+  // Other package tests build the repository dist concurrently. Own both the
+  // build output and the pack input so a competing clean cannot remove types
+  // between our successful build and npm's archive read.
+  await mkdir(packageRoot);
+  for (const file of ['package.json', 'LICENSE', 'README.md', 'CHANGELOG.md', 'docs', 'openapi.json']) {
+    await cp(path.join(root, file), path.join(packageRoot, file), { recursive: true });
+  }
+  run('npm', ['run', 'build', '--', '--out-dir', path.join(packageRoot, 'dist')], { cwd: root });
   const packed = JSON.parse(run('npm', [
     'pack',
     '--ignore-scripts',
     '--json',
     '--pack-destination',
     scratch,
-  ], { cwd: root }).stdout);
+  ], { cwd: packageRoot }).stdout);
   const filename = packed[0]?.filename;
   if (typeof filename !== 'string') throw new Error('npm pack returned no filename');
 
@@ -50,10 +58,11 @@ try {
   run(process.execPath, ['--input-type=module', '--eval', esm], { cwd: consumer });
 
   const typedConsumer = [
-    `import { Nika, type NikaConfig } from '${packageName}';`,
+    `import { Nika, type NikaConfig, type NikaEngineIdentity } from '${packageName}';`,
     "const config: NikaConfig = { bin: '/tmp/nika' };",
     'const client: Nika = new Nika(config);',
-    'void client;',
+    'const identity: Promise<NikaEngineIdentity> = client.serverIdentity();',
+    'void identity;',
     '',
   ].join('\n');
   await writeFile(path.join(consumer, 'consumer.mts'), typedConsumer);

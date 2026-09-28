@@ -27,15 +27,15 @@
   <a href="https://archive.softwareheritage.org/browse/origin/?origin_url=https://github.com/supernovae-st/nika-client"><img src="https://archive.softwareheritage.org/badge/origin/https://github.com/supernovae-st/nika-client/" alt="Archived by Software Heritage"></a>
 </p>
 
-<!-- engine media (this hero, the clip and the posters below) is served from supernovae-st/nika main (media/), not from a release tag: re-pin it to the first engine release tag that carries these clips, then on lockstep bumps -->
+<!-- engine media (this hero and the clips below) is served from supernovae-st/nika main (media/), not from a release tag: re-pin it to the first engine release tag that carries these clips, then on lockstep bumps -->
 <!-- motion: a TypeScript program running a .nika workflow and verifying its receipt -->
 <p align="center">
-  <a href="https://github.com/supernovae-st/nika/raw/refs/heads/main/media/videos/full-loop.mp4">
+  <a href="https://raw.githubusercontent.com/supernovae-st/nika/main/media/gifs/full-loop.optimized.gif">
     <img src="https://raw.githubusercontent.com/supernovae-st/nika/main/media/gifs/full-loop.optimized.gif"
-         alt="The four steps on the real command line: nika compile writes hello.nika, nika check passes it, nika run rehearses it offline with mock/echo, and nika trace verify reads back the same chain head the run printed" width="760">
+         alt="The four steps on the real command line: nika compile writes hello.nika, nika check passes it, nika run rehearses it offline with mock/echo, and nika trace verify reads back the same chain head the run printed" width="960">
   </a>
 </p>
-<p align="center"><sub>Write, check, run, verify: the loop your code drives, shown here on the command line. Click to open the video.</sub></p>
+<p align="center"><sub>Write, check, run, verify: the loop your code drives, shown here on the command line. At the end, <code>nika trace verify</code> reads back the chain head the run printed. All four commands are captured from the real CLI; the run is a <code>mock/echo</code> rehearsal.</sub></p>
 
 ## What is Nika?
 
@@ -214,25 +214,22 @@ accept.
   </tr>
 </table>
 
-<table>
-  <tr>
-    <td align="center" valign="top" width="33%">
-      <a href="https://github.com/supernovae-st/nika/raw/refs/heads/main/media/videos/static-check-fix.mp4"><img src="https://raw.githubusercontent.com/supernovae-st/nika/main/media/posters/static-check-fix.png" alt="nika check finds two defects in a pull-request review workflow, the real fix is applied, and the re-check comes back clean; nothing runs and no token is spent" width="240"></a>
-      <br><b>Checked before it runs</b>
-      <br><sub><code>nika check</code> finds two defects, the fix lands, the re-check is clean. Your code gets the same verdict from <code>check()</code> and <code>run()</code>.</sub>
-    </td>
-    <td align="center" valign="top" width="33%">
-      <a href="https://github.com/supernovae-st/nika/raw/refs/heads/main/media/videos/permits-audit.mp4"><img src="https://raw.githubusercontent.com/supernovae-st/nika/main/media/posters/permits-audit.png" alt="A workflow's declared permits drawn as a map; nika check catches the task that fetches a host outside them, and the widened boundary checks clean" width="240"></a>
-      <br><b>The file is the boundary</b>
-      <br><sub>A workflow lists what it may reach in <code>permits:</code>. The check catches the task that reaches past it.</sub>
-    </td>
-    <td align="center" valign="top" width="33%">
-      <a href="https://github.com/supernovae-st/nika/raw/refs/heads/main/media/videos/on-error-recover.mp4"><img src="https://raw.githubusercontent.com/supernovae-st/nika/main/media/posters/on-error-recover.png" alt="A missing live rates feed is absorbed by on_error: recover; the run finishes, the output is marked stale, and the trace records the failure" width="240"></a>
-      <br><b>Failures you planned for</b>
-      <br><sub><code>on_error: recover</code> absorbs a missing live feed: the run finishes, the output says stale, the trace records the failure.</sub>
-    </td>
-  </tr>
-</table>
+**Watch the check catch two mistakes before anything runs.**
+
+<p align="center">
+  <a href="https://raw.githubusercontent.com/supernovae-st/nika/main/media/gifs/static-check-fix.optimized.gif">
+    <img src="https://raw.githubusercontent.com/supernovae-st/nika/main/media/gifs/static-check-fix.optimized.gif"
+         alt="nika check finds two defects in a pull-request review workflow, the real fix is applied, and the re-check comes back clean; nothing runs and no token is spent" width="860">
+  </a>
+</p>
+<p align="center"><sub><code>nika check</code> finds two defects, the fix lands, the re-check is clean, and no model is called. Your code gets the same verdict from <code>check()</code> and <code>run()</code>. Every line is captured from the real CLI.</sub></p>
+
+- **The file is the boundary.** A workflow lists what it may reach in
+  `permits:`. The check catches the task that reaches past it.
+  ▶ [Watch the check catch an escape](https://raw.githubusercontent.com/supernovae-st/nika/main/media/gifs/permits-audit.optimized.gif)
+- **Failures you planned for.** `on_error: recover` absorbs a missing live
+  feed: the run finishes, the output says stale, the trace records the
+  failure. ▶ [Watch a missing feed absorbed](https://raw.githubusercontent.com/supernovae-st/nika/main/media/gifs/on-error-recover.optimized.gif)
 
 ## How it works
 
@@ -257,13 +254,15 @@ flowchart LR
   This package carries its answers to your code, typed. It never parses the
   file itself or re-implements the proof.
 
+**Watch the same engine audit a real job, then run it on a local model.**
+
 <p align="center">
-  <a href="https://github.com/supernovae-st/nika/raw/refs/heads/main/media/videos/nika-hero.mp4">
+  <a href="https://raw.githubusercontent.com/supernovae-st/nika/main/media/gifs/nika-hero.optimized.gif">
     <img src="https://raw.githubusercontent.com/supernovae-st/nika/main/media/gifs/nika-hero.optimized.gif"
-         alt="nika check audits a meeting-actions workflow, then nika run executes it on a local model through Ollama and writes the meeting's action items to a typed JSON file" width="760">
+         alt="nika check audits a meeting-actions workflow, then nika run executes it on a local model through Ollama and writes the meeting's action items to a typed JSON file" width="860">
   </a>
 </p>
-<p align="center"><sub>The same engine from the command line, on a real job: the audit first, then a run on a local model that writes a meeting's action items. Click to open the video.</sub></p>
+<p align="center"><sub>The same engine from the command line, on a real job: the audit first, then a run on a local model that writes a meeting's action items as typed JSON. Both are captured from the real CLI; the run uses a real local model (<code>ollama/llama3.2:3b</code>).</sub></p>
 
 ## Prove what ran
 
@@ -273,7 +272,15 @@ run hands your code a receipt, and `traceVerify(receipt)` asks the engine to
 check the trace against it. With a signing key (`nika key init`), the engine
 also seals the trace: it signs the record when the run ends.
 
-<!-- motion: trace-proof -->
+**Watch the engine verify a run's record, then catch one changed byte.**
+
+<p align="center">
+  <a href="https://raw.githubusercontent.com/supernovae-st/nika/main/media/gifs/trace-proof.optimized.gif">
+    <img src="https://raw.githubusercontent.com/supernovae-st/nika/main/media/gifs/trace-proof.optimized.gif"
+         alt="A run's trace drawn as five hash-linked blocks: nika trace verify reports the chain intact, then one byte of line 4 changes in a copy and verify stops at line 5: BROKEN, exit 2" width="860">
+  </a>
+</p>
+<p align="center"><sub>The chain reads back intact; in a copy with one changed byte, verify stops at the next line (BROKEN, exit 2). <code>traceVerify()</code> asks the engine for this same check on your run's trace, then checks your receipt against the engine's evidence. An unsigned <code>mock/echo</code> rehearsal captured from the real CLI; the scan is an illustration.</sub></p>
 
 | On this machine | `traceVerify()` answers |
 |---|---|

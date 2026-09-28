@@ -7,7 +7,7 @@ export type NikaCompileOutcome = components['schemas']['CompileOutcome'] | compo
 /** Journal delivery loss, independent of execution success; absence proves no seal. */
 export type NikaJournalEvidence = components['schemas']['JournalEvidence'];
 export interface NikaCompileOptions {
-  /** Stops this request. A lost answer is never automatically retried. */
+  /** Stops waiting, not a dispatched provider call. A lost answer may be billed and is never retried. */
   signal?: AbortSignal;
 }
 export interface NikaCompileResult {
@@ -44,7 +44,7 @@ export interface NikaRemoteConfig extends NikaSharedConfig {
   token: string;
   /** Plain HTTP is refused unless this is explicitly true. */
   allowInsecureHttp?: boolean;
-  /** Bound for HTTP admission. Default: 30 seconds. */
+  /** HTTP admission and JSON body bound (30s default); compile waits for the resident deadline or caller signal. */
   requestTimeout?: number;
   /** Fetch implementation used by the HTTP transport. */
   fetch?: typeof globalThis.fetch;

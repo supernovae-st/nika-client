@@ -24,6 +24,50 @@ function client(response: () => Response, capabilities?: string[]) {
 }
 
 describe('compile over the engine-owned HTTP contract', () => {
+  it('waits for a native round past the ordinary 30 second HTTP bound without a second POST', async () => {
+    vi.useFakeTimers();
+    try {
+      const replay = 'c'.repeat(64);
+      const fetch = vi.fn<typeof globalThis.fetch>(async (url, init) => {
+        if (String(url).endsWith('/health')) return json(health());
+        return new Promise<Response>((resolve, reject) => {
+          const timer = setTimeout(() => resolve(json(outcome, 200, { 'Nika-Compile-Replay': replay })), 35_000);
+          init?.signal?.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(new Error('connection closed before the kept round arrived'));
+          }, { once: true });
+        });
+      });
+      const nika = new Nika({ url: 'http://127.0.0.1:8787', allowInsecureHttp: true, token, fetch });
+      const result = nika.compile({ compile_version: 2, mode: 'create', cognition: 'explicitProvider', intent: 'hello' })
+        .then(value => ({ value }), error => ({ error }));
+      await vi.advanceTimersByTimeAsync(35_000);
+      expect(await result).toEqual({ value: { outcome, replayToken: replay } });
+      expect(fetch).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('honors explicit caller cancellation of a pending round without retrying', async () => {
+    const controller = new AbortController();
+    let started!: () => void;
+    const entered = new Promise<void>(resolve => { started = resolve; });
+    const fetch = vi.fn<typeof globalThis.fetch>(async (url, init) => {
+      if (String(url).endsWith('/health')) return json(health());
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new Error('caller stopped waiting')), { once: true });
+        started();
+      });
+    });
+    const nika = new Nika({ url: 'http://127.0.0.1:8787', allowInsecureHttp: true, token, fetch });
+    const result = nika.compile(request, { signal: controller.signal }).catch(error => error);
+    await entered;
+    controller.abort();
+    expect(await result).toMatchObject({ name: 'NikaTransportError' });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
   it('preserves incomplete outcomes as data and posts exactly the caller request', async () => {
     const { nika, fetch } = client(() => json(outcome));
     const result = await nika.compile(request);

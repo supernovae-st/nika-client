@@ -494,6 +494,13 @@ not save, execute, answer questions or retry a lost authoring response.
 `ready` describes a program for review, not permission to run it or a bound
 schedule. See [the HTTP authoring contract](docs/http-api.md#authoring).
 
+Compilation waits for the resident's authoring deadline; the ordinary
+30-second HTTP admission timer does not cut a model round short. Pass
+`{ signal: AbortSignal.timeout(600_000) }` to set your own waiting deadline.
+Stopping that wait does not cancel an already dispatched provider call.
+A lost answer may still be billed and may leave a kept round whose token
+you never received; the SDK does not retry it. JSON body reads remain bounded.
+
 ### Typed events, outputs, and identities
 
 `NikaEvent` is a discriminated union over the known lifecycle kinds of both

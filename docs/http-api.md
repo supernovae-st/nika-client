@@ -33,8 +33,8 @@ Any other non-2xx body is discarded and reported as a redacted
 - URLs containing credentials, a query, or a fragment are rejected.
 - Tokens must contain 32–512 visible ASCII bytes and are never sent to
   `/health`.
-- Each request has a bounded timeout and each JSON/SSE machine frame has a
-  byte ceiling.
+- HTTP admissions have a bounded timeout; authoring waits for the resident's
+  own deadline or the caller's signal. Each JSON/SSE machine frame has a byte ceiling.
 - Remote `check()` refuses `model` and `nativeStrict`; remote `run()` refuses
   `vars`, `model`, and `maxCostUsd` until the request envelope owns them.
 - Caller-provided workflow catalog names must be contained slash-separated
@@ -66,8 +66,16 @@ original input and its answers. It must omit `limits`. Replay makes no
 model call, expires with the server's bounded store, and can fail after a
 restart. The SDK neither stores the token globally nor replays implicitly.
 
-`requestTimeout` and `machineBufferBytes` still bound the response; callers
-can configure larger bounds for long authoring rounds. Direct native-process
+The resident owns the authoring deadline (300 seconds by default). The SDK
+does not apply the ordinary `requestTimeout` while waiting for compile headers.
+Use `signal`, for example `AbortSignal.timeout(600_000)`, for an explicit caller
+deadline. Aborting stops waiting; it does not cancel an already dispatched
+provider call. If the first answer is lost, the server may have completed and
+kept the round while the caller has no replay token; another fresh compile can
+spend again. There is no result lookup or idempotency guarantee for that case.
+
+`requestTimeout` still bounds JSON body reads after headers, and
+`machineBufferBytes` bounds their size. Direct native-process
 authoring returns a capability error instead of introducing a subprocess
 fallback. Cost-decision and reconciliation APIs are still separate work;
 this authoring method does not claim the complete V9 consumer contract.

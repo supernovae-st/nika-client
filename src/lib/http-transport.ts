@@ -157,10 +157,13 @@ export class HttpTransport implements Transport {
     }
     const path = '/v1/compile';
     // A redirect or retry can spend again; only the caller can authorize a new round.
+    // The resident owns this round's deadline. The ordinary HTTP admission timer
+    // must not abandon a paid round while its authorized model is still thinking.
+    // Callers can stop waiting with signal; that does not revoke a sent request.
     const response = await this.fetchResponse(path, {
       method: 'POST', body: JSON.stringify(request), signal: options.signal,
       headers: { 'Content-Type': 'application/json' }, redirect: 'error',
-    }, true, true, false);
+    }, false, true, false);
     if (response.status !== 200) {
       const refusal = await this.readRefusal(response, path);
       if (refusal) throw this.refused(path, { operation: 'compile', status: response.status, refusal });

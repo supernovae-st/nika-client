@@ -300,7 +300,7 @@ describe('the published compile shapes on the resident contract', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('keeps a typed caller abort the transport error, and never renames an abort a deadline', async () => {
+  it('names caller cancellation on both compile forms without renaming it a deadline', async () => {
     const aborting = (controller: AbortController) => resident((init) => new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener('abort', () => reject(new Error('caller stopped waiting')), { once: true });
       controller.abort();
@@ -309,7 +309,7 @@ describe('the published compile shapes on the resident contract', () => {
     const typed = await aborting(typedController).nika
       .compile({ compile_version: 1, mode: 'create', intent: 'hello' }, { signal: typedController.signal, timeoutMs: 60_000 })
       .catch((error: unknown) => error);
-    expect(typed).toMatchObject({ name: 'NikaTransportError', message: 'HTTP transport failed' });
+    expect(typed).toMatchObject({ name: 'NikaTransportError', message: 'compile aborted by caller' });
     const publishedController = new AbortController();
     const published = await aborting(publishedController).nika
       .compile('hello', { signal: publishedController.signal, timeoutMs: 60_000 })

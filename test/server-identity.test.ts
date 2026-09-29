@@ -31,6 +31,20 @@ describe('server identity for an HTTP-only consumer', () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('shares a failed handshake, then permits a fresh caller to retry health only', async () => {
+    const fetch = vi.fn().mockRejectedValueOnce(new TypeError('temporarily unavailable'))
+      .mockResolvedValueOnce(healthResponse());
+    const client = new Nika({ url: 'https://nika.example', token: TOKEN_A,
+      bin: '/absent/consumer-must-not-spawn-nika', fetch: fetch as typeof globalThis.fetch });
+    const failed = await Promise.allSettled([client.serverIdentity(), client.serverIdentity()]);
+    expect(failed.map(result => result.status)).toEqual(['rejected', 'rejected']);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect((await client.serverIdentity()).engineVersion).toBe('0.114.0');
+    await client.serverIdentity();
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch.mock.calls.every(([url]) => String(url).endsWith('/health'))).toBe(true);
+  });
+
   it('refuses server discovery on a native transport', async () => {
     const client = new Nika({ bin: HTTP_DEPTH_FIXTURE });
     await expect(client.serverIdentity()).rejects.toMatchObject({

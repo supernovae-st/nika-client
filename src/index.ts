@@ -8,7 +8,6 @@ import { NikaEngineUnavailable, resolveNikaEngine } from './lib/binary/index.js'
 import { RunSession } from './lib/run-session.js';
 import { normalizeCompileOptions, normalizeCompileRequest } from './lib/compile.js';
 import {
-  checkTimeout,
   isPublishedCompileRequest,
   refuseHybridRequest,
   withDeadline,
@@ -175,14 +174,14 @@ export class Nika {
       // stop immediately without cancelling the shared health handshake.
       if (this.transportKind === 'native-process') return this.transport.compile(normalized, checked);
       return withDeadline(checked, this.transportKind,
-        (signal) => this.transport.compile(normalized, { ...checked, signal }), true);
+        (signal) => this.transport.compile(normalized, { ...checked, signal }));
     }
     refuseHybridRequest(request);
-    checkTimeout(options.timeoutMs);
+    const checked = normalizeCompileOptions(options);
     return withDeadline(
-      options,
+      checked,
       this.transportKind,
-      (signal) => this.transport.compileWire(request, { ...options, signal }),
+      (signal) => this.transport.compileWire(request, { ...checked, signal }),
     );
   }
 

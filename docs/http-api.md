@@ -105,9 +105,13 @@ restart. The SDK neither stores the token globally nor replays implicitly.
 The resident owns the authoring deadline (300 seconds by default). The SDK
 does not apply the ordinary `requestTimeout` while waiting for compile headers.
 Use `timeoutMs: 600_000` for an explicit waiting deadline, including initial
-health negotiation. A signal-only abort during that first handshake is observed
-when its shared request answers, within `requestTimeout`. Aborting stops waiting; it does not cancel an already dispatched
-provider call. If the first answer is lost, the server may have completed and
+health negotiation. A caller abort rejects immediately as `NikaTransportError`
+with `compile aborted by caller`, including while a shared health probe is
+pending. Other callers keep their probe; the abandoned call sends no later
+compile POST. A failed health handshake is shared by its current waiters but
+is not cached: a later explicit call may retry health. Compile POSTs are never
+retried automatically. Aborting does not cancel an already dispatched provider
+call. After a POST was sent, the resident may have
 kept the round while the caller has no replay token; another fresh compile can
 spend again. There is no result lookup or idempotency guarantee for that case.
 

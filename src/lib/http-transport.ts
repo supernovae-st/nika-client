@@ -1221,7 +1221,12 @@ export class HttpTransport implements Transport {
   }
 
   private ensureServerIdentity(): Promise<NikaEngineIdentity> {
-    this.serverIdentityPromise ??= this.probeServerIdentity();
+    this.serverIdentityPromise ??= this.probeServerIdentity().catch(error => {
+      // A failed handshake is shared by its current waiters, never cached as
+      // a permanent refusal. Only a later caller starts a new health request.
+      this.serverIdentityPromise = undefined;
+      throw error;
+    });
     return this.serverIdentityPromise;
   }
 

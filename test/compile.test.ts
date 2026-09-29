@@ -68,6 +68,58 @@ describe('compile over the engine-owned HTTP contract', () => {
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
+  it('rechecks health on a fresh typed call after a failed handshake without replaying a POST', async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>()
+      .mockRejectedValueOnce(new TypeError('temporarily unavailable'))
+      .mockResolvedValueOnce(json(health()))
+      .mockResolvedValueOnce(json(outcome));
+    const nika = new Nika({ url: 'https://nika.example', token, fetch });
+    await expect(nika.compile(request)).rejects.toMatchObject({ name: 'NikaTransportError' });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(await nika.compile(request)).toEqual({ outcome });
+    expect(fetch.mock.calls.map(([url, init]) => [String(url), init?.method])).toEqual([
+      ['https://nika.example/health', 'GET'], ['https://nika.example/health', 'GET'],
+      ['https://nika.example/v1/compile', 'POST'],
+    ]);
+  });
+
+  it.each([undefined, 1_000])('stops a typed wait at caller abort with timeout %s while its peer keeps health', async (timeoutMs) => {
+    vi.useFakeTimers();
+    try {
+      let release!: () => void;
+      const healthGate = new Promise<void>(resolve => { release = resolve; });
+      let healthAborts = 0;
+      const fetch = vi.fn<typeof globalThis.fetch>(async (url, init) => {
+        if (String(url).endsWith('/health')) {
+          init?.signal?.addEventListener('abort', () => { healthAborts += 1; });
+          await healthGate;
+          return json(health());
+        }
+        return json(outcome);
+      });
+      const nika = new Nika({ url: 'https://nika.example', token, fetch });
+      const controller = new AbortController();
+      controller.signal.addEventListener('abort', event => event.stopImmediatePropagation());
+      let aborted: unknown;
+      const hurried = nika.compile(request, { signal: controller.signal, timeoutMs })
+        .catch(error => { aborted = error; });
+      const patient = nika.compile(request);
+      await vi.advanceTimersByTimeAsync(0);
+      controller.abort(new Error('caller changed intent'));
+      await vi.advanceTimersByTimeAsync(0);
+      const beforeHealth = aborted;
+      release();
+      await hurried;
+      expect(await patient).toEqual({ outcome });
+      expect(beforeHealth).toMatchObject({ name: 'NikaTransportError', message: 'compile aborted by caller' });
+      expect(healthAborts).toBe(0);
+      expect(fetch.mock.calls.filter(([url]) => String(url).endsWith('/health'))).toHaveLength(1);
+      expect(fetch.mock.calls.filter(([, init]) => init?.method === 'POST')).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('preserves incomplete outcomes as data and posts exactly the caller request', async () => {
     const { nika, fetch } = client(() => json(outcome));
     const result = await nika.compile(request);

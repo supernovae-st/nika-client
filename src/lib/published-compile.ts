@@ -5,7 +5,6 @@ import type { NikaCompileOptions, NikaCompileWireRequest, NikaPublishedCompileRe
 
 const signalAborted = Object.getOwnPropertyDescriptor(AbortSignal.prototype, 'aborted')?.get;
 const removeSignalListener = EventTarget.prototype.removeEventListener;
-const MAX_TIMEOUT_MS = 2_147_483_647;
 
 /**
  * A request is published-shaped when it is a string or an object without its
@@ -37,16 +36,6 @@ export function refuseHybridRequest(request: NikaCompileWireRequest): void {
   }
 }
 
-/** `timeoutMs`, when given, is a positive safe integer the platform's timers can hold. */
-export function checkTimeout(timeoutMs: unknown): void {
-  if (timeoutMs !== undefined && (typeof timeoutMs !== 'number' || !Number.isSafeInteger(timeoutMs)
-    || timeoutMs < 1 || timeoutMs > MAX_TIMEOUT_MS)) {
-    throw new NikaConfigurationError(
-      `compile: timeoutMs must be a positive safe integer between 1 and ${MAX_TIMEOUT_MS} milliseconds`,
-    );
-  }
-}
-
 /**
  * Run one compile under the caller's signal and an optional deadline, and
  * stop waiting the moment the deadline fires, even while the transport is
@@ -55,20 +44,14 @@ export function checkTimeout(timeoutMs: unknown): void {
  * transport holds is aborted so it sends nothing new, and the shared step is
  * left to finish for whoever else waits on it. The timer and the listener on
  * the caller's signal are released when the call ends, whichever way it ends.
- *
- * `callerStops` (the published door) gives a caller's abort the same
- * immediacy and the published words; otherwise a caller's abort keeps the
- * transport's own error, as the typed door always has, and disarms the
- * deadline so a later timer never renames it.
  */
 export async function withDeadline<T>(
   options: NikaCompileOptions,
   transport: NikaTransportKind,
   compile: (signal: AbortSignal | undefined) => Promise<T>,
-  callerStops = false,
 ): Promise<T> {
   const { signal: caller, timeoutMs } = options;
-  if (timeoutMs === undefined && !(callerStops && caller)) return compile(caller);
+  if (timeoutMs === undefined && !caller) return compile(caller);
   const controller = new AbortController();
   let stopWaiting!: (error: NikaTransportError) => void;
   const stopped = new Promise<never>((_resolve, reject) => {
@@ -82,21 +65,16 @@ export async function withDeadline<T>(
     controller.abort(error);
   };
   const abort = () => {
-    if (callerStops) {
-      stop(new NikaTransportError(transport, 'compile aborted by caller', {
-        cause: caller?.reason instanceof Error ? caller.reason : undefined,
-      }));
-      return;
-    }
-    clearTimeout(timer);
-    controller.abort(caller?.reason);
+    stop(new NikaTransportError(transport, 'compile aborted by caller', {
+      cause: caller?.reason instanceof Error ? caller.reason : undefined,
+    }));
   };
   if (caller) {
     if (signalAborted?.call(caller)) abort();
     else addAbortListener(caller, abort);
   }
   try {
-    if (callerStops && controller.signal.aborted) return await stopped;
+    if (controller.signal.aborted) return await stopped;
     if (timeoutMs !== undefined && !controller.signal.aborted) {
       timer = setTimeout(() => {
         stop(new NikaTransportError(transport, `compile timed out after ${timeoutMs} ms`));

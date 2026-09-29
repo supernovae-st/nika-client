@@ -71,7 +71,10 @@ if (command === '--sdk-identity') {
     checkReportVersion: 1,
     eventFormatVersion: 1,
     traceFormatVersion: 1,
-    supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'trace'],
+    supportedCapabilities: [
+      'check', 'executionSnapshot', 'eventStream', 'trace',
+      ...(process.env.NIKA_FAKE_INPUTS_LITERAL === '1' ? ['inputsLiteral'] : []),
+    ],
   }));
   return;
 }
@@ -170,6 +173,30 @@ if (command === 'check') {
 
 if (command === 'run' && argv.includes('--json')) {
   const emit = (value) => console.log(JSON.stringify(value));
+
+  // SYNTHETIC literal channel: read stdin to its end, then report exactly
+  // what arrived there, and whether a marker value also reached argv or the
+  // environment, so a test can prove where each value travelled.
+  if (workflow.includes('literal-echo')) {
+    const marker = 'MARKER-5c1e';
+    const chunks = [];
+    process.stdin.on('data', (chunk) => chunks.push(chunk));
+    process.stdin.on('end', () => {
+      const stdin = Buffer.concat(chunks).toString('utf8');
+      emit({ kind: 'workflow_started', argv });
+      emit({
+        kind: 'workflow_completed',
+        status: 'succeeded',
+        outputs: {
+          stdin,
+          argvCarriesMarker: argv.some((arg) => arg.includes(marker)),
+          envCarriesMarker: Object.values(process.env).some((value) => value?.includes(marker)),
+        },
+      });
+      process.exit(0);
+    });
+    return;
+  }
 
   const replay = Object.entries(WIRE_REPLAYS).find(([name]) => workflow.includes(name))?.[1];
   if (replay) {

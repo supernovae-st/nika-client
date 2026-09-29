@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Nika, NikaOperationError, NikaProtocolError } from '../src/index.js';
 import type { NikaEvent } from '../src/index.js';
 
@@ -157,4 +157,38 @@ describe.skipIf(!posix)('native admission boundary', () => {
     expect(Number.isSafeInteger(pid) && pid > 0).toBe(true);
     expect(alive(pid)).toBe(false);
   }, 15_000);
+});
+
+// The native literal input channel is the upstream one, and its cases live in
+// native-literal-inputs.test.ts and literal-inputs.test.ts, ported unchanged.
+// These two add what this line also promises: the values never reach the
+// engine's environment, and the HTTP-only admission options stay HTTP-only.
+// The `literal-echo` fixture mode is SYNTHETIC: it reports what arrived on
+// stdin and whether a marker also reached argv or the environment.
+describe.skipIf(!posix)('native literal inputs on this line', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  const inputs = {
+    ticket: 'MARKER-5c1e', off: false, zero: 0, empty: '', none: null, list: [1, 'two', [true]], nested: { k: -0.5 },
+  };
+
+  it('sends the inputs once on stdin, exactly, and never on argv or in the environment', async () => {
+    vi.stubEnv('NIKA_FAKE_INPUTS_LITERAL', '1');
+    const run = await native().run('literal-echo.nika', { inputs });
+    const events: NikaEvent[] = [];
+    for await (const event of run.events()) events.push(event.raw);
+    const result = await run.result();
+    expect(result).toMatchObject({ status: 'succeeded', exitCode: 0 });
+    expect(result.outputs).toEqual({ stdin: JSON.stringify(inputs), argvCarriesMarker: false, envCarriesMarker: false });
+    expect(events[0]).toMatchObject({
+      kind: 'workflow_started', argv: ['run', 'literal-echo.nika', '--json', '--inputs-json', '-'],
+    });
+  });
+
+  it('keeps access and costReview on the HTTP by-name door', async () => {
+    const failure = await native().run('literal-echo.nika', { access: 'local' }).catch((error: unknown) => error);
+    expect(failure).toMatchObject({ name: 'NikaCompatibilityError', capability: 'runOptions' });
+  });
 });

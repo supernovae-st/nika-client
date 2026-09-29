@@ -689,6 +689,34 @@ export interface NikaRunOptions {
   access?: components['schemas']['JobByName']['access'];
   /** Caller-supplied approved review; never created or approved implicitly. */
   costReview?: NikaCostReviewReference;
+  /**
+   * Native only, opt-in: bounds the wait for admission, from the call until
+   * the engine's first complete machine frame proves admission or a refusal
+   * (the engine identity probe included). See `NikaRunAdmissionOptions`.
+   * Without it a native admission waits as long as the engine does, as
+   * published, which is not qualified for unattended use. Over HTTP it is
+   * refused before any request: HTTP admission is bounded by `requestTimeout`.
+   */
+  admission?: NikaRunAdmissionOptions;
+}
+
+/**
+ * Bounds on the wait for one native admission. When `timeoutMs` passes or
+ * `signal` aborts before the engine's first complete frame, the SDK stops the
+ * process it started (the run engine: SIGTERM, then SIGKILL after a 2-second
+ * grace; or the identity probe it was running) and only then rejects `run()`
+ * with `NikaTransportError` (« run admission timed out » or « run admission
+ * aborted by caller »), saying whether the process was seen to exit or that
+ * its shutdown is unconfirmed after a further 2 seconds. The rejection
+ * therefore follows the deadline by up to that cleanup, never exactly at it.
+ * An earlier listener on `signal` that stops the abort event's propagation
+ * cannot keep the abort from the SDK. Once `run()` resolved, neither bound
+ * reaches the run: its timer and listener are gone, and `run.cancel()` stops it.
+ */
+export interface NikaRunAdmissionOptions {
+  signal?: AbortSignal;
+  /** Positive integer milliseconds, at most 2147483647. */
+  timeoutMs?: number;
 }
 
 /** Resume observation of an already-admitted durable HTTP job. */

@@ -1018,6 +1018,27 @@ Output that proves neither an admission nor a refusal (a line that is not
 machine output, a truncated or oversized report, an engine that exits without
 a frame) rejects `run()` with `NikaProtocolError` instead.
 
+A complete native refusal must end its stream and exit with its own status
+within two seconds. Otherwise the SDK stops the engine and rejects with
+`NikaProtocolError`, preserving the refusal data as `cause` without inventing
+an exit status.
+
+Native admission waits for the first complete machine frame, including the
+end of a legacy pretty report. By default this wait is unbounded and is not
+qualified for unattended use. Bound it explicitly:
+
+```ts
+const run = await nika.run('./workflow.nika', {
+  admission: { timeoutMs: 30_000, signal: abortController.signal },
+});
+```
+
+The bound covers the owned identity probe and admission. If it expires or the
+caller aborts, the SDK stops the process it started before rejecting with
+`NikaTransportError`; the message says whether the process was seen to exit.
+After admission, these bounds are released and do not cancel the running
+workflow. HTTP rejects `admission` before making any request.
+
 **A server's refusal.** A refusal `nika serve` types as
 `{ error: { code, message } }` becomes a `NikaOperationError` with the HTTP
 `status`, the server's `code` (`unauthorized`, `job_not_found`,

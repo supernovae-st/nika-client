@@ -104,6 +104,13 @@ Every release wave must ask and demonstrate an answer to these questions:
   `SYNTHETIC` cases are invented hostile shapes. A replay proves the SDK
   decodes those bytes, never that an engine still writes them: a new engine
   release needs a new capture.
+- Can native admission be bounded without leaving an engine or identity
+  probe alive? `test/native-run-admission-v9.test.ts` adds `SYNTHETIC`
+  controls for silent and unfinished output, ignored SIGTERM, a refusal that
+  leaves its stream open, an unfinished legacy report, hostile abort listeners,
+  and concurrent runs. These prove SDK timeout, cancellation, listener release
+  and owned-process cleanup. They do not qualify engine liveness. The published
+  native admission and literal-input suites remain required positive controls.
 - What happens if the server dies after admission but before the first SSE
   frame?
 - What happens if SSE reconnects after a duplicate, gap, conflicting replay,

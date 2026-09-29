@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, readFileSync, writeFileSync } from 'node:fs';
 
 /**
  * Byte-for-byte `run --json` captures of real engines (provenance:
@@ -64,6 +64,12 @@ if (process.env.NIKA_FAKE_PID_FILE && command === 'run') {
 }
 
 if (command === '--sdk-identity') {
+  if (process.env.NIKA_FAKE_IDENTITY_HANG === '1') {
+    // SYNTHETIC: an identity probe that never answers (it ends itself after a minute).
+    if (process.env.NIKA_FAKE_PID_FILE) writeFileSync(process.env.NIKA_FAKE_PID_FILE, String(process.pid));
+    setTimeout(() => process.exit(0), 60_000);
+    return;
+  }
   console.log(JSON.stringify({
     engineVersion: '0.114.0',
     machineProtocolVersion: 1,
@@ -516,6 +522,41 @@ if (command === 'run' && argv.includes('--json')) {
       process.on('SIGTERM', () => {});
       process.stdout.write('not a machine frame\n');
       setInterval(() => {}, 60_000);
+      return;
+    }
+    // SYNTHETIC liveness shapes: an engine that never proves admission, or
+    // never ends after its refusal. Each ends itself after a minute, so a
+    // failed test cannot leave one behind for long.
+    const linger = () => setTimeout(() => process.exit(0), 60_000);
+    if (workflow.includes('admit-silent')) {
+      linger();
+      return;
+    }
+    if (workflow.includes('admit-deaf-silent')) {
+      process.on('SIGTERM', () => {});
+      linger();
+      return;
+    }
+    if (workflow.includes('admit-unfinished')) {
+      process.stdout.write('{"kind":"workflow_started"');
+      linger();
+      return;
+    }
+    if (workflow.includes('admit-refusal-open')) {
+      process.stdout.write(line(envelope));
+      linger();
+      return;
+    }
+    if (workflow.includes('admit-refusal-lingers')) {
+      // The refusal, then end of stream, from a process that stays alive.
+      process.stdout.write(line(envelope), () => closeSync(1));
+      linger();
+      return;
+    }
+    if (workflow.includes('admit-pretty-open')) {
+      // The opening lines of a pretty-printed report, never closed, then nothing.
+      process.stdout.write('{\n  "clean": false,\n  "findings": [\n');
+      linger();
       return;
     }
   }

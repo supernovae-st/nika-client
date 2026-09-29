@@ -1,4 +1,5 @@
 import {
+  NikaCompatibilityError,
   NikaConfigurationError,
   NikaRunOwnershipError,
 } from './errors.js';
@@ -227,6 +228,13 @@ export class Nika {
     workflow: string,
     options: NikaRunOptions = {},
   ): Promise<NikaRun<Outputs>> {
+    if (options.admission !== undefined && this.transportKind === 'http') {
+      throw new NikaCompatibilityError(
+        'runAdmission',
+        'http',
+        'admission bounds a native engine until its first frame; HTTP admission is bounded by requestTimeout',
+      );
+    }
     const source = await this.transport.startRun(workflowName(workflow), options);
     return this.own<Outputs>(source);
   }
@@ -497,6 +505,7 @@ export type {
   NikaRunEvent,
   NikaRunEventKind,
   NikaRunId,
+  NikaRunAdmissionOptions,
   NikaRunOptions,
   NikaRunResult,
   NikaRunSealedEvent,

@@ -1,9 +1,12 @@
 import { costReviewProtocol } from './cost-review.js';
 import { spawn, type ChildProcessByStdio } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { addAbortListener } from 'node:events';
 import type { Readable, Writable } from 'node:stream';
+import { types as utilTypes } from 'node:util';
 import {
   NikaCompatibilityError,
+  NikaConfigurationError,
   NikaProtocolError,
   NikaTransportError,
 } from '../errors.js';
@@ -95,8 +98,11 @@ interface NativeProcess {
   readonly closed: Promise<number>;
   settled(): boolean;
   diagnostics(): string;
-  /** Release stdout, end a process that is still alive, and wait for it. */
-  stop(): Promise<void>;
+  /**
+   * Release stdout, end a process that is still alive, and wait for it:
+   * true once it was seen to close, false when even SIGKILL left it unconfirmed.
+   */
+  stop(): Promise<boolean>;
 }
 
 export interface NativeProcessTransportOptions {
@@ -223,47 +229,67 @@ export class NativeProcessTransport implements Transport {
     if (options.access !== undefined || options.costReview !== undefined) {
       throw new NikaCompatibilityError('runOptions', this.kind, 'access and costReview require HTTP by-name admission');
     }
-    // A map the SDK cannot send is the caller's mistake: it needs no engine.
+    // The caller's admission bounds, then a map the SDK cannot send: the
+    // caller's mistakes, judged before anything is spawned, the probe included.
+    const bounds = admissionBounds(options.admission);
     const inputs = literalInputs(options);
-    const identity = await this.ensureReady();
-    if (options.idempotencyKey !== undefined) {
-      throw new NikaCompatibilityError(
-        'idempotencyKey',
-        this.kind,
-        'idempotencyKey is an HTTP admission option',
-      );
-    }
-    if (inputs && !identity.supportedCapabilities.includes(INPUTS_LITERAL)) {
-      // An engine from before the channel is refused here, before any run is
-      // spawned. `--var` is not a fallback: it reads `@env:NAME` and coerces
-      // text by declared type, so it cannot carry literal values.
-      throw new NikaCompatibilityError(
-        INPUTS_LITERAL,
-        this.kind,
-        `Engine ${identity.engineVersion} at ${this.options.engine.bin} does not advertise `
-        + `${INPUTS_LITERAL} (advertised: ${identity.supportedCapabilities.join(', ')}); `
-        + 'run({ inputs }) needs the literal input channel `nika run --inputs-json -`. '
-        + 'The SDK never falls back to --var, which reads @env: and coerces by declared type',
-      );
-    }
-    const args = ['run', workflow, '--json', ...runFlags(options, inputs !== undefined)];
-    const spawnOptions = { cwd: this.options.cwd, shell: false } as const;
-    const child: EngineChild = inputs
-      ? spawn(this.options.engine.bin, args, { ...spawnOptions, stdio: ['pipe', 'pipe', 'pipe'] })
-      : spawn(this.options.engine.bin, args, { ...spawnOptions, stdio: ['ignore', 'pipe', 'pipe'] });
-    // stdin is absent only when the spawn itself failed, which `closed` reports.
-    if (inputs && child.stdin) writeLiteralInputs(child.stdin, inputs.json);
-    // The spawn that executes the workflow is the one that judges it: the
-    // engine re-checks on run, so no preflight check and no second spawn.
-    const engine = this.nativeProcess(child);
-    let first: NikaEvent;
+    const gate = new AdmissionGate(bounds, this.kind);
+    let engine: NativeProcess | undefined;
+    let probing = false;
     try {
-      first = await this.admission(engine);
+      gate.throwIfEnded();
+      probing = true;
+      // Bounded admission owns its probe, as compile does: the bound stops it
+      // and waits for it, and an aborted probe is never this client's cached identity.
+      const identity = bounds
+        ? await verifyNikaEngine(this.options.engine, {
+          signal: gate.signal, killGraceMs: STOP_GRACE_MILLISECONDS,
+        })
+        : await this.ensureReady();
+      probing = false;
+      if (options.idempotencyKey !== undefined) {
+        throw new NikaCompatibilityError(
+          'idempotencyKey',
+          this.kind,
+          'idempotencyKey is an HTTP admission option',
+        );
+      }
+      if (inputs && !identity.supportedCapabilities.includes(INPUTS_LITERAL)) {
+        // An engine from before the channel is refused here, before any run is
+        // spawned. `--var` is not a fallback: it reads `@env:NAME` and coerces
+        // text by declared type, so it cannot carry literal values.
+        throw new NikaCompatibilityError(
+          INPUTS_LITERAL,
+          this.kind,
+          `Engine ${identity.engineVersion} at ${this.options.engine.bin} does not advertise `
+          + `${INPUTS_LITERAL} (advertised: ${identity.supportedCapabilities.join(', ')}); `
+          + 'run({ inputs }) needs the literal input channel `nika run --inputs-json -`. '
+          + 'The SDK never falls back to --var, which reads @env: and coerces by declared type',
+        );
+      }
+      const args = ['run', workflow, '--json', ...runFlags(options, inputs !== undefined)];
+      const spawnOptions = { cwd: this.options.cwd, shell: false } as const;
+      const child: EngineChild = inputs
+        ? spawn(this.options.engine.bin, args, { ...spawnOptions, stdio: ['pipe', 'pipe', 'pipe'] })
+        : spawn(this.options.engine.bin, args, { ...spawnOptions, stdio: ['ignore', 'pipe', 'pipe'] });
+      // stdin is absent only when the spawn itself failed, which `closed` reports.
+      if (inputs && child.stdin) writeLiteralInputs(child.stdin, inputs.json);
+      // The spawn that executes the workflow is the one that judges it: the
+      // engine re-checks on run, so no preflight check and no second spawn.
+      engine = this.nativeProcess(child);
+      const first = await this.admission(engine, gate);
+      return this.processRun(randomUUID() as NikaRunId, engine, first);
     } catch (cause) {
-      await engine.stop();
-      throw cause;
+      // No run exists: a refused, unreadable or abandoned engine is stopped,
+      // never orphaned, and the caller hears whether it was seen to exit.
+      const exited = engine ? await engine.stop() : undefined;
+      const halt = cause instanceof AdmissionHalt ? cause : probing ? gate.halt() : undefined;
+      if (!halt) throw cause;
+      if (engine) throw halt.error(exited ? 'exited' : 'unconfirmed');
+      throw halt.error(probing ? 'probe' : 'none');
+    } finally {
+      gate.release();
     }
-    return this.processRun(randomUUID() as NikaRunId, engine, first);
   }
 
   async attachRun(_id: string, _options: NikaAttachRunOptions): Promise<TransportRun> {
@@ -393,13 +419,13 @@ export class NativeProcessTransport implements Transport {
         void lines.return(undefined).catch(() => {});
         // A map the engine never read must not outlive the run in the writer.
         child.stdin?.destroy();
-        if (settled) return;
+        if (settled) return true;
         // Ask first so a live engine can settle its journal, then insist: an
         // engine that ignores SIGTERM must never hold a caller's rejection.
         child.kill('SIGTERM');
-        if (await endsWithin(closed, STOP_GRACE_MILLISECONDS)) return;
+        if (await endsWithin(closed, STOP_GRACE_MILLISECONDS)) return true;
         child.kill('SIGKILL');
-        await endsWithin(closed, STOP_GRACE_MILLISECONDS);
+        return endsWithin(closed, STOP_GRACE_MILLISECONDS);
       },
     };
   }
@@ -411,14 +437,19 @@ export class NativeProcessTransport implements Transport {
    * is its one pre-run refusal object; anything else proves neither and stays
    * a protocol fault. The SDK reads which one the engine wrote and judges
    * nothing itself.
+   *
+   * Until that first frame is complete (a legacy pretty report included, to
+   * its end of stream), only the caller's opt-in admission bounds limit the
+   * wait: every read goes through the gate. Once it decided, they no longer
+   * reach this run; a refusal then has the stop grace to exit on its own.
    */
-  private async admission(engine: NativeProcess): Promise<NikaEvent> {
+  private async admission(engine: NativeProcess, gate: AdmissionGate): Promise<NikaEvent> {
     const { lines } = engine;
     const kind = this.kind;
-    const opening = await lines.next();
+    const opening = await gate.wait(lines.next());
     if (opening.done) {
       // A process that never spawned ends stdout too: `closed` rejects with it.
-      const exitCode = await engine.closed;
+      const exitCode = await gate.wait(engine.closed);
       // LEGACY(≤0.119) · dialect 3: the refusal is on stderr alone.
       const taught = legacyStderrRefusal(engine.diagnostics(), exitCode);
       if (taught) throw runRefusalError(kind, taught, exitCode);
@@ -440,7 +471,10 @@ export class NativeProcessTransport implements Transport {
     let refusal: RunRefusal | undefined;
     if (frame) {
       // One compact line: the only place admission evidence can come from.
-      if (isRunEvent(frame)) return frame as NikaEvent;
+      if (isRunEvent(frame)) {
+        gate.release();
+        return frame as NikaEvent;
+      }
       refusal = preRunRefusal(frame, kind);
     } else {
       // LEGACY(≤0.119) · dialect 2, a plain teaching line, then dialect 1, a
@@ -448,9 +482,11 @@ export class NativeProcessTransport implements Transport {
       // Both recover a refusal or nothing: neither can ever admit a run.
       refusal = legacyTeachingLine(line);
       if (!refusal) {
+        // The report reads on to its end of stream: each read stays under the gate.
+        const gated: AsyncIterator<string> = { next: () => gate.wait(lines.next()) };
         const report = await legacyPrettyReport(
           line,
-          lines,
+          gated,
           this.options.machineBufferBytes,
           kind,
         );
@@ -459,32 +495,60 @@ export class NativeProcessTransport implements Transport {
         refusal = preRunRefusal(report.frame, kind);
       }
     }
+    // The first frame is complete and decided: nothing the caller does reaches this run now.
+    gate.release();
     if (!refusal) {
       throw new NikaProtocolError(kind, quoted(
         'The first machine frame was neither a run event nor a pre-run refusal object',
         text,
       ));
     }
+    return this.settleRefusal(engine, refusal);
+  }
 
-    // A refusal is the whole stream. Anything after it, a run event above
-    // all, means this was not the refusal it looked like.
-    const extra = await lines.next();
-    if (!extra.done) {
-      throw new NikaProtocolError(kind, quoted(
-        'Engine wrote more machine output after its pre-run refusal',
-        extra.value,
-      ));
-    }
-    // The real exit status, read after the engine ended on its own. A success
-    // exit contradicts the refusal, and a contradiction is never a verdict.
-    const exitCode = await engine.closed;
-    if (exitCode === 0) {
-      throw new NikaProtocolError(kind, quoted(
-        'Engine wrote a pre-run refusal but exited 0',
+  /**
+   * A refusal is the whole stream, and the real exit status is read after the
+   * engine ended on its own. Both must come within the stop grace; otherwise
+   * the refusal never settled, and the SDK stops the engine and says so,
+   * keeping what the engine wrote as the error's cause.
+   */
+  private async settleRefusal(engine: NativeProcess, refusal: RunRefusal): Promise<never> {
+    const kind = this.kind;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const expired = new Promise<never>((_resolve, reject) => {
+      timer = setTimeout(() => reject(new AdmissionHalt((shutdown) => new NikaProtocolError(kind, quoted(
+        `Engine wrote a pre-run refusal but did not exit within ${STOP_GRACE_MILLISECONDS} ms; `
+        + shutdownWords(shutdown),
         refusal.message,
-      ));
+      ), { cause: refusal }))), STOP_GRACE_MILLISECONDS);
+    });
+    expired.catch(() => {});
+    const within = <T>(step: Promise<T>): Promise<T> => {
+      step.catch(() => {});
+      return Promise.race([step, expired]);
+    };
+    try {
+      // Anything after the refusal, a run event above all, means this was not
+      // the refusal it looked like.
+      const extra = await within(engine.lines.next());
+      if (!extra.done) {
+        throw new NikaProtocolError(kind, quoted(
+          'Engine wrote more machine output after its pre-run refusal',
+          extra.value,
+        ));
+      }
+      // A success exit contradicts the refusal, and a contradiction is never a verdict.
+      const exitCode = await within(engine.closed);
+      if (exitCode === 0) {
+        throw new NikaProtocolError(kind, quoted(
+          'Engine wrote a pre-run refusal but exited 0',
+          refusal.message,
+        ));
+      }
+      throw runRefusalError(kind, refusal, exitCode);
+    } finally {
+      clearTimeout(timer);
     }
-    throw runRefusalError(kind, refusal, exitCode);
   }
 
   private processRun(id: NikaRunId, engine: NativeProcess, first: NikaEvent): TransportRun {
@@ -582,7 +646,9 @@ export class NativeProcessTransport implements Transport {
         );
         return cancelPromise;
       },
-      cleanup: () => engine.stop(),
+      cleanup: async () => {
+        await engine.stop();
+      },
     };
   }
 
@@ -655,6 +721,175 @@ const ENGINE_PREFIX = /^nika:\s*/;
 const DIAGNOSTIC_EXCERPT_LIMIT = 240;
 /** How long an engine asked to end may take, per signal, before the SDK moves on. */
 const STOP_GRACE_MILLISECONDS = 2_000;
+const MAX_ADMISSION_TIMEOUT_MS = 2_147_483_647;
+const SIGNAL_INTERFACE = new Set([
+  'aborted', 'reason', 'onabort', 'throwIfAborted', 'addEventListener', 'removeEventListener', 'dispatchEvent',
+]);
+// The intrinsics, so a caller that shadows them after the call cannot change what runs.
+const signalAborted = Object.getOwnPropertyDescriptor(AbortSignal.prototype, 'aborted')?.get;
+const signalReason = Object.getOwnPropertyDescriptor(AbortSignal.prototype, 'reason')?.get;
+const removeSignalListener = EventTarget.prototype.removeEventListener;
+
+/** The caller's opt-in bounds on one native admission. */
+interface AdmissionBounds {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
+/** What had happened to the engine process when the SDK stopped waiting. */
+type Shutdown = 'none' | 'probe' | 'exited' | 'unconfirmed';
+
+function shutdownWords(shutdown: Shutdown): string {
+  switch (shutdown) {
+    case 'none': return 'no engine process was started';
+    case 'probe': return 'the engine identity probe it was waiting on ended and no run was started';
+    case 'exited': return 'the engine process was stopped and has exited';
+    case 'unconfirmed':
+      return `the engine process was sent SIGTERM, then SIGKILL, and had not exited ${STOP_GRACE_MILLISECONDS} ms `
+        + 'later: its shutdown is unconfirmed';
+  }
+}
+
+/** The SDK stopped waiting for admission; the public error is made once the engine's fate is known. */
+class AdmissionHalt extends Error {
+  constructor(private readonly finish: (shutdown: Shutdown) => Error) {
+    super('native admission stopped');
+  }
+
+  error(shutdown: Shutdown): Error {
+    return this.finish(shutdown);
+  }
+}
+
+/**
+ * One admission's opt-in bounds: a deadline and the caller's signal, either
+ * of which stops the wait before the first complete frame. It stops no
+ * process itself and never reaches an admitted run: `release()` removes its
+ * timer and listener on every path, and whoever owns a process stops it. Its
+ * own `signal` (never the caller's) is what the probe it bounds listens to.
+ */
+class AdmissionGate {
+  private readonly halted: Promise<never>;
+  private reject!: (halt: AdmissionHalt) => void;
+  private stopped?: AdmissionHalt;
+  private timer?: ReturnType<typeof setTimeout>;
+  private readonly onAbort: () => void;
+  private readonly controller = new AbortController();
+
+  constructor(private readonly bounds: AdmissionBounds | undefined, kind: NikaTransportKind) {
+    this.halted = new Promise<never>((_resolve, reject) => {
+      this.reject = reject;
+    });
+    this.halted.catch(() => {});
+    const signal = bounds?.signal;
+    this.onAbort = () => {
+      const reason: unknown = signal ? signalReason?.call(signal) : undefined;
+      this.stop(new AdmissionHalt((shutdown) => new NikaTransportError(
+        kind,
+        `run admission aborted by caller; ${shutdownWords(shutdown)}`,
+        { cause: reason instanceof Error ? reason : undefined },
+      )));
+    };
+    if (signal) {
+      // addAbortListener, not addEventListener: an earlier listener's
+      // stopImmediatePropagation() cannot keep the caller's abort from here.
+      if (signalAborted?.call(signal)) this.onAbort();
+      else addAbortListener(signal, this.onAbort);
+    }
+    const timeoutMs = bounds?.timeoutMs;
+    if (timeoutMs !== undefined && !this.stopped) {
+      this.timer = setTimeout(() => this.stop(new AdmissionHalt((shutdown) => new NikaTransportError(
+        kind,
+        `run admission timed out after ${timeoutMs} ms; ${shutdownWords(shutdown)}`,
+      ))), timeoutMs);
+    }
+  }
+
+  /** Aborted once a bound fired: the probe this gate bounds stops on it. */
+  get signal(): AbortSignal {
+    return this.controller.signal;
+  }
+
+  /** Before anything is spawned: a bound that already fired starts nothing. */
+  throwIfEnded(): void {
+    if (this.stopped) throw this.stopped;
+  }
+
+  /** The halt, once a bound fired. */
+  halt(): AdmissionHalt | undefined {
+    return this.stopped;
+  }
+
+  /** The step's own outcome, unless a bound fired first. */
+  wait<T>(step: Promise<T>): Promise<T> {
+    if (!this.bounds) return step;
+    step.catch(() => {});
+    return Promise.race([step, this.halted]);
+  }
+
+  release(): void {
+    clearTimeout(this.timer);
+    const signal = this.bounds?.signal;
+    if (signal) removeSignalListener.call(signal, 'abort', this.onAbort);
+  }
+
+  private stop(halt: AdmissionHalt): void {
+    if (this.stopped) return;
+    this.stopped = halt;
+    this.release();
+    this.reject(halt);
+    this.controller.abort();
+  }
+}
+
+/** The caller's admission bounds, judged before anything is spawned. */
+function admissionBounds(value: unknown): AdmissionBounds | undefined {
+  if (value === undefined) return undefined;
+  const refuse = (detail: string) => new NikaConfigurationError(`run({ admission }): ${detail}`);
+  if (value === null || typeof value !== 'object' || utilTypes.isProxy(value) || Array.isArray(value)
+    || (Object.getPrototypeOf(value) !== Object.prototype && Object.getPrototypeOf(value) !== null)) {
+    throw refuse('admission must be a plain object with signal and/or timeoutMs');
+  }
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  const fields: Record<string, unknown> = {};
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if (key !== 'signal' && key !== 'timeoutMs') {
+      throw refuse(`unknown option ${String(key)}; admission takes signal and timeoutMs`);
+    }
+    const descriptor = descriptors[key];
+    if (!('value' in descriptor)) throw refuse(`${key} must be a data property`);
+    fields[key] = descriptor.value;
+  }
+  const { signal, timeoutMs } = fields;
+  if (timeoutMs !== undefined && (typeof timeoutMs !== 'number' || !Number.isSafeInteger(timeoutMs)
+    || timeoutMs < 1 || timeoutMs > MAX_ADMISSION_TIMEOUT_MS)) {
+    throw refuse(`timeoutMs must be a positive safe integer between 1 and ${MAX_ADMISSION_TIMEOUT_MS} milliseconds`);
+  }
+  if (signal !== undefined && !isAbortSignal(signal)) throw refuse('signal must be an AbortSignal');
+  if (signal === undefined && timeoutMs === undefined) return undefined;
+  return {
+    ...(signal === undefined ? {} : { signal: signal as AbortSignal }),
+    ...(timeoutMs === undefined ? {} : { timeoutMs: timeoutMs as number }),
+  };
+}
+
+/** A genuine AbortSignal, judged without reading any Proxy or caller-shadowed member. */
+function isAbortSignal(value: unknown): boolean {
+  if (value === null || typeof value !== 'object' || utilTypes.isProxy(value)
+    || Object.getPrototypeOf(value) !== AbortSignal.prototype) return false;
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  for (const key of Reflect.ownKeys(descriptors)) {
+    if ((typeof key === 'string' && SIGNAL_INTERFACE.has(key)) || !('value' in descriptors[key as string])) {
+      return false;
+    }
+  }
+  try {
+    signalAborted?.call(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /** Whether `settling` settled, either way, inside the grace. Never rejects. */
 function endsWithin(settling: Promise<unknown>, milliseconds: number): Promise<boolean> {

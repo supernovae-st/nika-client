@@ -153,6 +153,9 @@ jobs:
               --workflows "$workflows_dir" \
               --token-file "$token_file" \
               --state-root "$state_dir" \
+              --authoring-model mock/echo \
+              --authoring-repairs 0 \
+              --cost-review \
               --plain
           ) >"$probe_root/server.log" 2>&1 &
           server_pid=$!
@@ -207,6 +210,7 @@ jobs:
         env:
           NIKA_BIN: ${{ runner.temp }}/nika-candidate/nika
           NIKA_COMPILE_PARITY_REPORT: ${{ runner.temp }}/nika-candidate-replay/compile-parity.json
+          NIKA_COMPILE_PARITY_PROFILE: full
         run: |
           set -euo pipefail
           mkdir -p "$(dirname "$NIKA_COMPILE_PARITY_REPORT")"

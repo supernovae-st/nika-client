@@ -233,3 +233,19 @@ retain their own measured and synthetic fixture provenance. Unit doubles and
 package checks do not qualify a real provider or the V9 semantic compiler.
 Exact-artifact consumer, effect, trace-integrity and independent business
 campaigns are still required before publication claims.
+
+
+### Candidate OpenAPI server profile
+
+The candidate workflow seats the optional native authoring and cost-review
+contracts when it compares the live schema with the packaged V9 schema.
+`NIKA_COMPILE_PARITY_PROFILE=full` selects that same server profile for the
+packed compile consumer replay. A keyless `mock/echo` authoring seat exposes
+the generation-2 contract; the parity cases use generation 1 and make no
+provider call. Capability checks require all three optional capabilities
+before exact schema equality is tested. This is contract and consumer
+qualification, not evidence of provider authoring quality.
+
+The default parity profile remains `foundation`. The release workflow still
+compares the exact public engine asset and remains red while the SDK's future
+contract is ahead of that release. Candidate success never waives that gate.

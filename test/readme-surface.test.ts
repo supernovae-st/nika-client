@@ -42,7 +42,9 @@ describe('packed public documentation', () => {
     expect(readme).toContain('`live_backpressure`');
     expect(readme).not.toContain('observer ceiling, default 256');
     // What a published 0.120.3 program must not assume on this line.
-    expect(readme).toContain('Two published 0.120.3 surfaces');
+    expect(readme).toContain('line still differs, such a program must not assume the published surface');
+    expect(readme).toContain('(`NikaPublishedCompileOutcome`) with `ready` exactly');
+    expect(readme).toContain('The kept-round replay token is never handed');
     expect(readme).toContain('the same `NikaCheckFinding` shape');
     expect(readme).toContain('`run()` then rejects, before any `NikaRun` exists');
     expect(readme).not.toContain('settles `run.result()` with a `NikaOperationError`');

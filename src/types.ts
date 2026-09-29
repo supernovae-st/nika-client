@@ -29,12 +29,78 @@ export type NikaJournalEvidence = components['schemas']['JournalEvidence'];
 export interface NikaCompileOptions {
   /** Stops waiting, not a dispatched provider call. A lost answer may be billed and is never retried. */
   signal?: AbortSignal;
+  /**
+   * A client deadline in positive integer milliseconds: it aborts the wait
+   * (`NikaTransportError`, « compile timed out ») and releases its timer
+   * when the compile ends. Like `signal`, it never revokes a sent request.
+   * Without it the resident's own authoring deadline applies.
+   */
+  timeoutMs?: number;
 }
 export interface NikaCompileResult {
   outcome: NikaCompileOutcome;
   /** Opaque kept-round token; valid only with this server and the exact original input. */
   replayToken?: string;
 }
+
+/** One structured constant edit, mirroring the engine's `set_constant`. */
+export interface NikaCompileSetConstant {
+  set_constant: {
+    /** Bare constant name (no `const.` prefix, no path). */
+    name: string;
+    /** The new literal, as a strict JSON value. */
+    value: unknown;
+  };
+}
+
+/**
+ * The published 0.120 CREATE request: an intent (or its bare-string
+ * shorthand), optionally with answers to the engine's stable question keys
+ * as strict JSON values.
+ */
+export interface NikaPublishedCompileCreateRequest {
+  intent: string;
+  answers?: Record<string, unknown>;
+  workflow?: never;
+  change?: never;
+  compile_version?: never;
+}
+
+/** The published 0.120 EDIT request: the accepted workflow's source and one change. */
+export interface NikaPublishedCompileEditRequest {
+  /** The accepted workflow's exact source (as a string). */
+  workflow: string;
+  change: string | NikaCompileSetConstant;
+  answers?: Record<string, unknown>;
+  intent?: never;
+  compile_version?: never;
+}
+
+/**
+ * A compile request in the published 0.120 shape. It carries no
+ * `compile_version`, which is how `compile()` tells it from the typed V9
+ * request, and it resolves the published outcome projection, never a replay
+ * token.
+ */
+export type NikaPublishedCompileRequest = NikaPublishedCompileCreateRequest | NikaPublishedCompileEditRequest;
+
+/**
+ * The published outcome projection: the resident's outcome as this line
+ * validates it, with `ready` derived exactly as `status === 'ready'`. Fields
+ * the V9 contract adds (such as `requested_trigger`) are kept.
+ */
+export type NikaPublishedCompileOutcome = NikaCompileOutcome & { ready: boolean };
+
+/** The engine's own completeness words (the published name for the outcome's status). */
+export type NikaCompileStatus = NikaCompileOutcome['status'];
+/** One authoring question, as the resident emitted it (the published name). */
+export type NikaCompileQuestion = NikaCompileOutcome['questions'][number];
+/** One structured authoring finding, as the resident emitted it (the published name). */
+export type NikaCompileDiagnostic = NikaCompileOutcome['diagnostics'][number];
+/** Authoring provenance: not program identity, not execution proof (the published name). */
+export type NikaCompileProvenance = NikaCompileOutcome['provenance'];
+/** The candidate's source-only check judgment (the published name). */
+export type NikaCompilePreview = NonNullable<NikaCompileOutcome['check_preview']>;
 
 interface NikaSharedConfig {
   /**

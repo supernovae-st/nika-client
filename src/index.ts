@@ -6,6 +6,15 @@ import { HttpTransport } from './lib/http-transport.js';
 import { NativeProcessTransport } from './lib/native-process-transport.js';
 import { NikaEngineUnavailable, resolveNikaEngine } from './lib/binary/index.js';
 import { RunSession } from './lib/run-session.js';
+import {
+  checkTimeout,
+  isPublishedCompileRequest,
+  publishedCompileOptions,
+  publishedCompileWire,
+  publishedOutcome,
+  refuseHybridRequest,
+  withDeadline,
+} from './lib/published-compile.js';
 import type { Transport, TransportRun } from './lib/transport.js';
 import type { NikaEngineIdentity } from './lib/engine-identity.js';
 export type { NikaEngineIdentity } from './lib/engine-identity.js';
@@ -21,6 +30,8 @@ import type {
   NikaCompileRequest,
   NikaCompileOptions,
   NikaCompileResult,
+  NikaPublishedCompileOutcome,
+  NikaPublishedCompileRequest,
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckOptions,
@@ -133,9 +144,46 @@ export class Nika {
     return this.transport.serverIdentity();
   }
 
-  /** Compile through a resident HTTP authority, without saving, running, or automatic retries. */
-  compile(request: NikaCompileRequest, options: NikaCompileOptions = {}): Promise<NikaCompileResult> {
-    return this.transport.compile(request, options);
+  /**
+   * Compile through a resident HTTP authority, without saving, running, or
+   * automatic retries.
+   *
+   * A typed V9 request (it carries `compile_version`) resolves the outcome and
+   * the kept-round `replayToken`. A request in the published 0.120 shape (an
+   * intent string, `{ intent }`, or `{ workflow, change }`) is validated as
+   * published, sent as the same `compile_version: 1` wire, and resolves the
+   * outcome itself with `ready`, never a replay token. A request is one or the
+   * other: a hybrid is refused, never reinterpreted. A native process refuses
+   * with `NikaCompatibilityError`.
+   */
+  compile(request: NikaCompileRequest, options?: NikaCompileOptions): Promise<NikaCompileResult>;
+  compile(
+    request: string | NikaPublishedCompileRequest,
+    options?: NikaCompileOptions,
+  ): Promise<NikaPublishedCompileOutcome>;
+  async compile(
+    request: NikaCompileRequest | string | NikaPublishedCompileRequest,
+    options: NikaCompileOptions = {},
+  ): Promise<NikaCompileResult | NikaPublishedCompileOutcome> {
+    // `async` on purpose: every failure, a caller's configuration mistake
+    // included, arrives as a rejection, never a synchronous throw.
+    if (isPublishedCompileRequest(request)) {
+      const wire = publishedCompileWire(request);
+      const checked = publishedCompileOptions(options);
+      const result = await withDeadline(
+        checked,
+        this.transportKind,
+        (signal) => this.transport.compile(wire, { signal }),
+      );
+      return publishedOutcome(result);
+    }
+    refuseHybridRequest(request);
+    checkTimeout(options.timeoutMs);
+    return withDeadline(
+      options,
+      this.transportKind,
+      (signal) => this.transport.compile(request, { ...options, signal }),
+    );
   }
 
   /** Prepare a review; this can hold the project cost lease, but never starts a job. */
@@ -408,6 +456,16 @@ export type {
   NikaCompileOutcome,
   NikaCompileOptions,
   NikaCompileResult,
+  NikaCompileDiagnostic,
+  NikaCompilePreview,
+  NikaCompileProvenance,
+  NikaCompileQuestion,
+  NikaCompileSetConstant,
+  NikaCompileStatus,
+  NikaPublishedCompileCreateRequest,
+  NikaPublishedCompileEditRequest,
+  NikaPublishedCompileOutcome,
+  NikaPublishedCompileRequest,
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckFinding,

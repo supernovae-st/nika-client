@@ -212,7 +212,19 @@ Covered by `npm test`:
   object that is no refusal, malformed findings, output after a refusal and a
   refusal that exits 0 stay protocol faults, and an engine that proves nothing
   is stopped (SIGTERM, then SIGKILL after its grace), never left running.
-  These are SYNTHETIC fixture cases, not engine captures.
+  One case replays a real engine capture of a required-input refusal byte for
+  byte (`test/fixtures/run-wire/README.md`); the others are SYNTHETIC fixture
+  cases, not engine captures.
+- `test/published-compile-compatibility.test.ts`: the published compile
+  shapes on the resident contract. An intent string, `{ intent, answers }` and
+  `{ workflow, change }` reach the exact `compile_version: 1` wire, with
+  `false`, `0`, `""` and `null` answers kept exactly, and resolve the outcome
+  itself with `ready` derived from `status` and never a replay token; the
+  typed V9 request keeps its outcome and token; malformed or hybrid requests
+  and invalid deadlines refuse before any request; a `timeoutMs` deadline
+  aborts the wait and its timer is released; a caller's abort stays the
+  transport's error; a native process still refuses. The packed `.mts` and
+  `.cts` consumers hold each door's type.
 
 `NikaCheckFinding` was a type-only gap: a strict TypeScript consumer written
 against published 0.120.3 could not compile here, while the same program
@@ -228,12 +240,24 @@ settle `result()` as `failed`, like an admitted failure, with the check
 findings dropped. It now keeps the published admission boundary on both
 transports.
 
+Compile was a runtime and type gap, measured on a real resident: the
+published program's `compile('hello', { timeoutMs })` was refused with 422
+(`malformed_compile_request`) because the request went out unchanged, while
+the resident's outcome underneath was the same (an identical candidate). The
+published shapes now reach the same wire and resolve the published
+projection; the typed V9 request is unchanged.
+
 Open, and not changed by this compatibility work: a program written against
 published 0.120.3 must not assume these surfaces on this line.
 
-- The compile API generation: `compile()` resolves `{ outcome, replayToken? }`
-  from typed requests here, the outcome itself with the `NikaCompile*` outcome
-  types there.
+- Native compile: published 0.120.3 compiles through the local engine; this
+  line refuses with `NikaCompatibilityError` and compiles only through a
+  resident.
+- Compile type names: `NikaCompileRequest` and `NikaCompileOutcome` keep the
+  typed V9 shapes here, so a strict consumer that annotated published shapes
+  with them names `NikaPublishedCompileRequest` and
+  `NikaPublishedCompileOutcome` instead. Without `timeoutMs` no client deadline
+  applies here, where the published package used its 30-second request timeout.
 - Run options: `inputs`, `access` and `costReview` by HTTP served name only,
   with a generated HTTP `idempotencyKey`, here; literal `inputs` on both
   transports and a required HTTP key there.

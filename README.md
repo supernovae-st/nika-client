@@ -693,12 +693,16 @@ A program written against published 0.120.3 reads the same run handle,
 lifecycle events, overflow reasons, default bound and `isNikaRunSucceeded`
 here, the same `NikaCheckFinding` shape, and the same admission boundary: a
 workflow the native engine refuses rejects `run()` itself, with no handle,
-as it does over HTTP (see [Errors](#errors)). Two published 0.120.3 surfaces
-differ on this line, so such a program must not assume them:
+as it does over HTTP (see [Errors](#errors)). Its compile calls in the
+published shape reach a resident the same way (see
+[Authoring through the resident](#authoring-through-the-resident)). Where this
+line still differs, such a program must not assume the published surface:
 
-- `compile()` resolves `{ outcome, replayToken? }` from typed requests here;
-  published 0.120.3 resolves the outcome itself and exports the
-  `NikaCompile*` outcome types this line does not.
+- `compile()` over a native process: published 0.120.3 compiles through the
+  local engine; this line refuses with `NikaCompatibilityError` and compiles
+  only through a resident.
+- A request annotated with the type `NikaCompileRequest` names the typed V9
+  request here; the published shapes are typed `NikaPublishedCompileRequest`.
 - `run()` options: here `inputs`, `access` and `costReview` ride the HTTP
   by-name admission only, and an omitted HTTP `idempotencyKey` is generated;
   published 0.120.3 binds literal `inputs` on both transports and requires the
@@ -726,10 +730,38 @@ schedule. See [the HTTP authoring contract](docs/http-api.md#authoring).
 
 Compilation waits for the resident's authoring deadline; the ordinary
 30-second HTTP admission timer does not cut a model round short. Pass
-`{ signal: AbortSignal.timeout(600_000) }` to set your own waiting deadline.
+`{ timeoutMs: 600_000 }`, or your own `signal`, to set a waiting deadline: it
+really aborts the wait and releases its timer when the compile ends.
 Stopping that wait does not cancel an already dispatched provider call.
 A lost answer may still be billed and may leave a kept round whose token
 you never received; the SDK does not retry it. JSON body reads remain bounded.
+
+The published 0.120 request shapes reach the same resident contract:
+
+```ts
+const outcome = await nika.compile('hello', { timeoutMs: 60_000 });
+if (outcome.ready) await writeFile('hello.nika', outcome.candidate ?? '');
+
+const edited = await nika.compile({
+  workflow: acceptedSource,
+  change: { set_constant: { name: 'limit', value: 10 } },
+});
+```
+
+An intent string, `{ intent, answers? }` or `{ workflow, change, answers? }`
+carries no `compile_version`, which is how `compile()` tells it from the
+typed request. It is validated as published (an unknown field, a mixed create
+and edit, or an answer that is not strict JSON refuses before any request),
+sent once as the `compile_version: 1` wire (`mode` create, or edit with the
+workflow as `source`), and resolves the outcome itself
+(`NikaPublishedCompileOutcome`) with `ready` exactly `status === 'ready'`.
+Fields the V9 contract adds, such as `requested_trigger` or a `choice`
+question, stay on the outcome. The kept-round replay token is never handed
+out on this door, as the published one never offered it: replay stays with
+the typed request. A request that mixes the two shapes (a `compile_version`
+beside a published `workflow` or a text `change`) is refused, never
+reinterpreted. Without `timeoutMs` no client deadline applies; the published
+package defaulted to its 30-second request timeout.
 
 ### Typed events, outputs, and identities
 

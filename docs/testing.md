@@ -91,7 +91,17 @@ Every release wave must ask and demonstrate an answer to these questions:
 - What happens if SSE reconnects after a duplicate, gap, conflicting replay,
   or terminal race?
 - Can one slow observer overflow without damaging another observer or
-  `run.done`?
+  `run.result()`?
+- Does one application read the same lifecycle words over the native process
+  and over HTTP, with `event.raw` still the protocol frame, and without a
+  per-task event the resident never streamed?
+- Does a frame whose state word is absent, null, future, or still running
+  stay an `engine.event` instead of being named settled?
+- Is a human gate (`paused`) kept apart from both failure and completion, and
+  the engine's `interrupted` evidence apart from a broken observation?
+- Does a program written against the published run handle run unchanged, and
+  does every compatibility door stay a view of the one session instead of a
+  second run, dispatch or stream?
 - Can two clients race the same idempotency key with equal and unequal
   snapshots?
 - Does cancellation win or replay honestly when settlement races it?
@@ -154,3 +164,61 @@ cleanup before emitting green evidence. The corpus runs in a fresh project and
 HOME. Changed fixtures require new measured results: old committed ledgers
 remain historical observations until a successful exact-version replay replaces
 them. Never relabel an old binary or weaken the replay comparison.
+
+## Published run-handle compatibility
+
+The run handle published as `@supernovae-st/nika` 0.120.3 is carried here as
+views of the one `RunSession` that owns each admitted run: `run.events()`
+projects the same bounded history into lifecycle words, `run.result()` is the
+settlement promise that `run.done` also is, and `run.status()` and
+`run.cancel()` delegate to the same transport run, whose accepted cancellation
+is memoized once. `nika.events(run)`, `nika.cancel(run)` and `nika.status(run)`
+stay as deprecated views of that same session. No view admits, dispatches,
+pumps or settles anything of its own.
+
+Covered by `npm test`:
+
+- `test/run-handle-compatibility.test.ts`: the handle's frozen member set;
+  `result()` and `done` as one promise; extracted methods; the native status
+  refusal and the resident's durable status; idempotent cancellation natively
+  and over HTTP, with one cancel request; the deprecated doors sharing the
+  handle's frames by identity, its memoized cancellation and its status; one
+  admission and one event stream over HTTP whatever mix of views and doors
+  reads the run; one transport pump for every view of both vocabularies; an
+  aborted observer ending only its own view; ownership refusals; an admitted
+  failure as result data; a broken observation rejecting `result()` and `done`
+  with the same error and recovering through `attachRun`; replay after the
+  result past the old 256 bound; the default 4096 bound to the frame;
+  `replay_truncated` with `observed` and `retained`, and `live_backpressure`
+  without them; the lifecycle projection and the success guard. The cases
+  are ported from the published line's tests. Its measured native wire files
+  and synthetic frame-count engine modes are not fixtures of this line, so
+  those laws run here over the resident's stream and over a synthetic
+  transport run.
+- `test/package-consumer.test.ts`: the same handle driven on the packed ESM
+  and CommonJS faces (native runs against the fixture engine, resident runs
+  against an in-process `fetch`), and strict `.mts` and `.cts` type checks of
+  the handle, the lifecycle event, the overflow reason and the success guard.
+- `test/one-sdk.test.ts`: the handle's exact member set over HTTP.
+
+Open, and not changed by this compatibility work: a program written against
+published 0.120.3 must not assume these surfaces on this line.
+
+- The compile API generation: `compile()` resolves `{ outcome, replayToken? }`
+  from typed requests here, the outcome itself with the `NikaCompile*` outcome
+  types there.
+- The `NikaCheckFinding` type export.
+- Run options: `inputs`, `access` and `costReview` by HTTP served name only,
+  with a generated HTTP `idempotencyKey`, here; literal `inputs` on both
+  transports and a required HTTP key there.
+- A native refusal printed before a run starts: a handle whose `result()`
+  rejects here, a rejected `run()` with no handle there.
+- The native status refusal message and one HTTP transport comment still name
+  `run.done`, which stays a valid alias.
+
+A source manifest version is not a publication claim. When this section was
+written (2026-09-29) this line's manifest read 0.118.7 while the latest npm
+release was 0.120.3, so a package built from this line is not a publishable
+upgrade over the published one. Versioning and publication stay with the
+release gates above; the committed gauntlet ledgers of earlier packages remain
+historical until an exact-version replay replaces them.

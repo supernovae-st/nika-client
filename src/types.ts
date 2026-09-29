@@ -37,7 +37,23 @@ export interface NikaCompileResult {
 }
 
 interface NikaSharedConfig {
-  /** Bound for each event subscriber. Default: 256 events. */
+  /**
+   * How many of a run's most recent frames a session retains, and therefore
+   * the most a view opened after the fact can be given, and the largest
+   * `bufferSize` a view may ask for. Default: 4096 frames. For scale, one
+   * measured fixture (a clean native run of 90 independent mock/echo infer
+   * tasks) wrote 273 frames; other shapes write more, so count your own.
+   *
+   * It is a finite bound, never a promise about the run. A run longer than it
+   * still succeeds and `run.result()` still resolves; only a late view is
+   * refused, with `NikaEventBufferOverflowError` whose `reason` is
+   * `replay_truncated` and whose `observed` says what to set. An explicit
+   * value is kept exactly as given. Each frame is bounded by
+   * `machineBufferBytes`, so the retained history holds at most
+   * `eventBufferSize * machineBufferBytes` of frame text per run. That bounds
+   * the history only: frames already handed to a consumer, other views and
+   * other runs are not counted in it.
+   */
   eventBufferSize?: number;
   /** Bound for buffered diagnostics and one machine frame. Default: 64 KiB. */
   machineBufferBytes?: number;
@@ -289,6 +305,83 @@ export type NikaEvent<
   | NikaUnknownEvent;
 
 /**
+ * The SDK's one lifecycle vocabulary, identical on both transports. Each word
+ * names a fact an engine wrote; the protocol word that carried it stays on
+ * `raw.kind`. Transports differ in cardinality, never in these names.
+ *
+ * A frame that speaks of the run's state earns its name only for a
+ * (kind, status) pair a producer defines. The engine's state word decides and
+ * is never defaulted: an absent, null, future, or still-running status, or
+ * one that contradicts its kind, stays an `engine.event`.
+ *
+ * - `run.started`: `workflow_started` · `execution.started`.
+ * - `task.scheduled` · `task.started` · `task.completed` · `task.failed`: the
+ *   native `task_*` frames. `nika serve` streams no per-task frame, so an HTTP
+ *   run yields none; the SDK never synthesizes one.
+ * - `run.waiting`: the settlement frame (`run_settled` · `execution.settled`)
+ *   carrying `paused`. A human gate holds the run: it is not failed, not a
+ *   completed execution, and stays resumable.
+ * - `run.settled`: exactly these pairs, and no other. The settlement frame
+ *   (`run_settled` · `execution.settled`) carrying `succeeded`, `failed`, or
+ *   `cancelled`; `execution.cancelled` carrying `cancelled`;
+ *   `execution.refused` carrying `failed`. A dedicated end kind with another
+ *   terminal word (a refusal that `succeeded`, a cancellation that `failed`)
+ *   contradicts itself and stays an `engine.event`.
+ * - `run.interrupted`: `workflow_interrupted` · `execution.interrupted` ·
+ *   `interrupted` carrying `interrupted`. The engine lost the execution and
+ *   its settlement is unknown: an evidence state, never a settlement. This is
+ *   an engine-reported frame, distinct from the thrown
+ *   `NikaObservationInterrupted`, which means this client lost its
+ *   observation of a run that may still be running.
+ * - `run.sealed`: `run_sealed`, native only.
+ * - `engine.event`: every other frame, including kinds this SDK version does
+ *   not know yet. Nothing is dropped; read `raw`.
+ *
+ * The projection keeps no state between frames and deduplicates nothing. The
+ * set is additive: keep a `default` branch.
+ */
+export type NikaRunEventKind =
+  | 'run.started'
+  | 'task.scheduled'
+  | 'task.started'
+  | 'task.completed'
+  | 'task.failed'
+  | 'run.waiting'
+  | 'run.settled'
+  | 'run.interrupted'
+  | 'run.sealed'
+  | 'engine.event';
+
+/**
+ * One run event in the SDK's lifecycle vocabulary, as `run.events()` yields
+ * it. It is a projection of exactly one protocol frame: `raw` is that frame,
+ * untouched, and every other field is present only when the frame stated it.
+ * An `engine.event` is given no lifecycle meaning: it carries no `status`,
+ * `task` or `error`, only its cursor and `raw`.
+ */
+export interface NikaRunEvent<
+  Outputs extends Record<string, unknown> = Record<string, unknown>,
+> {
+  readonly kind: NikaRunEventKind;
+  /** The transport whose protocol `raw` speaks. */
+  readonly transport: NikaTransportKind;
+  /** The engine's own state word, never renamed: a waiting run reads `paused`. */
+  readonly status?: NikaRunStatus;
+  /**
+   * HTTP only: the SSE sequence of this frame, the cursor to persist for
+   * `attachRun(id, { lastEventId })`. A native process has no durable replay,
+   * so a native event never carries one.
+   */
+  readonly sequence?: number;
+  /** The task a `task.*` frame named. */
+  readonly task?: string;
+  /** The failure the frame named: a failed task, or a failed settlement. */
+  readonly error?: NikaMachineError;
+  /** The exact protocol frame the engine wrote. */
+  readonly raw: NikaEvent<Outputs>;
+}
+
+/**
  * Engine-issued proof material. The SDK transports it but never constructs,
  * reads a workflow to enrich it, or verifies its claims itself.
  */
@@ -371,7 +464,13 @@ export interface NikaSettlement {
   [key: string]: unknown;
 }
 
-/** The only terminal value for a run. */
+/**
+ * The engine's result of observing an admitted run, including a paused run.
+ * Admitted workflow failure resolves with `status: 'failed'`; configuration,
+ * transport, protocol, and compatibility errors reject instead. Use
+ * `isNikaRunSucceeded(result)` before treating an observation as success.
+ * Outputs are optional even on success, and status stays forward-compatible.
+ */
 export interface NikaRunResult<
   Outputs extends Record<string, unknown> = Record<string, unknown>,
 > {
@@ -390,11 +489,65 @@ export interface NikaRunResult<
   [key: string]: unknown;
 }
 
-/** A run identity plus its one terminal settlement. */
+/**
+ * An admitted run and its whole lifecycle. `run()` and `attachRun()` return
+ * one once the transport admitted the run: a resident's refusal rejects there
+ * and yields no handle, while a native engine's refusal printed before the
+ * run starts settles `result()` with a `NikaOperationError`. Every member is
+ * bound to the run, so a method may be extracted
+ * (`const { events, result } = run`) and still works.
+ *
+ * The handle owns observation, settlement, status and cancellation, nothing
+ * else: checking, proof, catalogs and authoring stay on `Nika`. It is
+ * process-bound. To continue in another process, persist `id` and the last
+ * `event.sequence` you fully processed, then call
+ * `nika.attachRun(id, { lastEventId })`, the one recovery door.
+ *
+ * `id` is what differs by transport, and the type cannot show it:
+ * - HTTP: the resident's durable job id. This is the identity to store.
+ * - native: an ephemeral correlation id of this SDK process. It appears in no
+ *   journal and cannot be recovered after the process ends; `attachRun`
+ *   refuses it. Resume a native run through the engine's own trace.
+ */
 export interface NikaRun<
   Outputs extends Record<string, unknown> = Record<string, unknown>,
 > {
   readonly id: NikaRunId;
+  /**
+   * A bounded view of the run's events in the SDK's lifecycle vocabulary;
+   * each event keeps its protocol frame on `raw`. Transports differ in how
+   * many facts they emit, never in their names. The iterator throws for a
+   * broken observation (`NikaObservationInterrupted` carries the cursor); an
+   * admitted workflow failure ends it normally and is read from `result()`.
+   */
+  readonly events: (options?: NikaEventsOptions) => AsyncIterable<NikaRunEvent<Outputs>>;
+  /**
+   * The engine's result of observing this run, settled once. One failure law:
+   * - rejects: a transport, protocol, or compatibility fault, or a broken
+   *   observation (`NikaObservationInterrupted`, which carries the cursor).
+   *   None of them says the run failed; it may still be running.
+   * - rejects with `NikaOperationError`: a native engine refused the workflow
+   *   before the run started (a `NIKA-…` code line). Nothing ran.
+   * - resolves with `status: 'failed'`: an admitted failure is result data,
+   *   with the engine's `error.code` when the engine named one. `cancelled`
+   *   and the engine-reported `interrupted` resolve the same way.
+   * - resolves with `status: 'paused'`: a human gate holds the run. It is
+   *   neither a failure nor a completed execution.
+   * Read `isNikaRunSucceeded(result)` before treating it as success.
+   */
+  readonly result: () => Promise<NikaRunResult<Outputs>>;
+  /**
+   * The current durable status, without waiting for settlement. Only a
+   * resident owns one: a native run rejects with a typed
+   * `NikaCompatibilityError` instead of inventing a status.
+   */
+  readonly status: () => Promise<NikaRunStatus>;
+  /**
+   * Ask the engine to cancel. Idempotent: every call returns the one request.
+   * Acceptance is not a result; read what the engine recorded from `result()`.
+   */
+  readonly cancel: () => Promise<NikaCancelResult>;
+  /** Compatibility alias of `result()`: the same promise, kept while code migrates. */
   readonly done: Promise<NikaRunResult<Outputs>>;
 }
 
@@ -406,9 +559,9 @@ export interface NikaCancelResult {
    * `already_settled`: the run had already ended, nothing was cancelled.
    * `cancellation_requested`: the request was accepted while the execution
    * owner had not settled yet (a native SIGTERM, or the resident's 202); the
-   * run then settles on its own terminal, read from `run.done`, which may be
-   * `cancelled`, `succeeded`, `failed`, or `interrupted` once the resident's
-   * grace expired. Open to the engine's future words.
+   * run then settles on its own terminal, read from `run.result()`, which may
+   * be `cancelled`, `succeeded`, `failed`, or `interrupted` once the
+   * resident's grace expired. Open to the engine's future words.
    */
   status: 'cancelled' | 'already_settled' | 'cancellation_requested' | (string & {});
   transport: NikaTransportKind;
@@ -491,7 +644,12 @@ export interface NikaAttachRunOptions {
 export interface NikaEventsOptions {
   /** Stops this subscriber view. It never cancels the run. */
   signal?: AbortSignal;
-  /** Per-view queue bound, capped by the client eventBufferSize. */
+  /**
+   * Per-view queue bound, capped by the client eventBufferSize, which is also
+   * its default. A live view that falls further behind than this fails with
+   * `reason: 'live_backpressure'`; a view opened after more frames than this
+   * is refused with `reason: 'replay_truncated'`. Neither skips a frame.
+   */
   bufferSize?: number;
 }
 

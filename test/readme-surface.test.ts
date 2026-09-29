@@ -26,6 +26,25 @@ describe('packed public documentation', () => {
     expect(readme).toContain('pauseUntil:');
   });
 
+  it('teaches the published Run-owned lifecycle and keeps its compatibility doors', () => {
+    for (const member of ['run.events()', 'run.result()', 'run.status()', 'run.cancel()']) {
+      expect(readme).toContain(`\`${member}\``);
+    }
+    expect(readme).toContain('isNikaRunSucceeded(result)');
+    expect(readme).toContain('`run.done` is its compatibility');
+    for (const door of ['nika.events(run)', 'nika.cancel(run)', 'nika.status(run)']) {
+      expect(readme).toContain(`\`${door}\``);
+    }
+    expect(readme).toContain('### Migrating to the Run-owned lifecycle');
+    // One bound, two named refusals, never a silently shortened view.
+    expect(readme).toContain('**4096 by default**');
+    expect(readme).toContain('`replay_truncated`');
+    expect(readme).toContain('`live_backpressure`');
+    expect(readme).not.toContain('observer ceiling, default 256');
+    // What a published 0.120.3 program must not assume on this line.
+    expect(readme).toContain('Four published 0.120.3 surfaces differ on this line');
+  });
+
   it('exports package metadata so consumers can prove the installed pin', () => {
     expect(manifest.exports?.['./package.json']).toBe('./package.json');
     expect(readme).toContain("require('@supernovae-st/nika/package.json').version");

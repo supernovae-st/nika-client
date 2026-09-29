@@ -4,9 +4,12 @@ import type {
   NikaEvent,
   NikaEventsOptions,
   NikaRun,
+  NikaRunEvent,
   NikaRunResult,
   NikaRunStatus,
+  NikaTransportKind,
 } from '../types.js';
+import { semanticRunEvent } from './run-events.js';
 import type { TransportRun } from './transport.js';
 
 /** Owns the eager transport pump and every bounded observer view. */
@@ -20,11 +23,13 @@ export class RunSession {
   private rejectDone!: (error: Error) => void;
   private terminal = false;
   private cancelPromise?: Promise<NikaCancelResult>;
-  private historyOverflowed = false;
+  /** Every frame the pump delivered; `history` holds at most the last `eventBufferSize`. */
+  private observed = 0;
 
   constructor(
     private readonly source: TransportRun,
     private readonly eventBufferSize: number,
+    private readonly transport: NikaTransportKind,
   ) {
     this.done = new Promise<NikaRunResult>((resolve, reject) => {
       this.resolveDone = resolve;
@@ -33,20 +38,59 @@ export class RunSession {
     // A caller is allowed to observe only events; a transport failure must not
     // become a process-level unhandled rejection.
     this.done.catch(() => {});
-    this.run = Object.freeze({ id: source.id, done: this.done });
+    // The handle is this session's own lifecycle, as closures: a method a
+    // caller extracts keeps working, and nothing here can reach another run.
+    this.run = Object.freeze({
+      id: source.id,
+      events: (options?: NikaEventsOptions) => this.semanticEvents(options),
+      result: () => this.done,
+      status: () => this.status(),
+      cancel: () => this.cancel(),
+      done: this.done,
+    });
     void this.observeSettlement();
     void this.pump();
   }
 
-  events(options: NikaEventsOptions = {}): AsyncIterable<NikaEvent> {
+  /**
+   * The lifecycle vocabulary over the same bounded view: one history, one
+   * queue, and a pure per-frame projection at the edge. No second event bus.
+   */
+  semanticEvents(options: NikaEventsOptions = {}): AsyncIterableIterator<NikaRunEvent> {
+    const view = this.events(options);
+    const transport = this.transport;
+    const lifecycle: AsyncIterableIterator<NikaRunEvent> = {
+      [Symbol.asyncIterator]: () => lifecycle,
+      next: async () => {
+        const step = await view.next();
+        if (step.done) return { value: undefined, done: true };
+        return { value: semanticRunEvent(step.value, transport), done: false };
+      },
+      return: async () => {
+        await view.return?.();
+        return { value: undefined, done: true };
+      },
+    };
+    return lifecycle;
+  }
+
+  /** The protocol frames, exactly as the transport delivered them. */
+  events(options: NikaEventsOptions = {}): AsyncIterableIterator<NikaEvent> {
     const requested = options.bufferSize ?? this.eventBufferSize;
     if (!Number.isInteger(requested) || requested < 1 || requested > this.eventBufferSize) {
       throw new RangeError(
         `events bufferSize must be an integer from 1 to ${this.eventBufferSize}`,
       );
     }
-    if (this.historyOverflowed || this.history.length > requested) {
-      throw new NikaEventBufferOverflowError(this.source.id, requested);
+    // A view opened late is seeded with everything it missed, or it is
+    // refused: never a silently shortened replay. This is not backpressure
+    // (no subscriber was slow), so the refusal names the history instead:
+    // what was observed and what is still retained.
+    if (this.observed > requested) {
+      throw new NikaEventBufferOverflowError(this.source.id, requested, {
+        observed: this.observed,
+        retained: this.history.length,
+      });
     }
     const subscription = new EventSubscription(
       this.source.id,
@@ -77,7 +121,7 @@ export class RunSession {
   private async requestCancel(): Promise<NikaCancelResult> {
     const cancellation = await this.source.cancel();
     // An accepted signal is not an execution result. Observation continues
-    // independently; callers await run.done for the engine's actual verdict.
+    // independently; callers await run.result() for the engine's actual verdict.
     if (cancellation.status === 'cancellation_requested') return cancellation;
     const result = await this.source.done;
     // An active observer owns the terminal event boundary. Let the transport
@@ -105,11 +149,12 @@ export class RunSession {
   private async pump(): Promise<void> {
     try {
       for await (const event of this.source.events) {
+        this.observed += 1;
         this.history.push(event);
-        if (this.history.length > this.eventBufferSize) {
-          this.history.shift();
-          this.historyOverflowed = true;
-        }
+        // The retained history is bounded, never the run: past the capacity
+        // the oldest frame goes, and a late view is refused rather than
+        // handed a replay with a hole in it.
+        if (this.history.length > this.eventBufferSize) this.history.shift();
         for (const subscriber of [...this.subscribers]) subscriber.push(event);
       }
       this.resolveDone(await this.source.done);

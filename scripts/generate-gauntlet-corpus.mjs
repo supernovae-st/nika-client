@@ -465,10 +465,10 @@ for (const [domainIndex, domain] of domains.entries()) {
       failure_oracle: `${oracles[recipe]} for ${id}`,
       business_outcome: `${outcomes[recipe]} for ${domain.label}`,
       recipe: recipeNames[recipe],
-      workflow: `workflows/${id}.nika.yaml`,
+      workflow: `workflows/${id}.nika`,
     };
     entries.push(entry);
-    writeFileSync(join(workflowsRoot, `${id}.nika.yaml`), workflow(entry, recipe));
+    writeFileSync(join(workflowsRoot, `${id}.nika`), workflow(entry, recipe));
   }
 }
 

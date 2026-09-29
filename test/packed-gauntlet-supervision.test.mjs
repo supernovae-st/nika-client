@@ -41,7 +41,7 @@ for (const [name, script] of runners) {
     });
   }
 
-  test(`${name} interruption reaps an uncooperative build before recording red`, { timeout: 10_000 }, async () => {
+  test(`${name} interruption reaps an uncooperative build before recording red`, { timeout: 15_000 }, async () => {
     const scratch = mkdtempSync(path.join(tmpdir(), 'packed-interrupt-test-'));
     const owned = new OwnedProcesses();
     const reportPath = path.join(scratch, `${name}.json`);
@@ -56,15 +56,21 @@ for (const [name, script] of runners) {
     `, { mode: 0o755 });
     try {
       const handle = owned.start(process.execPath, [fileURLToPath(new URL(`../scripts/${script}`, import.meta.url))],
-        { timeoutMs: 7000, graceMs: 2500, env: { PATH: scratch, HOME: path.join(scratch, 'home'),
+        { timeoutMs: 12000, graceMs: 2500, env: { PATH: scratch, HOME: path.join(scratch, 'home'),
           NIKA_BIN: process.execPath, NIKA_KEYCHAIN: 'off', NIKA_GAUNTLET_RESULTS_DIR: scratch } });
+      let buildPid;
       await bounded((async () => {
-        const until = performance.now() + 1900;
-        while (!existsSync(marker) && performance.now() < until) await new Promise((resolve) => setTimeout(resolve, 10));
-        assert(existsSync(marker), 'fake build must start');
-      })(), 2000, 'fake build startup');
+        const until = performance.now() + 5900;
+        while (performance.now() < until) {
+          // Creation precedes write completion: an empty marker would become
+          // PID 0 and accidentally test our own process group instead.
+          const text = existsSync(marker) ? readFileSync(marker, 'utf8') : '';
+          if (/^[1-9][0-9]*$/.test(text)) { buildPid = Number(text); break; }
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+        assert(Number.isSafeInteger(buildPid), `fake build must publish its PID; runner exit=${handle.child.exitCode}, stderr=${handle.stderr}`);
+      })(), 6000, 'fake build startup');
       const during = JSON.parse(readFileSync(reportPath, 'utf8'));
-      const buildPid = Number(readFileSync(marker, 'utf8'));
       handle.signal('SIGINT');
       const result = await handle.done;
       gone(buildPid);

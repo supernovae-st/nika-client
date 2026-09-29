@@ -4,11 +4,11 @@ import { Nika } from '@supernovae-st/nika';
 const engine = process.env.NIKA_BIN;
 assert(engine, 'NIKA_BIN is required');
 const nika = new Nika({ bin: engine, cwd: process.cwd(), eventBufferSize: 128 });
-const checked = await nika.check('workflow.nika.yaml', { nativeStrict: true });
+const checked = await nika.check('workflow.nika', { nativeStrict: true });
 assert.equal(checked.clean, true);
 const [first, second] = await Promise.all([
-  nika.run('workflow.nika.yaml', { maxCostUsd: 0 }),
-  nika.run('workflow.nika.yaml', { maxCostUsd: 0 }),
+  nika.run('workflow.nika', { maxCostUsd: 0 }),
+  nika.run('workflow.nika', { maxCostUsd: 0 }),
 ]);
 const eventKinds = [];
 const observation = (async () => {

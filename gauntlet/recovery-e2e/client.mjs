@@ -12,7 +12,7 @@ const config = {
 const nika = new Nika(config);
 
 if (mode === 'producer') {
-  const run = await nika.run('workflow.nika.yaml', {
+  const run = await nika.run('workflow.nika', {
     idempotencyKey: 'sdk-0116-two-process-recovery',
   });
   for await (const event of nika.events(run)) {

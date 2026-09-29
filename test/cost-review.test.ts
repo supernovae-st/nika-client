@@ -98,7 +98,7 @@ describe('explicit, single-use cost review', () => {
     const operation = op === 'prepare' ? nika.prepareCostReview(request)
       : op === 'read' ? nika.costReview(id)
         : op === 'decide' ? nika.decideCostReview(id, { decision: 'decline', witness_sha256: hash })
-          : nika.run('daily.nika', { costReview: { review_id: id, witness_sha256: hash } });
+          : nika.run('daily.nika', { costReview: { review_id: id, witness_sha256: hash }, idempotencyKey: 'review-job' });
     await expect(operation).rejects.toBeInstanceOf(NikaCompatibilityError);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
@@ -128,18 +128,18 @@ describe('explicit, single-use cost review', () => {
 
   it('refuses inputs on a server without jobInputs instead of dropping them', async () => {
     const { nika, fetch } = remote(() => { throw new Error('must not dispatch'); }, caps.filter(c => c !== 'jobInputs'));
-    await expect(nika.run('daily.nika', { inputs: request.inputs })).rejects.toBeInstanceOf(NikaCompatibilityError);
+    await expect(nika.run('daily.nika', { inputs: request.inputs, idempotencyKey: 'input-job' })).rejects.toBeInstanceOf(NikaCompatibilityError);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
   it('rejects HTTP-only options before local source capture or process verification', async () => {
     const resolveEngine = vi.fn(() => { throw new Error('must not resolve'); });
     const http = new HttpTransport({ url: 'https://nika.example', token, fetch: vi.fn(), requestTimeout: 100, machineBufferBytes: 4096, resolveEngine });
-    await expect(http.startRun('/absolute/workflow.nika', { costReview: { review_id: id, witness_sha256: hash } }))
+    await expect(http.startRun('/absolute/workflow.nika', { costReview: { review_id: id, witness_sha256: hash }, idempotencyKey: 'snapshot-job' }))
       .rejects.toBeInstanceOf(NikaCompatibilityError);
     expect(resolveEngine).not.toHaveBeenCalled();
     const native = new NativeProcessTransport({ engine: {} as never, machineBufferBytes: 4096 });
-    await expect(native.startRun('daily.nika', { inputs: {} })).rejects.toBeInstanceOf(NikaCompatibilityError);
+    await expect(native.startRun('daily.nika', { costReview: { review_id: id, witness_sha256: hash } })).rejects.toBeInstanceOf(NikaCompatibilityError);
     await expect(native.prepareCostReview(request, {})).rejects.toBeInstanceOf(NikaCompatibilityError);
   });
 

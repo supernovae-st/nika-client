@@ -15,7 +15,7 @@ function client(event: Record<string, unknown>) {
 describe('current resident event and journal evidence contract', () => {
   it('keeps event time and journal loss separate from successful execution', async () => {
     const nika = client({ at: '2026-09-28T02:35:00Z', evidence: loss });
-    const run = await nika.run('workflows/flow.nika');
+    const run = await nika.run('workflows/flow.nika', { idempotencyKey: 'evidence-case' });
     const events = [];
     for await (const event of nika.events(run)) events.push(event);
     expect(events[0]).toMatchObject({ at: '2026-09-28T02:35:00Z', evidence: loss });
@@ -29,7 +29,7 @@ describe('current resident event and journal evidence contract', () => {
     { evidence: { status: 'mirror_lost', reason: 'invented' } },
     { evidence: null }, { private_field: 'still-forbidden' },
   ])('refuses invalid or private event fields: %j', async (event) => {
-    const run = await client(event).run('workflows/flow.nika');
+    const run = await client(event).run('workflows/flow.nika', { idempotencyKey: 'evidence-case' });
     await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);
   });
 

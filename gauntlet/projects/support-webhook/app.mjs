@@ -6,9 +6,9 @@ const server = createServer(async (request, response) => {
   const chunks = [];
   for await (const chunk of request) chunks.push(chunk);
   const ticket = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  const checked = await nika.check('workflow.nika.yaml', { nativeStrict: true });
+  const checked = await nika.check('workflow.nika', { nativeStrict: true });
   if (!checked.clean || ticket.priority !== 'urgent') throw new Error('webhook admission failed');
-  const run = await nika.run('workflow.nika.yaml', { maxCostUsd: 0 });
+  const run = await nika.run('workflow.nika', { maxCostUsd: 0 });
   const result = await run.done;
   response.writeHead(200, { 'content-type': 'application/json' });
   response.end(JSON.stringify({ ticket: ticket.id, result }));

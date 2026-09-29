@@ -20,89 +20,20 @@ export interface NikaPrepareCostReviewOptions extends NikaCostReviewOptions {
   idempotencyKey?: string;
 }
 
-/** Exact engine-owned authoring request; explicitProvider is an explicit caller opt-in. */
-export type NikaCompileRequest = components['schemas']['CompileRequest'] | components['schemas']['CompileRequestV2'];
-/** Authoring completeness is review material, never execution or schedule authority. */
-export type NikaCompileOutcome = components['schemas']['CompileOutcome'] | components['schemas']['CompileOutcomeV2'];
-/** Journal delivery loss, independent of execution success; absence proves no seal. */
-export type NikaJournalEvidence = components['schemas']['JournalEvidence'];
-export interface NikaCompileOptions {
-  /** Stops waiting, not a dispatched provider call. A lost answer may be billed and is never retried. */
-  signal?: AbortSignal;
-  /**
-   * A client deadline in positive integer milliseconds: when it fires the
-   * wait stops at once (`NikaTransportError`, « compile timed out »), even
-   * before the resident's health check answered, and nothing is sent after
-   * it; its timer is released when the compile ends. Like `signal`, it never
-   * revokes a sent request. Without it the resident's own authoring deadline
-   * applies.
-   */
-  timeoutMs?: number;
-}
+/** Exact versioned resident request; explicitProvider is an explicit caller opt-in. */
+export type NikaCompileWireRequest = components['schemas']['CompileRequest'] | components['schemas']['CompileRequestV2'];
+/** Resident authoring evidence, never execution or schedule authority. */
+export type NikaCompileWireOutcome = components['schemas']['CompileOutcome'] | components['schemas']['CompileOutcomeV2'];
 export interface NikaCompileResult {
-  outcome: NikaCompileOutcome;
-  /** Opaque kept-round token; valid only with this server and the exact original input. */
+  outcome: NikaCompileWireOutcome;
+  /** Opaque kept-round token, bound to this server and the exact original input. */
   replayToken?: string;
 }
-
-/** One structured constant edit, mirroring the engine's `set_constant`. */
-export interface NikaCompileSetConstant {
-  set_constant: {
-    /** Bare constant name (no `const.` prefix, no path). */
-    name: string;
-    /** The new literal, as a strict JSON value. */
-    value: unknown;
-  };
-}
-
-/**
- * The published 0.120 CREATE request: an intent (or its bare-string
- * shorthand), optionally with answers to the engine's stable question keys
- * as strict JSON values.
- */
-export interface NikaPublishedCompileCreateRequest {
-  intent: string;
-  answers?: Record<string, unknown>;
-  workflow?: never;
-  change?: never;
-  compile_version?: never;
-}
-
-/** The published 0.120 EDIT request: the accepted workflow's source and one change. */
-export interface NikaPublishedCompileEditRequest {
-  /** The accepted workflow's exact source (as a string). */
-  workflow: string;
-  change: string | NikaCompileSetConstant;
-  answers?: Record<string, unknown>;
-  intent?: never;
-  compile_version?: never;
-}
-
-/**
- * A compile request in the published 0.120 shape. It carries no
- * `compile_version`, which is how `compile()` tells it from the typed V9
- * request, and it resolves the published outcome projection, never a replay
- * token.
- */
-export type NikaPublishedCompileRequest = NikaPublishedCompileCreateRequest | NikaPublishedCompileEditRequest;
-
-/**
- * The published outcome projection: the resident's outcome as this line
- * validates it, with `ready` derived exactly as `status === 'ready'`. Fields
- * the V9 contract adds (such as `requested_trigger`) are kept.
- */
-export type NikaPublishedCompileOutcome = NikaCompileOutcome & { ready: boolean };
-
-/** The engine's own completeness words (the published name for the outcome's status). */
-export type NikaCompileStatus = NikaCompileOutcome['status'];
-/** One authoring question, as the resident emitted it (the published name). */
-export type NikaCompileQuestion = NikaCompileOutcome['questions'][number];
-/** One structured authoring finding, as the resident emitted it (the published name). */
-export type NikaCompileDiagnostic = NikaCompileOutcome['diagnostics'][number];
-/** Authoring provenance: not program identity, not execution proof (the published name). */
-export type NikaCompileProvenance = NikaCompileOutcome['provenance'];
-/** The candidate's source-only check judgment (the published name). */
-export type NikaCompilePreview = NonNullable<NikaCompileOutcome['check_preview']>;
+/** Compatibility aliases for the published source-only compile API. */
+export type NikaPublishedCompileRequest = NikaCompileRequest;
+export type NikaPublishedCompileCreateRequest = NikaCompileCreateRequest;
+export type NikaPublishedCompileEditRequest = NikaCompileEditRequest;
+export type NikaPublishedCompileOutcome = NikaCompileOutcome;
 
 interface NikaSharedConfig {
   /**
@@ -290,10 +221,38 @@ export interface NikaRunSealedEvent extends NikaEventFields {
 }
 
 /**
+ * A journal delivery loss the resident reported, exactly as its contract
+ * closes it: the run's journal mirror stopped recording. It is independent of
+ * the execution: a run can settle `succeeded` and still carry it. It is never
+ * a verdict and never changes a status; it says the trace may be incomplete
+ * before `traceVerify` is trusted. Its absence is only absence: it never
+ * claims that a journal exists.
+ *
+ * The pinned V9 contract carries this optional report; an older resident
+ * simply never sends it.
+ */
+export interface NikaJournalEvidence {
+  status: 'mirror_lost';
+  /** The mirror's first error, classified: never OS text, never a path. */
+  reason: 'write_failed' | 'record_refused';
+}
+
+/**
+ * Fields only the resident's frames carry. Both are optional on the wire and absent on a
+ * resident that predates them.
+ */
+interface NikaResidentEventFields extends NikaEventFields {
+  /** When the resident admitted the event: RFC 3339, UTC. Outside the event's hash chain. */
+  at?: string;
+  /** A reported journal delivery loss, on the terminal frame. */
+  evidence?: NikaJournalEvidence;
+}
+
+/**
  * The HTTP transport admitted the execution and it is running. This is the
  * first lifecycle frame `nika serve --bind` streams for a durable job.
  */
-export interface NikaExecutionStartedEvent extends NikaEventFields {
+export interface NikaExecutionStartedEvent extends NikaResidentEventFields {
   kind: 'execution.started';
 }
 
@@ -304,7 +263,7 @@ export interface NikaExecutionStartedEvent extends NikaEventFields {
  */
 export interface NikaExecutionSettledEvent<
   Outputs extends Record<string, unknown> = Record<string, unknown>,
-> extends NikaEventFields {
+> extends NikaResidentEventFields {
   kind: 'execution.settled';
   status?: NikaRunStatus;
   outputs?: Outputs;
@@ -318,13 +277,13 @@ export interface NikaExecutionSettledEvent<
  * claimed, or a running one whose owner settled the request as a
  * cancellation. It carries the settlement when the runtime built one.
  */
-export interface NikaExecutionCancelledEvent extends NikaEventFields {
+export interface NikaExecutionCancelledEvent extends NikaResidentEventFields {
   kind: 'execution.cancelled';
   settlement?: NikaSettlement;
 }
 
 /** The server refused the execution. */
-export interface NikaExecutionRefusedEvent extends NikaEventFields {
+export interface NikaExecutionRefusedEvent extends NikaResidentEventFields {
   kind: 'execution.refused';
 }
 
@@ -332,7 +291,7 @@ export interface NikaExecutionRefusedEvent extends NikaEventFields {
  * The execution was interrupted before settling. A resident that restarts
  * marks an orphaned running job with either word, so both are one variant.
  */
-export interface NikaExecutionInterruptedEvent extends NikaEventFields {
+export interface NikaExecutionInterruptedEvent extends NikaResidentEventFields {
   kind: 'execution.interrupted' | 'interrupted';
 }
 
@@ -548,12 +507,18 @@ export interface NikaRunResult<
   exitCode?: number;
   outputs?: Outputs;
   receipt?: NikaReceipt;
-  evidence?: NikaJournalEvidence;
   error?: NikaMachineError;
   /** Engine execution identity, when the transport surface reports one. */
   execution_id?: NikaExecutionId;
   /** The settlement's cause, tally and spend (engine 0.118+), when the terminal frame carried them. */
   settlement?: NikaSettlement;
+  /**
+   * HTTP only: the journal delivery loss the resident reported on the terminal
+   * frame or the durable job that settled this run. Copied, never inferred:
+   * absent when the resident reported none, which claims nothing about a
+   * journal. It never changes `status`. A native process reports none.
+   */
+  evidence?: NikaJournalEvidence;
   [key: string]: unknown;
 }
 
@@ -686,13 +651,40 @@ export interface NikaCheckOptions {
 }
 
 export interface NikaRunOptions {
+  /**
+   * Literal values for the workflow's declared `inputs:`, by name, with the
+   * same meaning on both transports. Values are strict JSON and stay literal:
+   * a string is never read as `@env:NAME`, an expression or a number, and
+   * nothing is coerced to the declared type. The engine validates the map
+   * (unknown key, type mismatch, missing required input) and refuses before
+   * any run exists. A value JSON cannot carry (`undefined`, a function, a
+   * symbol, a bigint, a non-finite number, a cycle, a class instance, a
+   * custom prototype, an array hole, an accessor, a Proxy) rejects `run()`
+   * with `NikaConfigurationError` instead of being dropped, and the
+   * serialized map is bounded at 1 MiB. No caller code runs while it is
+   * judged: no getter is invoked, and a Proxy is refused before it is read.
+   *
+   * Needs an engine that advertises the literal channel: `inputsLiteral`
+   * natively (values ride stdin, never argv), `jobInputs` over HTTP by served
+   * name. An engine without it rejects with `NikaCompatibilityError`; the SDK
+   * never falls back to `--var`. An execution snapshot freezes its inputs, so
+   * an HTTP run of a local path refuses `inputs`. Never put a secret here.
+   */
+  inputs?: Record<string, unknown>;
+  /**
+   * @deprecated Use `inputs`. `vars` is the native `--var KEY=VALUE` operator
+   * channel: the engine reads `@env:NAME` from its environment and coerces
+   * text to the declared type, so it cannot carry literal API values and has
+   * no HTTP form. Combining it with `inputs` rejects `run()`.
+   */
   vars?: Record<string, string | number | boolean>;
   model?: string;
   maxCostUsd?: number;
-  /** Retained for HTTP admission deduplication. */
+  /**
+   * Required for HTTP admission; reuse the same key and request after an
+   * uncertain response. Direct native runs reject this option.
+   */
   idempotencyKey?: string;
-  /** Typed caller inputs for a served HTTP workflow (jobInputs capability). */
-  inputs?: components['schemas']['JobByName']['inputs'];
   /** HTTP resident access profile; it must match the reviewed request. */
   access?: components['schemas']['JobByName']['access'];
   /** Caller-supplied approved review; never created or approved implicitly. */
@@ -737,7 +729,8 @@ export type NikaOperation =
   | 'workflow'
   | 'traceVerify'
   | 'schedule'
-  | 'scheduleStatus';
+  | 'scheduleStatus'
+  | 'compile';
 
 /** One engine-owned schedule finding. The vocabulary remains additive. */
 export interface NikaScheduleFinding {
@@ -896,4 +889,140 @@ export interface NikaScheduleApplyResult {
   applied: true;
   changed: boolean;
   status: NikaScheduleStatus;
+}
+
+/* ------------------------------------------------------------------ */
+/* Compile (issue #128) — the SDK projection of the engine's one       */
+/* authoring capability. Field names mirror the engine's               */
+/* `compile_version: 1` wire verbatim; the SDK invents none of them.   */
+/* ------------------------------------------------------------------ */
+
+/**
+ * One stateless authoring request. Exactly one shape:
+ *
+ * - CREATE: `{ intent }` (or the bare-string shorthand), optionally with
+ *   `answers` to the engine's stable question keys.
+ * - EDIT: `{ workflow, change }` — the accepted workflow's SOURCE plus the
+ *   change request — optionally with `answers`.
+ *
+ * The two shapes never mix, and there is no session: every call is a fresh
+ * request carrying everything the engine needs.
+ */
+export type NikaCompileRequest = NikaCompileCreateRequest | NikaCompileEditRequest;
+
+export interface NikaCompileCreateRequest {
+  /** Intent text, or an exact embedded skeleton name in this foundation. */
+  intent: string;
+  /**
+   * Answers to engine questions, by stable question key (`const.request`),
+   * as strict JSON values — never pre-serialized text. The SDK serializes
+   * each value exactly once onto the argv `KEY=JSON` channel; a value JSON
+   * cannot carry refuses with `NikaConfigurationError` before any spawn.
+   */
+  answers?: Record<string, unknown>;
+  workflow?: never;
+  change?: never;
+}
+
+export interface NikaCompileEditRequest {
+  /** The accepted workflow's exact source bytes (as a string). */
+  workflow: string;
+  /**
+   * The requested change: free text in the engine's supported edit
+   * vocabulary, or one structured constant edit mirroring the engine's
+   * `set_constant` operation. The value is a strict JSON value, judged by
+   * the same law as `answers`.
+   */
+  change: string | NikaCompileSetConstant;
+  answers?: Record<string, unknown>;
+  intent?: never;
+}
+
+/** One structured constant edit, mirroring the engine's `set_constant`. */
+export interface NikaCompileSetConstant {
+  set_constant: {
+    /** Bare constant name (no `const.` prefix, no path). */
+    name: string;
+    /** The new literal, as a strict JSON value. */
+    value: unknown;
+  };
+}
+
+export interface NikaCompileOptions {
+  /**
+   * Aborts this authoring process only. Compile owns no Run: this never
+   * touches `run.cancel()` semantics (client#126), and no workflow effect
+   * exists to interrupt.
+   */
+  signal?: AbortSignal;
+  /** Positive integer milliseconds before the compile child or HTTP request is stopped. */
+  timeoutMs?: number;
+}
+
+/** The engine's own completeness words; `ready` is never derived from confidence. */
+export type NikaCompileStatus = 'ready' | 'incomplete' | 'refused';
+
+/** One authoring question, exactly as the engine emitted it. */
+export interface NikaCompileQuestion {
+  /** Stable semantic hole path (`const.request`), never a session id. */
+  key: string;
+  label: string;
+  type: 'text' | 'literal' | 'choice';
+  options?: { key: string; label: string }[];
+  why: string;
+  mandatory: boolean;
+  [key: string]: unknown;
+}
+
+/** One structured authoring finding, exactly as the engine emitted it. */
+export interface NikaCompileDiagnostic {
+  kind: 'applied' | 'missed' | 'unknown' | 'requiresHuman' | 'refused';
+  target: string;
+  message: string;
+  [key: string]: unknown;
+}
+
+/** Authoring provenance — not program identity (#1664), not execution Proof. */
+export interface NikaCompileProvenance {
+  compiler_version: string;
+  spec_pin: string;
+  skeleton: string | null;
+  cognition: 'deterministicOnly';
+  [key: string]: unknown;
+}
+
+/** The candidate's pure Check judgment, with its deliberately limited scope. */
+export interface NikaCompilePreview {
+  /** `sourceOnly` in this foundation: no environment or admission claim. */
+  scope: 'sourceOnly';
+  report: NikaCheckResult;
+  [key: string]: unknown;
+}
+
+/**
+ * The reviewable authoring result. `candidate` is ordinary `.nika`
+ * SOURCE in memory — it is not a `Workflow` handle, and `run()` does not
+ * accept raw source: the caller materializes the candidate and `run(path)`
+ * re-admits it. The SDK never writes the candidate for you in this slice
+ * (no `dest`/`force`), and the engine never executes it.
+ *
+ * `incomplete` and `refused` are data, not exceptions: the SDK throws only
+ * on transport, protocol, compatibility and engine-stamped failures.
+ */
+export interface NikaCompileOutcome {
+  /** The wire generation this payload was validated against. Always 1. */
+  compile_version: 1;
+  status: NikaCompileStatus;
+  /** Exactly `status === 'ready'` — the engine's word, not a client judgment. */
+  ready: boolean;
+  /** The candidate source; may still carry unfilled holes when not ready. */
+  candidate: string | null;
+  questions: NikaCompileQuestion[];
+  diagnostics: NikaCompileDiagnostic[];
+  /** The boundary the candidate requests (from its pure report); never a grant. */
+  requested_boundary: Record<string, unknown> | null;
+  /** Present when the connected engine reports a requested trigger; never a grant. */
+  requested_trigger?: Record<string, unknown> | null;
+  check_preview: NikaCompilePreview | null;
+  provenance: NikaCompileProvenance;
 }

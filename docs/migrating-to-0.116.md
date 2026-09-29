@@ -64,9 +64,20 @@ invariants; observe or cancel a returned run through its owned lifecycle.
 | `nika.workflows.list()` | `nika.listWorkflows()` |
 | `nika.workflows.metadata(name)` | `nika.workflow(name)` |
 
-The new run handle is intentionally only `{ id, done }`. Methods reject a
-look-alike object from another client, so persist the job id and reattach after
-a process restart instead of rebuilding a handle by hand.
+In 0.116 the run handle was only `{ id, done }`. The Run now owns its
+lifecycle: `run.events()`, `run.result()`, `run.status()` and `run.cancel()`,
+with `run.done` kept as the alias of `run.result()`. The `nika.events(run)`,
+`nika.cancel(run)` and `nika.status(run)` forms this guide shows still work
+unchanged as deprecated wrappers, and `nika.events(run)` still yields the
+protocol vocabulary; `run.events()` yields one lifecycle vocabulary on both
+transports with that frame on `event.raw`. The wrappers stay for one release
+train counted from the first published train that carries the new API, with
+no version or date fixed; "Migrating to the Run-owned lifecycle" in the
+README defines that window.
+
+The client-level methods reject a look-alike object and a run from another
+client, so persist the job id and reattach after a process restart instead of
+rebuilding a handle by hand.
 
 `LocalNika.version()`, `dryRunPlan()`, and `test()` have no One SDK method in
 0.116. Keep those CLI-facing probes in deployment/CI (`nika --version`,
@@ -92,8 +103,12 @@ both versions.
 
 `runToEnd()` returned `{ ok, exitCode, events[] }` with every event buffered.
 `run.done` returns the terminal result only; the events ride `events(run)`
-as a bounded live iterator (default 256), so observe it concurrently or the
-prefix is gone. The removed methods (`version()`, `dryRunPlan()`, path-based
+as a bounded iterator. In 0.116 a session retained 256 frames, below the 273 a
+measured clean native run of 90 `mock/echo` tasks writes, so such a run had to
+be observed concurrently or its prefix was gone. The default is now 4096 and a view opened
+after the result replays every retained frame; past the bound it is refused
+with `reason: 'replay_truncated'`, never shortened, and the result is
+unaffected. An explicit `eventBufferSize` keeps its cap. The removed methods (`version()`, `dryRunPlan()`, path-based
 `traceVerify()`) are absent, not stubbed: calling them throws a plain
 `TypeError: … is not a function`, and a trace that only exists as a file
 path in a later process has no SDK verification door in 0.116.
@@ -111,7 +126,7 @@ These methods require an HTTP client. A native-process client returns a typed
 ## Durable status
 
 ```ts
-const run = await nika.run('flow.nika.yaml');
+const run = await nika.run('flow.nika');
 console.log(await nika.status(run));
 console.log(await run.done);
 ```

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,7 +9,7 @@ import { OwnedProcesses } from './one-door/process.mjs';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const expected = ['deployment-gate', 'evidence-provenance-pipeline', 'incident-response-controller',
-  'multi-tenant-webhook-router', 'scheduled-research-monitor'];
+  'multi-tenant-webhook-router', 'scheduled-research-monitor', 'signed-webhook-intake'];
 
 export function assertAppIdentity(source, project) {
   const committed = readFileSync(path.join(source, 'app.mjs'));
@@ -74,6 +74,12 @@ export async function runDepthProjects() {
     const packed = JSON.parse(await run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', scratch],
       { cwd: root, timeoutMs: 30_000 }));
     const tarball = path.join(scratch, packed[0].filename);
+    if (process.env.NIKA_GAUNTLET_RESULTS_DIR) {
+      // Keep the exact tested archive beside its provenance, so replay digest
+      // differences can be inspected without substituting a later rebuild.
+      copyFileSync(tarball, path.join(resultsRoot, packed[0].filename));
+      writeFileSync(path.join(resultsRoot, 'depth-package.json'), `${JSON.stringify(packed[0], null, 2)}\n`);
+    }
     // Preserve the repository-relative imports in the committed app. Only
     // shared harness helpers are copied; no SDK source or dist is staged.
     mkdirSync(path.join(scratch, 'scripts', 'one-door'), { recursive: true });
@@ -102,8 +108,8 @@ export async function runDepthProjects() {
           for (const [label, file] of [
             ['committed-app.mjs', path.join(source, 'app.mjs')],
             ['executed-app.mjs', path.join(project, 'app.mjs')],
-            ['workflow.nika.yaml', path.join(project, 'workflow.nika.yaml')],
-            ['controlled-cancel.nika.yaml', path.join(project, 'controlled-cancel.nika.yaml')],
+            ['workflow.nika', path.join(project, 'workflow.nika')],
+            ['controlled-cancel.nika', path.join(project, 'controlled-cancel.nika')],
           ]) {
             const bytes = readFileSync(file);
             writeFileSync(path.join(audit, label), bytes);

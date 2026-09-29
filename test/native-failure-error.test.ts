@@ -13,7 +13,7 @@ const FIXTURE = path.join(
 describe('a failed native run carries the engine failure', () => {
   it('a successful current settlement clears an earlier handled task error', async () => {
     const nika = new Nika({ bin: FIXTURE });
-    const run = await nika.run('recovered-settled.nika.yaml');
+    const run = await nika.run('recovered-settled.nika');
     const result = await run.done;
     expect(result.status).toBe('succeeded');
     expect(result.error).toBeUndefined();
@@ -71,7 +71,7 @@ describe('a failed native run carries the engine failure', () => {
 
   it('settles run.done with the failure the engine named', async () => {
     const nika = new Nika({ bin: FIXTURE });
-    const run = await nika.run('fields-failure.nika.yaml');
+    const run = await nika.run('fields-failure.nika');
     const kinds: string[] = [];
     for await (const event of nika.events(run)) kinds.push(String(event.kind));
     const result = await run.done;

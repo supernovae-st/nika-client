@@ -24,7 +24,7 @@ server.stderr.on('data', (chunk) => { diagnostics += chunk; });
 try {
   await waitForHealth(url);
   const nika = new Nika({ url, token, allowInsecureHttp: true, bin: engine, cwd: process.cwd(), eventBufferSize: 128 });
-  const checked = await nika.check('workflow.nika.yaml');
+  const checked = await nika.check('workflow.nika');
   assert.equal(checked.clean, true);
   let observedRun;
   const ingress = createHttpServer(async (request, response) => {
@@ -33,7 +33,7 @@ try {
       for await (const chunk of request) chunks.push(chunk);
       const delivery = JSON.parse(Buffer.concat(chunks).toString('utf8'));
       assert.deepEqual(delivery.tenants.sort(), ['atlas', 'boreal', 'cirrus']);
-      const run = await nika.run('workflow.nika.yaml', { idempotencyKey: `webhook-${delivery.delivery_id}` });
+      const run = await nika.run('workflow.nika', { idempotencyKey: `webhook-${delivery.delivery_id}` });
       observedRun ??= run;
       const result = await run.done;
       response.writeHead(200, { 'content-type': 'application/json' });

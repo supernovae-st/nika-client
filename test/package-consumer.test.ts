@@ -18,6 +18,9 @@ describe('packed Node consumer surfaces', () => {
       timeout: 120_000,
     });
     expect(output).toContain('exposes typed ESM, CommonJS and package metadata');
+    // Issue #116: the packed package, not the source tree, carries literal inputs.
+    expect(output).toContain('binds literal inputs from ESM over native stdin and HTTP');
+    expect(output).toContain('binds literal inputs from CommonJS over native stdin and HTTP');
   }, 120_000);
 
   // The run handle as 0.120.3 published it, driven for real on both packed

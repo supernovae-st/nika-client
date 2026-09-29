@@ -16,6 +16,215 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expose `serverIdentity()` and `NikaEngineIdentity` for HTTP consumers to
   inspect the validated cached protocol and capability snapshot without a
   local binary. Returned objects cannot mutate the SDK's admission state.
+- Packed depth project `signed-webhook-intake` — the app-owned webhook
+  qualification (engine nika#1719 names it as the path that stays
+  first-class). A loopback receiver verifies a Standard Webhooks
+  HMAC-SHA256 signature over the raw bytes with a 300 s timestamp window
+  using `node:crypto` only (the SDK still exports no verifier), normalizes
+  the payload into the workflow's declared `inputs` and admits it through
+  `run()` with the sender's delivery id as `idempotencyKey` against a real
+  `nika serve`. Measured on engine 0.120.3: a concurrently retried delivery
+  reuses one durable job; tampered, stale, malformed and mistyped deliveries
+  are refused as `INGRESS_AUTH`, `INGRESS_REPLAY`, `INGRESS_PARSE` and
+  `INPUT_MAPPING` before or at admission; `attachRun` and `run.events()`
+  observe the admitted job; and the same `workflow.nika` is started by the
+  webhook, a manual `run()` and a `once` schedule that fires the declared
+  default. The depth ledger, evidence gate and replay fixtures now count six
+  projects; the new row records behavioral verdicts only, never a job id.
+
+## [0.120.3]
+
+### Added
+
+- `Nika.compile(request, options)` — the SDK projection of the engine's one
+  authoring capability (issue #128, engine nika#1663). The native transport
+  runs one bounded `nika compile --json` child and validates the versioned
+  `compile_version: 1` wire: `status` (`ready` / `incomplete` / `refused`),
+  `ready` derived exactly from it, `candidate` source, `questions`,
+  `diagnostics`, `requested_boundary`, `check_preview` and `provenance` are
+  preserved verbatim. Incomplete and refused are data, never exceptions; a
+  ready outcome is accepted only from a child that exited 0, and a dead,
+  truncated, malformed or wrong-version wire fails typed
+  (`NikaProtocolError` / `NikaCompatibilityError` / `NikaOperationError` with
+  the engine's own code). The engine must advertise the `compile` capability;
+  older engines are refused before any compile spawn. CREATE takes an intent
+  (or exact skeleton name) plus `answers` — strict JSON values serialized
+  once onto argv as `KEY=JSON`; EDIT takes the accepted source plus a change
+  (text or explicit `set_constant`)
+  and lends the base through a 0700 scratch dir with a 0600 file, removed on
+  every path. `signal`/`timeoutMs` stop only this child (SIGTERM, then
+  SIGKILL inside a kill grace); no Run exists to cancel. The candidate is
+  source: `run()` still takes a path, and the caller owns materialization —
+  this slice ships no `dest`/`force`. Over `{ url }` the method consumes
+  authenticated `POST /v1/compile` when Serve advertises `compile`, using the
+  same outcome without process-only `exitCode`/`written` fields. HTTP cancellation,
+  timeouts and bounded response parsing never fall back to local compilation.
+
+The HTTP compile contract is pinned to engine commit
+`4334e58bddf539a6253f448eb05d562b6919f2b7` (nika#1709), merged after
+`v0.120.2` and first published in engine `v0.120.3`, whose Serve advertises
+HTTP compile. This SDK feature first publishes with 0.120.3.
+
+### Changed
+
+- Lockstep with public engine `v0.120.3`
+  (`578352a31254ff04025ac6207bcf6f40d3911613`, engine #1711). Package and
+  native optional payloads follow the engine train via `sync:native-versions`;
+  OpenAPI `info.version` is `0.120.3`. `ENGINE_QUAL_PIN` / `ENGINE_CANDIDATE`
+  name the tagged commit. Current gauntlet evidence is regenerated from the
+  verified public macOS arm64 archive; the historical paid-provider and trace
+  ledgers are untouched.
+
+## [0.120.2]
+
+### Changed
+
+- Lockstep with public engine `v0.120.2`
+  (`289a9adeae5a6937221ceac55b8080ef84c0ce69`, engine #1707). Package and
+  native optional payloads follow the engine train via `sync:native-versions`;
+  OpenAPI `info.version` is `0.120.2` with the Serve schema unchanged from
+  0.120.1 (the live type-drift gate is green). `ENGINE_QUAL_PIN` /
+  `ENGINE_CANDIDATE` name the tagged commit. Current gauntlet evidence is
+  regenerated from the verified public macOS arm64 archive
+  (`verify-engine-archive`, SHA256SUMS `b46243de…`): all five current reports
+  record `nika 0.120.2 (289a9adea)`; the historical paid-provider and trace
+  ledgers are untouched.
+- Install guidance is timeless: canonical `npm install @supernovae-st/nika`,
+  each SDK package bundles its own matching engine, and the standalone engine
+  CLI releases on an independent clock. Native `inputsLiteral` and
+  `isNikaRunSucceeded` are published on 0.120.0; `nika compile hello` replaces
+  retired `nika new`; admission, execution, and seal are separate facts (a
+  keyless HOME succeeds unsealed).
+- Release replay treats depth `package_sha256` as pack provenance: it must
+  match the tarball beside the ledger, and documentation-only README pack
+  changes may retarget it. Behavioral verdicts still compare exactly.
+
+## [0.120.1]
+
+### Changed
+
+- Lockstep with public engine `v0.120.1` (`9d554c84c8a63144c36e7245fee641e6bfc7349f`).
+  Package and native optional payloads follow that tag via `sync:native-versions`.
+  Served OpenAPI `info.version` is `0.120.1`; the rest of the Serve schema is
+  unchanged from 0.120.0. The public engine now accepts canonical `.nika`
+  workflow references in project-arm schemas (engine #1692). This is not
+  issue 1684 closure; the broader file-identity migration remains open.
+
+## [0.120.0]
+
+### Known engine limitation
+
+The public 0.120.0 project schema still rejects canonical `.nika` paths in
+`nika.yaml` arm bindings. The correction belongs to
+[engine #1692](https://github.com/supernovae-st/nika/pull/1692) and
+[Spec #345](https://github.com/supernovae-st/nika-spec/pull/345), for a later
+engine release. This SDK aligns with the current public engine; the broader
+file-identity migration remains open.
+
+### Changed
+
+- Canonical live workflow files are lowercase `.nika`. HTTP by-name
+  admission (`isContainedWorkflowName`) keeps contained-relative shape and
+  refuses retired `.nika.yaml` / `.nika.yml` names instead of falling back
+  to local capture. Project `nika.yaml` and runtime `.nika/` are unchanged.
+  Generated OpenAPI was regenerated from the engine Serve schema (`info.version`
+  0.120.0). Lockstep with public engine `v0.120.0`.
+
+### Added
+
+- The Run owns its lifecycle (#120). `NikaRun` now carries `events()`,
+  `result()`, `status()` and `cancel()` next to `id`; `run.result()` is the
+  documented settlement read and `run.done` stays as its compatibility alias
+  (the same promise). Every member is a closure over the run's one session,
+  so an extracted method (`const { events, result } = run`) still works, and
+  `run.cancel()` returns the one memoized request. `attachRun` remains the
+  one recovery door and returns a full `NikaRun`. The handle owns observation,
+  settlement, status and cancellation only: checking, proof, catalogs and
+  authoring stay on `Nika`. Native durability is not faked: a native
+  `run.status()` and `attachRun` still refuse with a typed
+  `NikaCompatibilityError`, the SDK starts no hidden `nika serve`, and a
+  native `run.id` is documented as an ephemeral, non-durable correlation id.
+- One lifecycle vocabulary on both transports (#117). `run.events()` yields
+  the new `NikaRunEvent`: a lifecycle `kind` (`NikaRunEventKind`: `run.started`
+  · `task.scheduled` · `task.started` · `task.completed` · `task.failed` ·
+  `run.waiting` · `run.settled` · `run.interrupted` · `run.sealed` ·
+  `engine.event`) with the exact protocol frame kept by identity on
+  `event.raw`. The adapter is a stateless per-frame projection. It names a
+  fact only when the engine wrote it, and a state-bearing frame only for one
+  of the exact (kind, status) pairs a producer defines, listed and never
+  computed: `run_settled` / `execution.settled` carrying `succeeded`,
+  `failed` or `cancelled` (or `paused`, which is `run.waiting`),
+  `execution.cancelled` carrying `cancelled`, `execution.refused` carrying
+  `failed`, and an interrupted kind carrying `interrupted`. An absent, null,
+  future or still-running status is never defaulted, and a terminal word on
+  the wrong dedicated kind (`execution.refused` carrying `succeeded`,
+  `execution.cancelled` carrying `failed`) contradicts itself: both stay an
+  `engine.event`, which carries its cursor and `raw` but no lifecycle
+  meaning. Nothing is dropped,
+  deduplicated or synthesized: `nika serve` streams no per-task frame, so an
+  HTTP run yields no `task.*` event. `event.status` is always the engine's
+  own word; a human gate (`paused`) is `run.waiting`, never `run.settled` and
+  never a failure; the engine's `interrupted` evidence state is
+  `run.interrupted`, never the thrown `NikaObservationInterrupted`, which
+  still means this client lost its view of a run that may be running.
+  `event.sequence` is the resident's replay cursor and exists only over HTTP.
+- Two released-engine wire captures (`nika 0.118.7`, the verified npm
+  payload): a human gate (`workflow_paused`, then `run_settled` carrying
+  `paused` and `human_gate`, exit 4) and a SIGTERM cancellation
+  (`workflow_cancelled`, then `run_settled` carrying `cancelled` and
+  `operator`, exit 130).
+
+- Add `run(workflow, { inputs })` (#116): literal values for the workflow's
+  declared `inputs:`, with the same meaning on both transports. Values are
+  strict JSON and stay literal: a string is never read as `@env:NAME`, an
+  expression or a number, and nothing is coerced to the declared type. The
+  engine validates the map and refuses before any run exists (`unknown_input`,
+  `input_type_mismatch`, `NIKA-1708`), surfaced as `NikaOperationError` with
+  the same code natively (`status: 3`) and over HTTP (`status: 422`).
+  - Native: the map rides the engine's stdin (`nika run --inputs-json -`,
+    nika#1683), never argv, and needs an engine that advertises
+    `inputsLiteral`.
+  - HTTP: the same bytes ride `JobByName.inputs` (nika#1642) for a workflow run
+    by its served name, and need a resident that advertises `jobInputs`. An
+    execution snapshot takes no overlay: a local path with `inputs` is refused
+    before any capture or request, an empty map included.
+  - An engine without the capability rejects with `NikaCompatibilityError`
+    before admission. There is no `--var` fallback, and a 202 negotiates
+    nothing: a resident from before the envelope accepts the field and ignores
+    its values.
+  - A value JSON would silently lose (`undefined`, a function, a symbol, a
+    bigint, a non-finite number, a cycle, a class instance, a prototype that
+    only claims to be plain, an array hole, an accessor, a lone surrogate, a
+    `Proxy`) rejects `run()` with `NikaConfigurationError` naming the path and
+    never the value. No caller code runs while the map is judged: a getter is
+    never invoked, and a `Proxy` is refused before anything reads it, its
+    prototype or that prototype's constructor, so none of its traps run. The serialized map is bounded at
+    1 MiB on both transports.
+  - The engine payload pinned by this package advertises neither capability
+    yet: `inputs` is refused on it until the pin reaches an engine that does.
+    The pinned `openapi.json` is unchanged for the same reason.
+- Read the two optional fields engine main adds to the resident's closed
+  projections, ahead of the pinned `openapi.json` (no released engine writes
+  them yet; against a released resident nothing changes). `JobEvent.at`, when
+  the resident admitted the event, is validated as an RFC 3339 timestamp and
+  rides `event.raw.at`. `evidence`, on the terminal frame and the durable job,
+  is read exactly as the engine closes it, `{ status: 'mirror_lost', reason:
+  'write_failed' | 'record_refused' }`, typed `NikaJournalEvidence`; any other
+  shape or word is a `NikaProtocolError` and the value is never quoted. It is
+  never a verdict: a run can settle `succeeded` with its journal mirror lost,
+  and `result.status`, the settlement and the receipt checks are unchanged.
+  `run.result()` copies it to the new optional `NikaRunResult.evidence` from
+  the frame or record that settled the run; absence claims nothing, and a
+  native run never carries it. Every other unknown field still refuses, on
+  both projections. Before this, a resident built from engine main could not
+  be observed at all: its first dated frame was a protocol fault.
+- Add `npm run gauntlet:inputs`: the packed SDK drives one explicit engine as a
+  native process and as a resident, from ESM and CommonJS, and the transports
+  must agree on outputs, refusal codes and `api-caller` provenance.
+
+- Add `isNikaRunSucceeded(result)` to narrow the engine's successful result
+  while preserving typed, optional outputs. Admitted failures still resolve;
+  paused, cancelled, interrupted, and unknown results do not pass the guard.
 
 - Add six-door runtime parity and bounded, owned process supervision for the
   corpus and packed application harnesses.
@@ -25,6 +234,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clarify the existing `traceVerify` claims: native verification requires a signed
   receipt binding, while HTTP `verified` also accepts an intact unsealed journal
   bound to the receipt's trace id. Preserve the distinction in API documentation.
+- The default `eventBufferSize` rises from 256 to 4096 frames (#122). It is
+  sized from one measured fixture, not from a law of N-task workflows: on the
+  released 0.118.7 engine a clean native run of N independent `mock/echo`
+  `infer` tasks wrote `3N + 3` frames (`workflow_started`, then
+  `task_scheduled` · `task_started` · `task_completed` per task, then
+  `workflow_completed` and `run_settled`), measured at N = 1 (6 frames) and
+  N = 90 (273). The old default was below those 273, so `await run.result()`
+  followed by `run.events()` refused on a run that had succeeded. Other shapes
+  write more frames (a tool call showed an extra `permit_checked`; retries,
+  agents and `for_each` were not measured), so 4096 is headroom over the
+  measured run, not a promised task count: count your own run, which
+  `error.observed` reports. The bound stays finite. Each frame is bounded by
+  `machineBufferBytes`, so the retained **history** holds at most
+  `eventBufferSize × machineBufferBytes` of frame text per run, 256 MiB at
+  both defaults where 256 frames gave 16 MiB. That is arithmetic (the measured
+  273 frames total 0.15 MiB) and it bounds the history only, not the session
+  or the process: frames already handed to a consumer, every open view and
+  every concurrent run add their own. No claim is made about heap or process
+  memory. **Migration:** nothing for most callers. An explicit
+  `eventBufferSize` is kept exactly as given, so `eventBufferSize: 256`
+  behaves as before; set it if that ceiling matters to you. A view's
+  `bufferSize` still defaults to `eventBufferSize`, so a default live view now
+  fails after falling 4096 frames behind instead of 256.
+- `NikaEventBufferOverflowError` tells its two refusals apart with a new
+  `reason` (#122). `live_backpressure`: a view observing live fell more than
+  `limit` frames behind. `replay_truncated`: a view was opened after the run
+  had produced more frames than it can be given; the error then carries
+  `observed` (frames the session saw, counted when the view was opened) and
+  `retained` (frames it still holds), and its message names the history and
+  what to set, no longer a subscriber that never existed. Both remain
+  refusals: a frame is never silently skipped, and a late view is never handed
+  a shortened replay. Neither is about the run. A run longer than the bound
+  still succeeds and `run.result()` is unaffected. `runId` and `limit` are
+  unchanged and the class is the same, so existing handlers keep working.
+  The SDK still reads no engine journal, keeps nothing on disk and adds no run
+  listing to extend a replay.
+- Native `run()` resolves only after the engine admitted the run (#121). A
+  refusal the engine writes before admission now rejects `run()` itself with
+  `NikaOperationError` (`operation: 'run'`, the engine's exit status in
+  `status`) and no `NikaRun` exists: there is nothing to await, observe or
+  cancel for a run that never started. A check refusal names the first
+  finding's code (`NIKA-SEC-004`, `NIKA-PARSE-005`, `NIKA-AUTH-006`, …) and
+  carries the engine's `findings[]` untouched; a budget or launch refusal
+  names its code (`NIKA-1709`, `NIKA-1708`). When the engine named no code,
+  as for an unreadable workflow file, `code` is the SDK's own `run_refused`
+  and `machineCode` stays absent. Before this change the handle was minted
+  first and a red check surfaced on `run.done` as `NikaProtocolError: Engine
+  machine output was not valid JSON: {`. The engine's own check on run is the
+  only judge: the SDK adds no preflight `check` and spawns the workflow once.
+  An admitted run is unchanged: its first frame is still delivered as the
+  first event, and an admitted failure still resolves as result data.
+  **Migration:** catch the refusal around `await nika.run(…)`, not only
+  around `await run.done`.
+- Output that proves neither admission nor a refusal rejects `run()` with
+  `NikaProtocolError` as well, instead of surfacing later on `run.done`: a
+  line that is not machine output, a truncated or oversized report, an engine
+  that exits without a frame, a refusal followed by any further output, a
+  refusal contradicted by exit 0, and a report that calls itself clean. After
+  admission a plain non-JSON line is a protocol fault on `run.done`; it is no
+  longer read as a late refusal, which no engine was measured to write.
+- `machineBufferBytes` now bounds every native machine line exactly. A
+  complete line that arrived whole in one pipe chunk used to pass unmeasured,
+  so the same frame could pass or fail with the chunking. A run whose frames
+  (for instance a `run_settled` with large outputs) exceed the 64 KiB default
+  must raise `machineBufferBytes`.
+- `NikaOperationFinding` is now `NikaScheduleFinding | NikaCheckFinding`. The
+  new exported `NikaCheckFinding` is the engine's check finding as written
+  (`code?`, `message`, `severity`, `gate`, `kind`, `task`, `docs_url`, open to
+  additive fields); schedule findings keep `code` and `detail`. Code that read
+  `error.findings[n].detail` as a `string` must narrow first.
+- Ending a native engine process is bounded: SIGTERM, then SIGKILL after a
+  two-second grace, so an engine that ignores SIGTERM can no longer hold a
+  rejection or a cleanup forever.
+- Engines up to 0.119.0 predate the engine's one `run --json` grammar
+  (engine #1650) and refuse in three other dialects: a pretty-printed check
+  report, a plain `NIKA-1709 · …` line, and a `NIKA-1708` line on stderr with
+  an empty stdout. One temporary module, `src/lib/legacy-run-refusals.ts`,
+  recovers exactly those measured shapes and nothing else. It is not a
+  protocol: it is deleted, with its three call sites, once the oldest
+  supported engine writes one compact refusal object.
+
+- HTTP `run()` now requires a caller-owned `idempotencyKey` and refuses an
+  omitted key before admission. Reuse that key and request after a lost
+  response so an application retry cannot silently create a second job.
+  Direct native runs continue to omit the key and reject one if supplied.
 
 - The package is published as `@supernovae-st/nika`, the product's name: one
   namespace for the owner, one artifact name per registry. The native payloads
@@ -34,9 +328,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Deprecated
 
-- `@supernovae-st/nika-client` receives no further versions. The name stays
-  installable for the versions it already holds and is marked deprecated on
-  npm after the first `@supernovae-st/nika` publication.
+- `nika.events(run)`, `nika.cancel(run)` and `nika.status(run)` are deprecated
+  in favour of `run.events()`, `run.cancel()` and `run.status()` (#120). They
+  stay for one release train as compatibility wrappers over the same session.
+  The window is counted from publication, never from a merge: it opens with
+  the first train published to npm that carries the Run-owned lifecycle, which
+  ships the wrappers unchanged; the earliest train that may remove them is the
+  one after it; and removal is decided by the One SDK baseline owner (#114)
+  and announced in that train's release notes. No version and no date are
+  fixed here. Behaviour is unchanged: `nika.events(run)` still
+  yields the **protocol** vocabulary (`workflow_*` · `task_*` · `run_*` ·
+  `execution.*`) frame for frame, so existing consumers keep working while
+  they migrate, and a foreign, reconstructed, serialized or other-client
+  handle still throws `NikaRunOwnershipError`: there is no global run
+  registry. **Migration:** `nika.events(run)` → `run.events()` (switch on the
+  lifecycle `kind`; the frame the wrapper yielded is `event.raw`),
+  `nika.cancel(run)` → `run.cancel()`, `nika.status(run)` → `run.status()`,
+  `await run.done` → `await run.result()` (`done` itself is not deprecated).
+- `run()`'s `vars` option is deprecated in favour of `inputs` (#116). It stays
+  the native `--var` operator channel with unchanged behaviour (`@env:NAME` is
+  read, text is coerced to the declared type) and has no HTTP form. `inputs`
+  beside `vars` rejects `run()` with `NikaConfigurationError`; the two are
+  never merged.
+- `@supernovae-st/nika-client` receives no further versions from this
+  repository, and the name stays installable for the versions it already
+  holds. This is a project decision, not a registry state: the name is
+  **not** marked deprecated on npm. `@supernovae-st/nika` has been published
+  and the old name's versions still carry no `deprecated` field, so installing
+  it raises no warning. Marking it on the registry is a separate owner action
+  (#113) that this changelog does not claim.
 
 ### Fixed
 

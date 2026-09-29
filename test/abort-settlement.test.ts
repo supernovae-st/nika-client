@@ -57,7 +57,7 @@ describe('abort settlement (issue #68)', () => {
   describe.skipIf(!posix)('native-process transport', () => {
     it('settles every internal promise when an events AbortSignal fires mid-run', async () => {
       const client = new Nika({ bin: FIXTURE });
-      const run = await client.run('cancel.nika.yaml');
+      const run = await client.run('cancel.nika');
       const controller = new AbortController();
       const view = client.events(run, { signal: controller.signal });
       let failure: unknown;
@@ -78,7 +78,7 @@ describe('abort settlement (issue #68)', () => {
 
     it('settles every internal promise when the caller cancels mid-run', async () => {
       const client = new Nika({ bin: FIXTURE });
-      const run = await client.run('cancel.nika.yaml');
+      const run = await client.run('cancel.nika');
       await expect(client.cancel(run)).resolves.toMatchObject({
         runId: run.id,
         accepted: true,
@@ -91,7 +91,7 @@ describe('abort settlement (issue #68)', () => {
     it('settles every internal promise when a check AbortSignal fires mid-capture', async () => {
       const client = new Nika({ bin: FIXTURE });
       const controller = new AbortController();
-      const pending = client.check('hang.nika.yaml', { signal: controller.signal });
+      const pending = client.check('hang.nika', { signal: controller.signal });
       setTimeout(() => controller.abort(), 50);
       await expect(pending).rejects.toMatchObject({
         name: 'NikaTransportError',

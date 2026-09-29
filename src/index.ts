@@ -6,12 +6,10 @@ import { HttpTransport } from './lib/http-transport.js';
 import { NativeProcessTransport } from './lib/native-process-transport.js';
 import { NikaEngineUnavailable, resolveNikaEngine } from './lib/binary/index.js';
 import { RunSession } from './lib/run-session.js';
+import { normalizeCompileOptions, normalizeCompileRequest } from './lib/compile.js';
 import {
   checkTimeout,
   isPublishedCompileRequest,
-  publishedCompileOptions,
-  publishedCompileWire,
-  publishedOutcome,
   refuseHybridRequest,
   withDeadline,
 } from './lib/published-compile.js';
@@ -27,7 +25,7 @@ import type {
   NikaCostReviewOptions,
   NikaCostReviewResult,
   NikaPrepareCostReviewOptions,
-  NikaCompileRequest,
+  NikaCompileWireRequest,
   NikaCompileOptions,
   NikaCompileResult,
   NikaPublishedCompileOutcome,
@@ -36,6 +34,8 @@ import type {
   NikaAttachRunOptions,
   NikaCheckOptions,
   NikaCheckResult,
+  NikaCompileOutcome,
+  NikaCompileRequest,
   NikaConfig,
   NikaEvent,
   NikaEventsOptions,
@@ -145,8 +145,7 @@ export class Nika {
   }
 
   /**
-   * Compile through a resident HTTP authority, without saving, running, or
-   * automatic retries.
+   * Compile without saving or running, through the selected engine authority.
    *
    * A typed V9 request (it carries `compile_version`) resolves the outcome and
    * the kept-round `replayToken`. A request in the published 0.120 shape (an
@@ -155,36 +154,35 @@ export class Nika {
    * outcome itself with `ready`, never a replay token. A request is one or the
    * other: a hybrid is refused, never reinterpreted, and anything else (null,
    * undefined, a Proxy) is refused before any trap or request. A native
-   * process refuses with `NikaCompatibilityError`.
+   * process supports the published form; versioned resident requests refuse
+   * with `NikaCompatibilityError` there.
    */
-  compile(request: NikaCompileRequest, options?: NikaCompileOptions): Promise<NikaCompileResult>;
+  compile(request: NikaCompileWireRequest, options?: NikaCompileOptions): Promise<NikaCompileResult>;
   compile(
     request: string | NikaPublishedCompileRequest,
     options?: NikaCompileOptions,
   ): Promise<NikaPublishedCompileOutcome>;
   async compile(
-    request: NikaCompileRequest | string | NikaPublishedCompileRequest,
+    request: NikaCompileWireRequest | string | NikaPublishedCompileRequest,
     options: NikaCompileOptions = {},
   ): Promise<NikaCompileResult | NikaPublishedCompileOutcome> {
     // `async` on purpose: every failure, a caller's configuration mistake
     // included, arrives as a rejection, never a synchronous throw.
     if (isPublishedCompileRequest(request)) {
-      const wire = publishedCompileWire(request);
-      const checked = publishedCompileOptions(options);
-      const result = await withDeadline(
-        checked,
-        this.transportKind,
-        (signal) => this.transport.compile(wire, { signal }),
-        true,
-      );
-      return publishedOutcome(result);
+      const normalized = normalizeCompileRequest(request);
+      const checked = normalizeCompileOptions(options);
+      // Native cancellation waits for owned-child cleanup. HTTP waiting can
+      // stop immediately without cancelling the shared health handshake.
+      if (this.transportKind === 'native-process') return this.transport.compile(normalized, checked);
+      return withDeadline(checked, this.transportKind,
+        (signal) => this.transport.compile(normalized, { ...checked, signal }), true);
     }
     refuseHybridRequest(request);
     checkTimeout(options.timeoutMs);
     return withDeadline(
       options,
       this.transportKind,
-      (signal) => this.transport.compile(request, { ...options, signal }),
+      (signal) => this.transport.compileWire(request, { ...options, signal }),
     );
   }
 
@@ -444,6 +442,8 @@ export {
 } from './events.js';
 
 export type {
+  NikaCompileWireRequest,
+  NikaCompileWireOutcome,
   NikaJournalEvidence,
   NikaCostReviewReference,
   NikaCostReview,

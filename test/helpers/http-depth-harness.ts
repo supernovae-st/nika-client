@@ -139,7 +139,7 @@ export function scheduleStatus(
   return {
     definition: {
       id: 'daily',
-      workflow: 'flow.nika.yaml',
+      workflow: 'flow.nika',
       when: { kind: 'cadence', expression: 'daily at 09:00 Europe/Paris' },
       maxCostUsd: 0.25,
       missed: 'catch-up-once',
@@ -170,9 +170,9 @@ export function makeSnapshotFixture(fill: string): { bin: string; cleanup(): voi
   const digest = fill.repeat(64);
   const snapshot = JSON.stringify({
     format_version: 1,
-    root: `${fill}.nika.yaml`,
+    root: `${fill}.nika`,
     digest,
-    units: [{ path: `${fill}.nika.yaml`, kind: 0, digest, bytes_hex: '00' }],
+    units: [{ path: `${fill}.nika`, kind: 0, digest, bytes_hex: '00' }],
   });
   const script = `#!/usr/bin/env node
 const argv = process.argv.slice(2);

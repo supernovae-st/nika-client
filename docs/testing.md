@@ -31,7 +31,7 @@ must remain labelled as non-gating evidence.
 
 CI adds a behavioral provenance replay. It downloads the Linux x64 asset for
 the exact root package version, verifies its GitHub attestation and published
-`SHA256SUMS` entry, then reruns all 100 deterministic workflows, the hostile suite, all five mini-SaaS projects, all five depth projects,
+`SHA256SUMS` entry, then reruns all 100 deterministic workflows, the hostile suite, all five mini-SaaS projects, all six depth projects,
 the two-process recovery scenario, and five scenarios through six execution
 doors from a freshly packed SDK. The runner
 mints an ephemeral run-signing key. Its
@@ -52,7 +52,15 @@ starts is a 200 `cancelled` whose terminal is one of those two writer kinds,
 only with `status=cancelled`. The verifiers bind each cancel reply to the
 terminals it may lead to, demand the run status of that terminal, and refuse any
 other pairing. The parsed deterministic and packed-project results must match
-exactly except for the recovery job UUID. The hostile comparison excludes
+exactly except for the recovery job UUID and the depth `package_sha256`.
+That digest is provenance of the tarball this replay packed (README lives
+inside the npm pack): the verifier requires `depth-package.json` beside the
+ledger, hashes the artifact, checks filename/size/sha512 integrity, refuses
+a missing or substituted pack, then compares behavior without requiring the
+committed baseline digest (that digest is a labelled historical ledger
+identity, not a re-hash of this run). A documentation-only
+README change retargets the digest and must still reproduce every behavioral
+verdict. The hostile comparison excludes
 `generated_at` and per-scenario duration and canonicalizes only the two ratified
 writer kinds of a cancelled terminal after checking the exact pairing. This proves that the
 attested public release currently reproduces the committed behavioral claims.
@@ -86,6 +94,16 @@ Every release wave must ask and demonstrate an answer to these questions:
   knowledge?
 - Do ESM and CommonJS load from the packed tarball on every supported Node
   major?
+- Does a workflow the engine refuses reject native `run()` with the engine's
+  code and findings, on every refusal dialect a supported engine writes, with
+  no run handle, no second spawn and no preflight check? Does output that
+  proves neither admission nor refusal stay a protocol fault? The answer is
+  `test/native-run-admission.test.ts`. Its `wire-*` cases replay stdout and
+  stderr captured byte-for-byte from real engines
+  (`test/fixtures/run-wire/README.md` records which, and how); its
+  `SYNTHETIC` cases are invented hostile shapes. A replay proves the SDK
+  decodes those bytes, never that an engine still writes them: a new engine
+  release needs a new capture.
 - What happens if the server dies after admission but before the first SSE
   frame?
 - What happens if SSE reconnects after a duplicate, gap, conflicting replay,
@@ -99,9 +117,6 @@ Every release wave must ask and demonstrate an answer to these questions:
   stay an `engine.event` instead of being named settled?
 - Is a human gate (`paused`) kept apart from both failure and completion, and
   the engine's `interrupted` evidence apart from a broken observation?
-- Does a program written against the published run handle run unchanged, and
-  does every compatibility door stay a view of the one session instead of a
-  second run, dispatch or stream?
 - Can two clients race the same idempotency key with equal and unequal
   snapshots?
 - Does cancellation win or replay honestly when settlement races it?
@@ -165,118 +180,56 @@ HOME. Changed fixtures require new measured results: old committed ledgers
 remain historical observations until a successful exact-version replay replaces
 them. Never relabel an old binary or weaken the replay comparison.
 
-## Published run-handle compatibility
+## Compile foundation parity
 
-The run handle published as `@supernovae-st/nika` 0.120.3 is carried here as
-views of the one `RunSession` that owns each admitted run: `run.events()`
-projects the same bounded history into lifecycle words, `run.result()` is the
-settlement promise that `run.done` also is, and `run.status()` and
-`run.cancel()` delegate to the same transport run, whose accepted cancellation
-is memoized once. `nika.events(run)`, `nika.cancel(run)` and `nika.status(run)`
-stay as deprecated views of that same session. No view admits, dispatches,
-pumps or settles anything of its own.
+Hermetic compile cases run with `npm test`, including strict request literals,
+capability/version refusal, native exit and signal laws, temporary-file failure
+cleanup, authenticated HTTP responses and cancellation. `npm run check:package-surface`
+checks both packed module faces and their public TypeScript contracts.
 
-Covered by `npm test`:
+For a frozen engine that advertises `compile` on both native and Serve doors:
 
-- `test/run-handle-compatibility.test.ts`: the handle's frozen member set;
-  `result()` and `done` as one promise; extracted methods; the native status
-  refusal and the resident's durable status; idempotent cancellation natively
-  and over HTTP, with one cancel request; the deprecated doors sharing the
-  handle's frames by identity, its memoized cancellation and its status; one
-  admission and one event stream over HTTP whatever mix of views and doors
-  reads the run; one transport pump for every view of both vocabularies; an
-  aborted observer ending only its own view; ownership refusals; an admitted
-  failure as result data; a broken observation rejecting `result()` and `done`
-  with the same error and recovering through `attachRun`; replay after the
-  result past the old 256 bound; the default 4096 bound to the frame;
-  `replay_truncated` with `observed` and `retained`, and `live_backpressure`
-  without them; the lifecycle projection and the success guard. The cases
-  are ported from the published line's tests. Its measured native wire files
-  and synthetic frame-count engine modes are not fixtures of this line, so
-  those laws run here over the resident's stream and over a synthetic
-  transport run.
-- `test/package-consumer.test.ts`: the same handle driven on the packed ESM
-  and CommonJS faces (native runs against the fixture engine, resident runs
-  against an in-process `fetch`), and strict `.mts` and `.cts` type checks of
-  the handle, the lifecycle event, the overflow reason, the success guard and
-  `NikaCheckFinding`, whose shape the compiler holds exactly equal to the
-  published one.
-- `test/one-sdk.test.ts`: the handle's exact member set over HTTP, and check
-  report findings read through `NikaCheckFinding` untouched.
-- `test/native-run-admission.test.ts`: the native admission boundary. `run()`
-  resolves only once the engine admitted the run, with the admitting frame as
-  its first event, and rejects before any handle exists on a refusal, with the
-  engine's code, findings and exit status: a red check report, an error
-  envelope, an uncoded finding (`run_refused`), a refusal line, a refusal on
-  stderr alone. An empty, malformed, partial or oversized stream, a kindless
-  object that is no refusal, malformed findings, output after a refusal and a
-  refusal that exits 0 stay protocol faults, and an engine that proves nothing
-  is stopped (SIGTERM, then SIGKILL after its grace), never left running.
-  One case replays a real engine capture of a required-input refusal byte for
-  byte (`test/fixtures/run-wire/README.md`); the others are SYNTHETIC fixture
-  cases, not engine captures.
-- `test/published-compile-compatibility.test.ts`: the published compile
-  shapes on the resident contract. An intent string, `{ intent, answers }` and
-  `{ workflow, change }` reach the exact `compile_version: 1` wire, with
-  `false`, `0`, `""` and `null` answers kept exactly, and resolve the outcome
-  itself with `ready` derived from `status` and never a replay token; the
-  typed V9 request keeps its outcome and token; malformed or hybrid requests
-  and invalid deadlines refuse before any request, and null, undefined or a
-  Proxy request before any trap; a `timeoutMs` deadline stops the wait at
-  once on both doors, even while the resident's health check is still
-  pending, sends nothing after it, leaves a concurrent caller on that same
-  check unaffected, and releases its timer; a caller's abort stops the
-  published door at once with the published `compile aborted by caller` and
-  stays the transport's error on the typed door; a native process still
-  refuses. The packed `.mts` and `.cts` consumers hold each door's type.
+```sh
+NIKA_BIN=/absolute/path/to/frozen/nika \
+NIKA_COMPILE_PARITY_REPORT=/absolute/path/to/compile-parity.json \
+node scripts/run-compile-parity-e2e.mjs
+```
 
-`NikaCheckFinding` was a type-only gap: a strict TypeScript consumer written
-against published 0.120.3 could not compile here, while the same program
-already ran unchanged, because the engine's report carries the findings and
-types never reach the runtime. It types the entries of a check report's
-`findings` and, as published, the findings a refused native `run()` carries
-(`NikaOperationFinding` is schedule or check findings).
+This installs the SDK tarball into an isolated consumer and compares the full
+common authoring outcomes across native/HTTP and ESM/CommonJS. It checks literal
+round trips, incomplete questions, refused expression islands, invalid bases,
+authentication, no project-file changes and no created jobs. HTTP is given a
+nonexistent local engine path, proving that it cannot use a fallback. The report
+records binary and package hashes and is green only after owned-process cleanup.
+A source binary containing engine commit
+`4334e58bddf539a6253f448eb05d562b6919f2b7` is required for both doors.
+Released engine 0.120.3 supports native compile and its Serve advertises HTTP
+compile; 0.120.2 and older predate the route. This is a foundation test, not general intent authoring
+or execution admission qualification.
 
-The native pre-run refusal was a runtime gap, measured on a real engine: for
-the one-line refusal a current engine writes (`{"error":{"code":"NIKA-1708",…}}`
-for a required input left unset), this line used to resolve `run()` and then
-settle `result()` as `failed`, like an admitted failure, with the check
-findings dropped. It now keeps the published admission boundary on both
-transports.
+The [2026-09-19 source-build receipt](../evidence/compile-4334e58b-20260919.json)
+records 14 cases across both doors and both module systems at that producer,
+with exact outcome parity and no resident-state or project-file mutation. Its
+engine is a clean source build predating the published v0.120.3 binary; its SDK
+tarball is the unreleased PR candidate. The hashes identify those tested bytes.
 
-Compile was a runtime and type gap, measured on a real resident: the
-published program's `compile('hello', { timeoutMs })` was refused with 422
-(`malformed_compile_request`) because the request went out unchanged, while
-the resident's outcome underneath was the same (an identical candidate). The
-published shapes now reach the same wire and resolve the published
-projection; the typed V9 request is unchanged.
+Compile source-build receipts live outside the published package, so recording
+a tarball hash does not change the bytes it identifies. They do not participate
+in the released-engine behavioral ledgers.
 
-Open, and not changed by this compatibility work: a program written against
-published 0.120.3 must not assume these surfaces on this line.
+## V9 consumer composition
 
-- Native compile: published 0.120.3 compiles through the local engine; this
-  line refuses with `NikaCompatibilityError` and compiles only through a
-  resident.
-- Compile type names: `NikaCompileRequest` and `NikaCompileOutcome` keep the
-  typed V9 shapes here, so a strict consumer that annotated published shapes
-  with them names `NikaPublishedCompileRequest` and
-  `NikaPublishedCompileOutcome` instead. Without `timeoutMs` no client deadline
-  applies here, where the published package used its 30-second request timeout.
-- Typed compile with only a caller `signal`: the client's first health check
-  is shared and takes no caller signal, so an abort during it is observed when
-  that check answers, within `requestTimeout`. A `timeoutMs` or the published
-  door stops at once.
-- Run options: `inputs`, `access` and `costReview` by HTTP served name only,
-  with a generated HTTP `idempotencyKey`, here; literal `inputs` on both
-  transports and a required HTTP key there.
-- The multi-line check report older engines wrote before a refusal is not
-  read as a refusal here; it stays a protocol fault.
-- One HTTP transport comment still names `run.done`, which stays a valid
-  alias.
+The published native/HTTP compile, literal-input and lifecycle suites remain
+required alongside the V9 tests. `test/compile.test.ts` covers explicit wire
+generations, provider capability refusal, preserved receipts and kept-round
+tokens. `test/published-compile-compatibility.test.ts` covers overload selection,
+strict request validation, a deadline during health negotiation, independent
+concurrent callers and no POST after an abandoned wait. The packed ESM and
+CommonJS consumers check both published names and explicit V9 wire types.
 
-A source manifest version is not a publication claim. When this section was
-written (2026-09-29) this line's manifest read 0.118.7 while the latest npm
-release was 0.120.3, so a package built from this line is not a publishable
-upgrade over the published one. Versioning and publication stay with the
-release gates above; the committed gauntlet ledgers of earlier packages remain
-historical until an exact-version replay replaces them.
+`test/run-handle-compatibility.test.ts` preserves the prior V9 consumer
+regressions beside the published lifecycle suite. Both native admission suites
+retain their own measured and synthetic fixture provenance. Unit doubles and
+package checks do not qualify a real provider or the V9 semantic compiler.
+Exact-artifact consumer, effect, trace-integrity and independent business
+campaigns are still required before publication claims.

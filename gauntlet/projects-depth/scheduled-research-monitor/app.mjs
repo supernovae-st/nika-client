@@ -21,8 +21,8 @@ let activeServer;
 try {
   activeServer = await startServer();
   let nika = client();
-  assert.equal((await nika.check('workflow.nika.yaml')).clean, true);
-  const created = await nika.schedule('workflow.nika.yaml', {
+  assert.equal((await nika.check('workflow.nika')).clean, true);
+  const created = await nika.schedule('workflow.nika', {
     id: 'research-six-hourly',
     when: { kind: 'cadence', expression: 'TZ=UTC 0 */6 * * *' },
     maxCostUsd: 0.000001,
@@ -36,7 +36,7 @@ try {
   // so a wall-clock date would make the committed replay evidence go stale at
   // every UTC midnight (#63).
   const pauseUntil = '2099-01-01';
-  const paused = await nika.schedule('workflow.nika.yaml', {
+  const paused = await nika.schedule('workflow.nika', {
     id: 'research-six-hourly',
     when: { kind: 'cadence', expression: 'TZ=UTC 0 */6 * * *' },
     maxCostUsd: 0.000001,
@@ -51,7 +51,7 @@ try {
   assert.notEqual(paused.status.revision, originalRevision);
   let staleError;
   try {
-    await nika.schedule('workflow.nika.yaml', {
+    await nika.schedule('workflow.nika', {
       id: 'research-six-hourly',
       when: { kind: 'cadence', expression: 'TZ=UTC 0 */6 * * *' },
       maxCostUsd: 0.000001,
@@ -73,7 +73,7 @@ try {
   const restored = await nika.scheduleStatus('research-six-hourly');
   assert.equal(restored.revision, paused.status.revision);
   assert.equal(restored.active, false);
-  const run = await nika.run('workflow.nika.yaml', { idempotencyKey: 'research-monitor-manual-001' });
+  const run = await nika.run('workflow.nika', { idempotencyKey: 'research-monitor-manual-001' });
   const events = [];
   for await (const event of nika.events(run)) events.push(event.sequence);
   const result = await run.done;

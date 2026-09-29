@@ -50,7 +50,7 @@ describe('run identities are the same on every settlement path', () => {
       bin: HTTP_DEPTH_FIXTURE,
       fetch: fetch as unknown as typeof globalThis.fetch,
     });
-    const run = await nika.run('flow.nika.yaml', { idempotencyKey: 'ids-1' });
+    const run = await nika.run('flow.nika', { idempotencyKey: 'ids-1' });
     const result = await run.done;
     expect(result).toMatchObject({
       status: 'succeeded',

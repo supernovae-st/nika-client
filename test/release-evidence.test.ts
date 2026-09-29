@@ -5,9 +5,9 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { verifyReleaseEvidence } from '../scripts/verify-release-evidence.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const VERSION = '0.118.7';
-const ENGINE = 'nika 0.118.7 (f3a31a6ee)';
-const PACKAGE = 'supernovae-st-nika-0.118.7.tgz';
+const VERSION = '0.120.3';
+const ENGINE = 'nika 0.120.3 (578352a31)';
+const PACKAGE = 'supernovae-st-nika-0.120.3.tgz';
 const currentEvidence = [
   'gauntlet/projects-depth/results.json',
   'gauntlet/results/hostile.json',
@@ -125,17 +125,18 @@ describe('release evidence identity', () => {
       'incident-response-controller',
       'multi-tenant-webhook-router',
       'scheduled-research-monitor',
+      'signed-webhook-intake',
     ]);
     writeJson(fixture, 'gauntlet/projects-depth/results.json', {
       schema_version: 1,
       engine: ENGINE,
       package: PACKAGE,
       projects,
-      summary: { total: 5, succeeded: 0, result: 'red' },
+      summary: { total: 6, succeeded: 0, result: 'red' },
     });
 
     expect(() => verifyReleaseEvidence(fixture)).toThrow(
-      'does not record a 5/5 green summary',
+      'does not record a 6/6 green summary',
     );
   });
 
@@ -301,6 +302,7 @@ function depthEvidence(incident: Record<string, unknown>): object {
     'incident-response-controller',
     'multi-tenant-webhook-router',
     'scheduled-research-monitor',
+    'signed-webhook-intake',
   ]).map((project: any) => project.project === 'incident-response-controller'
     ? { ...project, ...structuredClone(incident) }
     : project);
@@ -309,7 +311,7 @@ function depthEvidence(incident: Record<string, unknown>): object {
     engine: ENGINE,
     package: PACKAGE,
     projects,
-    summary: { total: 5, succeeded: 5, result: 'green' },
+    summary: { total: 6, succeeded: 6, result: 'green' },
   };
 }
 

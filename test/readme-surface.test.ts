@@ -26,30 +26,33 @@ describe('packed public documentation', () => {
     expect(readme).toContain('pauseUntil:');
   });
 
-  it('teaches the published Run-owned lifecycle and keeps its compatibility doors', () => {
-    for (const member of ['run.events()', 'run.result()', 'run.status()', 'run.cancel()']) {
-      expect(readme).toContain(`\`${member}\``);
+  it('teaches literal inputs without promising an engine that lacks the channel', () => {
+    // Issue #116: the public word is `inputs`, with the same meaning on both
+    // transports, and it is honest about what the connected engine must advertise.
+    expect(readme).toContain("inputs: { ticketId: '42' }");
+    expect(readme).toContain('`inputsLiteral`');
+    expect(readme).toContain('`jobInputs`');
+    expect(readme).toContain('never falls back to `--var`');
+    expect(readme).toMatch(/`vars`[^.]*deprecated/);
+    // The two sentences that described the world before the envelope.
+    expect(readme).not.toContain('request envelopes for per-call `vars`');
+    expect(readme).not.toContain('yes; `vars`, `model`, `maxCostUsd` allowed');
+    const httpApi = readFileSync(new URL('../docs/http-api.md', import.meta.url), 'utf8');
+    expect(httpApi).toContain('`jobInputs`');
+    expect(httpApi).not.toContain('remote `run()` refuses\n  `vars`, `model`, and `maxCostUsd` until');
+  });
+
+  it('documents the pinned optional frame fields and evidence as no verdict', () => {
+    const httpApi = readFileSync(new URL('../docs/http-api.md', import.meta.url), 'utf8');
+    for (const word of ['`at`', '`evidence`', '`mirror_lost`', '`write_failed`', '`record_refused`']) {
+      expect(httpApi).toContain(word);
     }
-    expect(readme).toContain('isNikaRunSucceeded(result)');
-    expect(readme).toContain('`run.done` is its compatibility');
-    for (const door of ['nika.events(run)', 'nika.cancel(run)', 'nika.status(run)']) {
-      expect(readme).toContain(`\`${door}\``);
-    }
-    expect(readme).toContain('### Migrating to the Run-owned lifecycle');
-    // One bound, two named refusals, never a silently shortened view.
-    expect(readme).toContain('**4096 by default**');
-    expect(readme).toContain('`replay_truncated`');
-    expect(readme).toContain('`live_backpressure`');
-    expect(readme).not.toContain('observer ceiling, default 256');
-    // What a published 0.120.3 program must not assume on this line.
-    expect(readme).toContain('line still differs, such a program must not assume the published surface');
-    expect(readme).toContain('(`NikaPublishedCompileOutcome`) with `ready` exactly');
-    expect(readme).toContain('The kept-round replay token is never handed');
-    expect(readme).toContain("stops at once, even before the resident's first health answer");
-    expect(readme).not.toContain('really aborts the wait');
-    expect(readme).toContain('the same `NikaCheckFinding` shape');
-    expect(readme).toContain('`run()` then rejects, before any `NikaRun` exists');
-    expect(readme).not.toContain('settles `run.result()` with a `NikaOperationError`');
+    // Honest about where the wire comes from: not the contract this package pins.
+    expect(httpApi).toContain('pinned V9 `openapi.json`');
+    expect(httpApi).toContain('Older residents may omit them');
+    // And about what it means: it reports a loss, it never judges the run.
+    expect(httpApi).toContain('never changes `result.status`');
+    expect(httpApi).toContain('absence claims nothing');
   });
 
   it('exports package metadata so consumers can prove the installed pin', () => {

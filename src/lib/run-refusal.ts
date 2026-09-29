@@ -2,39 +2,38 @@ import { NikaOperationError, NikaProtocolError } from '../errors.js';
 import type { NikaCheckFinding, NikaTransportKind } from '../types.js';
 import { machineObject } from './machine.js';
 
-/*
- * The native admission law as @supernovae-st/nika 0.120.3 publishes it on npm
- * (its run-refusal and legacy-run-refusals modules): the engine's first
- * machine frame decides. A frame with a `kind` is a run event, the engine's
- * own admission evidence. An object without one is its single pre-run refusal
- * object: a red check report (`clean: false` with its findings) or an
- * `{ "error": { code, message } }` envelope. The SDK reads which one the
- * engine wrote and judges nothing itself. The published multi-line report of
- * older engines is not carried here: a report that spans lines stays a
- * protocol fault.
+/**
+ * `nika run --json` writes compact JSON objects, one per line (engine #1650):
+ * lifecycle events when the run was admitted, or exactly one pre-run refusal
+ * object when it was not. A run event names its `kind`; a refusal object does
+ * not. It is one of the two shapes the engine was measured to write: its
+ * check report carrying its own `clean: false` verdict beside `findings`, or
+ * its error envelope `{ error: { code, message } }`, `code` null when the
+ * refusal class carries no wire code. The engine admits and the engine
+ * refuses; this module only reads which of the two it wrote. A report that
+ * calls itself clean, findings with no verdict, or an envelope with no
+ * message is none of them, and is never read as a refusal.
  */
 
-/** The SDK's own code when the engine named none (an unreadable workflow file). */
-const RUN_REFUSED = 'run_refused';
-const UNEXPLAINED = 'The engine refused this workflow before admission';
-/** Exits an engine uses for a refusal it teaches on stderr alone. */
-const REFUSAL_EXITS: ReadonlySet<number> = new Set([2, 3]);
-/** The engine prefixes a stream-routed line with its own name. */
-const ENGINE_PREFIX = /^nika(?: [a-z-]+)?:\s*/;
-
-/** What the engine refused with: its code when it named one, its words, its check findings. */
+/** What the engine said when it refused a run before admitting it. */
 export interface RunRefusal {
+  /** The engine's own code, only when the engine named one. */
   machineCode?: string;
   message: string;
-  findings?: NikaCheckFinding[];
+  findings?: readonly NikaCheckFinding[];
 }
 
-/** A machine frame that is a run event: the engine admitted the run. */
+/** The SDK's word for a refusal whose class the engine gave no code. */
+const RUN_REFUSED = 'run_refused';
+/** Only for a `clean: false` report whose findings carry no message at all. */
+const UNEXPLAINED = 'The engine refused this workflow before admission';
+
+/** A run event is the only admission evidence on this wire. */
 export function isRunEvent(frame: Record<string, unknown>): boolean {
   return typeof frame.kind === 'string';
 }
 
-/** The pre-run refusal a kindless frame carries, or `undefined` when it carries none. */
+/** The refusal a first frame carries, or undefined when it is not one. */
 export function preRunRefusal(
   frame: Record<string, unknown>,
   transport: NikaTransportKind,
@@ -44,53 +43,48 @@ export function preRunRefusal(
     return checkRefusal(frame.findings, transport);
   }
   const error = machineObject(frame.error);
-  if (!error || typeof error.message !== 'string' || error.message.length === 0) return undefined;
-  const machineCode = typeof error.code === 'string' && error.code.length > 0 ? error.code : undefined;
+  if (!error || typeof error.message !== 'string' || error.message.length === 0) {
+    return undefined;
+  }
+  const machineCode = typeof error.code === 'string' && error.code.length > 0
+    ? error.code
+    : undefined;
   return { ...(machineCode ? { machineCode } : {}), message: error.message };
 }
 
-/**
- * A refusal line an engine writes instead of a machine frame (`NIKA-1709 ·
- * refusing to start …`): no JSON value can open with `NIKA-`, so a match is
- * never a frame.
- */
-export function teachingLineRefusal(line: string): RunRefusal | undefined {
-  const machineCode = leadingCode(line);
-  return machineCode ? { machineCode, message: line } : undefined;
-}
-
-/** A refusal an engine taught on stderr alone, with a refusal exit and no machine frame. */
-export function stderrRefusal(stderr: string, exitCode: number): RunRefusal | undefined {
-  if (!REFUSAL_EXITS.has(exitCode)) return undefined;
-  for (const raw of stderr.split('\n')) {
-    const line = raw.trim().replace(ENGINE_PREFIX, '');
-    const machineCode = leadingCode(line);
-    if (machineCode) return { machineCode, message: line };
-  }
-  return undefined;
-}
-
-/** The typed refusal `run()` rejects with, carrying the engine's code, words and exit status. */
 export function runRefusalError(
   transport: NikaTransportKind,
   refusal: RunRefusal,
   exitCode: number,
 ): NikaOperationError {
-  return new NikaOperationError('run', transport, refusal.machineCode ?? RUN_REFUSED, refusal.message, {
-    status: exitCode,
-    ...(refusal.findings ? { findings: refusal.findings } : {}),
-    ...(refusal.machineCode ? { machineCode: refusal.machineCode } : {}),
-  });
+  return new NikaOperationError(
+    'run',
+    transport,
+    refusal.machineCode ?? RUN_REFUSED,
+    refusal.message,
+    {
+      status: exitCode,
+      ...(refusal.findings ? { findings: refusal.findings } : {}),
+      ...(refusal.machineCode ? { machineCode: refusal.machineCode } : {}),
+    },
+  );
 }
 
+/**
+ * The findings ride through untouched. The error is named after the first
+ * finding that carries a code, in the engine's own `NIKA-… · message` voice.
+ */
 function checkRefusal(values: unknown[], transport: NikaTransportKind): RunRefusal {
   const findings: NikaCheckFinding[] = [];
   for (const value of values) {
     const finding = machineObject(value);
-    if (!finding) throw new NikaProtocolError(transport, 'Pre-run refusal findings were malformed');
+    if (!finding) {
+      throw new NikaProtocolError(transport, 'Pre-run refusal findings were malformed');
+    }
     findings.push(finding as NikaCheckFinding);
   }
-  const named = findings.find((finding) => typeof finding.code === 'string' && finding.code) ?? findings[0];
+  const named = findings.find((finding) => typeof finding.code === 'string' && finding.code)
+    ?? findings[0];
   const machineCode = typeof named?.code === 'string' && named.code ? named.code : undefined;
   const said = typeof named?.message === 'string' && named.message ? named.message : undefined;
   const others = findings.length > 1 ? ` (+${findings.length - 1} more findings)` : '';
@@ -99,10 +93,4 @@ function checkRefusal(values: unknown[], transport: NikaTransportKind): RunRefus
     message: `${[machineCode, said ?? UNEXPLAINED].filter(Boolean).join(' · ')}${others}`,
     findings,
   };
-}
-
-/** The engine code a line opens with; a code needs a digit, so a bare word is never one. */
-function leadingCode(text: string): string | undefined {
-  const code = /^NIKA-[A-Z0-9_-]+/.exec(text)?.[0].replace(/-+$/, '');
-  return code && /\d/.test(code) ? code : undefined;
 }

@@ -21,7 +21,7 @@ jobs:
 
       - run: npm ci
       - run: npm test
-      - run: npm run build
+      - run: npm run check:package-surface
 
   node-current-smoke:
     runs-on: ubuntu-latest
@@ -91,6 +91,16 @@ jobs:
           chmod +x nika
           test "$(./nika --version | awk '{print $2}')" = "$version"
           ./nika key init --plain
+
+      - name: Gate packed compile parity against the exact public engine
+        env:
+          NIKA_BIN: ${{ runner.temp }}/nika-release-asset/nika
+          NIKA_COMPILE_PARITY_REPORT: ${{ runner.temp }}/nika-release-replay/compile-parity.json
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$NIKA_COMPILE_PARITY_REPORT")"
+          test -x "$NIKA_BIN"
+          node scripts/run-compile-parity-e2e.mjs
 
       - name: Replay every current behavioral evidence family
         env:
@@ -200,7 +210,7 @@ jobs:
           trap cleanup EXIT
           mkdir -p "$project_dir" "$workflows_dir" "$state_dir"
           printf '%s\n' 'nika: ci-type-drift-probe' > "$project_dir/nika.yaml"
-          cat > "$workflows_dir/test.nika.yaml" <<'EOF'
+          cat > "$workflows_dir/test.nika" <<'EOF'
           nika: test
           permits: {}
           tasks:

@@ -78,5 +78,5 @@ test('depth incident proof preserves the original project workflow and rejects a
     async run(workflow) { called.push(workflow); return { done: Promise.resolve({ status: 'failed' }) }; },
   };
   await assert.rejects(exerciseIncident(client, { arm() { throw new Error('must validate original workflow first'); } }), /succeeded/);
-  assert.deepEqual(called, ['workflow.nika.yaml', 'workflow.nika.yaml']);
+  assert.deepEqual(called, ['workflow.nika', 'workflow.nika']);
 });

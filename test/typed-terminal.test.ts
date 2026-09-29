@@ -61,7 +61,7 @@ const HTTP_RECEIPT = Object.freeze({
 // Compile-time only: this function is never invoked, so nothing in it runs.
 async function genericFlows(client: Nika): Promise<void> {
   // The caller's Outputs type flows run → done → events.
-  const run = await client.run<{ answer: number }>('flow.nika.yaml');
+  const run = await client.run<{ answer: number }>('flow.nika');
   expectTypeOf(run).toEqualTypeOf<NikaRun<{ answer: number }>>();
   expectTypeOf(run.id).toEqualTypeOf<NikaRunId>();
   expectTypeOf(run.done).toEqualTypeOf<Promise<NikaRunResult<{ answer: number }>>>();
@@ -97,7 +97,7 @@ async function genericFlows(client: Nika): Promise<void> {
   }
 
   // Omitting the generic keeps the transport shape, so existing code compiles.
-  const untyped = await client.run('flow.nika.yaml');
+  const untyped = await client.run('flow.nika');
   expectTypeOf(untyped).toEqualTypeOf<NikaRun>();
   const untypedResult = await untyped.done;
   expectTypeOf(untypedResult.outputs).toEqualTypeOf<Record<string, unknown> | undefined>();
@@ -240,7 +240,7 @@ describe('terminal frame guards', () => {
 describe.skipIf(!posix)('typed terminal hop through a real run', () => {
   it('flows the caller outputs type through events and the terminal result', async () => {
     const client = new Nika({ bin: FIXTURE });
-    const run = await client.run<{ answer: number }>('ok.nika.yaml');
+    const run = await client.run<{ answer: number }>('ok.nika');
     expectTypeOf(run.id).toEqualTypeOf<NikaRunId>();
     const seen: Array<string | undefined> = [];
     for await (const event of client.events(run)) {

@@ -13,8 +13,8 @@ import { bounded, cancelHeldRun, collectRunEvents } from '../../../scripts/gaunt
 // Cancellation is proved separately at an explicitly held loopback fetch.
 export async function exerciseIncident(nika, gate, signal) {
   const step = (promise, ms, label) => bounded(promise, ms, label, signal);
-  assert.equal((await step(nika.check('workflow.nika.yaml'), 10_000, 'incident check')).clean, true);
-  const original = await step(nika.run('workflow.nika.yaml', { idempotencyKey: 'incident-plan-1' }), 10_000, 'incident admission');
+  assert.equal((await step(nika.check('workflow.nika'), 10_000, 'incident check')).clean, true);
+  const original = await step(nika.run('workflow.nika', { idempotencyKey: 'incident-plan-1' }), 10_000, 'incident admission');
   const projectResult = await step(original.done, 30_000, 'incident workflow completion');
   assert.equal(projectResult.status, 'succeeded');
   assert.equal(projectResult.outputs?.plan?.incident?.id, 'inc-2042');
@@ -23,7 +23,7 @@ export async function exerciseIncident(nika, gate, signal) {
   assert.match(projectResult.outputs?.plan_digest ?? '', /^[0-9a-f]{64}$/);
 
   gate.arm('depth incident cancellation');
-  const run = await step(nika.run('controlled-cancel.nika.yaml', { idempotencyKey: 'incident-cancel-1' }), 10_000, 'controlled admission');
+  const run = await step(nika.run('controlled-cancel.nika', { idempotencyKey: 'incident-cancel-1' }), 10_000, 'controlled admission');
   const { cancellation, result, rendezvous } = await cancelHeldRun(nika, run, gate, signal);
   assert(result.receipt);
   const recovered = await step(nika.attachRun(run.id), 10_000, 'incident reattach');
@@ -41,9 +41,18 @@ export async function exerciseIncident(nika, gate, signal) {
     await bounded(observation.catch(() => {}), 2_000, 'incident replay observer cleanup');
   }
   const remoteProof = await step(nika.traceVerify(result.receipt), 5_000, 'remote receipt verdict');
-  assert.equal(remoteProof.verified, false);
-  assert.equal(remoteProof.verdict, 'unavailable');
-  assert.equal(remoteProof.reason, 'trace_journal_unavailable');
+  // 0.118 serve had no journal door (verified false / unavailable). A
+  // candidate that lists `.nika` also verifies the sealed receipt it issued.
+  // HTTP verify is GET /v1/jobs/:id/trace/verify: chain_head is not a request
+  // body. A receipt whose trace_id is not the journal's never reads verified.
+  assert.equal(remoteProof.verified, true);
+  assert.equal(remoteProof.trace_id, result.receipt.trace_id);
+  assert.notEqual(remoteProof.verdict, 'unavailable');
+  const mismatchedTrace = await step(nika.traceVerify({
+    ...result.receipt,
+    trace_id: '0'.repeat(32),
+  }), 5_000, 'mismatched trace_id');
+  assert.equal(mismatchedTrace.verified, false);
   return {
     project: 'incident-response-controller', status: 'succeeded',
     project_workflow_status: projectResult.status,
@@ -57,7 +66,9 @@ export async function exerciseIncident(nika, gate, signal) {
     settlement: settlementFacts(result),
     same_job_terminal_and_replay_matched: true,
     cancellation_rendezvous: rendezvous,
-    remote_receipt_verdict: { verdict: remoteProof.verdict, reason: remoteProof.reason },
+    remote_receipt_verdict: { verdict: remoteProof.verdict, reason: remoteProof.reason,
+      verified: remoteProof.verified, trace_id: remoteProof.trace_id },
+    mismatched_trace_rejected: true,
     deterministic_cost_cap_usd: 0,
   };
 }
@@ -142,7 +153,7 @@ async function main() {
   let failure;
   try {
     gate = await CancellationRendezvous.listen();
-    writeFileSync('controlled-cancel.nika.yaml', cancellationFixture(gate.url));
+    writeFileSync('controlled-cancel.nika', cancellationFixture(gate.url));
     server = owned.start(engine, ['serve', '--bind', '127.0.0.1:0', '--workflows', '.',
       '--token-file', tokenFile, '--state-root', path.join(runtime, 'state'), '--plain'],
     { cwd: process.cwd(), env: process.env, timeoutMs: 85_000, maxBuffer: 64 * 1024 });

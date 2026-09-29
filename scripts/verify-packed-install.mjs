@@ -69,7 +69,7 @@ try {
     }
   }
 
-  await writeFile(path.join(project, 'packed-release-smoke.nika.yaml'), [
+  await writeFile(path.join(project, 'packed-release-smoke.nika'), [
     'nika: packed-release-smoke',
     'model: mock/echo',
     'tasks:',
@@ -82,7 +82,7 @@ try {
     "import { Nika } from '@supernovae-st/nika';",
     'const nika = new Nika({ cwd: process.cwd() });',
     "if (nika.transportKind !== 'native-process') process.exit(1);",
-    "const report = await nika.check('packed-release-smoke.nika.yaml');",
+    "const report = await nika.check('packed-release-smoke.nika');",
     'if (report.clean !== true || report.exitCode !== 0) process.exit(2);',
   ].join(' ')], { cwd: project });
 

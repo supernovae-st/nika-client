@@ -100,7 +100,7 @@ describe('explicit cost-review protocol version', () => {
       ? sseResponse([{ sequence: 1, kind: 'execution.settled', status: 'succeeded' }])
       : jsonResponse({ id: 'job-1', status: 'queued' }, 202));
     const reference = { review_id: id, witness_sha256: hash };
-    const run = await nika.run(request.workflow, { inputs: request.inputs, access: request.access, costReview: reference });
+    const run = await nika.run(request.workflow, { inputs: request.inputs, access: request.access, costReview: reference, idempotencyKey: 'review-v2-job' });
     await expect(run.done).resolves.toMatchObject({ status: 'succeeded' });
     expect(JSON.parse(String(fetch.mock.calls[1][1]?.body))).toEqual({ ...request, cost_review: reference });
     expect(fetch.mock.calls.some(([url]) => String(url).includes('cost-reviews'))).toBe(false);

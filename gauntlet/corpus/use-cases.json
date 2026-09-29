@@ -11,7 +11,7 @@
     "failure_oracle": "projection carries the domain, actor, and accepted state for uc-001-customer-support-sla-breach-triage",
     "business_outcome": "produce a normalized decision card for customer support",
     "recipe": "project-record",
-    "workflow": "workflows/uc-001-customer-support-sla-breach-triage.nika.yaml"
+    "workflow": "workflows/uc-001-customer-support-sla-breach-triage.nika"
   },
   {
     "number": 2,
@@ -25,7 +25,7 @@
     "failure_oracle": "validation report is valid with zero errors for uc-002-customer-support-duplicate-ticket-diff",
     "business_outcome": "refuse malformed business input before downstream work for customer support",
     "recipe": "validate-contract",
-    "workflow": "workflows/uc-002-customer-support-duplicate-ticket-diff.nika.yaml"
+    "workflow": "workflows/uc-002-customer-support-duplicate-ticket-diff.nika"
   },
   {
     "number": 3,
@@ -39,7 +39,7 @@
     "failure_oracle": "revision patch is non-empty and points at the changed value for uc-003-customer-support-escalation-readiness",
     "business_outcome": "explain exactly what changed between two business revisions for customer support",
     "recipe": "diff-revisions",
-    "workflow": "workflows/uc-003-customer-support-escalation-readiness.nika.yaml"
+    "workflow": "workflows/uc-003-customer-support-escalation-readiness.nika"
   },
   {
     "number": 4,
@@ -53,7 +53,7 @@
     "failure_oracle": "merged policy is approved and keeps the original identifier for uc-004-customer-support-queue-batch-enrichment",
     "business_outcome": "apply an approved override without losing the base record for customer support",
     "recipe": "merge-policy",
-    "workflow": "workflows/uc-004-customer-support-queue-batch-enrichment.nika.yaml"
+    "workflow": "workflows/uc-004-customer-support-queue-batch-enrichment.nika"
   },
   {
     "number": 5,
@@ -67,7 +67,7 @@
     "failure_oracle": "evidence digest is stable and is logged without source disclosure for uc-005-customer-support-resolution-receipt",
     "business_outcome": "mint a stable evidence identifier for later reconciliation for customer support",
     "recipe": "hash-evidence",
-    "workflow": "workflows/uc-005-customer-support-resolution-receipt.nika.yaml"
+    "workflow": "workflows/uc-005-customer-support-resolution-receipt.nika"
   },
   {
     "number": 6,
@@ -81,7 +81,7 @@
     "failure_oracle": "measured duration is positive and uses fixed ISO timestamps for uc-006-commerce-refund-policy-validation",
     "business_outcome": "calculate an operational service window without ambient time for commerce operations",
     "recipe": "measure-window",
-    "workflow": "workflows/uc-006-commerce-refund-policy-validation.nika.yaml"
+    "workflow": "workflows/uc-006-commerce-refund-policy-validation.nika"
   },
   {
     "number": 7,
@@ -95,7 +95,7 @@
     "failure_oracle": "all three batch items return in input order with checked=true for uc-007-commerce-inventory-delta",
     "business_outcome": "enrich a bounded batch while preserving source order for commerce operations",
     "recipe": "batch-enrich",
-    "workflow": "workflows/uc-007-commerce-inventory-delta.nika.yaml"
+    "workflow": "workflows/uc-007-commerce-inventory-delta.nika"
   },
   {
     "number": 8,
@@ -109,7 +109,7 @@
     "failure_oracle": "parallel branches reconcile into one object with both values for uc-008-commerce-catalog-merge",
     "business_outcome": "reconcile two independent operational observations for commerce operations",
     "recipe": "parallel-reconcile",
-    "workflow": "workflows/uc-008-commerce-catalog-merge.nika.yaml"
+    "workflow": "workflows/uc-008-commerce-catalog-merge.nika"
   },
   {
     "number": 9,
@@ -123,7 +123,7 @@
     "failure_oracle": "threshold result is true and the admitted branch emits one log for uc-009-commerce-stockout-window",
     "business_outcome": "open an action only when a deterministic threshold is met for commerce operations",
     "recipe": "threshold-gate",
-    "workflow": "workflows/uc-009-commerce-stockout-window.nika.yaml"
+    "workflow": "workflows/uc-009-commerce-stockout-window.nika"
   },
   {
     "number": 10,
@@ -137,7 +137,7 @@
     "failure_oracle": "one typed machine event carries the case identity and accepted state for uc-010-commerce-price-change-event",
     "business_outcome": "publish a typed completion receipt for subscribers for commerce operations",
     "recipe": "emit-receipt",
-    "workflow": "workflows/uc-010-commerce-price-change-event.nika.yaml"
+    "workflow": "workflows/uc-010-commerce-price-change-event.nika"
   },
   {
     "number": 11,
@@ -151,7 +151,7 @@
     "failure_oracle": "projection carries the domain, actor, and accepted state for uc-011-finance-invoice-schema-guard",
     "business_outcome": "produce a normalized decision card for finance operations",
     "recipe": "project-record",
-    "workflow": "workflows/uc-011-finance-invoice-schema-guard.nika.yaml"
+    "workflow": "workflows/uc-011-finance-invoice-schema-guard.nika"
   },
   {
     "number": 12,
@@ -165,7 +165,7 @@
     "failure_oracle": "validation report is valid with zero errors for uc-012-finance-payment-reconciliation",
     "business_outcome": "refuse malformed business input before downstream work for finance operations",
     "recipe": "validate-contract",
-    "workflow": "workflows/uc-012-finance-payment-reconciliation.nika.yaml"
+    "workflow": "workflows/uc-012-finance-payment-reconciliation.nika"
   },
   {
     "number": 13,
@@ -179,7 +179,7 @@
     "failure_oracle": "revision patch is non-empty and points at the changed value for uc-013-finance-expense-policy-merge",
     "business_outcome": "explain exactly what changed between two business revisions for finance operations",
     "recipe": "diff-revisions",
-    "workflow": "workflows/uc-013-finance-expense-policy-merge.nika.yaml"
+    "workflow": "workflows/uc-013-finance-expense-policy-merge.nika"
   },
   {
     "number": 14,
@@ -193,7 +193,7 @@
     "failure_oracle": "merged policy is approved and keeps the original identifier for uc-014-finance-cashflow-window",
     "business_outcome": "apply an approved override without losing the base record for finance operations",
     "recipe": "merge-policy",
-    "workflow": "workflows/uc-014-finance-cashflow-window.nika.yaml"
+    "workflow": "workflows/uc-014-finance-cashflow-window.nika"
   },
   {
     "number": 15,
@@ -207,7 +207,7 @@
     "failure_oracle": "evidence digest is stable and is logged without source disclosure for uc-015-finance-close-receipt",
     "business_outcome": "mint a stable evidence identifier for later reconciliation for finance operations",
     "recipe": "hash-evidence",
-    "workflow": "workflows/uc-015-finance-close-receipt.nika.yaml"
+    "workflow": "workflows/uc-015-finance-close-receipt.nika"
   },
   {
     "number": 16,
@@ -221,7 +221,7 @@
     "failure_oracle": "measured duration is positive and uses fixed ISO timestamps for uc-016-people-candidate-intake",
     "business_outcome": "calculate an operational service window without ambient time for people operations",
     "recipe": "measure-window",
-    "workflow": "workflows/uc-016-people-candidate-intake.nika.yaml"
+    "workflow": "workflows/uc-016-people-candidate-intake.nika"
   },
   {
     "number": 17,
@@ -235,7 +235,7 @@
     "failure_oracle": "all three batch items return in input order with checked=true for uc-017-people-offer-diff",
     "business_outcome": "enrich a bounded batch while preserving source order for people operations",
     "recipe": "batch-enrich",
-    "workflow": "workflows/uc-017-people-offer-diff.nika.yaml"
+    "workflow": "workflows/uc-017-people-offer-diff.nika"
   },
   {
     "number": 18,
@@ -249,7 +249,7 @@
     "failure_oracle": "parallel branches reconcile into one object with both values for uc-018-people-onboarding-merge",
     "business_outcome": "reconcile two independent operational observations for people operations",
     "recipe": "parallel-reconcile",
-    "workflow": "workflows/uc-018-people-onboarding-merge.nika.yaml"
+    "workflow": "workflows/uc-018-people-onboarding-merge.nika"
   },
   {
     "number": 19,
@@ -263,7 +263,7 @@
     "failure_oracle": "threshold result is true and the admitted branch emits one log for uc-019-people-probation-window",
     "business_outcome": "open an action only when a deterministic threshold is met for people operations",
     "recipe": "threshold-gate",
-    "workflow": "workflows/uc-019-people-probation-window.nika.yaml"
+    "workflow": "workflows/uc-019-people-probation-window.nika"
   },
   {
     "number": 20,
@@ -277,7 +277,7 @@
     "failure_oracle": "one typed machine event carries the case identity and accepted state for uc-020-people-access-event",
     "business_outcome": "publish a typed completion receipt for subscribers for people operations",
     "recipe": "emit-receipt",
-    "workflow": "workflows/uc-020-people-access-event.nika.yaml"
+    "workflow": "workflows/uc-020-people-access-event.nika"
   },
   {
     "number": 21,
@@ -291,7 +291,7 @@
     "failure_oracle": "projection carries the domain, actor, and accepted state for uc-021-legal-clause-schema-guard",
     "business_outcome": "produce a normalized decision card for legal operations",
     "recipe": "project-record",
-    "workflow": "workflows/uc-021-legal-clause-schema-guard.nika.yaml"
+    "workflow": "workflows/uc-021-legal-clause-schema-guard.nika"
   },
   {
     "number": 22,
@@ -305,7 +305,7 @@
     "failure_oracle": "validation report is valid with zero errors for uc-022-legal-redline-diff",
     "business_outcome": "refuse malformed business input before downstream work for legal operations",
     "recipe": "validate-contract",
-    "workflow": "workflows/uc-022-legal-redline-diff.nika.yaml"
+    "workflow": "workflows/uc-022-legal-redline-diff.nika"
   },
   {
     "number": 23,
@@ -319,7 +319,7 @@
     "failure_oracle": "revision patch is non-empty and points at the changed value for uc-023-legal-fallback-merge",
     "business_outcome": "explain exactly what changed between two business revisions for legal operations",
     "recipe": "diff-revisions",
-    "workflow": "workflows/uc-023-legal-fallback-merge.nika.yaml"
+    "workflow": "workflows/uc-023-legal-fallback-merge.nika"
   },
   {
     "number": 24,
@@ -333,7 +333,7 @@
     "failure_oracle": "merged policy is approved and keeps the original identifier for uc-024-legal-renewal-window",
     "business_outcome": "apply an approved override without losing the base record for legal operations",
     "recipe": "merge-policy",
-    "workflow": "workflows/uc-024-legal-renewal-window.nika.yaml"
+    "workflow": "workflows/uc-024-legal-renewal-window.nika"
   },
   {
     "number": 25,
@@ -347,7 +347,7 @@
     "failure_oracle": "evidence digest is stable and is logged without source disclosure for uc-025-legal-signature-event",
     "business_outcome": "mint a stable evidence identifier for later reconciliation for legal operations",
     "recipe": "hash-evidence",
-    "workflow": "workflows/uc-025-legal-signature-event.nika.yaml"
+    "workflow": "workflows/uc-025-legal-signature-event.nika"
   },
   {
     "number": 26,
@@ -361,7 +361,7 @@
     "failure_oracle": "measured duration is positive and uses fixed ISO timestamps for uc-026-clinic-admin-referral-guard",
     "business_outcome": "calculate an operational service window without ambient time for clinic administration",
     "recipe": "measure-window",
-    "workflow": "workflows/uc-026-clinic-admin-referral-guard.nika.yaml"
+    "workflow": "workflows/uc-026-clinic-admin-referral-guard.nika"
   },
   {
     "number": 27,
@@ -375,7 +375,7 @@
     "failure_oracle": "all three batch items return in input order with checked=true for uc-027-clinic-admin-appointment-diff",
     "business_outcome": "enrich a bounded batch while preserving source order for clinic administration",
     "recipe": "batch-enrich",
-    "workflow": "workflows/uc-027-clinic-admin-appointment-diff.nika.yaml"
+    "workflow": "workflows/uc-027-clinic-admin-appointment-diff.nika"
   },
   {
     "number": 28,
@@ -389,7 +389,7 @@
     "failure_oracle": "parallel branches reconcile into one object with both values for uc-028-clinic-admin-care-instructions-merge",
     "business_outcome": "reconcile two independent operational observations for clinic administration",
     "recipe": "parallel-reconcile",
-    "workflow": "workflows/uc-028-clinic-admin-care-instructions-merge.nika.yaml"
+    "workflow": "workflows/uc-028-clinic-admin-care-instructions-merge.nika"
   },
   {
     "number": 29,
@@ -403,7 +403,7 @@
     "failure_oracle": "threshold result is true and the admitted branch emits one log for uc-029-clinic-admin-followup-window",
     "business_outcome": "open an action only when a deterministic threshold is met for clinic administration",
     "recipe": "threshold-gate",
-    "workflow": "workflows/uc-029-clinic-admin-followup-window.nika.yaml"
+    "workflow": "workflows/uc-029-clinic-admin-followup-window.nika"
   },
   {
     "number": 30,
@@ -417,7 +417,7 @@
     "failure_oracle": "one typed machine event carries the case identity and accepted state for uc-030-clinic-admin-handoff-event",
     "business_outcome": "publish a typed completion receipt for subscribers for clinic administration",
     "recipe": "emit-receipt",
-    "workflow": "workflows/uc-030-clinic-admin-handoff-event.nika.yaml"
+    "workflow": "workflows/uc-030-clinic-admin-handoff-event.nika"
   },
   {
     "number": 31,
@@ -431,7 +431,7 @@
     "failure_oracle": "projection carries the domain, actor, and accepted state for uc-031-education-enrollment-guard",
     "business_outcome": "produce a normalized decision card for education operations",
     "recipe": "project-record",
-    "workflow": "workflows/uc-031-education-enrollment-guard.nika.yaml"
+    "workflow": "workflows/uc-031-education-enrollment-guard.nika"
   },
   {
     "number": 32,
@@ -445,7 +445,7 @@
     "failure_oracle": "validation report is valid with zero errors for uc-032-education-rubric-diff",
     "business_outcome": "refuse malformed business input before downstream work for education operations",
     "recipe": "validate-contract",
-    "workflow": "workflows/uc-032-education-rubric-diff.nika.yaml"
+    "workflow": "workflows/uc-032-education-rubric-diff.nika"
   },
   {
     "number": 33,
@@ -459,7 +459,7 @@
     "failure_oracle": "revision patch is non-empty and points at the changed value for uc-033-education-learning-plan-merge",
     "business_outcome": "explain exactly what changed between two business revisions for education operations",
     "recipe": "diff-revisions",
-    "workflow": "workflows/uc-033-education-learning-plan-merge.nika.yaml"
+    "workflow": "workflows/uc-033-education-learning-plan-merge.nika"
   },
   {
     "number": 34,
@@ -473,7 +473,7 @@
     "failure_oracle": "merged policy is approved and keeps the original identifier for uc-034-education-assignment-window",
     "business_outcome": "apply an approved override without losing the base record for education operations",
     "recipe": "merge-policy",
-    "workflow": "workflows/uc-034-education-assignment-window.nika.yaml"
+    "workflow": "workflows/uc-034-education-assignment-window.nika"
   },
   {
     "number": 35,
@@ -487,7 +487,7 @@
     "failure_oracle": "evidence digest is stable and is logged without source disclosure for uc-035-education-completion-event",
     "business_outcome": "mint a stable evidence identifier for later reconciliation for education operations",
     "recipe": "hash-evidence",
-    "workflow": "workflows/uc-035-education-completion-event.nika.yaml"
+    "workflow": "workflows/uc-035-education-completion-event.nika"
   },
   {
     "number": 36,
@@ -501,7 +501,7 @@
     "failure_oracle": "measured duration is positive and uses fixed ISO timestamps for uc-036-logistics-shipment-guard",
     "business_outcome": "calculate an operational service window without ambient time for logistics",
     "recipe": "measure-window",
-    "workflow": "workflows/uc-036-logistics-shipment-guard.nika.yaml"
+    "workflow": "workflows/uc-036-logistics-shipment-guard.nika"
   },
   {
     "number": 37,
@@ -515,7 +515,7 @@
     "failure_oracle": "all three batch items return in input order with checked=true for uc-037-logistics-route-diff",
     "business_outcome": "enrich a bounded batch while preserving source order for logistics",
     "recipe": "batch-enrich",
-    "workflow": "workflows/uc-037-logistics-route-diff.nika.yaml"
+    "workflow": "workflows/uc-037-logistics-route-diff.nika"
   },
   {
     "number": 38,
@@ -529,7 +529,7 @@
     "failure_oracle": "parallel branches reconcile into one object with both values for uc-038-logistics-exception-merge",
     "business_outcome": "reconcile two independent operational observations for logistics",
     "recipe": "parallel-reconcile",
-    "workflow": "workflows/uc-038-logistics-exception-merge.nika.yaml"
+    "workflow": "workflows/uc-038-logistics-exception-merge.nika"
   },
   {
     "number": 39,
@@ -543,7 +543,7 @@
     "failure_oracle": "threshold result is true and the admitted branch emits one log for uc-039-logistics-delivery-window",
     "business_outcome": "open an action only when a deterministic threshold is met for logistics",
     "recipe": "threshold-gate",
-    "workflow": "workflows/uc-039-logistics-delivery-window.nika.yaml"
+    "workflow": "workflows/uc-039-logistics-delivery-window.nika"
   },
   {
     "number": 40,
@@ -557,7 +557,7 @@
     "failure_oracle": "one typed machine event carries the case identity and accepted state for uc-040-logistics-proof-event",
     "business_outcome": "publish a typed completion receipt for subscribers for logistics",
     "recipe": "emit-receipt",
-    "workflow": "workflows/uc-040-logistics-proof-event.nika.yaml"
+    "workflow": "workflows/uc-040-logistics-proof-event.nika"
   },
   {
     "number": 41,
@@ -571,7 +571,7 @@
     "failure_oracle": "projection carries the domain, actor, and accepted state for uc-041-real-estate-lead-guard",
     "business_outcome": "produce a normalized decision card for real estate operations",
     "recipe": "project-record",
-    "workflow": "workflows/uc-041-real-estate-lead-guard.nika.yaml"
+    "workflow": "workflows/uc-041-real-estate-lead-guard.nika"
   },
   {
     "number": 42,
@@ -585,7 +585,7 @@
     "failure_oracle": "validation report is valid with zero errors for uc-042-real-estate-lease-diff",
     "business_outcome": "refuse malformed business input before downstream work for real estate operations",
     "recipe": "validate-contract",
-    "workflow": "workflows/uc-042-real-estate-lease-diff.nika.yaml"
+    "workflow": "workflows/uc-042-real-estate-lease-diff.nika"
   },
   {
     "number": 43,
@@ -599,7 +599,7 @@
     "failure_oracle": "revision patch is non-empty and points at the changed value for uc-043-real-estate-listing-merge",
     "business_outcome": "explain exactly what changed between two business revisions for real estate operations",
     "recipe": "diff-revisions",
-    "workflow": "workflows/uc-043-real-estate-listing-merge.nika.yaml"
+    "workflow": "workflows/uc-043-real-estate-listing-merge.nika"
   },
   {
     "number": 44,
@@ -613,7 +613,7 @@
     "failure_oracle": "merged policy is approved and keeps the original identifier for uc-044-real-estate-inspection-window",
     "business_outcome": "apply an approved override without losing the base record for real estate operations",
     "recipe": "merge-policy",
-    "workflow": "workflows/uc-044-real-estate-inspection-window.nika.yaml"
+    "workflow": "workflows/uc-044-real-estate-inspection-window.nika"
   },
   {
     "number": 45,
@@ -627,7 +627,7 @@
     "failure_oracle": "evidence digest is stable and is logged without source disclosure for uc-045-real-estate-handover-event",
     "business_outcome": "mint a stable evidence identifier for later reconciliation for real estate operations",
     "recipe": "hash-evidence",
-    "workflow": "workflows/uc-045-real-estate-handover-event.nika.yaml"
+    "workflow": "workflows/uc-045-real-estate-handover-event.nika"
   },
   {
     "number": 46,
@@ -641,7 +641,7 @@
     "failure_oracle": "measured duration is positive and uses fixed ISO timestamps for uc-046-travel-booking-guard",
     "business_outcome": "calculate an operational service window without ambient time for travel operations",
     "recipe": "measure-window",
-    "workflow": "workflows/uc-046-travel-booking-guard.nika.yaml"
+    "workflow": "workflows/uc-046-travel-booking-guard.nika"
   },
   {
     "number": 47,
@@ -655,7 +655,7 @@
     "failure_oracle": "all three batch items return in input order with checked=true for uc-047-travel-itinerary-diff",
     "business_outcome": "enrich a bounded batch while preserving source order for travel operations",
     "recipe": "batch-enrich",
-    "workflow": "workflows/uc-047-travel-itinerary-diff.nika.yaml"
+    "workflow": "workflows/uc-047-travel-itinerary-diff.nika"
   },
   {
     "number": 48,
@@ -669,7 +669,7 @@
     "failure_oracle": "parallel branches reconcile into one object with both values for uc-048-travel-disruption-merge",
     "business_outcome": "reconcile two independent operational observations for travel operations",
     "recipe": "parallel-reconcile",
-    "workflow": "workflows/uc-048-travel-disruption-merge.nika.yaml"
+    "workflow": "workflows/uc-048-travel-disruption-merge.nika"
   },
   {
     "number": 49,
@@ -683,7 +683,7 @@
     "failure_oracle": "threshold result is true and the admitted branch emits one log for uc-049-travel-checkin-window",
     "business_outcome": "open an action only when a deterministic threshold is met for travel operations",
     "recipe": "threshold-gate",
-    "workflow": "workflows/uc-049-travel-checkin-window.nika.yaml"
+    "workflow": "workflows/uc-049-travel-checkin-window.nika"
   },
   {
     "number": 50,
@@ -697,7 +697,7 @@
     "failure_oracle": "one typed machine event carries the case identity and accepted state for uc-050-travel-voucher-event",
     "business_outcome": "publish a typed completion receipt for subscribers for travel operations",
     "recipe": "emit-receipt",
-    "workflow": "workflows/uc-050-travel-voucher-event.nika.yaml"
+    "workflow": "workflows/uc-050-travel-voucher-event.nika"
   },
   {
     "number": 51,
@@ -711,7 +711,7 @@
     "failure_oracle": "projection carries the domain, actor, and accepted state for uc-051-marketing-brief-guard",
     "business_outcome": "produce a normalized decision card for marketing",
     "recipe": "project-record",
-    "workflow": "workflows/uc-051-marketing-brief-guard.nika.yaml"
+    "workflow": "workflows/uc-051-marketing-brief-guard.nika"
   },
   {
     "number": 52,
@@ -725,7 +725,7 @@
     "failure_oracle": "validation report is valid with zero errors for uc-052-marketing-campaign-diff",
     "business_outcome": "refuse malformed business input before downstream work for marketing",
     "recipe": "validate-contract",
-    "workflow": "workflows/uc-052-marketing-campaign-diff.nika.yaml"
+    "workflow": "workflows/uc-052-marketing-campaign-diff.nika"
   },
   {
     "number": 53,
@@ -739,7 +739,7 @@
     "failure_oracle": "revision patch is non-empty and points at the changed value for uc-053-marketing-audience-merge",
     "business_outcome": "explain exactly what changed between two business revisions for marketing",
     "recipe": "diff-revisions",
-    "workflow": "workflows/uc-053-marketing-audience-merge.nika.yaml"
+    "workflow": "workflows/uc-053-marketing-audience-merge.nika"
   },
   {
     "number": 54,
@@ -753,7 +753,7 @@
     "failure_oracle": "merged policy is approved and keeps the original identifier for uc-054-marketing-launch-window",
     "business_outcome": "apply an approved override without losing the base record for marketing",
     "recipe": "merge-policy",
-    "workflow": "workflows/uc-054-marketing-launch-window.nika.yaml"
+    "workflow": "workflows/uc-054-marketing-launch-window.nika"
   },
   {
     "number": 55,
@@ -767,7 +767,7 @@
     "failure_oracle": "evidence digest is stable and is logged without source disclosure for uc-055-marketing-attribution-event",
     "business_outcome": "mint a stable evidence identifier for later reconciliation for marketing",
     "recipe": "hash-evidence",
-    "workflow": "workflows/uc-055-marketing-attribution-event.nika.yaml"
+    "workflow": "workflows/uc-055-marketing-attribution-event.nika"
   },
   {
     "number": 56,
@@ -781,7 +781,7 @@
     "failure_oracle": "measured duration is positive and uses fixed ISO timestamps for uc-056-engineering-issue-guard",
     "business_outcome": "calculate an operational service window without ambient time for software engineering",
     "recipe": "measure-window",
-    "workflow": "workflows/uc-056-engineering-issue-guard.nika.yaml"
+    "workflow": "workflows/uc-056-engineering-issue-guard.nika"
   },
   {
     "number": 57,
@@ -795,7 +795,7 @@
     "failure_oracle": "all three batch items return in input order with checked=true for uc-057-engineering-config-diff",
     "business_outcome": "enrich a bounded batch while preserving source order for software engineering",
     "recipe": "batch-enrich",
-    "workflow": "workflows/uc-057-engineering-config-diff.nika.yaml"
+    "workflow": "workflows/uc-057-engineering-config-diff.nika"
   },
   {
     "number": 58,
@@ -809,7 +809,7 @@
     "failure_oracle": "parallel branches reconcile into one object with both values for uc-058-engineering-release-merge",
     "business_outcome": "reconcile two independent operational observations for software engineering",
     "recipe": "parallel-reconcile",
-    "workflow": "workflows/uc-058-engineering-release-merge.nika.yaml"
+    "workflow": "workflows/uc-058-engineering-release-merge.nika"
   },
   {
     "number": 59,
@@ -823,7 +823,7 @@
     "failure_oracle": "threshold result is true and the admitted branch emits one log for uc-059-engineering-incident-window",
     "business_outcome": "open an action only when a deterministic threshold is met for software engineering",
     "recipe": "threshold-gate",
-    "workflow": "workflows/uc-059-engineering-incident-window.nika.yaml"
+    "workflow": "workflows/uc-059-engineering-incident-window.nika"
   },
   {
     "number": 60,
@@ -837,7 +837,7 @@
     "failure_oracle": "one typed machine event carries the case identity and accepted state for uc-060-engineering-deployment-event",
     "business_outcome": "publish a typed completion receipt for subscribers for software engineering",
     "recipe": "emit-receipt",
-    "workflow": "workflows/uc-060-engineering-deployment-event.nika.yaml"
+    "workflow": "workflows/uc-060-engineering-deployment-event.nika"
   },
   {
     "number": 61,
@@ -851,7 +851,7 @@
     "failure_oracle": "projection carries the domain, actor, and accepted state for uc-061-security-alert-guard",
     "business_outcome": "produce a normalized decision card for security operations",
     "recipe": "project-record",
-    "workflow": "workflows/uc-061-security-alert-guard.nika.yaml"
+    "workflow": "workflows/uc-061-security-alert-guard.nika"
   },
   {
     "number": 62,
@@ -865,7 +865,7 @@
     "failure_oracle": "validation report is valid with zero errors for uc-062-security-policy-diff",
     "business_outcome": "refuse malformed business input before downstream work for security operations",
     "recipe": "validate-contract",
-    "workflow": "workflows/uc-062-security-policy-diff.nika.yaml"
+    "workflow": "workflows/uc-062-security-policy-diff.nika"
   },
   {
     "number": 63,
@@ -879,7 +879,7 @@
     "failure_oracle": "revision patch is non-empty and points at the changed value for uc-063-security-exception-merge",
     "business_outcome": "explain exactly what changed between two business revisions for security operations",
     "recipe": "diff-revisions",
-    "workflow": "workflows/uc-063-security-exception-merge.nika.yaml"
+    "workflow": "workflows/uc-063-security-exception-merge.nika"
   },
   {
     "number": 64,
@@ -893,7 +893,7 @@
     "failure_oracle": "merged policy is approved and keeps the original identifier for uc-064-security-remediation-window",
     "business_outcome": "apply an approved override without losing the base record for security operations",
     "recipe": "merge-policy",
-    "workflow": "workflows/uc-064-security-remediation-window.nika.yaml"
+    "workflow": "workflows/uc-064-security-remediation-window.nika"
   },
   {
     "number": 65,
@@ -907,7 +907,7 @@
     "failure_oracle": "evidence digest is stable and is logged without source disclosure for uc-065-security-audit-event",
     "business_outcome": "mint a stable evidence identifier for later reconciliation for security operations",
     "recipe": "hash-evidence",
-    "workflow": "workflows/uc-065-security-audit-event.nika.yaml"
+    "workflow": "workflows/uc-065-security-audit-event.nika"
   },
   {
     "number": 66,
@@ -921,7 +921,7 @@
     "failure_oracle": "measured duration is positive and uses fixed ISO timestamps for uc-066-operations-request-guard",
     "business_outcome": "calculate an operational service window without ambient time for business operations",
     "recipe": "measure-window",
-    "workflow": "workflows/uc-066-operations-request-guard.nika.yaml"
+    "workflow": "workflows/uc-066-operations-request-guard.nika"
   },
   {
     "number": 67,
@@ -935,7 +935,7 @@
     "failure_oracle": "all three batch items return in input order with checked=true for uc-067-operations-roster-diff",
     "business_outcome": "enrich a bounded batch while preserving source order for business operations",
     "recipe": "batch-enrich",
-    "workflow": "workflows/uc-067-operations-roster-diff.nika.yaml"
+    "workflow": "workflows/uc-067-operations-roster-diff.nika"
   },
   {
     "number": 68,
@@ -949,7 +949,7 @@
     "failure_oracle": "parallel branches reconcile into one object with both values for uc-068-operations-runbook-merge",
     "business_outcome": "reconcile two independent operational observations for business operations",
     "recipe": "parallel-reconcile",
-    "workflow": "workflows/uc-068-operations-runbook-merge.nika.yaml"
+    "workflow": "workflows/uc-068-operations-runbook-merge.nika"
   },
   {
     "number": 69,
@@ -963,7 +963,7 @@
     "failure_oracle": "threshold result is true and the admitted branch emits one log for uc-069-operations-maintenance-window",
     "business_outcome": "open an action only when a deterministic threshold is met for business operations",
     "recipe": "threshold-gate",
-    "workflow": "workflows/uc-069-operations-maintenance-window.nika.yaml"
+    "workflow": "workflows/uc-069-operations-maintenance-window.nika"
   },
   {
     "number": 70,
@@ -977,7 +977,7 @@
     "failure_oracle": "one typed machine event carries the case identity and accepted state for uc-070-operations-completion-event",
     "business_outcome": "publish a typed completion receipt for subscribers for business operations",
     "recipe": "emit-receipt",
-    "workflow": "workflows/uc-070-operations-completion-event.nika.yaml"
+    "workflow": "workflows/uc-070-operations-completion-event.nika"
   },
   {
     "number": 71,
@@ -991,7 +991,7 @@
     "failure_oracle": "projection carries the domain, actor, and accepted state for uc-071-media-asset-guard",
     "business_outcome": "produce a normalized decision card for media production",
     "recipe": "project-record",
-    "workflow": "workflows/uc-071-media-asset-guard.nika.yaml"
+    "workflow": "workflows/uc-071-media-asset-guard.nika"
   },
   {
     "number": 72,
@@ -1005,7 +1005,7 @@
     "failure_oracle": "validation report is valid with zero errors for uc-072-media-transcript-diff",
     "business_outcome": "refuse malformed business input before downstream work for media production",
     "recipe": "validate-contract",
-    "workflow": "workflows/uc-072-media-transcript-diff.nika.yaml"
+    "workflow": "workflows/uc-072-media-transcript-diff.nika"
   },
   {
     "number": 73,
@@ -1019,7 +1019,7 @@
     "failure_oracle": "revision patch is non-empty and points at the changed value for uc-073-media-metadata-merge",
     "business_outcome": "explain exactly what changed between two business revisions for media production",
     "recipe": "diff-revisions",
-    "workflow": "workflows/uc-073-media-metadata-merge.nika.yaml"
+    "workflow": "workflows/uc-073-media-metadata-merge.nika"
   },
   {
     "number": 74,
@@ -1033,7 +1033,7 @@
     "failure_oracle": "merged policy is approved and keeps the original identifier for uc-074-media-publish-window",
     "business_outcome": "apply an approved override without losing the base record for media production",
     "recipe": "merge-policy",
-    "workflow": "workflows/uc-074-media-publish-window.nika.yaml"
+    "workflow": "workflows/uc-074-media-publish-window.nika"
   },
   {
     "number": 75,
@@ -1047,7 +1047,7 @@
     "failure_oracle": "evidence digest is stable and is logged without source disclosure for uc-075-media-rights-event",
     "business_outcome": "mint a stable evidence identifier for later reconciliation for media production",
     "recipe": "hash-evidence",
-    "workflow": "workflows/uc-075-media-rights-event.nika.yaml"
+    "workflow": "workflows/uc-075-media-rights-event.nika"
   },
   {
     "number": 76,
@@ -1061,7 +1061,7 @@
     "failure_oracle": "measured duration is positive and uses fixed ISO timestamps for uc-076-nonprofit-donor-guard",
     "business_outcome": "calculate an operational service window without ambient time for nonprofit operations",
     "recipe": "measure-window",
-    "workflow": "workflows/uc-076-nonprofit-donor-guard.nika.yaml"
+    "workflow": "workflows/uc-076-nonprofit-donor-guard.nika"
   },
   {
     "number": 77,
@@ -1075,7 +1075,7 @@
     "failure_oracle": "all three batch items return in input order with checked=true for uc-077-nonprofit-pledge-diff",
     "business_outcome": "enrich a bounded batch while preserving source order for nonprofit operations",
     "recipe": "batch-enrich",
-    "workflow": "workflows/uc-077-nonprofit-pledge-diff.nika.yaml"
+    "workflow": "workflows/uc-077-nonprofit-pledge-diff.nika"
   },
   {
     "number": 78,
@@ -1089,7 +1089,7 @@
     "failure_oracle": "parallel branches reconcile into one object with both values for uc-078-nonprofit-grant-merge",
     "business_outcome": "reconcile two independent operational observations for nonprofit operations",
     "recipe": "parallel-reconcile",
-    "workflow": "workflows/uc-078-nonprofit-grant-merge.nika.yaml"
+    "workflow": "workflows/uc-078-nonprofit-grant-merge.nika"
   },
   {
     "number": 79,
@@ -1103,7 +1103,7 @@
     "failure_oracle": "threshold result is true and the admitted branch emits one log for uc-079-nonprofit-campaign-window",
     "business_outcome": "open an action only when a deterministic threshold is met for nonprofit operations",
     "recipe": "threshold-gate",
-    "workflow": "workflows/uc-079-nonprofit-campaign-window.nika.yaml"
+    "workflow": "workflows/uc-079-nonprofit-campaign-window.nika"
   },
   {
     "number": 80,
@@ -1117,7 +1117,7 @@
     "failure_oracle": "one typed machine event carries the case identity and accepted state for uc-080-nonprofit-impact-event",
     "business_outcome": "publish a typed completion receipt for subscribers for nonprofit operations",
     "recipe": "emit-receipt",
-    "workflow": "workflows/uc-080-nonprofit-impact-event.nika.yaml"
+    "workflow": "workflows/uc-080-nonprofit-impact-event.nika"
   },
   {
     "number": 81,
@@ -1131,7 +1131,7 @@
     "failure_oracle": "projection carries the domain, actor, and accepted state for uc-081-hospitality-reservation-guard",
     "business_outcome": "produce a normalized decision card for hospitality",
     "recipe": "project-record",
-    "workflow": "workflows/uc-081-hospitality-reservation-guard.nika.yaml"
+    "workflow": "workflows/uc-081-hospitality-reservation-guard.nika"
   },
   {
     "number": 82,
@@ -1145,7 +1145,7 @@
     "failure_oracle": "validation report is valid with zero errors for uc-082-hospitality-room-diff",
     "business_outcome": "refuse malformed business input before downstream work for hospitality",
     "recipe": "validate-contract",
-    "workflow": "workflows/uc-082-hospitality-room-diff.nika.yaml"
+    "workflow": "workflows/uc-082-hospitality-room-diff.nika"
   },
   {
     "number": 83,
@@ -1159,7 +1159,7 @@
     "failure_oracle": "revision patch is non-empty and points at the changed value for uc-083-hospitality-service-merge",
     "business_outcome": "explain exactly what changed between two business revisions for hospitality",
     "recipe": "diff-revisions",
-    "workflow": "workflows/uc-083-hospitality-service-merge.nika.yaml"
+    "workflow": "workflows/uc-083-hospitality-service-merge.nika"
   },
   {
     "number": 84,
@@ -1173,7 +1173,7 @@
     "failure_oracle": "merged policy is approved and keeps the original identifier for uc-084-hospitality-checkout-window",
     "business_outcome": "apply an approved override without losing the base record for hospitality",
     "recipe": "merge-policy",
-    "workflow": "workflows/uc-084-hospitality-checkout-window.nika.yaml"
+    "workflow": "workflows/uc-084-hospitality-checkout-window.nika"
   },
   {
     "number": 85,
@@ -1187,7 +1187,7 @@
     "failure_oracle": "evidence digest is stable and is logged without source disclosure for uc-085-hospitality-stay-event",
     "business_outcome": "mint a stable evidence identifier for later reconciliation for hospitality",
     "recipe": "hash-evidence",
-    "workflow": "workflows/uc-085-hospitality-stay-event.nika.yaml"
+    "workflow": "workflows/uc-085-hospitality-stay-event.nika"
   },
   {
     "number": 86,
@@ -1201,7 +1201,7 @@
     "failure_oracle": "measured duration is positive and uses fixed ISO timestamps for uc-086-manufacturing-workorder-guard",
     "business_outcome": "calculate an operational service window without ambient time for manufacturing",
     "recipe": "measure-window",
-    "workflow": "workflows/uc-086-manufacturing-workorder-guard.nika.yaml"
+    "workflow": "workflows/uc-086-manufacturing-workorder-guard.nika"
   },
   {
     "number": 87,
@@ -1215,7 +1215,7 @@
     "failure_oracle": "all three batch items return in input order with checked=true for uc-087-manufacturing-bom-diff",
     "business_outcome": "enrich a bounded batch while preserving source order for manufacturing",
     "recipe": "batch-enrich",
-    "workflow": "workflows/uc-087-manufacturing-bom-diff.nika.yaml"
+    "workflow": "workflows/uc-087-manufacturing-bom-diff.nika"
   },
   {
     "number": 88,
@@ -1229,7 +1229,7 @@
     "failure_oracle": "parallel branches reconcile into one object with both values for uc-088-manufacturing-quality-merge",
     "business_outcome": "reconcile two independent operational observations for manufacturing",
     "recipe": "parallel-reconcile",
-    "workflow": "workflows/uc-088-manufacturing-quality-merge.nika.yaml"
+    "workflow": "workflows/uc-088-manufacturing-quality-merge.nika"
   },
   {
     "number": 89,
@@ -1243,7 +1243,7 @@
     "failure_oracle": "threshold result is true and the admitted branch emits one log for uc-089-manufacturing-maintenance-window",
     "business_outcome": "open an action only when a deterministic threshold is met for manufacturing",
     "recipe": "threshold-gate",
-    "workflow": "workflows/uc-089-manufacturing-maintenance-window.nika.yaml"
+    "workflow": "workflows/uc-089-manufacturing-maintenance-window.nika"
   },
   {
     "number": 90,
@@ -1257,7 +1257,7 @@
     "failure_oracle": "one typed machine event carries the case identity and accepted state for uc-090-manufacturing-batch-event",
     "business_outcome": "publish a typed completion receipt for subscribers for manufacturing",
     "recipe": "emit-receipt",
-    "workflow": "workflows/uc-090-manufacturing-batch-event.nika.yaml"
+    "workflow": "workflows/uc-090-manufacturing-batch-event.nika"
   },
   {
     "number": 91,
@@ -1271,7 +1271,7 @@
     "failure_oracle": "projection carries the domain, actor, and accepted state for uc-091-research-protocol-guard",
     "business_outcome": "produce a normalized decision card for research operations",
     "recipe": "project-record",
-    "workflow": "workflows/uc-091-research-protocol-guard.nika.yaml"
+    "workflow": "workflows/uc-091-research-protocol-guard.nika"
   },
   {
     "number": 92,
@@ -1285,7 +1285,7 @@
     "failure_oracle": "validation report is valid with zero errors for uc-092-research-evidence-diff",
     "business_outcome": "refuse malformed business input before downstream work for research operations",
     "recipe": "validate-contract",
-    "workflow": "workflows/uc-092-research-evidence-diff.nika.yaml"
+    "workflow": "workflows/uc-092-research-evidence-diff.nika"
   },
   {
     "number": 93,
@@ -1299,7 +1299,7 @@
     "failure_oracle": "revision patch is non-empty and points at the changed value for uc-093-research-dataset-merge",
     "business_outcome": "explain exactly what changed between two business revisions for research operations",
     "recipe": "diff-revisions",
-    "workflow": "workflows/uc-093-research-dataset-merge.nika.yaml"
+    "workflow": "workflows/uc-093-research-dataset-merge.nika"
   },
   {
     "number": 94,
@@ -1313,7 +1313,7 @@
     "failure_oracle": "merged policy is approved and keeps the original identifier for uc-094-research-review-window",
     "business_outcome": "apply an approved override without losing the base record for research operations",
     "recipe": "merge-policy",
-    "workflow": "workflows/uc-094-research-review-window.nika.yaml"
+    "workflow": "workflows/uc-094-research-review-window.nika"
   },
   {
     "number": 95,
@@ -1327,7 +1327,7 @@
     "failure_oracle": "evidence digest is stable and is logged without source disclosure for uc-095-research-provenance-event",
     "business_outcome": "mint a stable evidence identifier for later reconciliation for research operations",
     "recipe": "hash-evidence",
-    "workflow": "workflows/uc-095-research-provenance-event.nika.yaml"
+    "workflow": "workflows/uc-095-research-provenance-event.nika"
   },
   {
     "number": 96,
@@ -1341,7 +1341,7 @@
     "failure_oracle": "measured duration is positive and uses fixed ISO timestamps for uc-096-creator-sponsorship-guard",
     "business_outcome": "calculate an operational service window without ambient time for creator business",
     "recipe": "measure-window",
-    "workflow": "workflows/uc-096-creator-sponsorship-guard.nika.yaml"
+    "workflow": "workflows/uc-096-creator-sponsorship-guard.nika"
   },
   {
     "number": 97,
@@ -1355,7 +1355,7 @@
     "failure_oracle": "all three batch items return in input order with checked=true for uc-097-creator-draft-diff",
     "business_outcome": "enrich a bounded batch while preserving source order for creator business",
     "recipe": "batch-enrich",
-    "workflow": "workflows/uc-097-creator-draft-diff.nika.yaml"
+    "workflow": "workflows/uc-097-creator-draft-diff.nika"
   },
   {
     "number": 98,
@@ -1369,7 +1369,7 @@
     "failure_oracle": "parallel branches reconcile into one object with both values for uc-098-creator-content-merge",
     "business_outcome": "reconcile two independent operational observations for creator business",
     "recipe": "parallel-reconcile",
-    "workflow": "workflows/uc-098-creator-content-merge.nika.yaml"
+    "workflow": "workflows/uc-098-creator-content-merge.nika"
   },
   {
     "number": 99,
@@ -1383,7 +1383,7 @@
     "failure_oracle": "threshold result is true and the admitted branch emits one log for uc-099-creator-publish-window",
     "business_outcome": "open an action only when a deterministic threshold is met for creator business",
     "recipe": "threshold-gate",
-    "workflow": "workflows/uc-099-creator-publish-window.nika.yaml"
+    "workflow": "workflows/uc-099-creator-publish-window.nika"
   },
   {
     "number": 100,
@@ -1397,6 +1397,6 @@
     "failure_oracle": "one typed machine event carries the case identity and accepted state for uc-100-creator-royalty-event",
     "business_outcome": "publish a typed completion receipt for subscribers for creator business",
     "recipe": "emit-receipt",
-    "workflow": "workflows/uc-100-creator-royalty-event.nika.yaml"
+    "workflow": "workflows/uc-100-creator-royalty-event.nika"
   }
 ]

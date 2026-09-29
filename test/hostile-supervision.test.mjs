@@ -155,7 +155,7 @@ test('hostile owned process cannot green a signal exit or excessive output', asy
   } finally { await owned.close(); }
 });
 
-test('runner interruption reaps an uncooperative build and replaces stale green with a failed proof', { timeout: 10_000 }, async () => {
+test('runner interruption reaps an uncooperative build and replaces stale green with a failed proof', { timeout: 15_000 }, async () => {
   const scratch = mkdtempSync(path.join(tmpdir(), 'hostile-runner-test-'));
   const owned = new OwnedProcesses();
   const report = path.join(scratch, 'hostile.json');
@@ -173,15 +173,19 @@ test('runner interruption reaps an uncooperative build and replaces stale green 
   let retained;
   try {
     const handle = owned.start(process.execPath, [fileURLToPath(new URL('../scripts/run-hostile-gauntlet.mjs', import.meta.url))],
-      { timeoutMs: 7000, graceMs: 2500, env: { PATH: scratch, HOME: path.join(scratch, 'home'),
+      { timeoutMs: 12000, graceMs: 2500, env: { PATH: scratch, HOME: path.join(scratch, 'home'),
         NIKA_BIN: process.execPath, NIKA_KEYCHAIN: 'off', NIKA_GAUNTLET_RESULTS_DIR: scratch } });
+    let buildPid;
     await bounded((async () => {
-      const until = performance.now() + 1900;
-      while (!existsSync(marker) && performance.now() < until) await new Promise((resolve) => setTimeout(resolve, 10));
-      assert(existsSync(marker), 'fake build must start');
-    })(), 2000, 'fake build startup');
+      const until = performance.now() + 5900;
+      while (performance.now() < until) {
+        const text = existsSync(marker) ? readFileSync(marker, 'utf8') : '';
+        if (/^[1-9][0-9]*$/.test(text)) { buildPid = Number(text); break; }
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+      assert(Number.isSafeInteger(buildPid), `fake build must publish its PID; runner exit=${handle.child.exitCode}, stderr=${handle.stderr}`);
+    })(), 6000, 'fake build startup');
     assert.equal(JSON.parse(readFileSync(report, 'utf8')).result, 'incomplete');
-    const buildPid = Number(readFileSync(marker, 'utf8'));
     handle.signal('SIGINT');
     const result = await handle.done;
     retained = result.stderr.match(/hostile cleanup retained scratch: (.+)/)?.[1];

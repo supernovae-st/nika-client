@@ -1,0 +1,1 @@
+{"clean":false,"findings":[{"gate":"PARSE","kind":"parse","message":"cannot read missing.nika.yaml: No such file or directory (os error 2)","severity":"error"}],"parse_fatal":true,"report_version":1}

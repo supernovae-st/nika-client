@@ -11,29 +11,21 @@ Any other non-2xx body is discarded and reported as a redacted
 
 | HTTP route | SDK surface | Contract |
 |---|---|---|
-| `GET /health` | `serverIdentity()` and internal handshake | public protocol and capability identity; cached per client |
+| `GET /health` | `serverIdentity()` and internal handshake | validated cached identity and capabilities; not a fresh readiness or authorization check |
 | `GET /v1/openapi.json` | generation only | authenticated OpenAPI 3.1 document |
-| `POST /v1/compile` | `compile()` | source-only authoring, explicit native opt-in and zero-call replay |
 | `GET /v1/workflows` | `listWorkflows()` | contained relative workflow names |
 | `GET /v1/workflows/{name}` | `workflow(name)` | path-free metadata, never source bytes |
+| `POST /v1/compile` | `compile()` | capability-gated stateless source authoring; 200 ready/incomplete/refused, no job |
 | `POST /v1/check` | `check()` | validates a served name or immutable snapshot bytes without a job |
 | `POST /v1/jobs` | `run()` | admits a served name or exact snapshot bytes with an idempotency key |
 | `GET /v1/jobs/{id}` | internal settlement | durable job identity, outputs, receipt, settlement, or redacted error |
-| `GET /v1/jobs/{id}/status` | `status(run)` | current status only |
-| `GET /v1/jobs/{id}/events` | `events(run)` / `attachRun()` | bounded, sequenced SSE with replay |
-| `POST /v1/jobs/{id}/cancel` | `cancel(run)` | 200 a settled job or its terminal replay; 202 the request accepted on a running job, settled later by observation |
-| `GET /v1/jobs/{id}/trace/verify` | `traceVerify(receipt)` | engine-owned typed trace verdict; a positive verdict may carry `reason: "unsealed"` |
+| `GET /v1/jobs/{id}/status` | `run.status()` | current status only |
+| `GET /v1/jobs/{id}/events` | `run.events()` / `attachRun()` | bounded, sequenced SSE with replay |
+| `POST /v1/jobs/{id}/cancel` | `run.cancel()` | 200 a settled job or its terminal replay; 202 the request accepted on a running job, settled later by observation |
+| `GET /v1/jobs/{id}/trace/verify` | `traceVerify(receipt)` | engine-owned typed trace verdict; an intact unsigned journal can have `reason: "unsealed"` |
 | `GET/PUT /v1/schedules/{id}` | `scheduleStatus()` / `schedule()` | resident schedule projection and CAS mutation |
 
 ## Connection rules
-
-`serverIdentity()` returns a detached copy of the validated HTTP handshake,
-including `engineVersion`, protocol clocks, and `supportedCapabilities`. It
-needs no local binary or workflow file. The snapshot is cached by the client:
-it is not a fresh liveness or readiness probe, and the public endpoint does not
-authenticate the caller. Mutating the returned object cannot change the SDK's
-admission checks. Native clients refuse this HTTP-only operation with
-`NikaCompatibilityError`.
 
 - HTTPS is required for every host except loopback. Plain HTTP is accepted
   only for `localhost`, `127.0.0.0/8`, or `[::1]`, and only with an explicit
@@ -41,22 +33,58 @@ admission checks. Native clients refuse this HTTP-only operation with
 - URLs containing credentials, a query, or a fragment are rejected.
 - Tokens must contain 32–512 visible ASCII bytes and are never sent to
   `/health`.
-- HTTP admissions have a bounded timeout; authoring waits for the resident's
-  own deadline or the caller's signal. Each JSON/SSE machine frame has a byte ceiling.
+- Admission requests have a bounded timeout; versioned authoring uses the
+  resident deadline or the explicit caller deadline. JSON/SSE frames have a byte ceiling.
 - Remote `check()` refuses `model` and `nativeStrict`; remote `run()` refuses
-  `vars`, `model`, and `maxCostUsd` until the request envelope owns them.
+  `model`, `maxCostUsd` and the deprecated `vars` until a request envelope
+  owns them.
+- Remote `run()` sends `inputs` as `JobByName.inputs` only for a served name
+  and only when `GET /health` advertises `jobInputs`. That capability, not a
+  202, is the negotiation: a resident from before the envelope accepts the
+  extra field and ignores its values, so the SDK refuses it after `/health`
+  alone with `NikaCompatibilityError` (`capability: 'jobInputs'`). The
+  `inputs` envelope is engine-owned (nika#1642) and appears in the pinned V9
+  contract. The connected server must still advertise it.
+- A snapshot body takes no `inputs` overlay, an empty map included: `run()` of
+  a local path with `inputs` is refused before any capture or request.
+- The serialized `inputs` map is bounded at 1 MiB by the SDK, the bound the
+  native channel reads. The resident's whole-request ceiling is its own and may
+  be lower.
 - Caller-provided workflow catalog names must be contained slash-separated
   paths. Absolute paths, backslashes, empty segments, `.` and `..` are
   rejected before network I/O.
 
-A contained `.nika` or legacy `.nika.yaml` name uses the resident registry without a local
+A contained `.nika` name uses the resident registry without a local
 engine. Prefix a local file with `./` to capture and submit its snapshot.
 A successful by-name check returns `clean: true` and the compact resident
 acknowledgement; no local check report or exit code is fabricated.
 
+## Compile foundation
+
+Serve must advertise `compile` in `/health`. This route was added in engine
+commit `4334e58bddf539a6253f448eb05d562b6919f2b7`, after release 0.120.2, and
+first published in release 0.120.3.
+The bundled OpenAPI and generated types preserve the composed V9 producer contract, including this foundation. The SDK then posts a v1 create
+intent or inline edit source to `/v1/compile`, with bearer authentication and
+JSON content type. A string change becomes `{text: change}`; a structured change
+preserves `{set_constant: {name, value}}`. Literal answers retain their JSON
+types. There is no path, destination, idempotency key or local fallback.
+
+Every core outcome uses HTTP 200. `incomplete` and `refused` remain reviewable
+data; non-200 error envelopes raise `NikaOperationError` with the HTTP status
+and engine code. Bad versions, malformed outcomes, overflow, cancellation and
+timeout fail typed. The response is bounded by the smaller of
+`machineBufferBytes` and 8 MiB. Compile's timeout covers health negotiation,
+response headers and the complete body.
+
+The shared outcome contains candidate source, questions, diagnostics, requested
+boundary, source-only Check preview and provenance. It carries no process exit
+code or materialized destination. A candidate and its requested boundary grant
+nothing: execution needs a separate caller decision and normal `run` admission.
+
 ## Authoring
 
-`compile(request, { signal? })` sends the engine-owned generation-1 or
+`compile(request, { signal?, timeoutMs? })` with a `NikaCompileWireRequest` sends the engine-owned generation-1 or
 generation-2 request unchanged. Its types come from the checked-in live
 OpenAPI contract. The SDK checks the advertised capability before the POST,
 never resolves a local engine, refuses redirects, and sends the POST once.
@@ -76,17 +104,18 @@ restart. The SDK neither stores the token globally nor replays implicitly.
 
 The resident owns the authoring deadline (300 seconds by default). The SDK
 does not apply the ordinary `requestTimeout` while waiting for compile headers.
-Use `signal`, for example `AbortSignal.timeout(600_000)`, for an explicit caller
-deadline. Aborting stops waiting; it does not cancel an already dispatched
+Use `timeoutMs: 600_000` for an explicit waiting deadline, including initial
+health negotiation. A signal-only abort during that first handshake is observed
+when its shared request answers, within `requestTimeout`. Aborting stops waiting; it does not cancel an already dispatched
 provider call. If the first answer is lost, the server may have completed and
 kept the round while the caller has no replay token; another fresh compile can
 spend again. There is no result lookup or idempotency guarantee for that case.
 
 `requestTimeout` still bounds JSON body reads after headers, and
-`machineBufferBytes` bounds their size. Direct native-process
-authoring returns a capability error instead of introducing a subprocess
-fallback. Cost-decision and reconciliation APIs are still separate work;
-this authoring method does not claim the complete V9 consumer contract.
+`machineBufferBytes` bounds their size. Native processes refuse versioned
+resident requests; the published, unversioned `compile()` form works natively.
+The two request forms never mix and keep their separate return types.
+Cost review uses the separate explicit [review contract](cost-review-contract.md).
 
 ## Settlement
 
@@ -98,15 +127,60 @@ whose `status` contradicts the record carrying it, keeps fields it does not
 know, and never derives a settlement from an exit code; a job the resident
 lost (`interrupted`) carries none.
 
-## SSE recovery
+## Frame time and journal evidence
 
-An event may carry the resident's `at` timestamp and typed journal
-`evidence`. The timestamp is observation metadata outside the trace hash.
-`evidence: { status: 'mirror_lost', reason: 'write_failed' | 'record_refused' }`
-reports journal loss independently of execution success. The SDK preserves
-it on events and on `run.done`, including durable reattachment; its absence
-does not certify a sealed trace. Use `traceVerify()` for the engine's verdict.
-Unknown projection fields and malformed evidence are still refused.
+Both resident projections are closed, and the SDK refuses fields it does not
+know. The pinned V9 `openapi.json` includes optional `at` and `evidence` fields.
+Older residents may omit them; absence does not invent evidence.
+
+- `JobEvent.at` is when the resident admitted the event: an RFC 3339 timestamp
+  in UTC, outside the event's hash chain. It rides `event.raw.at` untouched.
+  Anything that is not such a timestamp is a `NikaProtocolError`. The durable
+  `Job` declares no `at`, so one there is still an unknown field.
+- `evidence`, on the terminal frame and on the durable `Job`, reports that the
+  run's journal mirror stopped recording. It is exactly a `status` and a
+  `reason`. The one status is `mirror_lost`. The reason is `write_failed`
+  (opening, writing or syncing the journal failed) or `record_refused` (a
+  record could not be admitted within the writer's bounds): a coarse class,
+  never OS text and never a path. Any other shape or word is a
+  `NikaProtocolError`, as the engine itself refuses one, and its value is
+  never quoted in the error.
+
+`evidence` is independent of the execution and is never a verdict: a run can
+settle `succeeded` while its mirror is lost. It never changes `result.status`,
+the settlement, or the receipt's identity checks. `run.result()` copies it to
+`result.evidence` from the frame or record that settled the run, so a caller
+who never iterates events still learns the trace may be incomplete before
+trusting `traceVerify`. Its absence claims nothing: not that a journal exists,
+only that no loss was reported. A native run never carries it.
+
+## Lifecycle vocabulary over the resident's frames
+
+`run.events()` names the resident's closed `JobEvent` frames in the SDK's
+lifecycle vocabulary and keeps each frame on `event.raw`:
+
+| `JobEvent.kind` | `JobEvent.status` | `event.kind` |
+|---|---|---|
+| `execution.started` | any | `run.started` |
+| `execution.settled` | `paused` | `run.waiting` |
+| `execution.settled` | `succeeded` · `failed` · `cancelled` | `run.settled` |
+| `execution.cancelled` | `cancelled` only | `run.settled` |
+| `execution.refused` | `failed` only | `run.settled` |
+| `execution.interrupted` · `interrupted` | `interrupted` | `run.interrupted` |
+| anything else: a `null` or future kind; an end kind whose status is absent, `null`, future, `queued` or `running`; or a pair that contradicts itself (`execution.refused` carrying `succeeded` or `cancelled`, `execution.cancelled` carrying `succeeded` or `failed`, an end kind carrying `interrupted`) | | `engine.event` |
+
+The pairs above are exhaustive and listed, never computed as a product of
+kinds and words. An unnamed frame is still delivered with `event.raw` intact,
+and `run.result()` still reads the state word the engine wrote on it.
+
+The resident streams no per-task frame, so an HTTP run yields no `task.*`
+event: the SDK never synthesizes one. `event.sequence` is the validated SSE
+id, the cursor to persist. The engine's `interrupted` (execution ownership
+was lost, settlement unknown) is data: a `run.interrupted` event and
+`result.status`. It is unrelated to `NikaObservationInterrupted` below, which
+is this client losing its view of a run that may still be running.
+
+## SSE recovery
 
 The client checks that SSE ids are canonical positive integers and equal
 `data.sequence`. An identical duplicate is ignored. A conflicting duplicate,
@@ -122,9 +196,13 @@ A cursor means “fully processed”, not merely “received”.
 
 ## Idempotency and schedules
 
-An omitted run idempotency key is generated once per admission. A caller key
-must be 1–255 bytes. Reusing a key with different snapshot bytes is an engine
-conflict, not a retry success.
+HTTP `run()` requires a caller-owned `idempotencyKey` of 1–255 bytes. Omitting
+it throws `NikaConfigurationError` before network I/O or local snapshot capture.
+Persist the key before admission and retry the exact request with the same key
+if the response is lost or times out. The SDK never generates a hidden key or
+retries admission automatically. Reusing a key with different request bytes
+is an engine conflict, not a retry success. Direct native runs still omit the
+key and reject it if supplied.
 
 The namespace is the whole durable job store under the server's configured
 `state-root`, across workflows, clients, schedules, and server restarts. The

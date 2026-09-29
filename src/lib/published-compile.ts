@@ -1,3 +1,4 @@
+import { addAbortListener } from 'node:events';
 import { types as utilTypes } from 'node:util';
 import { NikaConfigurationError, NikaTransportError } from '../errors.js';
 import type { NikaCompileOptions, NikaCompileWireRequest, NikaPublishedCompileRequest, NikaTransportKind } from '../types.js';
@@ -92,7 +93,7 @@ export async function withDeadline<T>(
   };
   if (caller) {
     if (signalAborted?.call(caller)) abort();
-    else caller.addEventListener('abort', abort, { once: true });
+    else addAbortListener(caller, abort);
   }
   try {
     if (callerStops && controller.signal.aborted) return await stopped;

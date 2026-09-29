@@ -80,6 +80,26 @@ afterEach(() => {
 
 describe('the published compile shapes on the resident contract', () => {
 
+  it('honors caller cancellation when an earlier listener stops event propagation', async () => {
+    const controller = new AbortController();
+    controller.signal.addEventListener('abort', (event) => event.stopImmediatePropagation());
+    const server = slowHealth();
+    const stopped = server.nika.compile('hello', { signal: controller.signal })
+      .then(() => ({ kind: 'resolved' }), (error: unknown) => ({ kind: 'rejected', error }));
+    const patient = server.nika.compile('hello');
+    await vi.waitFor(() => expect(server.fetch).toHaveBeenCalledTimes(1));
+    controller.abort();
+    const beforeHealth = await Promise.race([stopped,
+      new Promise<{ kind: string }>((resolve) => setTimeout(() => resolve({ kind: 'pending' }), 100))]);
+    server.release();
+    await Promise.all([stopped, patient]);
+    expect(beforeHealth).toMatchObject({ kind: 'rejected', error: {
+      name: 'NikaTransportError', message: 'compile aborted by caller',
+    } });
+    expect(server.posts).toHaveLength(1);
+    await expect(patient).resolves.toMatchObject({ ready: true });
+  });
+
   it.each([null, 'choices', [null], [{}], [{ key: 4, label: 'Four' }], [{ key: 'four', label: 4 }]])(
     'refuses malformed engine question options %j through the published compile door', async (options) => {
       const question = { key: 'const.column', label: 'Choose a column', type: 'choice',

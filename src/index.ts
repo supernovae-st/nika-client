@@ -410,6 +410,7 @@ export type {
   NikaCompileResult,
   NikaCancelResult,
   NikaAttachRunOptions,
+  NikaCheckFinding,
   NikaCheckOptions,
   NikaCheckResult,
   NikaConfig,

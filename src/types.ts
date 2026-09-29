@@ -682,6 +682,29 @@ export interface NikaScheduleFinding {
   [key: string]: unknown;
 }
 
+/**
+ * One engine-owned check finding, exactly as the engine's check report
+ * carries it. `code` is absent when the engine's failure class names none (an
+ * unreadable workflow file); the SDK never supplies one. The vocabulary
+ * remains additive.
+ *
+ * The published 0.120 line exports this shape. Here it types the entries of
+ * a check report's `findings` (`NikaCheckResult` keeps the report open). No
+ * operation error on this line carries check findings, so
+ * `NikaOperationFinding` keeps its schedule shape.
+ */
+export interface NikaCheckFinding {
+  code?: string;
+  message?: string;
+  severity?: string;
+  gate?: string;
+  kind?: string;
+  /** The task the finding judges, when it judges one. */
+  task?: string;
+  docs_url?: string;
+  [key: string]: unknown;
+}
+
 /** Findings carried by the one operation-error taxonomy. */
 export type NikaOperationFinding = NikaScheduleFinding;
 

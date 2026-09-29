@@ -42,7 +42,8 @@ describe('packed public documentation', () => {
     expect(readme).toContain('`live_backpressure`');
     expect(readme).not.toContain('observer ceiling, default 256');
     // What a published 0.120.3 program must not assume on this line.
-    expect(readme).toContain('Four published 0.120.3 surfaces differ on this line');
+    expect(readme).toContain('Three published 0.120.3 surfaces differ on this line');
+    expect(readme).toContain('the same `NikaCheckFinding` shape');
   });
 
   it('exports package metadata so consumers can prove the installed pin', () => {

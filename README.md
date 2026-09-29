@@ -691,13 +691,14 @@ for await (const e of nika.events(run)) {     for await (const e of run.events()
 
 A program written against published 0.120.3 reads the same run handle,
 lifecycle events, overflow reasons, default bound and `isNikaRunSucceeded`
-here. Four published 0.120.3 surfaces differ on this line, so such a program
-must not assume them:
+here, and the same `NikaCheckFinding` shape: it types the entries of a check
+report's `findings`, since no operation error on this line carries check
+findings. Three published 0.120.3 surfaces differ on this line, so such a
+program must not assume them:
 
 - `compile()` resolves `{ outcome, replayToken? }` from typed requests here;
   published 0.120.3 resolves the outcome itself and exports the
   `NikaCompile*` outcome types this line does not.
-- The `NikaCheckFinding` type is not exported here.
 - `run()` options: here `inputs`, `access` and `costReview` ride the HTTP
   by-name admission only, and an omitted HTTP `idempotencyKey` is generated;
   published 0.120.3 binds literal `inputs` on both transports and requires the

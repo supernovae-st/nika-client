@@ -198,8 +198,19 @@ Covered by `npm test`:
 - `test/package-consumer.test.ts`: the same handle driven on the packed ESM
   and CommonJS faces (native runs against the fixture engine, resident runs
   against an in-process `fetch`), and strict `.mts` and `.cts` type checks of
-  the handle, the lifecycle event, the overflow reason and the success guard.
-- `test/one-sdk.test.ts`: the handle's exact member set over HTTP.
+  the handle, the lifecycle event, the overflow reason, the success guard and
+  `NikaCheckFinding`, whose shape the compiler holds exactly equal to the
+  published one.
+- `test/one-sdk.test.ts`: the handle's exact member set over HTTP, and check
+  report findings read through `NikaCheckFinding` untouched.
+
+`NikaCheckFinding` was a type-only gap: a strict TypeScript consumer written
+against published 0.120.3 could not compile here, while the same program
+already ran unchanged, because the engine's report carries the findings and
+types never reach the runtime. On this line it types the entries of a check
+report's `findings`. No operation error here carries check findings, so
+`NikaOperationFinding` keeps its schedule shape rather than widening a type
+that current consumers read.
 
 Open, and not changed by this compatibility work: a program written against
 published 0.120.3 must not assume these surfaces on this line.
@@ -207,7 +218,6 @@ published 0.120.3 must not assume these surfaces on this line.
 - The compile API generation: `compile()` resolves `{ outcome, replayToken? }`
   from typed requests here, the outcome itself with the `NikaCompile*` outcome
   types there.
-- The `NikaCheckFinding` type export.
 - Run options: `inputs`, `access` and `costReview` by HTTP served name only,
   with a generated HTTP `idempotencyKey`, here; literal `inputs` on both
   transports and a required HTTP key there.

@@ -499,6 +499,13 @@ function questionsFrom(
     ) {
       throw protocol('a question lacks its key/label/type/why/mandatory shape');
     }
+    if (question.options !== undefined && (!Array.isArray(question.options)
+      || !question.options.every((entry) => {
+        const option = machineObject(entry);
+        return option && typeof option.key === 'string' && typeof option.label === 'string';
+      }))) {
+      throw protocol('question options lack their key/label shape');
+    }
     return question as unknown as NikaCompileQuestion;
   });
 }

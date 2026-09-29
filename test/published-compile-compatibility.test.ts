@@ -79,6 +79,27 @@ afterEach(() => {
 });
 
 describe('the published compile shapes on the resident contract', () => {
+
+  it.each([null, 'choices', [null], [{}], [{ key: 4, label: 'Four' }], [{ key: 'four', label: 4 }]])(
+    'refuses malformed engine question options %j through the published compile door', async (options) => {
+      const question = { key: 'const.column', label: 'Choose a column', type: 'choice',
+        mandatory: true, why: 'A source column is needed', options };
+      const { nika } = resident(() => json({ ...outcome, status: 'incomplete', candidate: null, questions: [question] }));
+      await expect(nika.compile('read a table')).rejects.toMatchObject({ name: 'NikaProtocolError' });
+    },
+  );
+
+  it('preserves engine-owned choice keys, labels and extensions without selecting an answer', async () => {
+    const question = { key: 'const.column', label: 'Choose a column', type: 'choice',
+      mandatory: true, why: 'A source column is needed', options: [
+        { key: 'id', label: 'Identifier', future: 'retained' }, { key: 'name', label: 'Name' },
+      ] };
+    const { nika, bodies } = resident(() => json({ ...outcome, status: 'incomplete', candidate: null, questions: [question] }));
+    const result = await nika.compile('read a table');
+    expect(result.questions).toEqual([question]);
+    expect(result.ready).toBe(false);
+    expect(bodies).toHaveLength(1);
+  });
   it('sends a bare intent as the compile_version 1 create wire and resolves the outcome with ready', async () => {
     const { nika, bodies } = resident();
     const result = await nika.compile('hello', { timeoutMs: 60_000 });

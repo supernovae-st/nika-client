@@ -491,11 +491,9 @@ export interface NikaRunResult<
 
 /**
  * An admitted run and its whole lifecycle. `run()` and `attachRun()` return
- * one once the transport admitted the run: a resident's refusal rejects there
- * and yields no handle, while a native engine's refusal printed before the
- * run starts settles `result()` with a `NikaOperationError`. Every member is
- * bound to the run, so a method may be extracted
- * (`const { events, result } = run`) and still works.
+ * one only after admission: a workflow the engine refuses rejects there and
+ * never yields a handle. Every member is bound to the run, so a method may be
+ * extracted (`const { events, result } = run`) and still works.
  *
  * The handle owns observation, settlement, status and cancellation, nothing
  * else: checking, proof, catalogs and authoring stay on `Nika`. It is
@@ -526,8 +524,6 @@ export interface NikaRun<
    * - rejects: a transport, protocol, or compatibility fault, or a broken
    *   observation (`NikaObservationInterrupted`, which carries the cursor).
    *   None of them says the run failed; it may still be running.
-   * - rejects with `NikaOperationError`: a native engine refused the workflow
-   *   before the run started (a `NIKA-…` code line). Nothing ran.
    * - resolves with `status: 'failed'`: an admitted failure is result data,
    *   with the engine's `error.code` when the engine named one. `cancelled`
    *   and the engine-reported `interrupted` resolve the same way.
@@ -688,10 +684,9 @@ export interface NikaScheduleFinding {
  * unreadable workflow file); the SDK never supplies one. The vocabulary
  * remains additive.
  *
- * The published 0.120 line exports this shape. Here it types the entries of
- * a check report's `findings` (`NikaCheckResult` keeps the report open). No
- * operation error on this line carries check findings, so
- * `NikaOperationFinding` keeps its schedule shape.
+ * The published 0.120 line exports this shape. It types the entries of a
+ * check report's `findings` (`NikaCheckResult` keeps the report open) and the
+ * findings a refused native `run()` carries.
  */
 export interface NikaCheckFinding {
   code?: string;
@@ -705,8 +700,12 @@ export interface NikaCheckFinding {
   [key: string]: unknown;
 }
 
-/** Findings carried by the one operation-error taxonomy. */
-export type NikaOperationFinding = NikaScheduleFinding;
+/**
+ * Findings carried by the one operation-error taxonomy: a schedule refusal
+ * carries schedule findings (`detail`), a refused `run()` carries the check
+ * findings that refused it (`message`).
+ */
+export type NikaOperationFinding = NikaScheduleFinding | NikaCheckFinding;
 
 export type NikaScheduleWhen =
   | { kind: 'once'; at: string }

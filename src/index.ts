@@ -167,11 +167,11 @@ export class Nika {
   }
 
   /**
-   * Resolves with the run's handle once the transport admitted it. A resident
-   * that refuses the job rejects here, with no handle; a native engine that
-   * refuses before the run starts (a `NIKA-…` code line) settles
-   * `run.result()` with a `NikaOperationError` instead. The handle owns the
-   * lifecycle: `run.events()`, `run.result()`, `run.status()`, `run.cancel()`.
+   * Resolves with the run's handle once the engine admitted it, and rejects
+   * without one when the engine refused it, on both transports: the refusal
+   * is a `NikaOperationError` carrying the engine's code, its findings and
+   * its exit status. The handle owns the lifecycle: `run.events()`,
+   * `run.result()`, `run.status()`, `run.cancel()`.
    *
    * `Outputs` is the caller's projection of the engine-emitted outputs map;
    * the SDK transports outputs without validating their shape.

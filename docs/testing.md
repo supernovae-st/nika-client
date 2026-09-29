@@ -203,14 +203,30 @@ Covered by `npm test`:
   published one.
 - `test/one-sdk.test.ts`: the handle's exact member set over HTTP, and check
   report findings read through `NikaCheckFinding` untouched.
+- `test/native-run-admission.test.ts`: the native admission boundary. `run()`
+  resolves only once the engine admitted the run, with the admitting frame as
+  its first event, and rejects before any handle exists on a refusal, with the
+  engine's code, findings and exit status: a red check report, an error
+  envelope, an uncoded finding (`run_refused`), a refusal line, a refusal on
+  stderr alone. An empty, malformed, partial or oversized stream, a kindless
+  object that is no refusal, malformed findings, output after a refusal and a
+  refusal that exits 0 stay protocol faults, and an engine that proves nothing
+  is stopped (SIGTERM, then SIGKILL after its grace), never left running.
+  These are SYNTHETIC fixture cases, not engine captures.
 
 `NikaCheckFinding` was a type-only gap: a strict TypeScript consumer written
 against published 0.120.3 could not compile here, while the same program
 already ran unchanged, because the engine's report carries the findings and
-types never reach the runtime. On this line it types the entries of a check
-report's `findings`. No operation error here carries check findings, so
-`NikaOperationFinding` keeps its schedule shape rather than widening a type
-that current consumers read.
+types never reach the runtime. It types the entries of a check report's
+`findings` and, as published, the findings a refused native `run()` carries
+(`NikaOperationFinding` is schedule or check findings).
+
+The native pre-run refusal was a runtime gap, measured on a real engine: for
+the one-line refusal a current engine writes (`{"error":{"code":"NIKA-1708",…}}`
+for a required input left unset), this line used to resolve `run()` and then
+settle `result()` as `failed`, like an admitted failure, with the check
+findings dropped. It now keeps the published admission boundary on both
+transports.
 
 Open, and not changed by this compatibility work: a program written against
 published 0.120.3 must not assume these surfaces on this line.
@@ -221,10 +237,10 @@ published 0.120.3 must not assume these surfaces on this line.
 - Run options: `inputs`, `access` and `costReview` by HTTP served name only,
   with a generated HTTP `idempotencyKey`, here; literal `inputs` on both
   transports and a required HTTP key there.
-- A native refusal printed before a run starts: a handle whose `result()`
-  rejects here, a rejected `run()` with no handle there.
-- The native status refusal message and one HTTP transport comment still name
-  `run.done`, which stays a valid alias.
+- The multi-line check report older engines wrote before a refusal is not
+  read as a refusal here; it stays a protocol fault.
+- One HTTP transport comment still names `run.done`, which stays a valid
+  alias.
 
 A source manifest version is not a publication claim. When this section was
 written (2026-09-29) this line's manifest read 0.118.7 while the latest npm

@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { readFileSync, writeFileSync } from 'node:fs';
+
 function main() {
 const argv = process.argv.slice(2);
 const command = argv[0];
@@ -125,6 +127,83 @@ if (command === 'run' && argv.includes('--json')) {
   if (workflow.includes('garbage-line')) {
     console.log('this line is not machine output at all');
     process.exit(0);
+  }
+
+  // A real engine capture (run-wire/README.md), replayed byte for byte.
+  if (workflow.includes('wire-315-input1708')) {
+    const wire = (name) => readFileSync(new URL(`./run-wire/${name}`, import.meta.url));
+    process.stderr.write(wire('315b3a516-input1708.stderr'));
+    process.stdout.write(wire('315b3a516-input1708.compact.stdout'), () => process.exit(3));
+    return;
+  }
+
+  // SYNTHETIC admission cases (labelled, never engine captures): the shapes a
+  // first machine frame can take, and the streams that prove neither.
+  if (workflow.includes('admit-')) {
+    const refusalCheck = {
+      // The findings of `nika check --json` on an exec task under no permits,
+      // as the exact 315b3a516 engine reports them statically; the envelope
+      // around them is synthetic, not a run capture.
+      clean: false,
+      findings: [{
+        code: 'NIKA-AUTH-006',
+        docs_url: 'https://nika.sh/language/errors/NIKA-AUTH-006',
+        gate: 'PERMITS',
+        kind: 'capability_escape',
+        message: 'exec task under a boundary that forbids shells (task `list`) — fix: add "echo" to permits.exec',
+        severity: 'error',
+        task: 'list',
+      }],
+    };
+    const envelope = { error: { code: 'NIKA-1708', message: 'NIKA-1708 · missing required inputs: `ticket`' } };
+    const done = (stdout, exitCode, stderr = '') => {
+      if (stderr) process.stderr.write(stderr);
+      process.stdout.write(stdout, () => process.exit(exitCode));
+    };
+    const line = (value) => `${JSON.stringify(value)}\n`;
+    if (process.env.NIKA_FAKE_PID_FILE) {
+      writeFileSync(process.env.NIKA_FAKE_PID_FILE, String(process.pid));
+    }
+    if (workflow.includes('admit-check-refusal')) return done(line(refusalCheck), 2);
+    if (workflow.includes('admit-two-findings')) {
+      return done(line({ clean: false, findings: [
+        { message: 'a finding the engine names no code for' },
+        ...refusalCheck.findings,
+      ] }), 2);
+    }
+    if (workflow.includes('admit-uncoded')) {
+      return done(line({ clean: false, findings: [{ message: 'cannot read missing.nika: No such file or directory (os error 2)' }] }), 3);
+    }
+    if (workflow.includes('admit-error-envelope')) {
+      return done(line(envelope), 3, 'nika run: NIKA-1708 · missing required inputs: `ticket`\n');
+    }
+    if (workflow.includes('admit-stderr-only')) {
+      return done('', 3, 'nika run: NIKA-1708 · missing required inputs: `ticket`\n');
+    }
+    if (workflow.includes('admit-empty')) return done('', 2, 'no machine frame at all\n');
+    if (workflow.includes('admit-malformed')) return done('{"kind": "workflow_started",\n', 1);
+    if (workflow.includes('admit-partial')) return done('{"clean":false,"findings":[{"code":"NIKA-AUTH', 2);
+    if (workflow.includes('admit-oversized')) {
+      return done(`{"clean":false,"findings":[{"message":"${'x'.repeat(200_000)}"}]}\n`, 2);
+    }
+    if (workflow.includes('admit-neither')) return done(line({ report_version: 1 }), 2);
+    if (workflow.includes('admit-bad-findings')) return done(line({ clean: false, findings: [1] }), 2);
+    if (workflow.includes('admit-more-after')) {
+      return done(`${line(envelope)}${line({ kind: 'workflow_started' })}`, 3);
+    }
+    if (workflow.includes('admit-exit-zero')) return done(line(envelope), 0);
+    if (workflow.includes('admit-hang-garbage')) {
+      // A first line that proves nothing, then the engine keeps running.
+      process.stdout.write('not a machine frame\n');
+      setInterval(() => {}, 60_000);
+      return;
+    }
+    if (workflow.includes('admit-hang-stubborn')) {
+      process.on('SIGTERM', () => {});
+      process.stdout.write('not a machine frame\n');
+      setInterval(() => {}, 60_000);
+      return;
+    }
   }
 
   if (workflow.includes('cancel')) {

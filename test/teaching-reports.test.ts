@@ -103,8 +103,8 @@ describe('the engine teaching report survives every transport', () => {
   });
 
   it('surfaces a pre-run engine refusal as a typed operation error', async () => {
-    const run = await native().run('refuse-1709.nika.yaml');
-    const failure = await run.done.catch((cause) => cause);
+    // The admission boundary: nothing was admitted, so run() itself rejects.
+    const failure = await native().run('refuse-1709.nika.yaml').catch((cause) => cause);
 
     expect(failure).toBeInstanceOf(NikaOperationError);
     expect(failure).toMatchObject({
@@ -119,8 +119,7 @@ describe('the engine teaching report survives every transport', () => {
   });
 
   it('keeps a protocol error for machine output that is not a refusal', async () => {
-    const run = await native().run('garbage-line.nika.yaml');
-    const failure = await run.done.catch((cause) => cause);
+    const failure = await native().run('garbage-line.nika.yaml').catch((cause) => cause);
 
     expect(failure).toMatchObject({ name: 'NikaProtocolError', transport: 'native-process' });
     expect((failure as Error).message).toContain('this line is not machine output at all');

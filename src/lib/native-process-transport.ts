@@ -48,6 +48,14 @@ import {
   receiptTraceLocator,
 } from './machine.js';
 import { verifyNikaEngine, type ResolvedNikaEngine } from './binary/index.js';
+import {
+  isRunEvent,
+  preRunRefusal,
+  runRefusalError,
+  stderrRefusal,
+  teachingLineRefusal,
+  type RunRefusal,
+} from './run-refusal.js';
 import type { Transport, TransportRun } from './transport.js';
 import type { NikaEngineIdentity } from './engine-identity.js';
 
@@ -132,7 +140,16 @@ export class NativeProcessTransport implements Transport {
       stdio: ['ignore', 'pipe', 'pipe'],
       shell: false,
     });
-    return this.processRun(randomUUID() as NikaRunId, child);
+    const engine = this.nativeProcess(child);
+    let first: NikaEvent;
+    try {
+      first = await this.admission(engine);
+    } catch (cause) {
+      // No run exists: a refused or unreadable engine is stopped, never orphaned.
+      await engine.stop();
+      throw cause;
+    }
+    return this.processRun(randomUUID() as NikaRunId, engine, first);
   }
 
   async attachRun(_id: string, _options: NikaAttachRunOptions): Promise<TransportRun> {
@@ -227,103 +244,145 @@ export class NativeProcessTransport implements Transport {
     };
   }
 
-  private processRun(id: NikaRunId, child: ChildProcessByStdio<null, Readable, Readable>): TransportRun {
+  /** One spawned engine: its bounded machine lines, its settlement, its diagnostics, its stop. */
+  private nativeProcess(child: ChildProcessByStdio<null, Readable, Readable>): NativeEngine {
     let settled = false;
+    let stderr = '';
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (chunk: string) => {
+      stderr = boundedAppend(stderr, chunk, this.options.machineBufferBytes);
+    });
+    const closed = new Promise<number>((resolve, reject) => {
+      child.once('error', (cause) => {
+        reject(new NikaTransportError(
+          this.kind,
+          `Cannot spawn ${this.options.engine.bin}: ${cause.message}`,
+          { cause },
+        ));
+      });
+      child.once('close', (code, signal) => {
+        settled = true;
+        resolve(code === null && signal ? 130 : code ?? 3);
+      });
+    });
+    closed.catch(() => {});
+    const lines = machineLines(child.stdout, this.options.machineBufferBytes, this.kind);
+    return {
+      child,
+      lines,
+      closed,
+      settled: () => settled,
+      diagnostics: () => stderr,
+      stop: async () => {
+        void lines.return(undefined).catch(() => {});
+        if (settled) return;
+        child.kill('SIGTERM');
+        if (await endsWithin(closed, STOP_GRACE_MILLISECONDS)) return;
+        child.kill('SIGKILL');
+        await endsWithin(closed, STOP_GRACE_MILLISECONDS);
+      },
+    };
+  }
+
+  /**
+   * The admission law, as the published 0.120 line states it: resolve with
+   * the run's first event, or reject before any run exists. The first machine
+   * frame decides. A run event is the engine's own admission evidence; an
+   * object without a `kind` is its one pre-run refusal object; anything else
+   * proves neither and stays a protocol fault. The SDK reads which one the
+   * engine wrote and judges nothing itself.
+   */
+  private async admission(engine: NativeEngine): Promise<NikaEvent> {
+    const { lines } = engine;
+    const kind = this.kind;
+    const opening = await lines.next();
+    if (opening.done) {
+      const exitCode = await engine.closed;
+      const taught = stderrRefusal(engine.diagnostics(), exitCode);
+      if (taught) throw runRefusalError(kind, taught, exitCode);
+      throw new NikaProtocolError(kind, quoted(
+        `Engine exited without a machine frame (exit ${exitCode})`,
+        engine.diagnostics(),
+      ));
+    }
+    const line = opening.value;
+    let frame: Record<string, unknown> | undefined;
+    let unreadable: unknown;
+    try {
+      frame = parseMachineObject(line, kind);
+    } catch (cause) {
+      unreadable = cause;
+    }
+    let refusal: RunRefusal | undefined;
+    if (frame) {
+      if (isRunEvent(frame)) return frame as NikaEvent;
+      refusal = preRunRefusal(frame, kind);
+    } else {
+      refusal = teachingLineRefusal(line);
+      if (!refusal) throw quotedProtocolError(unreadable, line, kind);
+    }
+    if (!refusal) {
+      throw new NikaProtocolError(kind, quoted(
+        'The first machine frame was neither a run event nor a pre-run refusal object',
+        line,
+      ));
+    }
+    const extra = await lines.next();
+    if (!extra.done) {
+      throw new NikaProtocolError(kind, quoted(
+        'Engine wrote more machine output after its pre-run refusal',
+        extra.value,
+      ));
+    }
+    const exitCode = await engine.closed;
+    if (exitCode === 0) {
+      throw new NikaProtocolError(kind, quoted(
+        'Engine wrote a pre-run refusal but exited 0',
+        refusal.message,
+      ));
+    }
+    throw runRefusalError(kind, refusal, exitCode);
+  }
+
+  private processRun(id: NikaRunId, engine: NativeEngine, first: NikaEvent): TransportRun {
+    const { child, lines, closed } = engine;
     let lastEvent: NikaEvent | undefined;
     let receipt: NikaReceipt | undefined;
     let outputs: Record<string, unknown> | undefined;
     let machineError: ReturnType<typeof eventError>;
     let settlement: NikaSettlement | undefined;
     let streamError: Error | undefined;
-    let refusal: EngineRefusal | undefined;
     let resolveDrained!: () => void;
     const drained = new Promise<void>((resolve) => {
       resolveDrained = resolve;
     });
 
-    let stderr = '';
-    child.stderr.setEncoding('utf8');
-    child.stderr.on('data', (chunk: string) => {
-      stderr = boundedAppend(stderr, chunk, this.options.machineBufferBytes);
-    });
-
-    const closed = new Promise<number>((resolve, reject) => {
-      child.once('error', (cause) => {
-        streamError = new NikaTransportError(
-          this.kind,
-          `Cannot spawn ${this.options.engine.bin}: ${cause.message}`,
-          { cause },
-        );
-        reject(streamError);
-      });
-      child.once('close', (code, signal) => {
-        settled = true;
-        if (code === null && signal && !streamError) resolve(130);
-        else resolve(code ?? 3);
-      });
-    });
-    closed.catch(() => {});
-
     const kind = this.kind;
-    const machineBufferBytes = this.options.machineBufferBytes;
-    // A plain `NIKA-…` line under --json is the engine refusing the run, not a
-    // broken machine stream. Hold it and let run.done carry the typed verdict
-    // with the real exit status; the event stream simply carried no frame.
-    const lineEvent = (line: string): NikaEvent | undefined => {
-      const refused = engineRefusal(line);
-      if (refused) {
-        refusal ??= refused;
-        return undefined;
-      }
-      return machineLine(line, kind) as NikaEvent;
+    const observe = (event: NikaEvent): NikaEvent => {
+      lastEvent = event;
+      receipt = eventReceipt(event) ?? receipt;
+      outputs = eventOutputs(event) ?? outputs;
+      const currentSettlement = eventSettlement(event, kind);
+      machineError = currentSettlement ? eventError(event) : eventError(event) ?? machineError;
+      settlement = currentSettlement ?? settlement;
+      return event;
     };
     const events: AsyncIterable<NikaEvent> = {
       [Symbol.asyncIterator]: async function* () {
-        let buffer = '';
-        child.stdout.setEncoding('utf8');
         try {
-          for await (const chunk of child.stdout) {
-            buffer += String(chunk);
-            let newline: number;
-            while ((newline = buffer.indexOf('\n')) >= 0) {
-              const line = buffer.slice(0, newline).trim();
-              buffer = buffer.slice(newline + 1);
-              if (!line) continue;
-              const event = lineEvent(line);
-              if (!event) continue;
-              lastEvent = event;
-              receipt = eventReceipt(event) ?? receipt;
-              outputs = eventOutputs(event) ?? outputs;
-              const currentSettlement = eventSettlement(event, kind);
-              machineError = currentSettlement ? eventError(event) : eventError(event) ?? machineError;
-              settlement = currentSettlement ?? settlement;
-              yield event;
-            }
-            if (Buffer.byteLength(buffer) > machineBufferBytes) {
-              throw new NikaProtocolError(
-                kind,
-                `Native machine line exceeded ${machineBufferBytes} bytes`,
-              );
-            }
-          }
-          const tail = buffer.trim();
-          if (tail) {
-            const event = lineEvent(tail);
-            if (event) {
-              lastEvent = event;
-              receipt = eventReceipt(event) ?? receipt;
-              outputs = eventOutputs(event) ?? outputs;
-              const currentSettlement = eventSettlement(event, kind);
-              machineError = currentSettlement ? eventError(event) : eventError(event) ?? machineError;
-              settlement = currentSettlement ?? settlement;
-              yield event;
-            }
+          // The frame that proved admission is the run's first event.
+          yield observe(first);
+          for (;;) {
+            const next = await lines.next();
+            if (next.done) break;
+            yield observe(machineLine(next.value, kind) as NikaEvent);
           }
         } catch (cause) {
           streamError = cause instanceof Error ? cause : new Error(String(cause));
-          if (!settled) child.kill('SIGTERM');
+          if (!engine.settled()) child.kill('SIGTERM');
           throw streamError;
         } finally {
+          void lines.return(undefined).catch(() => {});
           resolveDrained();
         }
       },
@@ -331,16 +390,8 @@ export class NativeProcessTransport implements Transport {
 
     const done = Promise.all([closed, drained]).then(([exitCode]): NikaRunResult => {
       if (streamError) throw streamError;
-      if (refusal) {
-        throw new NikaOperationError(
-          'run',
-          this.kind,
-          refusal.code,
-          refusal.line,
-          { status: exitCode },
-        );
-      }
       const status = eventStatus(lastEvent) ?? statusForExit(exitCode, lastEvent?.kind);
+      const stderr = engine.diagnostics();
       return {
         id,
         status,
@@ -364,12 +415,12 @@ export class NativeProcessTransport implements Transport {
         throw new NikaCompatibilityError(
           'runStatus',
           this.kind,
-          'A direct native process has no independent durable status authority; await run.done',
+          'A direct native process has no independent durable status authority; await run.result()',
         );
       },
       cancel: () => {
         cancelPromise ??= Promise.resolve(
-          settled
+          engine.settled()
             ? {
                 runId: id,
                 accepted: false,
@@ -385,10 +436,7 @@ export class NativeProcessTransport implements Transport {
         );
         return cancelPromise;
       },
-      cleanup: async () => {
-        if (!settled) child.kill('SIGTERM');
-        await closed.catch(() => {});
-      },
+      cleanup: () => engine.stop(),
     };
   }
 
@@ -440,15 +488,63 @@ export class NativeProcessTransport implements Transport {
   }
 }
 
-interface EngineRefusal {
-  code: string;
-  line: string;
+/** One spawned engine the transport owns from spawn to settlement. */
+interface NativeEngine {
+  child: ChildProcessByStdio<null, Readable, Readable>;
+  lines: AsyncGenerator<string, void, undefined>;
+  closed: Promise<number>;
+  settled: () => boolean;
+  diagnostics: () => string;
+  stop: () => Promise<void>;
+}
+
+/** How long a stopped engine gets before the next signal. */
+const STOP_GRACE_MILLISECONDS = 2_000;
+
+function endsWithin(settling: Promise<unknown>, milliseconds: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(false), milliseconds);
+    const ended = () => {
+      clearTimeout(timer);
+      resolve(true);
+    };
+    settling.then(ended, ended);
+  });
+}
+
+/** The engine's stdout as bounded, trimmed, non-empty machine lines. */
+async function* machineLines(
+  stdout: Readable,
+  limit: number,
+  kind: NikaTransportKind,
+): AsyncGenerator<string, void, undefined> {
+  const bounded = (raw: string): string => {
+    if (Buffer.byteLength(raw) > limit) {
+      throw new NikaProtocolError(
+        kind,
+        `Native machine line exceeded ${limit} bytes; machineBufferBytes bounds one machine frame`,
+      );
+    }
+    return raw.trim();
+  };
+  let buffer = '';
+  stdout.setEncoding('utf8');
+  for await (const chunk of stdout) {
+    buffer += String(chunk);
+    let newline: number;
+    while ((newline = buffer.indexOf('\n')) >= 0) {
+      const line = bounded(buffer.slice(0, newline));
+      buffer = buffer.slice(newline + 1);
+      if (line) yield line;
+    }
+    bounded(buffer);
+  }
+  const tail = bounded(buffer);
+  if (tail) yield tail;
 }
 
 /** The engine prefixes a stream-routed report with its own name. */
 const ENGINE_PREFIX = /^nika:\s*/;
-/** A refusal line opens with the engine code that owns the verdict. */
-const REFUSAL_CODE = /^(NIKA-[A-Z0-9-]+)\b/;
 const DIAGNOSTIC_EXCERPT_LIMIT = 240;
 
 function reportObject(text: string): Record<string, unknown> | undefined {
@@ -474,12 +570,6 @@ function diagnosticExcerpt(text: string, limit = DIAGNOSTIC_EXCERPT_LIMIT): stri
   return single.length > limit ? `${single.slice(0, limit)}…` : single;
 }
 
-/** No JSON value can open with `NIKA-`, so a match is never a machine frame. */
-function engineRefusal(line: string): EngineRefusal | undefined {
-  const code = REFUSAL_CODE.exec(line)?.[1];
-  return code ? { code, line } : undefined;
-}
-
 /** Keep the protocol verdict, and quote the line that earned it. */
 function machineLine(line: string, kind: NikaTransportKind): Record<string, unknown> {
   try {
@@ -495,6 +585,19 @@ function machineLine(line: string, kind: NikaTransportKind): Record<string, unkn
       { cause: cause instanceof Error ? cause : undefined },
     );
   }
+}
+
+/** A protocol verdict that quotes the bytes that earned it. */
+function quotedProtocolError(cause: unknown, text: string, kind: NikaTransportKind): NikaProtocolError {
+  const verdict = cause instanceof Error ? cause.message : 'Engine machine output was unreadable';
+  return new NikaProtocolError(kind, quoted(verdict, text), {
+    cause: cause instanceof Error ? cause : undefined,
+  });
+}
+
+function quoted(verdict: string, text: string): string {
+  const excerpt = diagnosticExcerpt(text);
+  return excerpt ? `${verdict}: ${excerpt}` : verdict;
 }
 
 function runFlags(options: NikaRunOptions): string[] {

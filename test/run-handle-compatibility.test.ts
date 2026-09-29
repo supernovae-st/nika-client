@@ -678,19 +678,18 @@ describe.skipIf(!posix)('the published run handle over the one session', () => {
       });
     }, 20_000);
 
-    it('rejects result() for a native refusal before the run starts, as its done alias does', async () => {
-      // This line's native door returns a handle before the engine's refusal
-      // line is read; published 0.120.3 rejects run() itself instead.
-      const run = await native().run('refuse-1709.nika');
-      const failure = await run.result().catch((cause: unknown) => cause);
+    it('rejects run() itself for a native refusal before the run starts: no handle exists', async () => {
+      // The admission boundary the published line states: a refused workflow
+      // never yields a handle, so no result() or done could carry it.
+      const failure = await native().run('refuse-1709.nika').catch((cause: unknown) => cause);
 
       expect(failure).toMatchObject({
         name: 'NikaOperationError',
         operation: 'run',
         code: 'NIKA-1709',
         transport: 'native-process',
+        status: 2,
       });
-      await expect(run.done).rejects.toBe(failure);
     });
 
     it('fails every view, result() and done with the one transport error', async () => {

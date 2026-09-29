@@ -42,8 +42,10 @@ describe('packed public documentation', () => {
     expect(readme).toContain('`live_backpressure`');
     expect(readme).not.toContain('observer ceiling, default 256');
     // What a published 0.120.3 program must not assume on this line.
-    expect(readme).toContain('Three published 0.120.3 surfaces differ on this line');
+    expect(readme).toContain('Two published 0.120.3 surfaces');
     expect(readme).toContain('the same `NikaCheckFinding` shape');
+    expect(readme).toContain('`run()` then rejects, before any `NikaRun` exists');
+    expect(readme).not.toContain('settles `run.result()` with a `NikaOperationError`');
   });
 
   it('exports package metadata so consumers can prove the installed pin', () => {

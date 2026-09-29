@@ -691,10 +691,10 @@ for await (const e of nika.events(run)) {     for await (const e of run.events()
 
 A program written against published 0.120.3 reads the same run handle,
 lifecycle events, overflow reasons, default bound and `isNikaRunSucceeded`
-here, and the same `NikaCheckFinding` shape: it types the entries of a check
-report's `findings`, since no operation error on this line carries check
-findings. Three published 0.120.3 surfaces differ on this line, so such a
-program must not assume them:
+here, the same `NikaCheckFinding` shape, and the same admission boundary: a
+workflow the native engine refuses rejects `run()` itself, with no handle,
+as it does over HTTP (see [Errors](#errors)). Two published 0.120.3 surfaces
+differ on this line, so such a program must not assume them:
 
 - `compile()` resolves `{ outcome, replayToken? }` from typed requests here;
   published 0.120.3 resolves the outcome itself and exports the
@@ -703,9 +703,6 @@ program must not assume them:
   by-name admission only, and an omitted HTTP `idempotencyKey` is generated;
   published 0.120.3 binds literal `inputs` on both transports and requires the
   HTTP key.
-- A native refusal printed before a run starts returns a handle here whose
-  `run.result()` rejects with `NikaOperationError`; published 0.120.3 rejects
-  `run()` itself and yields no handle.
 
 ### Authoring through the resident
 
@@ -832,9 +829,41 @@ Server messages are engine-owned and path-free; a reflected bearer token is
 redacted before it reaches an error message. A non-2xx answer without that
 typed body stays a `NikaTransportError` whose body is redacted entirely.
 
-An engine refusal printed before a run starts — a `NIKA-…` code line such as a
-cost-floor refusal — settles `run.result()` with a `NikaOperationError` carrying
-`operation: 'run'`, the engine's code, and its full refusal line.
+A native engine refuses a workflow before admitting it: a red check, a cost
+floor above `maxCostUsd`, a required input left unset, a file it cannot read.
+`run()` then rejects, before any `NikaRun` exists, with a `NikaOperationError`
+carrying `operation: 'run'` and the engine's exit status in `status`:
+
+```ts
+try {
+  const run = await nika.run('./workflow.nika');
+  const result = await run.result(); // admitted: a failure here is result data
+} catch (error) {
+  if (error instanceof NikaOperationError && error.operation === 'run') {
+    console.error(error.code); // 'NIKA-AUTH-006'
+    for (const finding of error.findings ?? []) console.error(finding.message);
+  } else throw error;
+}
+```
+
+- `code` is the engine's own code: the first check finding that names one, or
+  the refusal's code (`NIKA-1709`, `NIKA-1708`). `machineCode` repeats it. When
+  the engine named none, as for an unreadable file, `code` is the SDK's
+  `run_refused` and `machineCode` is absent; the SDK never supplies an engine
+  code.
+- `findings` holds the engine's check findings untouched, as
+  `NikaCheckFinding`. A budget or launch refusal has no findings.
+- Nothing was admitted, so nothing else exists: no run id, no events, no
+  trace, no receipt.
+
+The engine's first machine frame decides, and the SDK judges nothing itself:
+a run event is admission; an object without a `kind` is the refusal (a check
+report with `clean: false`, or `{ "error": { code, message } }`); a line that
+opens with a `NIKA-` code, or a refusal taught on stderr alone under exit 2 or
+3, reads the same way. Output that proves neither (no frame, a line that is
+not machine output, a truncated or oversized frame, more output after the
+refusal, or a refusal that exits 0) rejects `run()` with `NikaProtocolError`,
+and the engine process is stopped rather than left running.
 
 ## Security boundaries
 

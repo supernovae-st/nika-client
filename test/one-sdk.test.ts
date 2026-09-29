@@ -829,8 +829,8 @@ describe('HTTP transport', () => {
       [key: string]: unknown;
     }
     expectTypeOf<NikaCheckFinding>().toEqualTypeOf<PublishedCheckFinding>();
-    // An additive export: the operation-error findings keep their schedule shape.
-    expectTypeOf<NikaOperationFinding>().toEqualTypeOf<NikaScheduleFinding>();
+    // As published: a refused run() carries check findings, a schedule refusal its own.
+    expectTypeOf<NikaOperationFinding>().toEqualTypeOf<NikaScheduleFinding | NikaCheckFinding>();
 
     const fetch = vi.fn().mockResolvedValueOnce(healthResponse());
     const report = await remote(fetch as typeof globalThis.fetch).check('./parse-fatal.nika.yaml');

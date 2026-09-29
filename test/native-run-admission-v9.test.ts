@@ -441,6 +441,26 @@ describe.skipIf(!posix)('native admission bounds and refusal settlement', () => 
     expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
   });
 
+  it('starts no run if the caller aborts while flags are read after the probe', async () => {
+    const controller = new AbortController();
+    const reason = new Error('stop before workflow launch');
+    const argvs = argvLog();
+    const { failure } = await rejection(() => native().run('ok.nika', {
+      admission: { signal: controller.signal },
+      get model() {
+        controller.abort(reason);
+        return 'mock/echo';
+      },
+    }));
+    expect(failure).toBeInstanceOf(NikaTransportError);
+    expect((failure as Error).message).toBe(
+      'run admission aborted by caller; the engine identity probe it was waiting on ended and no run was started',
+    );
+    expect((failure as Error).cause).toBe(reason);
+    expect(argvs()).toEqual([['--sdk-identity']]);
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
+  });
+
   it('bounds an identity probe that never answers, stops that owned probe, and starts no run', async () => {
     vi.stubEnv('NIKA_FAKE_IDENTITY_HANG', '1');
     const probe = watchChild();

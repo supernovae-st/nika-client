@@ -246,7 +246,6 @@ export class NativeProcessTransport implements Transport {
           signal: gate.signal, killGraceMs: STOP_GRACE_MILLISECONDS,
         })
         : await this.ensureReady();
-      probing = false;
       if (options.idempotencyKey !== undefined) {
         throw new NikaCompatibilityError(
           'idempotencyKey',
@@ -268,6 +267,10 @@ export class NativeProcessTransport implements Transport {
         );
       }
       const args = ['run', workflow, '--json', ...runFlags(options, inputs !== undefined)];
+      // Reading caller options can synchronously abort after the probe.
+      // Recheck before the first workflow effect, while no run exists.
+      gate.throwIfEnded();
+      probing = false;
       const spawnOptions = { cwd: this.options.cwd, shell: false } as const;
       const child: EngineChild = inputs
         ? spawn(this.options.engine.bin, args, { ...spawnOptions, stdio: ['pipe', 'pipe', 'pipe'] })

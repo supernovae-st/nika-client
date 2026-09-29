@@ -221,10 +221,14 @@ Covered by `npm test`:
   `false`, `0`, `""` and `null` answers kept exactly, and resolve the outcome
   itself with `ready` derived from `status` and never a replay token; the
   typed V9 request keeps its outcome and token; malformed or hybrid requests
-  and invalid deadlines refuse before any request; a `timeoutMs` deadline
-  aborts the wait and its timer is released; a caller's abort stays the
-  transport's error; a native process still refuses. The packed `.mts` and
-  `.cts` consumers hold each door's type.
+  and invalid deadlines refuse before any request, and null, undefined or a
+  Proxy request before any trap; a `timeoutMs` deadline stops the wait at
+  once on both doors, even while the resident's health check is still
+  pending, sends nothing after it, leaves a concurrent caller on that same
+  check unaffected, and releases its timer; a caller's abort stops the
+  published door at once with the published `compile aborted by caller` and
+  stays the transport's error on the typed door; a native process still
+  refuses. The packed `.mts` and `.cts` consumers hold each door's type.
 
 `NikaCheckFinding` was a type-only gap: a strict TypeScript consumer written
 against published 0.120.3 could not compile here, while the same program
@@ -258,6 +262,10 @@ published 0.120.3 must not assume these surfaces on this line.
   with them names `NikaPublishedCompileRequest` and
   `NikaPublishedCompileOutcome` instead. Without `timeoutMs` no client deadline
   applies here, where the published package used its 30-second request timeout.
+- Typed compile with only a caller `signal`: the client's first health check
+  is shared and takes no caller signal, so an abort during it is observed when
+  that check answers, within `requestTimeout`. A `timeoutMs` or the published
+  door stops at once.
 - Run options: `inputs`, `access` and `costReview` by HTTP served name only,
   with a generated HTTP `idempotencyKey`, here; literal `inputs` on both
   transports and a required HTTP key there.

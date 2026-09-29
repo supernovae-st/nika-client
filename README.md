@@ -730,9 +730,13 @@ schedule. See [the HTTP authoring contract](docs/http-api.md#authoring).
 
 Compilation waits for the resident's authoring deadline; the ordinary
 30-second HTTP admission timer does not cut a model round short. Pass
-`{ timeoutMs: 600_000 }`, or your own `signal`, to set a waiting deadline: it
-really aborts the wait and releases its timer when the compile ends.
-Stopping that wait does not cancel an already dispatched provider call.
+`{ timeoutMs: 600_000 }` to set a waiting deadline: when it fires the wait
+stops at once, even before the resident's first health answer, nothing is
+sent after it, and its timer is released when the compile ends. Your own
+`signal` stops the wait too; on the typed request, an abort during the
+client's first health check is observed when that check answers, within
+`requestTimeout`. Stopping that wait does not cancel an already dispatched
+provider call.
 A lost answer may still be billed and may leave a kept round whose token
 you never received; the SDK does not retry it. JSON body reads remain bounded.
 
@@ -760,8 +764,10 @@ question, stay on the outcome. The kept-round replay token is never handed
 out on this door, as the published one never offered it: replay stays with
 the typed request. A request that mixes the two shapes (a `compile_version`
 beside a published `workflow` or a text `change`) is refused, never
-reinterpreted. Without `timeoutMs` no client deadline applies; the published
-package defaulted to its 30-second request timeout.
+reinterpreted; null, undefined or a Proxy is refused before any trap or
+request. A caller's abort stops this door at once with the published
+`compile aborted by caller`. Without `timeoutMs` no client deadline applies;
+the published package defaulted to its 30-second request timeout.
 
 ### Typed events, outputs, and identities
 

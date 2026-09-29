@@ -45,6 +45,8 @@ describe('packed public documentation', () => {
     expect(readme).toContain('line still differs, such a program must not assume the published surface');
     expect(readme).toContain('(`NikaPublishedCompileOutcome`) with `ready` exactly');
     expect(readme).toContain('The kept-round replay token is never handed');
+    expect(readme).toContain("stops at once, even before the resident's first health answer");
+    expect(readme).not.toContain('really aborts the wait');
     expect(readme).toContain('the same `NikaCheckFinding` shape');
     expect(readme).toContain('`run()` then rejects, before any `NikaRun` exists');
     expect(readme).not.toContain('settles `run.result()` with a `NikaOperationError`');

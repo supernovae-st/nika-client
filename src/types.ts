@@ -30,10 +30,12 @@ export interface NikaCompileOptions {
   /** Stops waiting, not a dispatched provider call. A lost answer may be billed and is never retried. */
   signal?: AbortSignal;
   /**
-   * A client deadline in positive integer milliseconds: it aborts the wait
-   * (`NikaTransportError`, « compile timed out ») and releases its timer
-   * when the compile ends. Like `signal`, it never revokes a sent request.
-   * Without it the resident's own authoring deadline applies.
+   * A client deadline in positive integer milliseconds: when it fires the
+   * wait stops at once (`NikaTransportError`, « compile timed out »), even
+   * before the resident's health check answered, and nothing is sent after
+   * it; its timer is released when the compile ends. Like `signal`, it never
+   * revokes a sent request. Without it the resident's own authoring deadline
+   * applies.
    */
   timeoutMs?: number;
 }

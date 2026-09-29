@@ -44,6 +44,36 @@ function resident(answer: (init?: RequestInit) => Promise<Response> | Response =
   return { nika, fetch, bodies };
 }
 
+/** A resident whose health answer waits for `release()`, remembering every compile it was sent. */
+function slowHealth() {
+  let release!: () => void;
+  const released = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let answered = false;
+  const posts: unknown[] = [];
+  const fetch = vi.fn<typeof globalThis.fetch>(async (url, init) => {
+    if (String(url).endsWith('/health')) {
+      await released;
+      answered = true;
+      return json(health);
+    }
+    posts.push(JSON.parse(String(init?.body)));
+    return json(outcome, { 'Nika-Compile-Replay': replay });
+  });
+  const nika = new Nika({
+    url: 'http://127.0.0.1:8787', allowInsecureHttp: true, token, bin: '/missing/compile-must-not-spawn', fetch,
+  });
+  return { nika, fetch, posts, release, answered: () => answered };
+}
+
+/** Let an abandoned compile step run on after its health answer, then read what it sent. */
+async function settleAbandoned(resident: ReturnType<typeof slowHealth>): Promise<void> {
+  resident.release();
+  await vi.waitFor(() => expect(resident.answered()).toBe(true));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -107,11 +137,49 @@ describe('the published compile shapes on the resident contract', () => {
     ['a class instance answer', { intent: 'hello', answers: { 'const.a': new Date(0) } }],
     ['a hybrid V9 edit with a published source', { compile_version: 1, mode: 'edit', workflow: 'x', change: { text: 'y' } }],
     ['a hybrid V9 edit with a text change', { compile_version: 1, mode: 'edit', source: 'x', change: 'y' }],
+    ['null', null],
+    ['undefined', undefined],
+    ['a number', 42],
   ])('refuses %s before any request, never reinterpreting it', async (_label, request) => {
     const { nika, fetch } = resident();
     const refused = await (nika.compile as (request: unknown) => Promise<unknown>)(request).catch((error: unknown) => error);
     expect(refused).toBeInstanceOf(NikaConfigurationError);
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a published-shaped target', { intent: 'hello' }],
+    ['a typed-shaped target', { compile_version: 1, mode: 'create', intent: 'hello' }],
+  ])('refuses a Proxy over %s before any trap or request', async (_label, target) => {
+    const traps: PropertyKey[] = [];
+    // Every trap the language looks up on this handler is recorded.
+    const handler = new Proxy({}, {
+      get: (_handler, trap) => {
+        traps.push(trap);
+        return Reflect.get(Reflect, trap);
+      },
+    });
+    const { nika, fetch } = resident();
+    const refused = await (nika.compile as (request: unknown) => Promise<unknown>)(new Proxy(target, handler))
+      .catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(NikaConfigurationError);
+    expect(traps).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('reads a typed request without running its getters to tell the doors apart', async () => {
+    let reads = 0;
+    const request = { compile_version: 1, mode: 'create', intent: 'hello' };
+    Object.defineProperty(request, 'change', {
+      enumerable: false,
+      get: () => {
+        reads += 1;
+        return 'y';
+      },
+    });
+    const { nika } = resident();
+    await nika.compile(request as { compile_version: 1; mode: 'create'; intent: string });
+    expect(reads).toBe(0);
   });
 
   it.each([0, -1, 1.5, 2 ** 31])('refuses timeoutMs %s before any request', async (timeoutMs) => {
@@ -146,15 +214,67 @@ describe('the published compile shapes on the resident contract', () => {
     expect(clearTimer).toHaveBeenCalledWith(setTimer.mock.results[index]?.value);
   });
 
-  it('keeps a caller abort the transport error, not a deadline', async () => {
+  it.each([
+    ['the published door', (nika: Nika) => nika.compile('hello', { timeoutMs: 50 })],
+    ['the typed door', (nika: Nika) => nika.compile({ compile_version: 1, mode: 'create', intent: 'hello' }, { timeoutMs: 50 })],
+  ])('stops waiting at its deadline on %s while the health check is pending, and sends nothing after', async (_label, call) => {
+    const resident = slowHealth();
+    const failure = await (call(resident.nika) as Promise<unknown>).catch((error: unknown) => error);
+    expect(failure).toMatchObject({ name: 'NikaTransportError' });
+    expect((failure as Error).message).toContain('compile timed out after 50 ms');
+    expect(resident.answered()).toBe(false);
+    await settleAbandoned(resident);
+    expect(resident.posts).toEqual([]);
+    expect(resident.fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves a concurrent caller on the same health check unaffected by another deadline', async () => {
+    const resident = slowHealth();
+    const hurried = resident.nika.compile('hello', { timeoutMs: 50 }).catch((error: unknown) => error);
+    const patient = resident.nika.compile({ intent: 'hello' });
+    expect(((await hurried) as Error).message).toContain('compile timed out after 50 ms');
+    resident.release();
+    await expect(patient).resolves.toEqual({ ...outcome, ready: true });
+    expect(resident.posts).toEqual([{ compile_version: 1, mode: 'create', intent: 'hello' }]);
+    expect(resident.fetch.mock.calls.filter(([url]) => String(url).endsWith('/health'))).toHaveLength(1);
+  });
+
+  it('stops at once when the caller aborts on the published door, in the published words', async () => {
+    const resident = slowHealth();
     const controller = new AbortController();
-    const { nika } = resident((init) => new Promise<Response>((_resolve, reject) => {
+    const pending = resident.nika.compile('hello', { signal: controller.signal }).catch((error: unknown) => error);
+    controller.abort();
+    const failure = await pending;
+    expect(failure).toMatchObject({ name: 'NikaTransportError' });
+    expect((failure as Error).message).toContain('compile aborted by caller');
+    expect(resident.answered()).toBe(false);
+    await settleAbandoned(resident);
+    expect(resident.posts).toEqual([]);
+  });
+
+  it('refuses an already aborted published compile without any request', async () => {
+    const { nika, fetch } = resident();
+    const failure = await nika.compile('hello', { signal: AbortSignal.abort() }).catch((error: unknown) => error);
+    expect((failure as Error).message).toContain('compile aborted by caller');
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('keeps a typed caller abort the transport error, and never renames an abort a deadline', async () => {
+    const aborting = (controller: AbortController) => resident((init) => new Promise<Response>((_resolve, reject) => {
       init?.signal?.addEventListener('abort', () => reject(new Error('caller stopped waiting')), { once: true });
       controller.abort();
     }));
-    const failure = await nika.compile('hello', { signal: controller.signal, timeoutMs: 60_000 })
+    const typedController = new AbortController();
+    const typed = await aborting(typedController).nika
+      .compile({ compile_version: 1, mode: 'create', intent: 'hello' }, { signal: typedController.signal, timeoutMs: 60_000 })
       .catch((error: unknown) => error);
-    expect((failure as Error).message).not.toContain('timed out');
+    expect(typed).toMatchObject({ name: 'NikaTransportError', message: 'HTTP transport failed' });
+    const publishedController = new AbortController();
+    const published = await aborting(publishedController).nika
+      .compile('hello', { signal: publishedController.signal, timeoutMs: 60_000 })
+      .catch((error: unknown) => error);
+    expect((published as Error).message).toContain('compile aborted by caller');
+    expect((published as Error).message).not.toContain('timed out');
   });
 
   it('still refuses a native compile with a typed compatibility error', async () => {

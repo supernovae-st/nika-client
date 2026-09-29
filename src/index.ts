@@ -153,8 +153,9 @@ export class Nika {
    * intent string, `{ intent }`, or `{ workflow, change }`) is validated as
    * published, sent as the same `compile_version: 1` wire, and resolves the
    * outcome itself with `ready`, never a replay token. A request is one or the
-   * other: a hybrid is refused, never reinterpreted. A native process refuses
-   * with `NikaCompatibilityError`.
+   * other: a hybrid is refused, never reinterpreted, and anything else (null,
+   * undefined, a Proxy) is refused before any trap or request. A native
+   * process refuses with `NikaCompatibilityError`.
    */
   compile(request: NikaCompileRequest, options?: NikaCompileOptions): Promise<NikaCompileResult>;
   compile(
@@ -174,6 +175,7 @@ export class Nika {
         checked,
         this.transportKind,
         (signal) => this.transport.compile(wire, { signal }),
+        true,
       );
       return publishedOutcome(result);
     }

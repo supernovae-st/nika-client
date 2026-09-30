@@ -225,14 +225,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$NIKA_GAUNTLET_RESULTS_DIR"
-          sha=$(grep -E '^[0-9a-f]{40}$' ENGINE_QUAL_PIN | head -1)
+          # The resolved candidate (a dispatch input wins over ENGINE_QUAL_PIN), never the file alone.
+          sha="$ENGINE_SHA"
           ident=$("$NIKA_BIN" --version)
           ver=$(printf '%s\n' "$ident" | awk '{print $2}')
           short=${sha:0:9}
           case "$ident" in
             *"($short"*) ;;
             *)
-              echo "::error::built binary '$ident' does not carry ENGINE_QUAL_PIN $sha"
+              echo "::error::built binary '$ident' does not carry the resolved candidate engine $sha"
               exit 1
               ;;
           esac

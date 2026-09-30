@@ -1,3 +1,40 @@
+import type { components } from './generated/openapi.js';
+
+/** Engine-owned, single-use HTTP review; approval alone never runs a workflow. */
+export type NikaCostReview = components['schemas']['CostReview'];
+/** Explicit V2 review with the engine-owned finite dispatch bound. */
+export type NikaCostReviewV2 = components['schemas']['CostReviewV2'];
+export type NikaCostReviewResultV2 = NikaCostReviewV2 | components['schemas']['CostReviewNotRequiredV2'];
+export type NikaCostReviewRequest = components['schemas']['CostReviewRequest'];
+export type NikaCostReviewDecision = components['schemas']['CostReviewDecision'];
+export type NikaCostReviewReference = components['schemas']['CostReviewReference'];
+export type NikaCostReviewResult = NikaCostReview | components['schemas']['CostReviewNotRequired'];
+export interface NikaCostReviewOptions {
+  /** Wire version to create/read/decide. Defaults to 1; never falls back. */
+  version?: 1 | 2;
+  /** Stops waiting; a sent decision may already have taken effect. */
+  signal?: AbortSignal;
+}
+export interface NikaPrepareCostReviewOptions extends NikaCostReviewOptions {
+  /** Explicit replay identity. The SDK never retries a lost response. */
+  idempotencyKey?: string;
+}
+
+/** Exact versioned resident request; explicitProvider is an explicit caller opt-in. */
+export type NikaCompileWireRequest = components['schemas']['CompileRequest'] | components['schemas']['CompileRequestV2'];
+/** Resident authoring evidence, never execution or schedule authority. */
+export type NikaCompileWireOutcome = components['schemas']['CompileOutcome'] | components['schemas']['CompileOutcomeV2'];
+export interface NikaCompileResult {
+  outcome: NikaCompileWireOutcome;
+  /** Opaque kept-round token, bound to this server and the exact original input. */
+  replayToken?: string;
+}
+/** Compatibility aliases for the published source-only compile API. */
+export type NikaPublishedCompileRequest = NikaCompileRequest;
+export type NikaPublishedCompileCreateRequest = NikaCompileCreateRequest;
+export type NikaPublishedCompileEditRequest = NikaCompileEditRequest;
+export type NikaPublishedCompileOutcome = NikaCompileOutcome;
+
 interface NikaSharedConfig {
   /**
    * How many of a run's most recent frames a session retains, and therefore
@@ -42,7 +79,7 @@ export interface NikaRemoteConfig extends NikaSharedConfig {
   token: string;
   /** Plain HTTP is refused unless this is explicitly true. */
   allowInsecureHttp?: boolean;
-  /** Bound for HTTP admission. Default: 30 seconds. */
+  /** HTTP admission and JSON body bound (30s default); compile waits for the resident deadline or caller signal. */
   requestTimeout?: number;
   /** Fetch implementation used by the HTTP transport. */
   fetch?: typeof globalThis.fetch;
@@ -98,6 +135,9 @@ export interface NikaCheckResult {
 
 /** Fields every engine event can carry, whether its kind is known or not. */
 interface NikaEventFields {
+  /** Resident event time, outside the event hash chain. */
+  at?: string;
+  evidence?: NikaJournalEvidence;
   status?: NikaRunStatus;
   sequence?: number;
   receipt?: NikaReceipt;
@@ -188,8 +228,8 @@ export interface NikaRunSealedEvent extends NikaEventFields {
  * before `traceVerify` is trusted. Its absence is only absence: it never
  * claims that a journal exists.
  *
- * Engine main, ahead of the contract this package pins: no released engine
- * writes it yet, and a resident that predates it simply never sends it.
+ * The pinned V9 contract carries this optional report; an older resident
+ * simply never sends it.
  */
 export interface NikaJournalEvidence {
   status: 'mirror_lost';
@@ -198,8 +238,7 @@ export interface NikaJournalEvidence {
 }
 
 /**
- * Fields only the resident's frames carry, both from engine main, ahead of the
- * contract this package pins. Both are optional on the wire and absent on a
+ * Fields only the resident's frames carry. Both are optional on the wire and absent on a
  * resident that predates them.
  */
 interface NikaResidentEventFields extends NikaEventFields {
@@ -565,13 +604,20 @@ export interface NikaWorkflowMetadata {
 }
 
 export interface NikaTraceVerifyResult {
+  /**
+   * Transport-specific compatibility result. Native verification requires the
+   * engine's signed receipt binding. HTTP accepts a positive journal verdict
+   * bound to this receipt's trace_id, including an intact unsealed journal.
+   * Inspect the engine's seal/anchor/replay facts for those separate claims;
+   * this boolean alone proves neither signature, billing nor business outcome.
+   */
   verified: boolean;
   /**
    * Engine-owned trace verdict. The native path answers `verified` or
-   * `invalid`; the resident's door answers `unavailable` while it has no
-   * trace-journal authority (engine 0.118), and will speak the CLI's tiers
-   * (`OK` · `SEALED` · `ANCHORED` · `REPLAYED` hold · `INCOMPLETE` ·
-   * `TAMPERED` do not) once it does. Open to additive future vocabulary.
+   * `invalid`; the resident answers its CLI journal tiers or `unavailable`
+   * when no journal is available. HTTP recognizes positive tiers without
+   * regard to case (`OK`, `SEALED`, `ANCHORED`, `REPLAYED`); incomplete and
+   * tampered journals do not hold. Open to additive future vocabulary.
    */
   verdict?:
     | 'verified'
@@ -584,7 +630,7 @@ export interface NikaTraceVerifyResult {
     | 'INCOMPLETE'
     | 'TAMPERED'
     | (string & {});
-  /** Engine-owned explanation for a negative or unavailable verdict; a verdict that holds carries none. */
+  /** Engine-owned explanation or attained tier, including `unsealed` beside a positive `ok`. */
   reason?:
     | 'trace_invalid'
     | 'receipt_mismatch'
@@ -639,6 +685,38 @@ export interface NikaRunOptions {
    * uncertain response. Direct native runs reject this option.
    */
   idempotencyKey?: string;
+  /** HTTP resident access profile; it must match the reviewed request. */
+  access?: components['schemas']['JobByName']['access'];
+  /** Caller-supplied approved review; never created or approved implicitly. */
+  costReview?: NikaCostReviewReference;
+  /**
+   * Native only, opt-in: bounds the wait for admission, from the call until
+   * the engine's first complete machine frame proves admission or a refusal
+   * (the engine identity probe included). See `NikaRunAdmissionOptions`.
+   * Without it a native admission waits as long as the engine does, as
+   * published, which is not qualified for unattended use. Over HTTP it is
+   * refused before any request: HTTP admission is bounded by `requestTimeout`.
+   */
+  admission?: NikaRunAdmissionOptions;
+}
+
+/**
+ * Bounds on the wait for one native admission. When `timeoutMs` passes or
+ * `signal` aborts before the engine's first complete frame, the SDK stops the
+ * process it started (the run engine: SIGTERM, then SIGKILL after a 2-second
+ * grace; or the identity probe it was running) and only then rejects `run()`
+ * with `NikaTransportError` (« run admission timed out » or « run admission
+ * aborted by caller »), saying whether the process was seen to exit or that
+ * its shutdown is unconfirmed after a further 2 seconds. The rejection
+ * therefore follows the deadline by up to that cleanup, never exactly at it.
+ * An earlier listener on `signal` that stops the abort event's propagation
+ * cannot keep the abort from the SDK. Once `run()` resolved, neither bound
+ * reaches the run: its timer and listener are gone, and `run.cancel()` stops it.
+ */
+export interface NikaRunAdmissionOptions {
+  signal?: AbortSignal;
+  /** Positive integer milliseconds, at most 2147483647. */
+  timeoutMs?: number;
 }
 
 /** Resume observation of an already-admitted durable HTTP job. */
@@ -666,6 +744,10 @@ export interface NikaTraceVerifyOptions {
 
 /** The SDK operations whose engine refusal can be returned as a typed error. */
 export type NikaOperation =
+  | 'compile'
+  | 'prepareCostReview'
+  | 'costReview'
+  | 'decideCostReview'
   | 'check'
   | 'run'
   | 'attachRun'
@@ -690,6 +772,10 @@ export interface NikaScheduleFinding {
  * carries it. `code` is absent when the engine's failure class names none (an
  * unreadable workflow file); the SDK never supplies one. The vocabulary
  * remains additive.
+ *
+ * The published 0.120 line exports this shape. It types the entries of a
+ * check report's `findings` (`NikaCheckResult` keeps the report open) and the
+ * findings a refused native `run()` carries.
  */
 export interface NikaCheckFinding {
   code?: string;
@@ -909,7 +995,8 @@ export interface NikaCompileQuestion {
   /** Stable semantic hole path (`const.request`), never a session id. */
   key: string;
   label: string;
-  type: 'text' | 'literal';
+  type: 'text' | 'literal' | 'choice';
+  options?: { key: string; label: string }[];
   why: string;
   mandatory: boolean;
   [key: string]: unknown;
@@ -962,6 +1049,8 @@ export interface NikaCompileOutcome {
   diagnostics: NikaCompileDiagnostic[];
   /** The boundary the candidate requests (from its pure report); never a grant. */
   requested_boundary: Record<string, unknown> | null;
+  /** Present when the connected engine reports a requested trigger; never a grant. */
+  requested_trigger?: Record<string, unknown> | null;
   check_preview: NikaCompilePreview | null;
   provenance: NikaCompileProvenance;
 }

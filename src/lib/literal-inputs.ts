@@ -205,8 +205,7 @@ function tooLarge(label: 'run({ inputs })' | 'compile({ answers })' | 'compile({
   }
   if (label === 'compile({ answers })') {
     return new NikaConfigurationError(
-      `compile({ answers }): the serialized answers exceed ${LITERAL_INPUTS_MAX_BYTES} bytes (1 MiB); `
-      + 'answers ride argv, one KEY=JSON element each, never a wire',
+      `compile({ answers }): the serialized answers exceed ${LITERAL_INPUTS_MAX_BYTES} bytes (1 MiB)`,
     );
   }
   return new NikaConfigurationError(
@@ -273,7 +272,7 @@ function keySegment(key: string | symbol): string {
 }
 
 /** The kind of a refused value, never the value. */
-function describe(value: unknown): string {
+export function describe(value: unknown): string {
   if (value === null) return 'null';
   if (typeof value === 'undefined') return 'undefined';
   if (typeof value !== 'object') return `a ${typeof value}`;

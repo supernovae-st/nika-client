@@ -433,6 +433,9 @@ export function compilePayloadFrom(
     check_preview: previewFrom(payload.check_preview, protocol),
     provenance: provenanceFrom(payload.provenance, protocol),
   };
+  if (payload.requested_trigger !== undefined) {
+    outcome.requested_trigger = nullableObject(payload.requested_trigger, 'requested_trigger', protocol);
+  }
   return outcome;
 }
 
@@ -490,11 +493,18 @@ function questionsFrom(
       !question
       || typeof question.key !== 'string'
       || typeof question.label !== 'string'
-      || (question.type !== 'text' && question.type !== 'literal')
+      || (question.type !== 'text' && question.type !== 'literal' && question.type !== 'choice')
       || typeof question.why !== 'string'
       || typeof question.mandatory !== 'boolean'
     ) {
       throw protocol('a question lacks its key/label/type/why/mandatory shape');
+    }
+    if (question.options !== undefined && (!Array.isArray(question.options)
+      || !question.options.every((entry) => {
+        const option = machineObject(entry);
+        return option && typeof option.key === 'string' && typeof option.label === 'string';
+      }))) {
+      throw protocol('question options lack their key/label shape');
     }
     return question as unknown as NikaCompileQuestion;
   });

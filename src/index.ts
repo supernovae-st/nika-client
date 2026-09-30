@@ -1,4 +1,5 @@
 import {
+  NikaCompatibilityError,
   NikaConfigurationError,
   NikaRunOwnershipError,
 } from './errors.js';
@@ -6,17 +7,33 @@ import { HttpTransport } from './lib/http-transport.js';
 import { NativeProcessTransport } from './lib/native-process-transport.js';
 import { NikaEngineUnavailable, resolveNikaEngine } from './lib/binary/index.js';
 import { RunSession } from './lib/run-session.js';
-import type { Transport, TransportRun } from './lib/transport.js';
+import { normalizeCompileOptions, normalizeCompileRequest } from './lib/compile.js';
 import {
-  normalizeCompileOptions,
-  normalizeCompileRequest,
-} from './lib/compile.js';
+  isPublishedCompileRequest,
+  refuseHybridRequest,
+  withDeadline,
+} from './lib/published-compile.js';
+import type { Transport, TransportRun } from './lib/transport.js';
+import type { NikaEngineIdentity } from './lib/engine-identity.js';
+export type { NikaEngineIdentity } from './lib/engine-identity.js';
 import type {
+  NikaCostReview,
+  NikaCostReviewV2,
+  NikaCostReviewResultV2,
+  NikaCostReviewRequest,
+  NikaCostReviewDecision,
+  NikaCostReviewOptions,
+  NikaCostReviewResult,
+  NikaPrepareCostReviewOptions,
+  NikaCompileWireRequest,
+  NikaCompileOptions,
+  NikaCompileResult,
+  NikaPublishedCompileOutcome,
+  NikaPublishedCompileRequest,
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckOptions,
   NikaCheckResult,
-  NikaCompileOptions,
   NikaCompileOutcome,
   NikaCompileRequest,
   NikaConfig,
@@ -118,40 +135,91 @@ export class Nika {
     this.transportKind = this.transport.kind;
   }
 
+  /**
+   * Detached snapshot of the HTTP identity already validated by this client.
+   * Uses the client's cached handshake; not a fresh liveness, readiness or
+   * authorization check. No local engine is resolved on this HTTP operation.
+   */
+  serverIdentity(): Promise<NikaEngineIdentity> {
+    return this.transport.serverIdentity();
+  }
+
+  /**
+   * Compile without saving or running, through the selected engine authority.
+   *
+   * A typed V9 request (it carries `compile_version`) resolves the outcome and
+   * the kept-round `replayToken`. A request in the published 0.120 shape (an
+   * intent string, `{ intent }`, or `{ workflow, change }`) is validated as
+   * published, sent as the same `compile_version: 1` wire, and resolves the
+   * outcome itself with `ready`, never a replay token. A request is one or the
+   * other: a hybrid is refused, never reinterpreted, and anything else (null,
+   * undefined, a Proxy) is refused before any trap or request. A native
+   * process supports the published form; versioned resident requests refuse
+   * with `NikaCompatibilityError` there.
+   */
+  compile(request: NikaCompileWireRequest, options?: NikaCompileOptions): Promise<NikaCompileResult>;
+  compile(
+    request: string | NikaPublishedCompileRequest,
+    options?: NikaCompileOptions,
+  ): Promise<NikaPublishedCompileOutcome>;
+  async compile(
+    request: NikaCompileWireRequest | string | NikaPublishedCompileRequest,
+    options: NikaCompileOptions = {},
+  ): Promise<NikaCompileResult | NikaPublishedCompileOutcome> {
+    // `async` on purpose: every failure, a caller's configuration mistake
+    // included, arrives as a rejection, never a synchronous throw.
+    if (isPublishedCompileRequest(request)) {
+      const normalized = normalizeCompileRequest(request);
+      const checked = normalizeCompileOptions(options);
+      // Native cancellation waits for owned-child cleanup. HTTP waiting can
+      // stop immediately without cancelling the shared health handshake.
+      if (this.transportKind === 'native-process') return this.transport.compile(normalized, checked);
+      return withDeadline(checked, this.transportKind,
+        (signal) => this.transport.compile(normalized, { ...checked, signal }));
+    }
+    refuseHybridRequest(request);
+    const checked = normalizeCompileOptions(options);
+    return withDeadline(
+      checked,
+      this.transportKind,
+      (signal) => this.transport.compileWire(request, { ...checked, signal }),
+    );
+  }
+
+  /** Prepare a review; this can hold the project cost lease, but never starts a job. */
+  prepareCostReview(request: NikaCostReviewRequest, options: NikaPrepareCostReviewOptions & { version: 2 }): Promise<NikaCostReviewResultV2>;
+  prepareCostReview(request: NikaCostReviewRequest, options?: NikaPrepareCostReviewOptions & { version?: 1 }): Promise<NikaCostReviewResult>;
+  prepareCostReview(request: NikaCostReviewRequest, options: NikaPrepareCostReviewOptions): Promise<NikaCostReviewResult | NikaCostReviewResultV2>;
+  prepareCostReview(request: NikaCostReviewRequest, options: NikaPrepareCostReviewOptions = {}): Promise<NikaCostReviewResult | NikaCostReviewResultV2> {
+    return this.transport.prepareCostReview(request, options);
+  }
+
+  /** Observe a review without approving, renewing, or executing it. */
+  costReview(id: string, options: NikaCostReviewOptions & { version: 2 }): Promise<NikaCostReviewV2>;
+  costReview(id: string, options?: NikaCostReviewOptions & { version?: 1 }): Promise<NikaCostReview>;
+  costReview(id: string, options: NikaCostReviewOptions): Promise<NikaCostReview | NikaCostReviewV2>;
+  costReview(id: string, options: NikaCostReviewOptions = {}): Promise<NikaCostReview | NikaCostReviewV2> {
+    return this.transport.costReview(id, options);
+  }
+
+  /** Send exactly one explicit caller decision; a separate run() admits the job. */
+  decideCostReview(id: string, decision: NikaCostReviewDecision, options: NikaCostReviewOptions & { version: 2 }): Promise<NikaCostReviewV2>;
+  decideCostReview(id: string, decision: NikaCostReviewDecision, options?: NikaCostReviewOptions & { version?: 1 }): Promise<NikaCostReview>;
+  decideCostReview(id: string, decision: NikaCostReviewDecision, options: NikaCostReviewOptions): Promise<NikaCostReview | NikaCostReviewV2>;
+  decideCostReview(id: string, decision: NikaCostReviewDecision, options: NikaCostReviewOptions = {}): Promise<NikaCostReview | NikaCostReviewV2> {
+    return this.transport.decideCostReview(id, decision, options);
+  }
+
   check(workflow: string, options: NikaCheckOptions = {}): Promise<NikaCheckResult> {
     return this.transport.check(workflowName(workflow), options);
   }
 
   /**
-   * Authoring (issue #128): describe work — or name an accepted workflow plus
-   * a change — and get the engine's checked candidate back, without running
-   * anything. `compile()` never means `run()`: the outcome is data (candidate
-   * source, questions, diagnostics, requested boundary, source-only Check
-   * preview, provenance), `incomplete`/`refused` resolve instead of throwing,
-   * and no workflow effect, approval or Proof exists.
-   *
-   * The candidate is ordinary `.nika` SOURCE. `run()` consumes a path,
-   * so the caller materializes the candidate and `run(path)` re-admits it —
-   * the compile preview is a review, never admission. Over `{ url }` this calls
-   * the authenticated Serve compile door, gated by its advertised capability;
-   * the SDK never compiles locally as a fallback.
-   */
-  async compile(
-    request: string | NikaCompileRequest,
-    options: NikaCompileOptions = {},
-  ): Promise<NikaCompileOutcome> {
-    // `async` on purpose: like `run()`, every failure — including a caller's
-    // configuration mistake — arrives as a rejection, never a sync throw.
-    return this.transport.compile(
-      normalizeCompileRequest(request),
-      normalizeCompileOptions(options),
-    );
-  }
-
-  /**
    * Resolves with the run's handle once the engine admitted it, and rejects
-   * without one when the engine refused it. The handle owns the lifecycle:
-   * `run.events()`, `run.result()`, `run.status()`, `run.cancel()`.
+   * without one when the engine refused it, on both transports: the refusal
+   * is a `NikaOperationError` carrying the engine's code, its findings and
+   * its exit status. The handle owns the lifecycle: `run.events()`,
+   * `run.result()`, `run.status()`, `run.cancel()`.
    *
    * `Outputs` is the caller's projection of the engine-emitted outputs map;
    * the SDK transports outputs without validating their shape.
@@ -160,6 +228,13 @@ export class Nika {
     workflow: string,
     options: NikaRunOptions = {},
   ): Promise<NikaRun<Outputs>> {
+    if (options.admission !== undefined && this.transportKind === 'http') {
+      throw new NikaCompatibilityError(
+        'runAdmission',
+        'http',
+        'admission bounds a native engine until its first frame; HTTP admission is bounded by requestTimeout',
+      );
+    }
     const source = await this.transport.startRun(workflowName(workflow), options);
     return this.own<Outputs>(source);
   }
@@ -374,20 +449,37 @@ export {
 } from './events.js';
 
 export type {
+  NikaCompileWireRequest,
+  NikaCompileWireOutcome,
+  NikaJournalEvidence,
+  NikaCostReviewReference,
+  NikaCostReview,
+  NikaCostReviewV2,
+  NikaCostReviewResultV2,
+  NikaCostReviewRequest,
+  NikaCostReviewDecision,
+  NikaCostReviewOptions,
+  NikaCostReviewResult,
+  NikaPrepareCostReviewOptions,
+  NikaCompileRequest,
+  NikaCompileOutcome,
+  NikaCompileOptions,
+  NikaCompileResult,
+  NikaCompileDiagnostic,
+  NikaCompilePreview,
+  NikaCompileProvenance,
+  NikaCompileQuestion,
+  NikaCompileSetConstant,
+  NikaCompileStatus,
+  NikaPublishedCompileCreateRequest,
+  NikaPublishedCompileEditRequest,
+  NikaPublishedCompileOutcome,
+  NikaPublishedCompileRequest,
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckFinding,
   NikaCheckOptions,
   NikaCheckResult,
-  NikaCompileDiagnostic,
-  NikaCompileOptions,
-  NikaCompileOutcome,
-  NikaCompilePreview,
-  NikaCompileProvenance,
-  NikaCompileQuestion,
-  NikaCompileRequest,
-  NikaCompileStatus,
-  NikaCompileSetConstant,
   NikaConfig,
   NikaLocalConfig,
   NikaRemoteConfig,
@@ -400,7 +492,6 @@ export type {
   NikaExecutionSettledEvent,
   NikaExecutionStartedEvent,
   NikaJobId,
-  NikaJournalEvidence,
   NikaMachineError,
   NikaRunCause,
   NikaCostQualifier,
@@ -414,6 +505,7 @@ export type {
   NikaRunEvent,
   NikaRunEventKind,
   NikaRunId,
+  NikaRunAdmissionOptions,
   NikaRunOptions,
   NikaRunResult,
   NikaRunSealedEvent,

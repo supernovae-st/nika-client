@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, readFileSync, writeFileSync } from 'node:fs';
+import { appendFileSync, closeSync, readFileSync, writeFileSync } from 'node:fs';
 
 /**
  * Byte-for-byte `run --json` captures of real engines (provenance:
@@ -64,6 +64,12 @@ if (process.env.NIKA_FAKE_PID_FILE && command === 'run') {
 }
 
 if (command === '--sdk-identity') {
+  if (process.env.NIKA_FAKE_IDENTITY_HANG === '1') {
+    // SYNTHETIC: an identity probe that never answers (it ends itself after a minute).
+    if (process.env.NIKA_FAKE_PID_FILE) writeFileSync(process.env.NIKA_FAKE_PID_FILE, String(process.pid));
+    setTimeout(() => process.exit(0), 60_000);
+    return;
+  }
   console.log(JSON.stringify({
     engineVersion: '0.114.0',
     machineProtocolVersion: 1,
@@ -71,7 +77,10 @@ if (command === '--sdk-identity') {
     checkReportVersion: 1,
     eventFormatVersion: 1,
     traceFormatVersion: 1,
-    supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'trace'],
+    supportedCapabilities: [
+      'check', 'executionSnapshot', 'eventStream', 'trace',
+      ...(process.env.NIKA_FAKE_INPUTS_LITERAL === '1' ? ['inputsLiteral'] : []),
+    ],
   }));
   return;
 }
@@ -170,6 +179,30 @@ if (command === 'check') {
 
 if (command === 'run' && argv.includes('--json')) {
   const emit = (value) => console.log(JSON.stringify(value));
+
+  // SYNTHETIC literal channel: read stdin to its end, then report exactly
+  // what arrived there, and whether a marker value also reached argv or the
+  // environment, so a test can prove where each value travelled.
+  if (workflow.includes('literal-echo')) {
+    const marker = 'MARKER-5c1e';
+    const chunks = [];
+    process.stdin.on('data', (chunk) => chunks.push(chunk));
+    process.stdin.on('end', () => {
+      const stdin = Buffer.concat(chunks).toString('utf8');
+      emit({ kind: 'workflow_started', argv });
+      emit({
+        kind: 'workflow_completed',
+        status: 'succeeded',
+        outputs: {
+          stdin,
+          argvCarriesMarker: argv.some((arg) => arg.includes(marker)),
+          envCarriesMarker: Object.values(process.env).some((value) => value?.includes(marker)),
+        },
+      });
+      process.exit(0);
+    });
+    return;
+  }
 
   const replay = Object.entries(WIRE_REPLAYS).find(([name]) => workflow.includes(name))?.[1];
   if (replay) {
@@ -414,6 +447,118 @@ if (command === 'run' && argv.includes('--json')) {
   if (workflow.includes('garbage-line')) {
     console.log('this line is not machine output at all');
     process.exit(0);
+  }
+
+  // A real engine capture (run-wire/README.md), replayed byte for byte.
+  if (workflow.includes('wire-315-input1708')) {
+    const wire = (name) => readFileSync(new URL(`./run-wire/${name}`, import.meta.url));
+    process.stderr.write(wire('315b3a516-input1708.stderr'));
+    process.stdout.write(wire('315b3a516-input1708.compact.stdout'), () => process.exit(3));
+    return;
+  }
+
+  // SYNTHETIC admission cases (labelled, never engine captures): the shapes a
+  // first machine frame can take, and the streams that prove neither.
+  if (workflow.includes('admit-')) {
+    const refusalCheck = {
+      // The findings of `nika check --json` on an exec task under no permits,
+      // as the exact 315b3a516 engine reports them statically; the envelope
+      // around them is synthetic, not a run capture.
+      clean: false,
+      findings: [{
+        code: 'NIKA-AUTH-006',
+        docs_url: 'https://nika.sh/language/errors/NIKA-AUTH-006',
+        gate: 'PERMITS',
+        kind: 'capability_escape',
+        message: 'exec task under a boundary that forbids shells (task `list`) — fix: add "echo" to permits.exec',
+        severity: 'error',
+        task: 'list',
+      }],
+    };
+    const envelope = { error: { code: 'NIKA-1708', message: 'NIKA-1708 · missing required inputs: `ticket`' } };
+    const done = (stdout, exitCode, stderr = '') => {
+      if (stderr) process.stderr.write(stderr);
+      process.stdout.write(stdout, () => process.exit(exitCode));
+    };
+    const line = (value) => `${JSON.stringify(value)}\n`;
+    if (process.env.NIKA_FAKE_PID_FILE) {
+      writeFileSync(process.env.NIKA_FAKE_PID_FILE, String(process.pid));
+    }
+    if (workflow.includes('admit-check-refusal')) return done(line(refusalCheck), 2);
+    if (workflow.includes('admit-two-findings')) {
+      return done(line({ clean: false, findings: [
+        { message: 'a finding the engine names no code for' },
+        ...refusalCheck.findings,
+      ] }), 2);
+    }
+    if (workflow.includes('admit-uncoded')) {
+      return done(line({ clean: false, findings: [{ message: 'cannot read missing.nika: No such file or directory (os error 2)' }] }), 3);
+    }
+    if (workflow.includes('admit-error-envelope')) {
+      return done(line(envelope), 3, 'nika run: NIKA-1708 · missing required inputs: `ticket`\n');
+    }
+    if (workflow.includes('admit-stderr-only')) {
+      return done('', 3, 'nika run: NIKA-1708 · missing required inputs: `ticket`\n');
+    }
+    if (workflow.includes('admit-empty')) return done('', 2, 'no machine frame at all\n');
+    if (workflow.includes('admit-malformed')) return done('{"kind": "workflow_started",\n', 1);
+    if (workflow.includes('admit-partial')) return done('{"clean":false,"findings":[{"code":"NIKA-AUTH', 2);
+    if (workflow.includes('admit-oversized')) {
+      return done(`{"clean":false,"findings":[{"message":"${'x'.repeat(200_000)}"}]}\n`, 2);
+    }
+    if (workflow.includes('admit-neither')) return done(line({ report_version: 1 }), 2);
+    if (workflow.includes('admit-bad-findings')) return done(line({ clean: false, findings: [1] }), 2);
+    if (workflow.includes('admit-more-after')) {
+      return done(`${line(envelope)}${line({ kind: 'workflow_started' })}`, 3);
+    }
+    if (workflow.includes('admit-exit-zero')) return done(line(envelope), 0);
+    if (workflow.includes('admit-hang-garbage')) {
+      // A first line that proves nothing, then the engine keeps running.
+      process.stdout.write('not a machine frame\n');
+      setInterval(() => {}, 60_000);
+      return;
+    }
+    if (workflow.includes('admit-hang-stubborn')) {
+      process.on('SIGTERM', () => {});
+      process.stdout.write('not a machine frame\n');
+      setInterval(() => {}, 60_000);
+      return;
+    }
+    // SYNTHETIC liveness shapes: an engine that never proves admission, or
+    // never ends after its refusal. Each ends itself after a minute, so a
+    // failed test cannot leave one behind for long.
+    const linger = () => setTimeout(() => process.exit(0), 60_000);
+    if (workflow.includes('admit-silent')) {
+      linger();
+      return;
+    }
+    if (workflow.includes('admit-deaf-silent')) {
+      process.on('SIGTERM', () => {});
+      linger();
+      return;
+    }
+    if (workflow.includes('admit-unfinished')) {
+      process.stdout.write('{"kind":"workflow_started"');
+      linger();
+      return;
+    }
+    if (workflow.includes('admit-refusal-open')) {
+      process.stdout.write(line(envelope));
+      linger();
+      return;
+    }
+    if (workflow.includes('admit-refusal-lingers')) {
+      // The refusal, then end of stream, from a process that stays alive.
+      process.stdout.write(line(envelope), () => closeSync(1));
+      linger();
+      return;
+    }
+    if (workflow.includes('admit-pretty-open')) {
+      // The opening lines of a pretty-printed report, never closed, then nothing.
+      process.stdout.write('{\n  "clean": false,\n  "findings": [\n');
+      linger();
+      return;
+    }
   }
 
   if (workflow.includes('cancel')) {

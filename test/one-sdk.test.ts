@@ -15,11 +15,14 @@ import {
 } from '../src/index.js';
 import { resolveNikaEngine } from '../src/lib/binary/index.js';
 import type {
+  NikaCheckFinding,
   NikaEvent,
   NikaLocalConfig,
+  NikaOperationFinding,
   NikaRun,
   NikaRunId,
   NikaRunOptions,
+  NikaScheduleFinding,
   NikaScheduleOptions,
 } from '../src/index.js';
 
@@ -811,6 +814,31 @@ describe('HTTP transport', () => {
       findings: [{ code: 'NIKA-PARSE-001' }],
     });
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('types check report findings with the exact published NikaCheckFinding shape', async () => {
+    // The shape @supernovae-st/nika 0.120.3 exports, copied verbatim.
+    interface PublishedCheckFinding {
+      code?: string;
+      message?: string;
+      severity?: string;
+      gate?: string;
+      kind?: string;
+      task?: string;
+      docs_url?: string;
+      [key: string]: unknown;
+    }
+    expectTypeOf<NikaCheckFinding>().toEqualTypeOf<PublishedCheckFinding>();
+    // As published: a refused run() carries check findings, a schedule refusal its own.
+    expectTypeOf<NikaOperationFinding>().toEqualTypeOf<NikaScheduleFinding | NikaCheckFinding>();
+
+    const fetch = vi.fn().mockResolvedValueOnce(healthResponse());
+    const report = await remote(fetch as typeof globalThis.fetch).check('./parse-fatal.nika');
+    const findings = report.findings as NikaCheckFinding[];
+    // The engine's entries ride through untouched; the SDK names no code of its own.
+    expect(findings).toEqual([{ code: 'NIKA-PARSE-001', message: 'fixture parse failure' }]);
+    const uncoded: NikaCheckFinding = { message: 'the workflow file could not be read' };
+    expect(uncoded.code).toBeUndefined();
   });
 
   it('projects the server trace authority typed unavailable verdict', async () => {

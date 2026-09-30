@@ -153,6 +153,9 @@ jobs:
               --workflows "$workflows_dir" \
               --token-file "$token_file" \
               --state-root "$state_dir" \
+              --authoring-model mock/echo \
+              --authoring-repairs 0 \
+              --cost-review \
               --plain
           ) >"$probe_root/server.log" 2>&1 &
           server_pid=$!
@@ -207,6 +210,7 @@ jobs:
         env:
           NIKA_BIN: ${{ runner.temp }}/nika-candidate/nika
           NIKA_COMPILE_PARITY_REPORT: ${{ runner.temp }}/nika-candidate-replay/compile-parity.json
+          NIKA_COMPILE_PARITY_PROFILE: full
         run: |
           set -euo pipefail
           mkdir -p "$(dirname "$NIKA_COMPILE_PARITY_REPORT")"
@@ -221,14 +225,15 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$NIKA_GAUNTLET_RESULTS_DIR"
-          sha=$(grep -E '^[0-9a-f]{40}$' ENGINE_QUAL_PIN | head -1)
+          # The resolved candidate (a dispatch input wins over ENGINE_QUAL_PIN), never the file alone.
+          sha="$ENGINE_SHA"
           ident=$("$NIKA_BIN" --version)
           ver=$(printf '%s\n' "$ident" | awk '{print $2}')
           short=${sha:0:9}
           case "$ident" in
             *"($short"*) ;;
             *)
-              echo "::error::built binary '$ident' does not carry ENGINE_QUAL_PIN $sha"
+              echo "::error::built binary '$ident' does not carry the resolved candidate engine $sha"
               exit 1
               ;;
           esac

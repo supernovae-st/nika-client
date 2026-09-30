@@ -239,7 +239,8 @@ describe('authenticated HTTP compile foundation', () => {
       timeoutMs: 120, signal: controller.signal,
     })).rejects.toThrow('compile timed out after 120 ms');
     expect(fetch).toHaveBeenCalledTimes(2);
-    expect(fetch.mock.calls[1]![1]!.signal).toBe(fetch.mock.calls[0]![1]!.signal);
+    expect(fetch.mock.calls[0]![1]!.signal?.aborted).toBe(false);
+    expect(fetch.mock.calls[1]![1]!.signal?.aborted).toBe(true);
     expect(stalled.cancel).toHaveBeenCalledOnce();
     expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
   });

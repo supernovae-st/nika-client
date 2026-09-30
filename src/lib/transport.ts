@@ -1,9 +1,19 @@
 import type {
+  NikaCostReview,
+  NikaCostReviewV2,
+  NikaCostReviewResultV2,
+  NikaCostReviewRequest,
+  NikaCostReviewDecision,
+  NikaCostReviewOptions,
+  NikaCostReviewResult,
+  NikaPrepareCostReviewOptions,
+  NikaCompileWireRequest,
+  NikaCompileOptions,
+  NikaCompileResult,
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckOptions,
   NikaCheckResult,
-  NikaCompileOptions,
   NikaCompileOutcome,
   NikaCompileRequest,
   NikaEvent,
@@ -20,6 +30,7 @@ import type {
   NikaTransportKind,
   NikaWorkflowMetadata,
 } from '../types.js';
+import type { NikaEngineIdentity } from './engine-identity.js';
 
 export interface TransportRun {
   readonly id: NikaRunId;
@@ -33,6 +44,11 @@ export interface TransportRun {
 /** The adapter boundary. It has exactly the native-process and HTTP implementations. */
 export interface Transport {
   readonly kind: NikaTransportKind;
+  serverIdentity(): Promise<NikaEngineIdentity>;
+  compileWire(request: NikaCompileWireRequest, options: NikaCompileOptions): Promise<NikaCompileResult>;
+  prepareCostReview(request: NikaCostReviewRequest, options: NikaPrepareCostReviewOptions): Promise<NikaCostReviewResult | NikaCostReviewResultV2>;
+  costReview(id: string, options: NikaCostReviewOptions): Promise<NikaCostReview | NikaCostReviewV2>;
+  decideCostReview(id: string, decision: NikaCostReviewDecision, options: NikaCostReviewOptions): Promise<NikaCostReview | NikaCostReviewV2>;
   check(workflow: string, options: NikaCheckOptions): Promise<NikaCheckResult>;
   compile(request: NikaCompileRequest, options: NikaCompileOptions): Promise<NikaCompileOutcome>;
   startRun(workflow: string, options: NikaRunOptions): Promise<TransportRun>;

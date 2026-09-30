@@ -16,6 +16,7 @@ const SDK_ROOT = resolve(import.meta.dirname, '..');
 const SPEC = join(SDK_ROOT, 'openapi.json');
 const SDK_FILES = [
   join(SDK_ROOT, 'src/lib/http-transport.ts'),
+  join(SDK_ROOT, 'src/lib/cost-review.ts'),
 ];
 
 const ABSENT = [
@@ -39,7 +40,7 @@ function extractSdkEndpoints() {
   for (const file of SDK_FILES) {
     if (!existsSync(file)) continue;
     const src = readFileSync(file, 'utf-8');
-    const apiCallRegex = /([`'"])((?:\/health|\/v1\/).*?)\1/gs;
+    const apiCallRegex = /([`'"])((?:\/health|\/v[12]\/).*?)\1/gs;
     let match;
     while ((match = apiCallRegex.exec(src)) !== null) {
       const cleaned = match[2].replace(/\$\{[^}]+\}/g, ':param');

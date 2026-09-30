@@ -64,7 +64,9 @@ async function main() {
   console.log('Generating TypeScript types...');
   execFileSync(
     'npx',
-    ['openapi-typescript', specPath, '-o', OUTPUT_FILE],
+    // JSON object order is not part of the wire contract. Local snapshots and
+    // live servers must generate identical declarations for the same schema.
+    ['openapi-typescript', specPath, '--alphabetize', '-o', OUTPUT_FILE],
     { cwd: SDK_ROOT, stdio: 'inherit' },
   );
 

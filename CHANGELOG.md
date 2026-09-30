@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add explicit cost review V2 for finite fan-out and authored retries, with
+  versioned result types and strict capability admission. V1 remains the default;
+  the SDK never falls back, approves, runs, or retries a review automatically.
+
+- Expose `serverIdentity()` and `NikaEngineIdentity` for HTTP consumers to
+  inspect the validated cached protocol and capability snapshot without a
+  local binary. Returned objects cannot mutate the SDK's admission state.
 - Packed depth project `signed-webhook-intake` — the app-owned webhook
   qualification (engine nika#1719 names it as the path that stays
   first-class). A loopback receiver verifies a Standard Webhooks
@@ -224,6 +231,9 @@ file-identity migration remains open.
 
 ### Changed
 
+- Clarify the existing `traceVerify` claims: native verification requires a signed
+  receipt binding, while HTTP `verified` also accepts an intact unsealed journal
+  bound to the receipt's trace id. Preserve the distinction in API documentation.
 - The default `eventBufferSize` rises from 256 to 4096 frames (#122). It is
   sized from one measured fixture, not from a law of N-task workflows: on the
   released 0.118.7 engine a clean native run of N independent `mock/echo`
@@ -349,6 +359,9 @@ file-identity migration remains open.
   (#113) that this changelog does not claim.
 
 ### Fixed
+
+- Isolate the packed module test's build output and archive inputs so parallel
+  native package tests cannot remove its TypeScript declarations mid-pack.
 
 - The publication proof waits for the registry: after `npm publish` the
   version's metadata and its archive become visible in two steps, and the

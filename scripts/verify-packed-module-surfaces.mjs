@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +9,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const LITERAL_INPUTS_SCENARIO = 'literal-inputs-scenario.cjs';
 const scratch = await mkdtemp(path.join(tmpdir(), 'nika-package-surface-'));
 const consumer = path.join(scratch, 'consumer');
+const packageRoot = path.join(scratch, 'package');
 // The strict lifecycle application (issues #117 and #120) and the replaying
 // engine the unit suite already drives it with. The app is compiled against
 // the packed types; the packed faces then run the same lifecycle for real.
@@ -16,14 +17,21 @@ const lifecycleApp = path.join(root, 'test', 'fixtures', 'lifecycle-app.ts');
 const replayEngine = path.join(root, 'test', 'fixtures', 'fake-nika.mjs');
 
 try {
-  run('npm', ['run', 'build'], { cwd: root });
+  // Other package tests build the repository dist concurrently. Own both the
+  // build output and the pack input so a competing clean cannot remove types
+  // between our successful build and npm's archive read.
+  await mkdir(packageRoot);
+  for (const file of ['package.json', 'LICENSE', 'README.md', 'CHANGELOG.md', 'docs', 'openapi.json']) {
+    await cp(path.join(root, file), path.join(packageRoot, file), { recursive: true });
+  }
+  run('npm', ['run', 'build', '--', '--out-dir', path.join(packageRoot, 'dist')], { cwd: root });
   const packed = JSON.parse(run('npm', [
     'pack',
     '--ignore-scripts',
     '--json',
     '--pack-destination',
     scratch,
-  ], { cwd: root }).stdout);
+  ], { cwd: packageRoot }).stdout);
   const filename = packed[0]?.filename;
   if (typeof filename !== 'string') throw new Error('npm pack returned no filename');
 
@@ -212,12 +220,25 @@ try {
   }
 
   const typedConsumer = [
+    `import type { NikaEngineIdentity, NikaCostReview, NikaCostReviewV2, NikaCostReviewResultV2, NikaCostReviewOptions, NikaCompileWireRequest, NikaCompileResult } from '${packageName}';`,
     `import { Nika, isNikaRunSucceeded, type NikaConfig, type NikaRunOptions, type NikaRunResult } from '${packageName}';`,
     `import type { NikaCompileOutcome, NikaCompileRequest } from '${packageName}';`,
     `import type { NikaEvent, NikaJournalEvidence, NikaRun, NikaRunEvent, NikaRunEventKind } from '${packageName}';`,
     `import type { NikaEventBufferOverflowError } from '${packageName}';`,
     "const config: NikaConfig = { bin: '/tmp/nika' };",
     'const client: Nika = new Nika(config);',
+    'const identity: Promise<NikaEngineIdentity> = client.serverIdentity();',
+    'void identity;',
+    "const id = 'rev-01234567-89ab-cdef-0123-456789abcdef';",
+    'const one: Promise<NikaCostReview> = client.costReview(id);',
+    'const two: Promise<NikaCostReviewV2> = client.costReview(id, { version: 2 });',
+    "const prepared: Promise<NikaCostReviewResultV2> = client.prepareCostReview({ workflow: 'fan' }, { version: 2 });",
+    "const decision: Promise<NikaCostReviewV2> = client.decideCostReview(id, { decision: 'decline', witness_sha256: 'a'.repeat(64) }, { version: 2 });",
+    'const dynamic: NikaCostReviewOptions = { version: Math.random() > 0.5 ? 1 : 2 };',
+    'const either: Promise<NikaCostReview | NikaCostReviewV2> = client.costReview(id, dynamic);',
+    '// @ts-expect-error An explicit V2 result is not a V1 result.',
+    'const wrong: Promise<NikaCostReview> = client.costReview(id, { version: 2 });',
+    'void [one, two, prepared, decision, either, wrong];',
     'void client;',
     'declare const owned: NikaRun<{ answer: number }>;',
     'const { events, result: readResult, status, cancel } = owned;',
@@ -306,6 +327,9 @@ try {
     'void compileDest;',
     `const compilePromise: Promise<NikaCompileOutcome> = client.compile('x');`,
     'void compilePromise;',
+    `const wireRequest: NikaCompileWireRequest = { compile_version: 2, mode: 'create', cognition: 'explicitProvider', intent: 'hello' };`,
+    'const wirePromise: Promise<NikaCompileResult> = client.compile(wireRequest);',
+    'void wirePromise;',
     '',
   ].join('\n');
   await writeFile(path.join(consumer, 'consumer.mts'), typedConsumer);

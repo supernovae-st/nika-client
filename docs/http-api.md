@@ -11,7 +11,7 @@ Any other non-2xx body is discarded and reported as a redacted
 
 | HTTP route | SDK surface | Contract |
 |---|---|---|
-| `GET /health` | internal identity handshake | public liveness and protocol versions |
+| `GET /health` | `serverIdentity()` and internal handshake | validated cached identity and capabilities; not a fresh readiness or authorization check |
 | `GET /v1/openapi.json` | generation only | authenticated OpenAPI 3.1 document |
 | `GET /v1/workflows` | `listWorkflows()` | contained relative workflow names |
 | `GET /v1/workflows/{name}` | `workflow(name)` | path-free metadata, never source bytes |
@@ -22,7 +22,7 @@ Any other non-2xx body is discarded and reported as a redacted
 | `GET /v1/jobs/{id}/status` | `run.status()` | current status only |
 | `GET /v1/jobs/{id}/events` | `run.events()` / `attachRun()` | bounded, sequenced SSE with replay |
 | `POST /v1/jobs/{id}/cancel` | `run.cancel()` | 200 a settled job or its terminal replay; 202 the request accepted on a running job, settled later by observation |
-| `GET /v1/jobs/{id}/trace/verify` | `traceVerify(receipt)` | engine-owned typed trace verdict; `reason` only on a verdict that does not hold |
+| `GET /v1/jobs/{id}/trace/verify` | `traceVerify(receipt)` | engine-owned typed trace verdict; an intact unsigned journal can have `reason: "unsealed"` |
 | `GET/PUT /v1/schedules/{id}` | `scheduleStatus()` / `schedule()` | resident schedule projection and CAS mutation |
 
 ## Connection rules
@@ -33,8 +33,8 @@ Any other non-2xx body is discarded and reported as a redacted
 - URLs containing credentials, a query, or a fragment are rejected.
 - Tokens must contain 32–512 visible ASCII bytes and are never sent to
   `/health`.
-- Each request has a bounded timeout and each JSON/SSE machine frame has a
-  byte ceiling.
+- Admission requests have a bounded timeout; versioned authoring uses the
+  resident deadline or the explicit caller deadline. JSON/SSE frames have a byte ceiling.
 - Remote `check()` refuses `model` and `nativeStrict`; remote `run()` refuses
   `model`, `maxCostUsd` and the deprecated `vars` until a request envelope
   owns them.
@@ -43,8 +43,8 @@ Any other non-2xx body is discarded and reported as a redacted
   202, is the negotiation: a resident from before the envelope accepts the
   extra field and ignores its values, so the SDK refuses it after `/health`
   alone with `NikaCompatibilityError` (`capability: 'jobInputs'`). The
-  `inputs` envelope is engine-owned (nika#1642) and lands in the pinned
-  `openapi.json` when the engine pin reaches a release that serves it.
+  `inputs` envelope is engine-owned (nika#1642) and appears in the pinned V9
+  contract. The connected server must still advertise it.
 - A snapshot body takes no `inputs` overlay, an empty map included: `run()` of
   a local path with `inputs` is refused before any capture or request.
 - The serialized `inputs` map is bounded at 1 MiB by the SDK, the bound the
@@ -64,7 +64,7 @@ acknowledgement; no local check report or exit code is fabricated.
 Serve must advertise `compile` in `/health`. This route was added in engine
 commit `4334e58bddf539a6253f448eb05d562b6919f2b7`, after release 0.120.2, and
 first published in release 0.120.3.
-The bundled OpenAPI and generated types preserve that exact producer contract. The SDK then posts a v1 create
+The bundled OpenAPI and generated types preserve the composed V9 producer contract, including this foundation. The SDK then posts a v1 create
 intent or inline edit source to `/v1/compile`, with bearer authentication and
 JSON content type. A string change becomes `{text: change}`; a structured change
 preserves `{set_constant: {name, value}}`. Literal answers retain their JSON
@@ -82,6 +82,45 @@ boundary, source-only Check preview and provenance. It carries no process exit
 code or materialized destination. A candidate and its requested boundary grant
 nothing: execution needs a separate caller decision and normal `run` admission.
 
+## Authoring
+
+`compile(request, { signal?, timeoutMs? })` with a `NikaCompileWireRequest` sends the engine-owned generation-1 or
+generation-2 request unchanged. Its types come from the checked-in live
+OpenAPI contract. The SDK checks the advertised capability before the POST,
+never resolves a local engine, refuses redirects, and sends the POST once.
+A timeout or lost response may have spent the authorized model request;
+there is no automatic retry or fabricated idempotency key.
+
+The result is `{ outcome, replayToken? }`. `ready`, `incomplete`, and
+`refused` are authoring outcomes. HTTP refusals remain typed operation
+errors. A candidate and `check_preview` are review material: compiling does
+not create a job, execute effects, save source or bind a schedule.
+
+If the server returns a kept-round token, a caller can explicitly replay
+generation 2 with `cognition: 'deterministicOnly'`, `replay_token`, the exact
+original input and its answers. It must omit `limits`. Replay makes no
+model call, expires with the server's bounded store, and can fail after a
+restart. The SDK neither stores the token globally nor replays implicitly.
+
+The resident owns the authoring deadline (300 seconds by default). The SDK
+does not apply the ordinary `requestTimeout` while waiting for compile headers.
+Use `timeoutMs: 600_000` for an explicit waiting deadline, including initial
+health negotiation. A caller abort rejects immediately as `NikaTransportError`
+with `compile aborted by caller`, including while a shared health probe is
+pending. Other callers keep their probe; the abandoned call sends no later
+compile POST. A failed health handshake is shared by its current waiters but
+is not cached: a later explicit call may retry health. Compile POSTs are never
+retried automatically. Aborting does not cancel an already dispatched provider
+call. After a POST was sent, the resident may have
+kept the round while the caller has no replay token; another fresh compile can
+spend again. There is no result lookup or idempotency guarantee for that case.
+
+`requestTimeout` still bounds JSON body reads after headers, and
+`machineBufferBytes` bounds their size. Native processes refuse versioned
+resident requests; the published, unversioned `compile()` form works natively.
+The two request forms never mix and keep their separate return types.
+Cost review uses the separate explicit [review contract](cost-review-contract.md).
+
 ## Settlement
 
 The terminal `execution.settled` frame and the durable job nest the run's
@@ -92,14 +131,11 @@ whose `status` contradicts the record carrying it, keeps fields it does not
 know, and never derives a settlement from an exit code; a job the resident
 lost (`interrupted`) carries none.
 
-## Frame time and journal evidence (engine main)
+## Frame time and journal evidence
 
-Both resident projections are closed, and the SDK refuses any field it does
-not know. Engine main adds two optional fields that are
-ahead of the pinned `openapi.json`: no released engine writes them yet, and a
-resident that predates them never sends them, so nothing changes against a
-released resident. They are read so that a resident built from engine main can
-be observed at all; the pin itself moves only with a release.
+Both resident projections are closed, and the SDK refuses fields it does not
+know. The pinned V9 `openapi.json` includes optional `at` and `evidence` fields.
+Older residents may omit them; absence does not invent evidence.
 
 - `JobEvent.at` is when the resident admitted the event: an RFC 3339 timestamp
   in UTC, outside the event's hash chain. It rides `event.raw.at` untouched.

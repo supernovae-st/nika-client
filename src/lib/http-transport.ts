@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   NikaCompatibilityError,
   NikaConfigurationError,
@@ -7,16 +8,26 @@ import {
   NikaTransportError,
 } from '../errors.js';
 import type {
+  NikaCostReview,
+  NikaCostReviewV2,
+  NikaCostReviewResultV2,
+  NikaCostReviewRequest,
+  NikaCostReviewDecision,
+  NikaCostReviewOptions,
+  NikaCostReviewResult,
+  NikaPrepareCostReviewOptions,
+  NikaCompileWireRequest,
+  NikaCompileOptions,
+  NikaCompileResult,
+  NikaJournalEvidence,
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckOptions,
   NikaCheckResult,
-  NikaCompileOptions,
   NikaCompileOutcome,
   NikaCompileRequest,
   NikaEvent,
   NikaExecutionId,
-  NikaJournalEvidence,
   NikaReceipt,
   NikaRunId,
   NikaRunOptions,
@@ -42,6 +53,8 @@ import { literalInputs } from './literal-inputs.js';
 import { COMPILE_CAPABILITY, COMPILE_RESPONSE_MAX_BYTES, compileBody, compilePayloadFrom, compileSignal } from './compile.js';
 import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
 import { readSettlement } from './settlement.js';
+import { readCompileOutcome } from './wire-compile.js';
+import { admissionKey, costReviewProtocol, costReviewId, readCostReviewResult, reviewReference, reviewWitness } from './cost-review.js';
 import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
 import type { Transport, TransportRun } from './transport.js';
 import {
@@ -148,12 +161,58 @@ const JOB_INPUTS = 'jobInputs';
 
 export class HttpTransport implements Transport {
   readonly kind = 'http' as const;
-  private serverIdentity?: Promise<NikaEngineIdentity>;
+  private serverIdentityPromise?: Promise<NikaEngineIdentity>;
   private localIdentity?: Promise<NikaEngineIdentity>;
   private resolvedEngine?: ResolvedNikaEngine;
   private remoteIdentity?: NikaEngineIdentity;
+  private compileHandshake?: {
+    controller: AbortController;
+    promise: Promise<NikaEngineIdentity>;
+    users: number;
+    settled: boolean;
+  };
 
   constructor(private readonly options: HttpTransportOptions) {}
+
+  async serverIdentity(): Promise<NikaEngineIdentity> {
+    // Never let a consumer change the cached capabilities used for admission.
+    return structuredClone(await this.ensureServerIdentity());
+  }
+
+  async compileWire(request: NikaCompileWireRequest, options: NikaCompileOptions): Promise<NikaCompileResult> {
+    options.signal?.throwIfAborted();
+    await this.ensureServerIdentity();
+    options.signal?.throwIfAborted();
+    const capability = request.compile_version === 2 ? 'compileNativeV2' : 'compile';
+    if (!this.remoteIdentity?.supportedCapabilities.includes(capability)) {
+      throw this.gap(capability, 'The connected server did not advertise this authoring contract');
+    }
+    const path = '/v1/compile';
+    // A redirect or retry can spend again; only the caller can authorize a new round.
+    // The resident owns this round's deadline. The ordinary HTTP admission timer
+    // must not abandon a paid round while its authorized model is still thinking.
+    // Callers can stop waiting with signal; that does not revoke a sent request.
+    const response = await this.fetchResponse(path, {
+      method: 'POST', body: JSON.stringify(request), signal: options.signal,
+      headers: { 'Content-Type': 'application/json' }, redirect: 'error',
+    }, false, true, false);
+    if (response.status !== 200) {
+      const refusal = await this.readRefusal(response, path);
+      if (refusal) throw this.refused(path, { operation: 'compile', status: response.status, refusal });
+      throw new NikaTransportError(this.kind, `HTTP ${response.status} for ${path}: [REDACTED]`);
+    }
+    if (response.headers.get('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json') {
+      await discardResponse(response);
+      throw new NikaProtocolError(this.kind, 'HTTP compile returned an invalid content-type');
+    }
+    const replayToken = response.headers.get('Nika-Compile-Replay');
+    if (replayToken !== null && !/^[a-f0-9]{64}$/.test(replayToken)) {
+      await discardResponse(response);
+      throw new NikaProtocolError(this.kind, 'HTTP compile returned an invalid replay token');
+    }
+    const outcome = readCompileOutcome(await this.readObservationObject(response, path, options.signal));
+    return { outcome, ...(replayToken === null ? {} : { replayToken }) };
+  }
 
   async check(workflow: string, options: NikaCheckOptions): Promise<NikaCheckResult> {
     if (options.model !== undefined || options.nativeStrict === true) {
@@ -187,6 +246,66 @@ export class HttpTransport implements Transport {
     return captured.report;
   }
 
+  async prepareCostReview(request: NikaCostReviewRequest, options: NikaPrepareCostReviewOptions): Promise<NikaCostReviewResult | NikaCostReviewResultV2> {
+    const protocol = costReviewProtocol(options.version);
+    options.signal?.throwIfAborted();
+    if (!machineObject(request) || !isContainedWorkflowName(request.workflow)) {
+      throw new TypeError('cost review requires a contained served workflow name');
+    }
+    const body = JSON.stringify(request);
+    const key = admissionKey(options.idempotencyKey ?? randomUUID());
+    await this.requireCostReview(protocol.capability, options.signal);
+    const { object, status } = await this.jsonWithStatus(protocol.create, {
+      method: 'POST', body, signal: options.signal, redirect: 'error',
+      headers: { 'Content-Type': 'application/json', 'Idempotency-Key': key },
+    }, true, [200, 201], 'prepareCostReview');
+    const result = readCostReviewResult(object, status === 200, undefined, protocol.version);
+    if (status === 201 && (!('state' in result) || result.state !== 'pending')) {
+      throw new NikaProtocolError(this.kind, 'A newly created cost review must be pending');
+    }
+    return result;
+  }
+
+  async costReview(id: string, options: NikaCostReviewOptions): Promise<NikaCostReview | NikaCostReviewV2> {
+    const protocol = costReviewProtocol(options.version);
+    id = costReviewId(id);
+    await this.requireCostReview(protocol.capability, options.signal);
+    const object = await this.json(protocol.read(id), {
+      method: 'GET', signal: options.signal, redirect: 'error', headers: { Accept: 'application/json' },
+    }, true, [200], 'costReview');
+    return readCostReviewResult(object, false, id, protocol.version) as NikaCostReview | NikaCostReviewV2;
+  }
+
+  async decideCostReview(id: string, decision: NikaCostReviewDecision, options: NikaCostReviewOptions): Promise<NikaCostReview | NikaCostReviewV2> {
+    const protocol = costReviewProtocol(options.version);
+    id = costReviewId(id);
+    if (!machineObject(decision) || !['approve_once', 'decline'].includes(decision.decision)
+      || Object.keys(decision).some(key => key !== 'decision' && key !== 'witness_sha256')) {
+      throw new TypeError('cost review decision must explicitly be approve_once or decline with its witness');
+    }
+    reviewWitness(decision.witness_sha256);
+    const body = JSON.stringify(decision);
+    await this.requireCostReview(protocol.capability, options.signal);
+    const object = await this.json(protocol.decide(id), {
+      method: 'POST', body, signal: options.signal, redirect: 'error',
+      headers: { 'Content-Type': 'application/json' },
+    }, true, [200], 'decideCostReview');
+    return readCostReviewResult(object, false, id, protocol.version) as NikaCostReview | NikaCostReviewV2;
+  }
+
+  private async requireCostReview(capability?: string, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted();
+    await this.ensureServerIdentity();
+    signal?.throwIfAborted();
+    const capabilities = this.remoteIdentity?.supportedCapabilities ?? [];
+    const supported = capability === undefined
+      ? capabilities.includes('costReviewV1') || capabilities.includes('costReviewV2')
+      : capabilities.includes(capability);
+    if (!supported) {
+      throw this.gap(capability ?? 'costReviewV1', 'The connected server did not advertise explicit cost review');
+    }
+  }
+
   /**
    * Stateless authoring through the authenticated Serve compile door.
    * A remote connection never falls back to a local compile — the candidate
@@ -202,7 +321,8 @@ export class HttpTransport implements Transport {
     const signal = composed.signal!;
     try {
       if (signal.aborted) throw new NikaTransportError(this.kind, 'compile aborted');
-      const identity = this.remoteIdentity ?? await this.probeServerIdentity(signal);
+      const identity = this.remoteIdentity ?? await this.compileIdentity(signal);
+      if (signal.aborted) throw new NikaTransportError(this.kind, 'compile aborted');
       if (!identity.supportedCapabilities.includes(COMPILE_CAPABILITY)) {
         throw this.gap(COMPILE_CAPABILITY,
           'The connected engine does not advertise compile; the SDK never compiles locally as a substitute');
@@ -285,14 +405,21 @@ export class HttpTransport implements Transport {
       // The by-name form (ADR-131): the resident captures the world of a
       // workflow its registry lists and computes the digest its receipt
       // carries. No local engine is spawned and no digest is expected here.
+      const hasReview = options.costReview !== undefined;
+      if (hasReview) reviewReference(options.costReview);
+      const body = JSON.stringify({ workflow,
+        ...(inputs === undefined ? {} : { inputs: JSON.parse(inputs.json) }),
+        ...(options.access === undefined ? {} : { access: options.access }),
+        ...(options.costReview === undefined ? {} : { cost_review: options.costReview }),
+      });
       await this.ensureServerIdentity();
+      if (hasReview) await this.requireCostReview();
       if (inputs) this.requireJobInputs();
-      // The map's bytes are the ones the native transport writes to stdin.
-      const body = inputs
-        ? `{"workflow":${JSON.stringify(workflow)},"inputs":${inputs.json}}`
-        : JSON.stringify({ workflow });
       const job = await this.admitJob(body, idempotencyKey);
       return this.httpRun(job.id as NikaRunId, 0, job);
+    }
+    if (options.inputs !== undefined || options.access !== undefined || options.costReview !== undefined) {
+      throw this.gap('runOptions', 'inputs, access and costReview require HTTP by-name admission');
     }
     const captured = await this.captureSnapshot(workflow);
     if (captured.bytes === undefined) {
@@ -336,6 +463,7 @@ export class HttpTransport implements Transport {
   private async admitJob(body: string, idempotencyKey: string): Promise<DurableJob> {
     const admitted = await this.json('/v1/jobs', {
       method: 'POST',
+      redirect: 'error',
       headers: {
         'Content-Type': 'application/json',
         'Idempotency-Key': idempotencyKey,
@@ -450,8 +578,8 @@ export class HttpTransport implements Transport {
       [200],
       'traceVerify',
     );
-    // A verdict that holds carries no reason; `unavailable` and the negative
-    // tiers name theirs. Either is typed when present, neither is demanded.
+    // A positive verdict may carry a tier such as `unsealed` in reason.
+    // Preserve that independent fact; reason is typed when present, not required.
     if (
       typeof object.verdict !== 'string'
       || (object.reason !== undefined && typeof object.reason !== 'string')
@@ -772,9 +900,8 @@ export class HttpTransport implements Transport {
     if (!event) throw new NikaProtocolError(this.kind, 'SSE data was not an object');
     // The resident's projection (`JobEvent`, closed): the frame identity, the
     // terminal outputs and receipt, and the settlement it nests whole on the
-    // terminal frame (engine 0.118 · ADR-128). Engine main adds two optional
-    // fields ahead of the pinned contract: `at`, when the resident admitted the
-    // event, and `evidence`, a reported journal loss. Anything else still refuses.
+    // terminal frame (engine 0.118 · ADR-128). The V9 pin includes optional
+    // `at` admission time and `evidence` journal loss. Anything else refuses.
     const allowed = new Set([
       'sequence', 'at', 'kind', 'status', 'code', 'message', 'outputs', 'receipt', 'settlement',
       'evidence',
@@ -1053,9 +1180,54 @@ export class HttpTransport implements Transport {
     return new NikaCompatibilityError(capability, this.kind, message);
   }
 
+  /**
+   * Compile callers share negotiation, but own their waiting deadlines. The
+   * shared request has no shorter admission timer and is cancelled only when
+   * its last waiting compile leaves. A caller can never abort another caller.
+   */
+  private compileIdentity(signal: AbortSignal): Promise<NikaEngineIdentity> {
+    let handshake = this.compileHandshake;
+    if (!handshake || handshake.controller.signal.aborted) {
+      const controller = new AbortController();
+      handshake = {
+        controller,
+        promise: this.probeServerIdentity(controller.signal),
+        users: 0,
+        settled: false,
+      };
+      this.compileHandshake = handshake;
+      const current = handshake;
+      const settled = () => {
+        current.settled = true;
+        if (this.compileHandshake === current) this.compileHandshake = undefined;
+      };
+      current.promise.then(settled, settled);
+    }
+    const current = handshake;
+    current.users += 1;
+    let released = false;
+    const release = () => {
+      if (released) return;
+      released = true;
+      current.users -= 1;
+      if (current.users === 0 && !current.settled) current.controller.abort();
+    };
+    signal.addEventListener('abort', release, { once: true });
+    if (signal.aborted) release();
+    return current.promise.finally(() => {
+      signal.removeEventListener('abort', release);
+      release();
+    });
+  }
+
   private ensureServerIdentity(): Promise<NikaEngineIdentity> {
-    this.serverIdentity ??= this.probeServerIdentity();
-    return this.serverIdentity;
+    this.serverIdentityPromise ??= this.probeServerIdentity().catch(error => {
+      // A failed handshake is shared by its current waiters, never cached as
+      // a permanent refusal. Only a later caller starts a new health request.
+      this.serverIdentityPromise = undefined;
+      throw error;
+    });
+    return this.serverIdentityPromise;
   }
 
   private async probeServerIdentity(signal?: AbortSignal): Promise<NikaEngineIdentity> {

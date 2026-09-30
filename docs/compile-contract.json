@@ -1,0 +1,13 @@
+{
+  "engine_repository": "https://github.com/supernovae-st/nika",
+  "engine_commit": "4e2952338e8d9e5f14acea98acab1f118bbf09c6",
+  "engine_binary_sha256": "34891336a464dd08b95ab6a8aa9c576f5973c116359f1298e79f733e4808b1ba",
+  "openapi_sha256": "cf4ed96b0832697ab04f955a5f42de7671c0fd33347cb66b19704c62d7dbc76d",
+  "served_contract": "GET /v1/openapi.json with explicit native authoring seat",
+  "engine_contract_files": [
+    "crates/nika-serve/openapi.json",
+    "crates/nika-serve/src/server/compile/openapi.json",
+    "crates/nika-serve/src/server/compile/openapi-native.json"
+  ],
+  "status": "development pin; actual generation-1 and replay decision evidence plus exact CSV check/run/trace verified on the pinned binary; complete V9 consumer lifecycle remains open"
+}

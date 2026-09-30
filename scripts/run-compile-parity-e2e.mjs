@@ -12,6 +12,12 @@ import { stopResident, waitForHealth } from './one-door/resident.mjs';
 const root = path.resolve(import.meta.dirname, '..');
 const binary = process.env.NIKA_BIN;
 const reportPath = process.env.NIKA_COMPILE_PARITY_REPORT;
+const profile = process.env.NIKA_COMPILE_PARITY_PROFILE ?? 'foundation';
+assert(['foundation', 'full'].includes(profile), 'compile parity profile must be foundation or full');
+// The full schema includes two explicitly seated optional doors. This mock
+// seat is never called: every consumer below stays on compile generation 1.
+const optionalDoors = profile === 'full'
+  ? ['--authoring-model', 'mock/echo', '--authoring-repairs', '0', '--cost-review'] : [];
 if (reportPath) writeFileSync(reportPath, JSON.stringify({ result: 'incomplete' }) + '\n');
 assert(binary && path.isAbsolute(binary), 'NIKA_BIN must identify the frozen absolute engine path');
 const scratch = mkdtempSync(path.join(tmpdir(), 'nika-compile-parity-'));
@@ -59,7 +65,7 @@ try {
     'process.stdout.write(JSON.stringify(await scenario(sdk, JSON.parse(readFileSync(process.argv[2], "utf8")))));',
   ].join('\n'));
   server = owned.start(binary, ['serve', '--bind', '127.0.0.1:0', '--workflows', project,
-    '--token-file', path.join(scratch, 'token'), '--state-root', path.join(scratch, 'state'), '--plain'],
+    '--token-file', path.join(scratch, 'token'), '--state-root', path.join(scratch, 'state'), '--plain', ...optionalDoors],
   { cwd: project, env, timeoutMs: 300000 });
   let url;
   const deadline = Date.now() + 15000;
@@ -79,6 +85,11 @@ try {
   };
   const health = await request('/health');
   assert(health.supportedCapabilities.includes('compile'), 'Serve must advertise compile');
+  if (profile === 'full') {
+    for (const capability of ['compileNativeV2', 'costReviewV1', 'costReviewV2']) {
+      assert(health.supportedCapabilities.includes(capability), `full profile must advertise ${capability}`);
+    }
+  }
   const openapi = await request('/v1/openapi.json', true);
   assert(openapi.paths['/v1/compile']?.post, 'the live OpenAPI must own POST /v1/compile');
   assert.deepEqual(openapi, JSON.parse(readFileSync(path.join(root, 'openapi.json'), 'utf8')),
@@ -97,7 +108,7 @@ try {
   report = { result: 'green', scope: 'compile foundation; no general authoring or execution grant',
     engine: { version, binary_sha256: binarySha, identity, health },
     sdk: { version: packed.version, package_sha256: await sha256(tarball) },
-    compile_openapi: openapi.paths['/v1/compile'], resident_state_unchanged: true, results };
+    profile, compile_openapi: openapi.paths['/v1/compile'], resident_state_unchanged: true, results };
 } catch (error) {
   if (reportPath) writeFileSync(reportPath, JSON.stringify({ result: 'failed', message: error.message }, null, 2) + '\n');
   throw error;

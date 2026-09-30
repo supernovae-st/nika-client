@@ -1018,6 +1018,27 @@ Output that proves neither an admission nor a refusal (a line that is not
 machine output, a truncated or oversized report, an engine that exits without
 a frame) rejects `run()` with `NikaProtocolError` instead.
 
+A complete native refusal must end its stream and exit with its own status
+within two seconds. Otherwise the SDK stops the engine and rejects with
+`NikaProtocolError`, preserving the refusal data as `cause` without inventing
+an exit status.
+
+Native admission waits for the first complete machine frame, including the
+end of a legacy pretty report. By default this wait is unbounded and is not
+qualified for unattended use. Bound it explicitly:
+
+```ts
+const run = await nika.run('./workflow.nika', {
+  admission: { timeoutMs: 30_000, signal: abortController.signal },
+});
+```
+
+The bound covers the owned identity probe and admission. If it expires or the
+caller aborts, the SDK stops the process it started before rejecting with
+`NikaTransportError`; the message says whether the process was seen to exit.
+After admission, these bounds are released and do not cancel the running
+workflow. HTTP rejects `admission` before making any request.
+
 **A server's refusal.** A refusal `nika serve` types as
 `{ error: { code, message } }` becomes a `NikaOperationError` with the HTTP
 `status`, the server's `code` (`unauthorized`, `job_not_found`,
@@ -1228,6 +1249,58 @@ To report a vulnerability privately, follow
   and the [changelog](https://github.com/supernovae-st/nika-client/blob/main/CHANGELOG.md).
 - **Upstream:** [the engine](https://github.com/supernovae-st/nika) and
   [the language specification](https://github.com/supernovae-st/nika-spec).
+
+## Resident V9 extensions
+
+`serverIdentity()` returns a detached copy of the HTTP client's validated,
+cached identity and advertised capabilities. It needs no local binary and is
+not a fresh health, readiness or authorization check. A native client refuses it.
+
+The published `compile('hello')`, `{ intent, answers? }` and
+`{ workflow, change, answers? }` shapes work on both transports and resolve a
+`NikaCompileOutcome` with `ready === (status === 'ready')`.
+`NikaPublishedCompileOutcome` remains an alias for that public type.
+No compile call saves or executes the candidate or approves its effects.
+
+An explicitly versioned `NikaCompileWireRequest` uses the resident-only door:
+
+```ts
+const authored = await nika.compile({
+  compile_version: 2,
+  mode: 'create',
+  cognition: 'explicitProvider',
+  intent: 'Read ./orders.csv and keep paid rows in ./paid.csv',
+}, { timeoutMs: 600_000 });
+console.log(authored.outcome.status, authored.outcome.questions);
+```
+
+It resolves `{ outcome, replayToken? }`, with `NikaCompileWireOutcome` preserving
+the engine's evidence. Generation 1 is deterministic; generation 2 requires
+`compileNativeV2` and explicit caller consent. The operator seats the model and
+the request grant; `limits.max_calls` can only narrow that grant. A kept-round
+token permits an explicit zero-call replay on that same server with the exact
+original input. The SDK never replays, retries, answers questions, or substitutes
+a local engine automatically. A lost answer can still have spent a model call.
+
+The published HTTP form uses `timeoutMs` or the ordinary `requestTimeout` for
+the entire call. Concurrent compile calls share health negotiation, but an
+abort or deadline only cancels that negotiation after its last waiter leaves.
+The V9 wire form waits for the resident's authoring deadline, with an optional
+client `timeoutMs` that stops waiting at once, including during health negotiation.
+A typed wire caller's signal-only abort during the initial health check is
+observed when that check answers, within `requestTimeout`. Stopping an HTTP
+wait never revokes a provider call already sent. Native public compile awaits
+its child cleanup before rejecting on cancellation or timeout.
+
+Cost review is explicit and HTTP-only. `prepareCostReview()` may hold the
+project cost lease and create or reconcile its journal; `costReview()` observes;
+`decideCostReview()` sends `approve_once` or `decline`. Approval alone never
+starts a job. A separate `run()` supplies the same workflow, literal inputs,
+access profile and approved `costReview` reference. V1 is the default; pass
+`{ version: 2 }` to each review method for finite fan-out and authored-retry
+bounds. The server must advertise `costReviewV2`; no fallback or automatic
+approval occurs. See [cost review](docs/cost-review-contract.md) and
+[HTTP authoring](docs/http-api.md#authoring).
 
 ## Contributing
 

@@ -211,6 +211,26 @@ try {
     );
   }
 
+  // The documented compile example, verbatim from examples/: typechecked below
+  // against the packed types, then run from the tarball against the fixture
+  // engine (compile, answer from a JSON file, materialize, run).
+  const COMPILE_EXAMPLE = 'compile-then-run.mts';
+  await copyFile(path.join(root, 'examples', 'compile-then-run.ts'), path.join(consumer, COMPILE_EXAMPLE));
+  if (process.platform !== 'win32') {
+    const exampleLog = path.join(scratch, 'example.argv');
+    await writeFile(path.join(consumer, 'answers.json'), '{"const.request":"An outage affects support customers."}\n');
+    const exampleEnv = { ...consumerEnv, NIKA_BIN: path.join(root, 'test/fixtures/fake-nika-compile.mjs'),
+      NIKA_FAKE_ARGV_LOG: exampleLog };
+    const printed = run(process.execPath, [COMPILE_EXAMPLE, 'classify-and-route', 'answers.json', 'out/triage.nika'],
+      { cwd: consumer, env: exampleEnv }).stdout;
+    assertCompileExample(printed, await readFile(exampleLog, 'utf8'),
+      await readFile(path.join(consumer, 'out', 'triage.nika'), 'utf8'));
+    process.stdout.write(
+      `Packed ${packageName}@${expectedVersion} runs examples/compile-then-run.ts: `
+      + 'compile, answer from a file, materialize, run\n',
+    );
+  }
+
   const typedConsumer = [
     `import { Nika, isNikaRunSucceeded, type NikaConfig, type NikaRunOptions, type NikaRunResult } from '${packageName}';`,
     `import { isNikaCompileHeld, nextCompileRequest } from '${packageName}';`,
@@ -348,6 +368,7 @@ try {
     'consumer.cts',
     'lifecycle-app.mts',
     'lifecycle-app.cts',
+    COMPILE_EXAMPLE,
   ], { cwd: consumer });
 
   process.stdout.write(
@@ -557,4 +578,34 @@ function assertCompile(report, moduleSystem) {
   }, say('a resident without a native seat refuses a provider round after /health alone'));
   assert.match(unseatedMessage, /Nothing was posted/, say('the refusal says nothing was sent'));
 
+}
+
+/**
+ * What the documented compile example did from the packed package: one
+ * deterministic incomplete round, the answer from the JSON file on the next
+ * round's argv, the ready candidate written where it was told, then one run
+ * of that file. The engine is the compile fixture; nothing else is spawned.
+ */
+function assertCompileExample(printed, argvLog, written) {
+  const lines = printed.trim().split('\n');
+  assert.deepEqual(lines.filter((line) => line.startsWith('compile · ')), [
+    'compile · incomplete · generation 1 · no provider call',
+    'compile · ready · generation 1 · no provider call',
+  ], 'the example reports each compile round');
+  assert.ok(lines.includes('? const.request · What request should this workflow classify?'),
+    'the example shows the question it answers');
+  assert.ok(lines.includes('event · run.settled · succeeded'), 'the example observes the run');
+  assert.match(lines.at(-1), /^run · succeeded · outputs \{"source_bytes":\d+\}$/, 'the example reads the result');
+  const argvs = argvLog.trim().split('\n').map((line) => JSON.parse(line));
+  assert.deepEqual(argvs.slice(0, 3), [
+    ['--sdk-identity'],
+    ['compile', '--json', '--', 'classify-and-route'],
+    ['compile', '--json', '--answer=const.request="An outage affects support customers."', '--', 'classify-and-route'],
+  ], 'the answer from the file rides the next round once');
+  assert.equal(argvs.length, 4, 'compile twice, then run once');
+  assert.equal(argvs[3][0], 'run');
+  assert.match(argvs[3][1], /\/out\/triage\.nika$/, 'run() receives the materialized candidate');
+  assert.equal(argvs[3][2], '--json');
+  assert.match(written, /const: \{ request: "An outage affects support customers\." \}/,
+    'the written file is the ready candidate');
 }

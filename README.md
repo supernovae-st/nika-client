@@ -381,7 +381,7 @@ Create the client once: it drives the bundled engine by default, or a
 | `run(workflow, options?)` | Checks the workflow, then starts it | a `NikaRun` once the engine admits it; rejects with `NikaOperationError` when the engine refuses |
 | `check(workflow, options?)` | Audits a workflow without running it | the engine's report: `clean` and the findings |
 | `traceVerify(receipt, options?)` | Has the engine verify a run's record | `NikaTraceVerifyResult`: `verified`, `verdict`, `reason` |
-| `compile(request, options?)` | Writes or edits a candidate workflow, without running it | `NikaCompileOutcome` |
+| `compile(request, options?)` | Writes or edits a candidate workflow, without running it; `nextCompileRequest()` builds an answer round | `NikaCompileOutcome` |
 | `attachRun(id, options?)` | Picks a server job back up after a restart | a `NikaRun` |
 | `listWorkflows()` · `workflow(name)` | Lists or describes the workflows a server serves | names · metadata |
 | `schedule(workflow, options)` · `scheduleStatus(id)` | Creates, changes or reads a schedule on a server | the applied schedule · its status |
@@ -890,10 +890,12 @@ await nika.schedule('hello.nika', {
 <details>
 <summary><b>Write or edit a workflow: <code>compile()</code></b></summary>
 
-`compile()` asks the engine for a candidate workflow and runs nothing. On
-this version it resolves the exact skeleton names `nika compile --list` shows
-(`hello` included) and edits the constants of an existing workflow. Free-text
-intent comes back `incomplete`, and nothing is written.
+`compile()` asks the engine for a candidate workflow and runs nothing.
+Without a provider it resolves the exact skeleton names `nika compile --list`
+shows (`hello` included) and edits the constants of an existing workflow;
+other free text comes back `incomplete`. A provider reads free intent only
+when the request opts in, and the full guide is
+[docs/compile.md](docs/compile.md).
 
 ```ts
 const candidate = await nika.compile({
@@ -918,8 +920,10 @@ if (candidate.ready && candidate.candidate !== null) {
 - **The candidate is source, not a run.** `candidate` is `.nika` text. Review
   it, write it to a file yourself, then `run(path)`: the normal admission
   applies. Neither `requested_boundary` nor the source-only `check_preview`
-  grants any authority. Compile creates no run, job, approval or proof, and
-  the package writes no file.
+  grants any authority. Compile creates no run, job, approval or proof. An
+  HTTP compile writes nothing; a local engine keeps its plan records under
+  `.nika/compile/` and, when a request names `output`, writes the ready
+  candidate there.
 - **Stopping it.** `signal` and `timeoutMs` stop only the compile request.
   Standard `AbortSignal`s work, `AbortSignal.any` composites included; a
   signal with overridden interfaces, or a proxy, is refused before any work
@@ -929,7 +933,48 @@ if (candidate.ready && candidate.candidate !== null) {
   `POST /v1/compile`; this method first shipped with 0.120.3. An engine
   without it, a 0.120.2 or older server included, is refused with
   `NikaCompatibilityError` and no local fallback. The outcome has no
-  `exitCode` or `written` field.
+  `exitCode` field, and `written` only when a local request named `output`.
+
+**From an intention, with a provider.** Over HTTP, `cognition:
+'explicitProvider'` lets the server's seated model author one round (the
+server must advertise `compileNativeV2`); on a local engine, `authoringModel`
+seats the model you name, with the engine's own credentials. Answer the
+questions with `nextCompileRequest()`: over HTTP it replays the kept round by
+its `replay_token` with zero provider calls, which binds the answers without
+asking the verifier; a provider round carrying the answers then has the
+candidate judged (see [docs/compile.md](docs/compile.md)).
+
+```ts
+import { isNikaCompileHeld, nextCompileRequest, type NikaCompileRequest } from '@supernovae-st/nika';
+
+let request: NikaCompileRequest = {
+  intent: 'Every morning at 9, summarize ./inbox/*.md into ./digest.md',
+  cognition: 'explicitProvider',
+  limits: { max_calls: 6 },
+};
+let outcome = await remote.compile(request);
+if (outcome.status === 'incomplete' && !isNikaCompileHeld(outcome)) {
+  const answers = { 'const.audience': 'team' };
+  // Zero calls: the answers bound into the kept round, a preview pending judgment.
+  const preview = await remote.compile(nextCompileRequest(request, outcome, answers));
+  console.log(preview.candidate);
+  // One provider round carrying the answers has the candidate judged; it may spend.
+  outcome = await remote.compile({ ...request, answers });
+}
+```
+
+- **Provider calls.** `compile_version` is 2 exactly when one happened, with
+  its receipt in `provenance.authoring`. Without an opt-in nothing is called,
+  whatever keys the environment holds.
+- **Held candidates.** When the verifier does not accept a candidate the
+  outcome stays `incomplete` and `isNikaCompileHeld(outcome)` is true: the
+  candidate is a preview, never a workflow to run.
+- **Refusals.** A server refusal is a `NikaOperationError` whose `code` is the
+  engine's (`compile_limit`, `compile_new_intent_required`,
+  `malformed_compile_request`, `compile_context_changed`…).
+- **Example.** [`examples/compile-then-run.ts`](examples/compile-then-run.ts)
+  compiles, answers from a JSON file and runs the ready workflow on either
+  door.
 
 </details>
 
@@ -950,7 +995,7 @@ if (candidate.ready && candidate.candidate !== null) {
 | `traceVerify` | the engine's verifier plus the signed receipt binding | the server's verdict on the journal it wrote (`ok`, `sealed`…), or `unavailable` without one |
 | `schedule` / `scheduleStatus` | refused | the server's schedules |
 | `listWorkflows` / `workflow` | refused | the served workflow catalog, without paths |
-| `compile` | the engine's `compile` capability | `POST /v1/compile`, when advertised |
+| `compile` | the engine's `compile` capability; `authoringModel`, `decisionModel`, `fresh` and `output` allowed | `POST /v1/compile`, when advertised; `cognition` and `replay_token` need `compileNativeV2` |
 
 The vocabulary is one; the number of events is not. A local engine reports
 each task, a server reports durable, sequenced execution frames, and the

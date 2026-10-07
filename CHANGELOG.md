@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `compile()` reaches provider-backed authoring on both doors, mirroring the
+  engine's compile wire generation 2. Over HTTP, `cognition:
+  'explicitProvider'` posts one fresh `compile_version: 2` round under the
+  server's seated model (gated by the `compileNativeV2` capability, refused
+  after `/health` alone otherwise), with optional `limits` (`max_calls`,
+  `repairs`, `max_tokens`, `call_timeout_ms`, `deadline_ms`), `workflow_id`
+  and an edit's `original_intent`; its `Nika-Compile-Replay` header becomes
+  `outcome.replay_token`, and `cognition: 'deterministicOnly'` with that token
+  replays the kept round with zero provider calls. On a local engine,
+  `authoringModel`, `decisionModel`, `fresh`, `output`, `original_intent` and
+  `limits` map onto the CLI's own flags. The outcome reads both generations:
+  `compile_version` 2 exactly when `provenance.authoring` carries the receipt,
+  `choice` questions with `options`, `requested_trigger`, the provenance
+  `strategy`, `suggested_file`, `plan` and `decision`, and the CLI's
+  `written`, `existing_destination`, `plan_record_error` and
+  `declined_record_error`. A ready outcome carrying the verifier's
+  `verify_held` or `verify_resume` marker is a protocol fault: a held
+  candidate never reads as ready. New exports: `nextCompileRequest()` builds
+  an answer round (a zero-call replay when the outcome carries a token; a
+  replay binds the answers but asks no verifier, so a provider round carrying
+  them has the candidate judged), `isNikaCompileHeld()` reads the held
+  marker, and the request, receipt, trigger and refusal-code types. A
+  provider round waits for its `limits.deadline_ms` plus the server's handoff
+  and one `requestTimeout`, and without that limit or `timeoutMs` gets no SDK
+  deadline, as the engine sets none by default; its answer is read up to the
+  8 MiB compile bound. The generation-2 types are hand-written from the engine
+  source, ahead of the pinned `openapi.json` (engine 0.120.3); see
+  `docs/compile.md` and `examples/compile-then-run.ts`.
 - Packed depth project `signed-webhook-intake` — the app-owned webhook
   qualification (engine nika#1719 names it as the path that stays
   first-class). A loopback receiver verifies a Standard Webhooks

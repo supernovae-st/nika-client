@@ -15,7 +15,7 @@ Any other non-2xx body is discarded and reported as a redacted
 | `GET /v1/openapi.json` | generation only | authenticated OpenAPI 3.1 document |
 | `GET /v1/workflows` | `listWorkflows()` | contained relative workflow names |
 | `GET /v1/workflows/{name}` | `workflow(name)` | path-free metadata, never source bytes |
-| `POST /v1/compile` | `compile()` | capability-gated stateless source authoring; 200 ready/incomplete/refused, no job |
+| `POST /v1/compile` | `compile()` | capability-gated stateless source authoring; 200 ready/incomplete/refused, no job; generation 2 needs `compileNativeV2` |
 | `POST /v1/check` | `check()` | validates a served name or immutable snapshot bytes without a job |
 | `POST /v1/jobs` | `run()` | admits a served name or exact snapshot bytes with an idempotency key |
 | `GET /v1/jobs/{id}` | internal settlement | durable job identity, outputs, receipt, settlement, or redacted error |
@@ -33,8 +33,9 @@ Any other non-2xx body is discarded and reported as a redacted
 - URLs containing credentials, a query, or a fragment are rejected.
 - Tokens must contain 32–512 visible ASCII bytes and are never sent to
   `/health`.
-- Each request has a bounded timeout and each JSON/SSE machine frame has a
-  byte ceiling.
+- Each request has a bounded timeout, except a compile provider round
+  without `timeoutMs` or `limits.deadline_ms` (see [compile.md](compile.md)),
+  and each JSON/SSE machine frame has a byte ceiling.
 - Remote `check()` refuses `model` and `nativeStrict`; remote `run()` refuses
   `model`, `maxCostUsd` and the deprecated `vars` until a request envelope
   owns them.
@@ -81,6 +82,42 @@ The shared outcome contains candidate source, questions, diagnostics, requested
 boundary, source-only Check preview and provenance. It carries no process exit
 code or materialized destination. A candidate and its requested boundary grant
 nothing: execution needs a separate caller decision and normal `run` admission.
+
+## Compile generation 2 (ahead of the pin)
+
+A resident whose operator seated a native authoring model (`nika serve
+--authoring-model`) advertises `compileNativeV2` and also speaks
+`compile_version: 2`. The SDK sends generation 2 only for a request that names
+`cognition: 'explicitProvider'` (one fresh round under that seat) or a
+`replay_token` with `cognition: 'deterministicOnly'` (a zero-call replay of a
+round the server kept), and refuses either after `/health` alone on a resident
+without the capability. The body carries `mode`, `cognition`, the input
+(`intent` and `workflow_id`, or `source`, `change` and `original_intent`),
+`answers`, `limits` (fresh rounds only) and `replay_token` (replays only).
+
+The answer is `compile_version: 2` exactly when a provider call happened, with
+its receipt in `provenance.authoring`; a replay and a round that needed no call
+answer generation 1. A fresh round whose native plan the server keeps answers
+the `Nika-Compile-Replay` header, surfaced as `outcome.replay_token` (64
+lowercase hex digits, never quoted in an error); a header on any other answer
+is a `NikaProtocolError`. Every 200 answer to a generation-2 request carries
+`Cache-Control: no-store`; the SDK caches nothing either. A replay binds its
+answers with zero calls but asks no verifier, so a model-authored candidate
+stays `incomplete` until a provider round carrying the answers has it judged.
+The server sets no default deadline on a provider round: the client waits for
+`limits.deadline_ms` plus the server's 5 s handoff and one `requestTimeout`,
+or, without that limit, sets none unless `timeoutMs` is given. A
+generation-2 answer is read up to 8 MiB. Refusals add 409 (`compile_replay_unavailable`, `compile_replay_input_changed`,
+`compile_context_changed`), 408 `compile_deadline_exceeded`, 422
+`compile_new_intent_required`, 500 `compile_disclosure_refused` and 503
+`compile_replay_capacity` or `stopping`.
+
+This contract is ahead of the pinned `openapi.json`, which describes the
+released 0.120.3 resident: the default document never carries it, and a
+seated resident merges it into its live document. Its types are written by
+hand from the engine source (`nika-serve/src/server/compile/v2.rs`,
+`author.rs`, `openapi-native.json`). Released engines 0.121.0 and later serve
+it; `limits.max_calls` needs 0.122.0. See [compile.md](compile.md).
 
 ## Settlement
 

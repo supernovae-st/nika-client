@@ -30,10 +30,52 @@ round (HTTP) and the CLI's own facts (local engine).
 | Who chooses the model | the server's operator (`nika serve --authoring-model`) | you, per request |
 | Credentials | the server's environment | the local engine's environment |
 | Answer round | the kept round's judged answer round by its `replay_token` (judge calls only) where `/health` lists `compileJudgedAnswerRound`, else a fresh round carrying the answers; or its zero-call replay | the engine replays the plan it recorded under `.nika/compile/` |
+| The files the intent names | observed by the LOCAL engine in the client's `cwd` and sent as `observed_world` where `/health` lists `compileObservedWorld` (see below) | observed by the engine in its working directory |
+| Who judges a candidate | the operator's decision model where `/health` lists `compileDecisionSeat` (`nika serve --decision-model`), else the authoring model | `decisionModel`, else the authoring model |
 
 A door that lacks what a request needs refuses it with
 `NikaCompatibilityError` before anything is posted or spawned, and the SDK
 never compiles locally as a substitute for a server.
+
+## The files your intent names, over HTTP
+
+A server never reads your files. So that its seat does not ask you for a
+field name, a key or a shape it could have read, every generation-2 request
+(a provider round, a judged answer round, a zero-call replay) asks the local
+engine what it observes of the files the request states — `nika compile
+--observe-only -- <intent>` (a text revision: its `original_intent` and its
+change), run in the client's `cwd` — and sends that document unchanged as
+`observed_world`. It holds what `nika compile` hands its own seat: a CSV's
+header, a JSON file's keys and nested key paths, a column's short repeated
+values (a status, a kind), counts of value kinds, the absent and
+outside-the-project states — never a row. The server admits it only in that
+shape, about paths the request states, at most 64 rows and 256 KiB
+(`422 compile_observation_refused` otherwise); its seat, its grounding law
+and its judge then read it.
+
+| `observe` option | Behavior |
+|---|---|
+| absent (default) | sent when `/health` lists `compileObservedWorld`; nothing otherwise |
+| `true` | required: a server without the capability is a `NikaCompatibilityError` (`capability: 'compileObservedWorld'`) before anything is posted |
+| `false` | never observed, never sent |
+
+Where `/health` also lists `compileTrialInputs` (a server that tries
+candidates), the same request carries `trial_inputs`: the text of the files
+the observation read (the engine offers them only when they are UTF-8 text
+and at most 1 MiB in all). The server writes them into a scratch project of
+its own and tries each final candidate there before it can be `ready`, in the
+observed room `nika compile` and the Session use; the trial's report reaches
+its judge and its repairs (`provenance.decision.rehearsal`). These bytes go
+to the server that will run the workflow on the same files anyway; they are
+never sent to a model nor echoed back. `observe: false` sends neither.
+
+The observation is part of a kept round's input: its answer rounds observe
+again, and a file that changed in between makes another input
+(`409 compile_replay_input_changed`): author again. A local engine that cannot
+print the document (one from before the flag) fails typed with
+`capability: 'compileObservedWorld'` and nothing is posted; pass
+`{ observe: false }` to compile without it. A local compile ignores the
+option: the engine always observes its own working directory.
 
 ## What is a provider call, and what is not
 
@@ -265,7 +307,7 @@ ready.
 | Error | When |
 |---|---|
 | `NikaConfigurationError` | the request or options break a shape law (above); nothing was sent or spawned |
-| `NikaCompatibilityError` | the door lacks `compile`, `compileNativeV2`, `compileJudgedAnswerRound` or a field (`compileOptions`), or the answer carries a wire generation this request cannot receive |
+| `NikaCompatibilityError` | the door lacks `compile`, `compileNativeV2`, `compileJudgedAnswerRound`, a required `compileObservedWorld` or a field (`compileOptions`); the local engine could not observe the request's files; or the answer carries a wire generation this request cannot receive |
 | `NikaProtocolError` | the answer breaks the contract: malformed JSON, a ready outcome without candidate or with a held marker, generation 2 without its receipt, a replay token where none can be, a destination the request never named |
 | `NikaTransportError` | aborted, timed out, the engine could not be spawned or was killed |
 | `NikaOperationError` | the engine refused: `code` is its machine code, `status` the HTTP status or the local exit code |
@@ -279,7 +321,7 @@ ready.
 | 409 | `compile_replay_unavailable` (an unknown, expired or forgotten token: a held judged round forgets its own) · `compile_replay_input_changed` · `compile_context_changed` (the server's pinned knowledge snapshot moved; nothing was sent) |
 | 413 | `body_too_large` |
 | 415 | `unsupported_media_type` · `unsupported_content_encoding` |
-| 422 | `malformed_compile_request` · `compile_version_unsupported` · `compile_mode_unsupported` · `compile_cognition_unsupported` · `compile_limit` · `compile_new_intent_required` |
+| 422 | `malformed_compile_request` · `compile_version_unsupported` · `compile_mode_unsupported` · `compile_cognition_unsupported` · `compile_limit` · `compile_new_intent_required` · `compile_observation_refused` · `compile_trial_inputs_refused` |
 | 500 | `internal_error` · `compile_disclosure_refused` (the answer would carry a withheld credential) |
 | 503 | `compile_busy` · `compile_replay_capacity` · `stopping` |
 
@@ -330,7 +372,9 @@ and receipt. An HTTP generation-1 answer keeps the smaller of
   verdicts `.nika/compile/<intent sha256>.declined.json` (the directory ignores
   itself for Git), and with `output` the ready candidate. Nothing that is not
   ready is ever written to `output`.
-- An HTTP compile writes nothing, anywhere.
+- An HTTP compile writes nothing, anywhere. Its generation-2 requests spawn
+  the local engine with `compile --observe-only` (read-only, same bounds as
+  above) unless `observe: false`.
 
 ## Engine versions
 
@@ -341,7 +385,10 @@ seat flags, `requested_trigger`, `choice` questions and Serve generation 2,
 without `limits.max_calls`. 0.122.0 adds `limits.max_calls` and
 `--authoring-max-calls`. The judged answer round and its capability are newer
 still: engine integration commits `158a961cd` and `b7dace1e5`, in no release
-yet. An engine without a flag
+yet; so are `nika compile --observe-only`, `observed_world` with its
+`compileObservedWorld` capability, `trial_inputs` with `compileTrialInputs`,
+and `nika serve --decision-model` with `compileDecisionSeat` (the 0.123
+integration line). An engine without a flag
 answers with a usage error; a server without a field answers
 `422 malformed_compile_request`. Point `NIKA_BIN` (or `bin`) at the engine you
 mean to use.

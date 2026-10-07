@@ -1038,6 +1038,23 @@ export interface NikaCompileOptions {
    * compile by `signal` alone.
    */
   timeoutMs?: number;
+  /**
+   * Over HTTP, whether a generation-2 request (a provider round, a kept
+   * round's judged answer round or its replay) carries what the local engine
+   * observes of the files the request states (`nika compile --observe-only`
+   * in the client's `cwd`: headers, key sets, short categorical values and
+   * kind counts, never a row) as `observed_world`, so the server's seat, its
+   * grounding law and its judge read the real shape instead of asking for it.
+   * Default: sent whenever the server lists `compileObservedWorld`; `true`
+   * requires it (a server without it is a typed gap); `false` sends none. A
+   * kept round's later requests must observe the same files: another
+   * observation is another input (`409 compile_replay_input_changed`). Where
+   * the server also lists `compileTrialInputs`, the text of the files the
+   * observation read rides as `trial_inputs`, and the server tries each final
+   * candidate on them before it can be ready. A local compile always observes
+   * (and tries) its own working directory; this has no effect there.
+   */
+  observe?: boolean;
 }
 
 /** The engine's own completeness words; `ready` is never derived from confidence. */

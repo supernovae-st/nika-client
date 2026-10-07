@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Over HTTP, a generation-2 compile request carries what the local engine
+  observes of the files the request names (`nika compile --observe-only`,
+  run in the client's `cwd`: headers, keys, short repeated values, never a
+  row) as `observed_world` when the server lists `compileObservedWorld`, so
+  the server's seat, its grounding law and its judge read the real shape
+  instead of asking for field names. Where the server also lists
+  `compileTrialInputs`, the text of the files that observation read rides as
+  `trial_inputs` and the server tries each final candidate on them before it
+  can be ready. The new `observe` compile option requires (`true`) or turns
+  off (`false`) both; a local engine that cannot observe fails typed
+  (`capability: 'compileObservedWorld'`) before anything is posted. The
+  example writes its workflow beside the files it names.
 - `compile()` reaches provider-backed authoring on both doors, mirroring the
   engine's compile wire generation 2. Over HTTP, `cognition:
   'explicitProvider'` posts one fresh `compile_version: 2` round under the

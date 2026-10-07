@@ -88,12 +88,14 @@ nothing: execution needs a separate caller decision and normal `run` admission.
 A resident whose operator seated a native authoring model (`nika serve
 --authoring-model`) advertises `compileNativeV2` and also speaks
 `compile_version: 2`. The SDK sends generation 2 only for a request that names
-`cognition: 'explicitProvider'` (one fresh round under that seat) or a
+`cognition: 'explicitProvider'` (one fresh round under that seat, or, with a
+kept round's `replay_token`, that round's judged answer round) or a
 `replay_token` with `cognition: 'deterministicOnly'` (a zero-call replay of a
-round the server kept), and refuses either after `/health` alone on a resident
-without the capability. The body carries `mode`, `cognition`, the input
-(`intent` and `workflow_id`, or `source`, `change` and `original_intent`),
-`answers`, `limits` (fresh rounds only) and `replay_token` (replays only).
+round the server kept), and refuses all three after `/health` alone on a
+resident without the capability. The body carries `mode`, `cognition`, the
+input (`intent` and `workflow_id`, or `source`, `change` and
+`original_intent`), `answers`, `limits` (`explicitProvider` only) and
+`replay_token`.
 
 The answer is `compile_version: 2` exactly when a provider call happened, with
 its receipt in `provenance.authoring`; a replay and a round that needed no call
@@ -103,7 +105,13 @@ lowercase hex digits, never quoted in an error); a header on any other answer
 is a `NikaProtocolError`. Every 200 answer to a generation-2 request carries
 `Cache-Control: no-store`; the SDK caches nothing either. A replay binds its
 answers with zero calls but asks no verifier, so a model-authored candidate
-stays `incomplete` until a provider round carrying the answers has it judged.
+stays `incomplete`. The judged answer round replays the kept plan with the
+answers and asks the seat only to judge it (judge calls, generation 2, no
+authoring call): `ready`, or held with its token forgotten (a later request
+with it answers 409 `compile_replay_unavailable`). It needs engine integration
+commit `158a961cd`, in no release yet; an older server answers it
+`422 malformed_compile_request`, which the SDK reports as a
+`NikaCompatibilityError` (`compileJudgedAnswerRound`).
 The server sets no default deadline on a provider round: the client waits for
 `limits.deadline_ms` plus the server's 5 s handoff and one `requestTimeout`,
 or, without that limit, sets none unless `timeoutMs` is given. A

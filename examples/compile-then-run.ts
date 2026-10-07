@@ -23,9 +23,12 @@
  *
  * Without a seat, compile is deterministic: exact skeleton names (`nika compile
  * --list`) resolve, and other intents come back incomplete with diagnostics.
- * Over HTTP, a kept round's replay binds the answers with zero provider calls
- * but asks no verifier, so the example then sends one provider round carrying
- * every answer to have the candidate judged; that round may spend.
+ * Over HTTP, when the provider round kept its plan, the answers go to that
+ * round's judged answer round: the server replays the kept plan with them and
+ * its seat only judges the result (judge calls, never a second authoring call).
+ * That needs a server with the judged answer round (engine integration commit
+ * 158a961cd, not in a released engine yet); an older one refuses it with a
+ * NikaCompatibilityError and nothing is spent.
  *
  * Exit codes: 0 the run succeeded · 1 the run did not, or an SDK error ·
  * 2 compile stopped before a ready candidate · 64 usage.
@@ -73,8 +76,7 @@ async function main(): Promise<number> {
     request = { intent, authoringModel: process.env.NIKA_AUTHORING_MODEL, ...limits };
   }
 
-  const first = request;
-  const given: Record<string, unknown> = {};
+  const given = new Set<string>();
   let outcome = await nika.compile(request);
   for (let round = 1; !outcome.ready; round += 1) {
     report(outcome);
@@ -84,33 +86,24 @@ async function main(): Promise<number> {
       return 2;
     }
     if (outcome.status === 'refused') return 2;
-    if (round > MAX_ROUNDS) {
-      console.error(`stopped after ${MAX_ROUNDS} answer rounds; read the diagnostics above`);
-      return 2;
-    }
     const reply: Record<string, unknown> = {};
     for (const question of outcome.questions) {
-      if (Object.hasOwn(known, question.key) && !Object.hasOwn(given, question.key)) {
+      if (Object.hasOwn(known, question.key) && !given.has(question.key)) {
         reply[question.key] = known[question.key];
       }
     }
-    if (Object.keys(reply).length > 0) {
-      Object.assign(given, reply);
-      // Over HTTP a kept round replays by its token with zero provider calls;
-      // locally the engine replays the plan it recorded under .nika/compile/.
-      request = nextCompileRequest(request, outcome, reply);
-    } else if (request.replay_token !== undefined) {
-      // A replay binds the answers but asks no verifier: the candidate stays a
-      // preview until a new provider round, carrying every answer, judges it.
-      // That round may spend.
-      request = { ...first, answers: { ...first.answers, ...given } };
-    } else {
+    if (Object.keys(reply).length === 0 || round > MAX_ROUNDS) {
       const missing = outcome.questions.filter((question) => !Object.hasOwn(known, question.key));
       console.error(missing.length > 0
         ? `add these keys to ${answersFile}: ${missing.map((question) => question.key).join(', ')}`
         : 'nothing left to answer from the file; read the diagnostics above');
       return 2;
     }
+    for (const key of Object.keys(reply)) given.add(key);
+    // Over HTTP, a provider round that kept its plan gets its judged answer round
+    // (the seat judges the replayed candidate; no second authoring call). Locally
+    // the engine replays the plan it recorded under .nika/compile/.
+    request = nextCompileRequest(request, outcome, reply);
     outcome = await nika.compile(request);
   }
   report(outcome);

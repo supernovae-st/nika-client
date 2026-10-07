@@ -29,7 +29,7 @@ round (HTTP) and the CLI's own facts (local engine).
 | Provider round | `cognition: 'explicitProvider'`; `/health` must advertise `compileNativeV2` | `authoringModel: 'provider/name'` |
 | Who chooses the model | the server's operator (`nika serve --authoring-model`) | you, per request |
 | Credentials | the server's environment | the local engine's environment |
-| Answer round | replay by `replay_token`, zero provider calls | the engine replays the plan it recorded under `.nika/compile/` |
+| Answer round | the kept round's judged answer round by its `replay_token` (judge calls only), or its zero-call replay | the engine replays the plan it recorded under `.nika/compile/` |
 
 A door that lacks what a request needs refuses it with
 `NikaCompatibilityError` before anything is posted or spawned, and the SDK
@@ -49,8 +49,12 @@ never compiles locally as a substitute for a server.
 - An outcome is `compile_version: 2` exactly when a provider call happened;
   `provenance.authoring` is then the receipt (model, logical `calls`, token
   counters, `backend.authority`). Token usage is not an invoice.
-- A replay (`deterministicOnly` with a `replay_token`) makes zero calls and
-  answers generation 1; it asks no verifier either. A local answer round
+- A judged answer round (`explicitProvider` with a kept round's
+  `replay_token`) replays the kept plan with your answers and asks the seat
+  only to judge it: judge calls, `compile_version` 2, never a second authoring
+  call. It still may spend, on the judge.
+- A zero-call replay (`deterministicOnly` with a `replay_token`) makes no call
+  and answers generation 1; it asks no verifier either. A local answer round
   replays the recorded plan with no authoring call; a verifier that round asks
   makes its own calls.
 - Compile creates no run, job, approval, trace, schedule or permission. The
@@ -90,7 +94,7 @@ a local engine has are named after the flag they become.
 | `limits.max_tokens` | `limits.max_tokens` | `--authoring-max-tokens` |
 | `limits.call_timeout_ms` | `limits.call_timeout_ms` | `--authoring-timeout`, whole seconds only |
 | `limits.deadline_ms` | `limits.deadline_ms` | refused: no flag; bound the child with `timeoutMs` |
-| `replay_token` | `replay_token` | refused |
+| `replay_token` | `replay_token`: with `explicitProvider` the judged answer round, with `deterministicOnly` the zero-call replay | refused |
 | `authoringModel` | refused | `--authoring-model` |
 | `decisionModel` (create) | refused | `--decision-model` |
 | `fresh` (create) | refused | `--fresh` |
@@ -103,12 +107,13 @@ Over HTTP the request picks the wire generation:
 | no `cognition` | `compile_version: 1` | `compile` |
 | `cognition: 'deterministicOnly'`, no token | `compile_version: 1` with that cognition | `compile` |
 | `cognition: 'explicitProvider'` | `compile_version: 2`, a fresh round | `compileNativeV2` |
-| `cognition: 'deterministicOnly'` and `replay_token` | `compile_version: 2`, a replay | `compileNativeV2` |
+| `cognition: 'explicitProvider'` and `replay_token` | `compile_version: 2`, the kept round's judged answer round | `compileNativeV2`, and an engine with the judged answer round (below) |
+| `cognition: 'deterministicOnly'` and `replay_token` | `compile_version: 2`, the kept round's zero-call replay | `compileNativeV2` |
 
 The SDK refuses with `NikaConfigurationError`, before any request or process,
 what the published wire refuses by shape: an unknown field; `intent` mixed
-with `workflow`/`change`; a `replay_token` without `deterministicOnly` or that
-is not 64 lowercase hex digits; `limits` without a provider opt-in or beside
+with `workflow`/`change`; a `replay_token` without a cognition or that is not
+64 lowercase hex digits; `limits` without a provider opt-in or beside
 `deterministicOnly`; a limit that is not an integer within its published range
 (`max_calls` and `max_tokens` 1–4294967295, `repairs` 0–4294967295, the two
 durations from 1 ms); `original_intent` beside `set_constant`; a create-only
@@ -137,7 +142,7 @@ Not exposed: `--authoring-samples`, `--authoring-strategy`,
 | `requested_trigger` | the trigger the request names (`kind`, `status`, `cadence`, `cron`…), a requirement you bind through the schedule contract; absent on engines before the field |
 | `check_preview` | the source-only Check report; never admission |
 | `provenance` | `compiler_version`, `spec_pin`, `skeleton`, `cognition`, and when present `strategy`, `suggested_file`, `plan`, `decision`, `authoring` |
-| `replay_token` | HTTP only: the `Nika-Compile-Replay` header of a fresh round whose plan the server keeps |
+| `replay_token` | HTTP only: the `Nika-Compile-Replay` header of a provider round whose plan the server keeps |
 | `written`, `existing_destination` | local engine only, when the request named `output` |
 | `plan_record_error`, `declined_record_error` | local engine only: it could not keep or remove a record under `.nika/compile/` |
 
@@ -146,61 +151,83 @@ no display or masking.
 
 ## Answer rounds
 
-`nextCompileRequest(request, outcome, answers)` builds the next request: the
-same input with these answers merged over the previous ones. It maps; it
-judges nothing and never decides to spend for you.
+`nextCompileRequest(request, outcome, answers, options?)` builds the next
+request: the same input with these answers merged over the previous ones. It
+maps; it judges nothing.
 
-- **HTTP, with a token.** The next request replays the kept round: the exact
-  input, `cognition: 'deterministicOnly'`, the token, no `limits`, zero
-  provider calls. The server compares the input byte for byte
-  (`409 compile_replay_input_changed` otherwise). A replay binds the answers
-  into the kept plan but asks no verifier, so a model-authored candidate comes
-  back `incomplete`: a preview with the answers in place and its judgment
-  pending (`provenance.decision.pending`). Replaying again returns the same
-  document. To have it judged, send a new provider round carrying every
-  answer: your first request with `answers`. That round may spend, and the
-  verifier then decides `ready` or holds the candidate.
+- **HTTP, a kept round: the judged answer round.** When a provider round
+  answered a `replay_token`, the next request is that round's judged answer
+  round: the exact input, the merged answers, `cognition: 'explicitProvider'`,
+  the token and the previous `limits` (which may narrow it). The server
+  replays the kept plan with the answers and asks its seat only to judge the
+  replayed bytes: judge calls, `compile_version` 2, never a second authoring
+  call. A candidate the seat accepts is `ready`. One it does not accept is
+  held (`verify_held`, `incomplete`, no new token) and the server forgets the
+  token: any later request with it answers `409 compile_replay_unavailable`.
+  If the judged round answers new questions instead, the next request answers
+  them by the same token (or by a newer one the round answered).
+- **HTTP, a kept round: the zero-call replay.** Pass `{ cognition:
+  'deterministicOnly' }` for the replay that makes no call: the exact input,
+  the token, no `limits`. It binds the answers into the kept plan but asks no
+  judge, so a model-authored candidate comes back `incomplete`, a preview with
+  its judgment pending (`provenance.decision.pending`); replaying again
+  returns the same document. From a replay, the next request stays a replay
+  unless you pass `{ cognition: 'explicitProvider' }`.
+- **Either way,** the server compares the input byte for byte
+  (`409 compile_replay_input_changed` otherwise). Tokens live in that server
+  run only: a restart forgets them (`409 compile_replay_unavailable`), an
+  operator may limit their count and lifetime, and a lost first answer leaves
+  no token. Keep a token as you keep the request; do not log it.
 - **HTTP, without a token.** A held candidate, a cold plan round or a round
   that needed no call keeps no plan. The next request is a new fresh round
-  and may spend again.
-- **Tokens** live in that server run only: a restart forgets them
-  (`409 compile_replay_unavailable`), an operator may limit their count and
-  lifetime, and a lost first answer leaves no token. Keep a token as you keep
-  the request; do not log it.
+  and may spend again. The `cognition` option is refused there: there is no
+  kept round to answer.
 - **Local engine.** The next request repeats the intent with every answer as
   `--answer`. When a round carries at least one answer, the engine replays
   the plan it recorded for that intent under `.nika/compile/` in its working
   directory, with no authoring call, and the seat's verifier may decide it in
   that round; keep the same `cwd` between rounds. `fresh` is dropped. A round
   with no answer reads the intent again and may spend.
+- **A held outcome has no next round.** `nextCompileRequest()` refuses it with
+  `NikaConfigurationError`: its token is forgotten and asking again would
+  author anew. Stop there, or send a new request yourself.
 - **`intent.clarification`.** Its answer replaces the whole request. A server
-  refuses it as an answer (`422 compile_new_intent_required` on a fresh round,
-  `409 compile_replay_input_changed` on a replay): start a new create request
-  with the replacement intent. A local engine consumes it as an `--answer`
-  only beside a seat.
+  refuses it as an answer (`422 compile_new_intent_required` on a fresh or
+  judged round, `409 compile_replay_input_changed` on a replay): start a new
+  create request with the replacement intent. A local engine consumes it as an
+  `--answer` only beside a seat.
 
-A loop must be bounded: stop when a round brings no new answer, and cap the
-number of rounds.
+A loop must be bounded: stop on a held or refused outcome, when a round brings
+no new answer, and after a few rounds.
 
 ```ts
-const first: NikaCompileRequest = { intent, cognition: 'explicitProvider', limits: { max_calls: 8 } };
-let request = first;
+let request: NikaCompileRequest = { intent, cognition: 'explicitProvider', limits: { max_calls: 8 } };
 let outcome = await nika.compile(request);
-const given: Record<string, unknown> = {};
 for (let round = 0; !outcome.ready && round < 4; round += 1) {
   if (isNikaCompileHeld(outcome) || outcome.status === 'refused') break;
-  const reply = await askYourUser(outcome.questions); // your application's choice
-  if (Object.keys(reply).length > 0) {
-    Object.assign(given, reply);
-    request = nextCompileRequest(request, outcome, reply); // a zero-call replay when a token came back
-  } else if (request.replay_token !== undefined) {
-    request = { ...first, answers: given }; // have the answered candidate judged; it may spend
-  } else {
-    break; // nothing new to send
-  }
+  const answers = await askYourUser(outcome.questions); // your application's choice
+  if (Object.keys(answers).length === 0) break;
+  // After a provider round that kept its plan: its judged answer round.
+  request = nextCompileRequest(request, outcome, answers);
   outcome = await nika.compile(request);
 }
 ```
+
+### Servers without the judged answer round
+
+The judged answer round needs an engine that serves it: engine integration
+commit `158a961cd` (`feat(serve): judge a kept round's answer round without
+authoring`), which no released engine carries yet. No `/health` capability
+advertises it. A server from before it, released 0.121.0 and 0.122.0
+included, parses `explicitProvider` with a `replay_token` as
+`422 malformed_compile_request`, before any slot or call: nothing is authored
+or spent and the kept round is untouched. The SDK sends that combination only
+in the shape the wire publishes, so it reports this refusal as a
+`NikaCompatibilityError` with `capability: 'compileJudgedAnswerRound'`. On such
+a server, send the zero-call replay (`{ cognition: 'deterministicOnly' }`) to
+bind the answers, and a new `explicitProvider` round carrying them (your first
+request with `answers`) to have the candidate judged; that round authors
+again and may spend.
 
 ## Held candidates
 
@@ -208,8 +235,9 @@ When the verifier answers on a candidate's bytes and does not accept them, the
 engine marks the outcome with an `applied` diagnostic targeting `verify_held`
 and leaves it `incomplete`. `candidate` then holds a preview to show at most:
 never run it or save it as an accepted result. `isNikaCompileHeld(outcome)`
-reads the marker. A server keeps no replay token for it, so asking again is a
-fresh round. A `verify_resume` marker means no admitted judgment was made: the
+reads the marker. A server keeps no replay token for it, and a held judged
+answer round forgets the token it answered (a later request with it answers
+`409 compile_replay_unavailable`), so asking again is a fresh round. A `verify_resume` marker means no admitted judgment was made: the
 candidate is withdrawn and the round's record kept.
 
 The SDK refuses with `NikaProtocolError` an outcome that calls itself `ready`
@@ -221,7 +249,7 @@ ready.
 | Error | When |
 |---|---|
 | `NikaConfigurationError` | the request or options break a shape law (above); nothing was sent or spawned |
-| `NikaCompatibilityError` | the door lacks `compile`, `compileNativeV2` or a field (`compileOptions`), or the answer carries a wire generation this request cannot receive |
+| `NikaCompatibilityError` | the door lacks `compile`, `compileNativeV2`, the judged answer round (`compileJudgedAnswerRound`) or a field (`compileOptions`), or the answer carries a wire generation this request cannot receive |
 | `NikaProtocolError` | the answer breaks the contract: malformed JSON, a ready outcome without candidate or with a held marker, generation 2 without its receipt, a replay token where none can be, a destination the request never named |
 | `NikaTransportError` | aborted, timed out, the engine could not be spawned or was killed |
 | `NikaOperationError` | the engine refused: `code` is its machine code, `status` the HTTP status or the local exit code |
@@ -232,7 +260,7 @@ ready.
 |---|---|
 | 401 | `unauthorized` |
 | 408 | `request_timeout` (intake, generation 1, replays) · `compile_deadline_exceeded` (a fresh round's absolute deadline passed; a call in flight may still be billed) |
-| 409 | `compile_replay_unavailable` · `compile_replay_input_changed` · `compile_context_changed` (the server's pinned knowledge snapshot moved; nothing was sent) |
+| 409 | `compile_replay_unavailable` (an unknown, expired or forgotten token: a held judged round forgets its own) · `compile_replay_input_changed` · `compile_context_changed` (the server's pinned knowledge snapshot moved; nothing was sent) |
 | 413 | `body_too_large` |
 | 415 | `unsupported_media_type` · `unsupported_content_encoding` |
 | 422 | `malformed_compile_request` · `compile_version_unsupported` · `compile_mode_unsupported` · `compile_cognition_unsupported` · `compile_limit` · `compile_new_intent_required` |
@@ -252,9 +280,10 @@ reports it as `NikaProtocolError` quoting that error. The type
 
 - a generation-1 request or a replay keeps the client's `requestTimeout`
   unless `timeoutMs` is set;
-- a provider round with `limits.deadline_ms` waits for that deadline, the
-  server's 5 s handoff and one `requestTimeout` more, so the server's own
-  `408 compile_deadline_exceeded` arrives before the client stops waiting;
+- a provider round (fresh or judged) with `limits.deadline_ms` waits for that
+  deadline, the server's 5 s handoff and one `requestTimeout` more, so the
+  server's own `408 compile_deadline_exceeded` arrives before the client stops
+  waiting;
 - a provider round without `timeoutMs` or `limits.deadline_ms` gets no SDK
   deadline. The server sets none either unless its operator configured one
   (`nika serve --authoring-deadline`): the round runs until it settles.
@@ -291,19 +320,23 @@ version bundles, speaks generation 1 only, without `requested_trigger` or
 `choice` questions, and its CLI has none of the seat flags. 0.121.0 adds the
 seat flags, `requested_trigger`, `choice` questions and Serve generation 2,
 without `limits.max_calls`. 0.122.0 adds `limits.max_calls` and
-`--authoring-max-calls`. An engine without a flag answers with a usage error;
-a server without a field answers `422 malformed_compile_request`. Point
-`NIKA_BIN` (or `bin`) at the engine you mean to use.
+`--authoring-max-calls`. The judged answer round is newer still: engine
+integration commit `158a961cd`, in no release yet. An engine without a flag
+answers with a usage error; a server without a field answers
+`422 malformed_compile_request`. Point `NIKA_BIN` (or `bin`) at the engine you
+mean to use.
 
 The pinned `openapi.json` and `src/generated/openapi.d.ts` describe the
 released 0.120.3 resident and stay pinned to it. The generation-2 types are
 written by hand from the engine source: `nika-serve/src/server/compile/v2.rs`,
-`author.rs` and `openapi-native.json`, `nika-compile/src/wire.rs` and
-`nika-cli-host/src/compile.rs` with `compile/render.rs`.
+`author.rs` and `openapi-native.json` (at `158a961cd` for the judged answer
+round), `nika-compile/src/wire.rs` and `nika-cli-host/src/compile.rs` with
+`compile/render.rs`.
 
 ## Example
 
 [`examples/compile-then-run.ts`](../examples/compile-then-run.ts) compiles an
-intention, answers its questions from a JSON file, writes the ready candidate
-and runs it through `run()`, on either door. It reads the server URL and token
+intention, answers its questions from a JSON file (over HTTP by the judged
+answer round), writes the ready candidate and runs it through `run()`, on
+either door. It reads the server URL and token
 or the engine binary from the environment and embeds no key.

@@ -939,10 +939,10 @@ if (candidate.ready && candidate.candidate !== null) {
 'explicitProvider'` lets the server's seated model author one round (the
 server must advertise `compileNativeV2`); on a local engine, `authoringModel`
 seats the model you name, with the engine's own credentials. Answer the
-questions with `nextCompileRequest()`: over HTTP it replays the kept round by
-its `replay_token` with zero provider calls, which binds the answers without
-asking the verifier; a provider round carrying the answers then has the
-candidate judged (see [docs/compile.md](docs/compile.md)).
+questions with `nextCompileRequest()`: over HTTP, after a provider round that
+kept its plan, it sends that round's judged answer round, where the server
+replays the kept plan with your answers and its seat only judges it, with no
+second authoring call (see [docs/compile.md](docs/compile.md)).
 
 ```ts
 import { isNikaCompileHeld, nextCompileRequest, type NikaCompileRequest } from '@supernovae-st/nika';
@@ -954,13 +954,11 @@ let request: NikaCompileRequest = {
 };
 let outcome = await remote.compile(request);
 if (outcome.status === 'incomplete' && !isNikaCompileHeld(outcome)) {
-  const answers = { 'const.audience': 'team' };
-  // Zero calls: the answers bound into the kept round, a preview pending judgment.
-  const preview = await remote.compile(nextCompileRequest(request, outcome, answers));
-  console.log(preview.candidate);
-  // One provider round carrying the answers has the candidate judged; it may spend.
-  outcome = await remote.compile({ ...request, answers });
+  // The judged answer round: the kept plan replayed with the answers, then judged.
+  request = nextCompileRequest(request, outcome, { 'const.audience': 'team' });
+  outcome = await remote.compile(request);
 }
+console.log(outcome.ready ? outcome.candidate : outcome.diagnostics);
 ```
 
 - **Provider calls.** `compile_version` is 2 exactly when one happened, with
@@ -968,7 +966,12 @@ if (outcome.status === 'incomplete' && !isNikaCompileHeld(outcome)) {
   whatever keys the environment holds.
 - **Held candidates.** When the verifier does not accept a candidate the
   outcome stays `incomplete` and `isNikaCompileHeld(outcome)` is true: the
-  candidate is a preview, never a workflow to run.
+  candidate is a preview, never a workflow to run, and a held judged round's
+  token is forgotten (`409 compile_replay_unavailable` if sent again).
+- **Engines.** The judged answer round needs engine integration commit
+  `158a961cd`, in no release yet; an older server refuses it with
+  `NikaCompatibilityError` (`compileJudgedAnswerRound`) and spends nothing.
+  `{ cognition: 'deterministicOnly' }` asks for the zero-call replay instead.
 - **Refusals.** A server refusal is a `NikaOperationError` whose `code` is the
   engine's (`compile_limit`, `compile_new_intent_required`,
   `malformed_compile_request`, `compile_context_changed`…).

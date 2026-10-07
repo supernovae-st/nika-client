@@ -490,6 +490,32 @@ function destination(output, readyCandidate) {
   return existsSync(output) ? { existing_destination: output } : {};
 }
 
+/**
+ * `nika compile --observe-only -- <intent>` (engine `nika-cli-host/src/compile.rs`
+ * `observation_document`): the observer's facts of the files the intent states,
+ * never a row. SYNTHETIC values: `./calendar.json` is observed as a JSON object
+ * of two keys; an intent naming no file is observed as nothing; `unobservable`
+ * is refused like an engine from before the flag (clap: stderr, exit 2).
+ */
+function observeOnly() {
+  logInvocation();
+  const intent = argv[argv.indexOf('--') + 1] ?? '';
+  if (intent.includes('unobservable')) {
+    process.stderr.write("error: unexpected argument '--observe-only' found\n", () => process.exit(2));
+    return;
+  }
+  const world = intent.includes('./calendar.json')
+    ? { observed: [{ path: './calendar.json', state: 'observed', complete: true, kind: 'json',
+      columns: ['appointments', 'owner'], bytes: 512, peek_sha256: 'e'.repeat(64) }],
+    kinds: { './calendar.json': { sampled: 1, nested: { paths: { 'appointments[].start': { text: 3 } } } } } }
+    : null;
+  const trial = world === null ? null
+    : { files: [{ path: './calendar.json', text: '{"owner":"o","appointments":[]}' }] };
+  const document = { observation_version: 1, intent_sha256: 'f'.repeat(64), observed_world: world,
+    trial_inputs: trial };
+  process.stdout.write(`${JSON.stringify(document)}\n`, () => process.exit(0));
+}
+
 function run() {
   logInvocation();
   const workflow = argv[1];
@@ -512,6 +538,8 @@ if (argv[0] === '--sdk-identity') {
   logInvocation();
   if (process.env.NIKA_FAKE_COMPILE_PROBE === 'slow') sleepForever();
   else process.stdout.write(`${JSON.stringify(IDENTITY)}\n`);
+} else if (argv[0] === 'compile' && argv.includes('--observe-only')) {
+  observeOnly();
 } else if (argv[0] === 'compile' && argv.includes('--json')) {
   await compile();
 } else if (argv[0] === 'run' && argv.includes('--json')) {

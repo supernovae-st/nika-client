@@ -95,6 +95,49 @@ export const COMPILE_REPLAY_HEADER = 'Nika-Compile-Replay';
 export const COMPILE_JUDGED_ROUND = 'compileJudgedAnswerRound';
 
 /**
+ * The capability a resident lists once its generation 2 admits
+ * `observed_world`: what the caller's own engine observed of the files the
+ * request states (`nika compile --observe-only`, engine
+ * `nika-cli-host/src/compile/observe.rs`), read by the server's seat, the
+ * grounding law and the judge exactly as the CLI's own observation is. The
+ * server reads no file of the caller's.
+ */
+export const COMPILE_OBSERVED_WORLD = 'compileObservedWorld';
+
+/**
+ * The capability a resident lists once its operator seated a decision model
+ * beside the author (`nika serve --decision-model`): it judges every candidate
+ * in place of the author. It names no model.
+ */
+export const COMPILE_DECISION_SEAT = 'compileDecisionSeat';
+
+/**
+ * The capability a resident lists once it tries candidates (`nika serve`):
+ * generation 2 then admits `trial_inputs` beside `observed_world` — the text of
+ * the files the local observation read — and tries each final candidate on a
+ * scratch project of exactly those files, in the observed room `nika compile`
+ * and the Session use. The trial's report reaches the judge and the repairs.
+ */
+export const COMPILE_TRIAL_INPUTS = 'compileTrialInputs';
+
+/** What one local observation sends: the exact JSON texts of its two fields. */
+export interface CompileObservation {
+  /** `observed_world`: the observer's facts (headers, keys, short values, never a row). */
+  readonly world: string;
+  /** `trial_inputs`: the text of the files it read, when the engine offered them. */
+  readonly trial?: string;
+}
+
+/** The `nika compile --observe-only` document generation this SDK reads. */
+export const COMPILE_OBSERVATION_VERSION = 1;
+
+/**
+ * Finite bound for one observation document: at most 256 KiB of
+ * `observed_world` and 1 MiB of `trial_inputs` text, JSON-escaped.
+ */
+export const COMPILE_OBSERVATION_MAX_BYTES = 4 * 1024 * 1024;
+
+/**
  * Finite bound for one compile response (the candidate plus its full Check
  * report in one JSON document). Overflow kills the child and fails typed
  * (`NikaProtocolError`); the SDK never parses a truncated payload.
@@ -382,9 +425,12 @@ function normalizeChange(change: unknown): string | NikaCompileSetConstant {
 export function normalizeCompileOptions(options: NikaCompileOptions): NikaCompileOptions {
   const record = dataRecord(options, 'options');
   for (const key of Reflect.ownKeys(record)) {
-    if (key !== 'signal' && key !== 'timeoutMs') {
+    if (key !== 'signal' && key !== 'timeoutMs' && key !== 'observe') {
       throw new NikaConfigurationError(`compile: unknown option ${String(key)}`);
     }
+  }
+  if (record.observe !== undefined && typeof record.observe !== 'boolean') {
+    throw new NikaConfigurationError('compile: observe must be a boolean');
   }
   const timeoutMs = record.timeoutMs;
   if (timeoutMs !== undefined && (typeof timeoutMs !== 'number'
@@ -646,7 +692,10 @@ export function compileTimeoutMs(
  * (`deterministicOnly` + `replay_token`); everything else is generation 1,
  * byte for byte as before.
  */
-export function compileRequest(request: NikaCompileRequest): CompileHttpRequest {
+export function compileRequest(
+  request: NikaCompileRequest,
+  observation?: CompileObservation,
+): CompileHttpRequest {
   refuseNativeOnlyFields(request);
   compileAnswers(request.answers); // Keep the literal/key law identical across doors.
   const answers = request.answers === undefined ? ''
@@ -684,8 +733,14 @@ export function compileRequest(request: NikaCompileRequest): CompileHttpRequest 
   }
   const limits = request.limits === undefined ? '' : `,"limits":${JSON.stringify(request.limits)}`;
   const token = request.replay_token === undefined ? '' : `,"replay_token":"${request.replay_token}"`;
+  if (observation !== undefined && generation !== COMPILE_PROVIDER_WIRE_VERSION) {
+    throw new NikaConfigurationError('compile: observed_world rides a generation-2 request only');
+  }
+  const observed = observation === undefined ? ''
+    : `,"observed_world":${observation.world}`
+      + (observation.trial === undefined ? '' : `,"trial_inputs":${observation.trial}`);
   return {
-    body: `${head}${input}${answers}${limits}${token}}`,
+    body: `${head}${input}${answers}${limits}${token}${observed}}`,
     generation,
     capability: generation === COMPILE_PROVIDER_WIRE_VERSION
       ? COMPILE_NATIVE_V2_CAPABILITY
@@ -696,6 +751,58 @@ export function compileRequest(request: NikaCompileRequest): CompileHttpRequest 
     provider,
     judged: provider && request.replay_token !== undefined,
   };
+}
+
+/**
+ * The words whose stated files a generation-2 request's observation covers,
+ * exactly as the server binds it (engine `nika-serve/src/server/compile/v2.rs`):
+ * a creation's intent, a text revision's original request and its change. A
+ * structured constant states no file.
+ */
+export function observedText(request: NikaCompileRequest): string | undefined {
+  if (request.intent !== undefined) return request.intent;
+  if (typeof request.change === 'string' && request.original_intent !== undefined) {
+    return `${request.original_intent}\n${request.change}`;
+  }
+  return undefined;
+}
+
+/**
+ * The `observed_world` (and, when `trials`, the `trial_inputs`) of one `nika
+ * compile --observe-only` capture, as the exact JSON texts to send, or
+ * `undefined` when the request states no file the engine could observe. The
+ * SDK forwards the engine's document unchanged: the server admits it by the
+ * observer's own law and refuses anything else whole.
+ */
+export function observedWorldFrom(
+  captured: EngineCapture,
+  transport: NikaTransportKind,
+  engine: string,
+  trials = false,
+): CompileObservation | undefined {
+  const refuse = (why: string) => new NikaCompatibilityError(
+    COMPILE_OBSERVED_WORLD,
+    transport,
+    `The local engine at ${engine} did not observe the request's files (${why}); the remote seat `
+    + 'would author without them. Nothing was posted. Use an engine that prints `nika compile '
+    + "--observe-only`, or pass { observe: false } to compile without the observation",
+  );
+  if (captured.exitSignal !== null) throw refuse(`ended by ${captured.exitSignal}`);
+  if (captured.exitCode !== 0) throw refuse(`exit ${captured.exitCode}`);
+  const document = machineObject(tryParseJson(captured.stdout));
+  if (!document || document.observation_version !== COMPILE_OBSERVATION_VERSION) {
+    throw refuse('no observation document of version 1');
+  }
+  const world = document.observed_world;
+  if (world === null) return undefined;
+  if (!machineObject(world)) throw refuse('observed_world is neither an object nor null');
+  const trial = document.trial_inputs;
+  if (trial !== undefined && trial !== null && !machineObject(trial)) {
+    throw refuse('trial_inputs is neither an object nor null');
+  }
+  return trials && trial !== undefined && trial !== null
+    ? { world: JSON.stringify(world), trial: JSON.stringify(trial) }
+    : { world: JSON.stringify(world) };
 }
 
 /** Local engine flags with no field on the HTTP wire: a typed gap, never a silent drop. */

@@ -42,13 +42,19 @@ import { literalInputs } from './literal-inputs.js';
 import {
   COMPILE_CAPABILITY,
   COMPILE_JUDGED_ROUND,
+  COMPILE_OBSERVATION_MAX_BYTES,
+  COMPILE_OBSERVED_WORLD,
   COMPILE_REPLAY_HEADER,
+  COMPILE_TRIAL_INPUTS,
+  type CompileObservation,
   COMPILE_RESPONSE_MAX_BYTES,
   COMPILE_PROVIDER_WIRE_VERSION,
   compilePayloadFrom,
   compileRequest,
   compileSignal,
   compileTimeoutMs,
+  observedText,
+  observedWorldFrom,
 } from './compile.js';
 import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
 import { readSettlement } from './settlement.js';
@@ -223,7 +229,7 @@ export class HttpTransport implements Transport {
     request: NikaCompileRequest,
     options: NikaCompileOptions,
   ): Promise<NikaCompileOutcome> {
-    const planned = compileRequest(request);
+    let planned = compileRequest(request);
     const timeoutMs = compileTimeoutMs(request, planned.provider, options.timeoutMs,
       this.options.requestTimeout);
     const composed = compileSignal({ ...options, timeoutMs });
@@ -251,6 +257,8 @@ export class HttpTransport implements Transport {
           + "'deterministicOnly' }) or with a new explicitProvider round carrying the answers, which may "
           + 'spend; nextCompileRequest() chooses that round by default on such a server');
       }
+      const observed = await this.observation(request, planned.generation, identity, options, signal);
+      if (observed !== undefined) planned = compileRequest(request, observed);
       const path = '/v1/compile';
       const response = await this.fetchResponse(path, {
         method: 'POST',
@@ -1130,6 +1138,46 @@ export class HttpTransport implements Transport {
       maxFrameBytes: this.options.machineBufferBytes,
       maxBufferBytes: this.options.machineBufferBytes,
     };
+  }
+
+  /**
+   * What the local engine observes of the files a generation-2 request states,
+   * as the `observed_world` to send (see `NikaCompileOptions.observe`): the
+   * engine's own bounded document, run in the client's `cwd` — the server reads
+   * no file of the caller's. `undefined` when nothing is to be sent.
+   */
+  private async observation(
+    request: NikaCompileRequest,
+    generation: number,
+    identity: NikaEngineIdentity,
+    options: NikaCompileOptions,
+    signal?: AbortSignal,
+  ): Promise<CompileObservation | undefined> {
+    const text = observedText(request);
+    if (generation !== COMPILE_PROVIDER_WIRE_VERSION || text === undefined || options.observe === false) {
+      return undefined;
+    }
+    if (!identity.supportedCapabilities.includes(COMPILE_OBSERVED_WORLD)) {
+      if (options.observe !== true) return undefined;
+      throw this.gap(COMPILE_OBSERVED_WORLD,
+        `The connected nika serve ${identity.engineVersion} does not advertise ${COMPILE_OBSERVED_WORLD} `
+        + `(advertised: ${identity.supportedCapabilities.join(', ') || 'nothing'}): it cannot read what `
+        + 'this machine observes of the request\'s files. Nothing was posted');
+    }
+    // The local engine's integrity and clocks, against the server identity in hand.
+    compatibleEngineIdentity(identity, this.kind, await verifyNikaEngine(this.localEngine()));
+    const engine = this.localEngine().bin;
+    const captured = await captureEngine(engine, ['compile', '--observe-only', '--', text], {
+      cwd: this.options.cwd,
+      signal,
+      bufferBytes: COMPILE_OBSERVATION_MAX_BYTES,
+      transport: this.kind,
+      label: 'compile observation',
+      killGraceMs: 2_000,
+    });
+    if (signal?.aborted) throw new NikaTransportError(this.kind, 'compile aborted');
+    return observedWorldFrom(captured, this.kind, engine,
+      identity.supportedCapabilities.includes(COMPILE_TRIAL_INPUTS));
   }
 
   private gap(capability: string, message: string): NikaCompatibilityError {

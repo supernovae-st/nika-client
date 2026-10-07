@@ -3,7 +3,13 @@
  * JSON file, then run the ready workflow through the ordinary `run()` path.
  *
  *   npm run build                       # the example imports the package by name
- *   node examples/compile-then-run.ts "<intent>" answers.json out/workflow.nika
+ *   node examples/compile-then-run.ts "<intent>" answers.json workflow.nika
+ *
+ * Write the workflow beside the files the intent names: a workflow's relative
+ * paths (`./calendar.json`) resolve from its own directory when it runs.
+ * Over HTTP the server runs the admitted snapshot against its own files, not
+ * this machine's: a workflow that reads local data runs there only if the
+ * server holds that data too (otherwise `NIKA-BUILTIN-READ-001`).
  *
  * `answers.json` maps question keys to JSON values, for example
  * `{ "const.request": "An outage affects support customers." }`.
@@ -31,6 +37,15 @@
  * without it the next round is a fresh one carrying the answers, which authors
  * again and may spend.
  *
+ * Over HTTP a provider round also carries what the LOCAL engine observes of
+ * the files the intent names (`nika compile --observe-only`, in this process's
+ * working directory: headers, keys, short repeated values, never a row) when
+ * the server lists compileObservedWorld, so the server's seat reads the real
+ * shape instead of asking you for field names: run the example from the
+ * directory that holds the files. NIKA_OBSERVE=0 sends none. A server started
+ * with `--decision-model` (compileDecisionSeat) has that model judge each
+ * candidate instead of the author.
+ *
  * Exit codes: 0 the run succeeded · 1 the run did not, or an SDK error ·
  * 2 compile stopped before a ready candidate · 64 usage.
  */
@@ -46,7 +61,7 @@ const MAX_ROUNDS = 4;
 async function main(): Promise<number> {
   const [intent, answersFile, outputFile] = process.argv.slice(2);
   if (!intent || !answersFile || !outputFile) {
-    console.error('usage: node examples/compile-then-run.ts "<intent>" answers.json out/workflow.nika');
+    console.error('usage: node examples/compile-then-run.ts "<intent>" answers.json workflow.nika');
     return 64;
   }
   const answers: unknown = JSON.parse(await readFile(answersFile, 'utf8'));
@@ -78,7 +93,8 @@ async function main(): Promise<number> {
   }
 
   const given = new Set<string>();
-  let outcome = await nika.compile(request);
+  const options = process.env.NIKA_OBSERVE === '0' ? { observe: false } : {};
+  let outcome = await nika.compile(request, options);
   for (let round = 1; !outcome.ready; round += 1) {
     report(outcome);
     if (isNikaCompileHeld(outcome)) {
@@ -106,7 +122,7 @@ async function main(): Promise<number> {
     // second authoring call), else a fresh round carrying the answers. Locally
     // the engine replays the plan it recorded under .nika/compile/.
     request = nextCompileRequest(request, outcome, reply);
-    outcome = await nika.compile(request);
+    outcome = await nika.compile(request, options);
   }
   report(outcome);
 

@@ -66,7 +66,7 @@ function resident(capabilities) {
       return json({
         status: 'ok',
         service: 'nika-serve',
-        engineVersion: '0.120.3',
+        engineVersion: '0.122.0',
         machineProtocolVersion: 1,
         snapshotFormatVersion: 1,
         checkReportVersion: 1,

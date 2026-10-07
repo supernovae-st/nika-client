@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.122.0]
+
 ### Added
 
 - Packed depth project `signed-webhook-intake` — the app-owned webhook
@@ -24,6 +26,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   webhook, a manual `run()` and a `once` schedule that fires the declared
   default. The depth ledger, evidence gate and replay fixtures now count six
   projects; the new row records behavioral verdicts only, never a job id.
+
+### Changed
+
+- Lockstep with public engine `v0.122.0`
+  (`5660e683fd737bbd6f0abfa3b9c32cc00f189d93`, engine #1758); the SDK does
+  not lockstep engine 0.121.0. Package and native optional payloads follow
+  the engine train via `sync:native-versions`. `ENGINE_QUAL_PIN` /
+  `ENGINE_CANDIDATE` name the tagged commit. `openapi.json` and
+  `src/generated/openapi.d.ts` are regenerated from the live 0.122.0 Serve:
+  `info.version` is `0.122.0`; the compile outcome gains `requested_trigger`,
+  `choice` questions with `options` and optional provenance `strategy`,
+  `decision`, `plan` and `suggested_file`; a schedule `PUT` accepts per-fire
+  `inputs`. The route set is unchanged. Current gauntlet evidence is
+  regenerated from the verified public macOS arm64 archive; the historical
+  paid-provider and trace ledgers are untouched.
+
+### Known limitation
+
+- The SDK does not yet speak the 0.122.0 additions. `compile()` does not
+  project `requested_trigger`, keeps the new provenance fields untyped and
+  refuses a `choice` question: on engine 0.122.0 an intent that names a
+  schedule asks `trigger.missed` and `trigger.overlap` as choices, so its
+  outcome fails as `NikaProtocolError` on both transports, where engine
+  0.120.3 answered `incomplete` without questions. Skeletons, edits and the
+  other compile parity cases behave as on 0.120.3. `schedule()` does not send
+  per-fire `inputs`.
 
 ## [0.120.3]
 

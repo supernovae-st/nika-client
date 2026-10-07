@@ -885,8 +885,11 @@ export interface NikaNextCompileOptions {
    * `explicitProvider` is its judged answer round (the server's seat judges
    * the replayed bytes: judge calls, no authoring call, it may spend);
    * `deterministicOnly` is its zero-call replay (no call, no judge, so a
-   * model-authored candidate stays a preview). By default the next round keeps
-   * the previous request's cognition. Refused when no kept round is involved.
+   * model-authored candidate stays a preview). By default, after an
+   * `explicitProvider` round: the judged answer round where the server serves
+   * it (`outcome.judged_answer_round_available`), else a new fresh round
+   * carrying the answers (it may spend); after a zero-call replay: another
+   * one. Refused when no kept round is involved.
    */
   cognition?: NikaCompileRequestCognition;
 }
@@ -1268,6 +1271,14 @@ export interface NikaCompileOutcome {
    * log it.
    */
   replay_token?: string;
+  /**
+   * HTTP only, beside a kept round (this outcome carries a `replay_token`, or
+   * its request answered one): whether the server that answered serves that
+   * round's judged answer round, as its `/health` lists
+   * `compileJudgedAnswerRound`. An SDK fact, not part of the engine's
+   * document; `nextCompileRequest()` reads it.
+   */
+  judged_answer_round_available?: boolean;
   /**
    * Local engine only, and only when the request named `output`: the
    * destination the engine wrote (`null` when nothing was written).

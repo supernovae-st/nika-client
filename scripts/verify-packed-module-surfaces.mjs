@@ -319,6 +319,8 @@ try {
     'const compileGeneration: 1 | 2 = compileOutcome.compile_version;',
     'const compileCalls: number | undefined = compileOutcome.provenance.authoring?.calls;',
     'const compileToken: string | undefined = compileOutcome.replay_token;',
+    'const compileJudgedServed: boolean | undefined = compileOutcome.judged_answer_round_available;',
+    'void compileJudgedServed;',
     'const compileHeld: boolean = isNikaCompileHeld(compileOutcome);',
     'void compileGeneration; void compileCalls; void compileToken; void compileHeld;',
     `const compileFresh: NikaCompileRequest = { intent: 'x', cognition: 'explicitProvider', limits: { max_calls: 6, deadline_ms: 60000 } };`,
@@ -560,8 +562,9 @@ function assertCompile(report, moduleSystem) {
   say('HTTP structured edits use the accepted wire'));
 
   const REPLAY = '0123456789abcdef'.repeat(4);
-  assert.deepEqual(report.generation2.round1, { version: 2, status: 'incomplete', token: true, calls: 2, held: false },
-    say('a provider round reads generation 2 with its receipt and replay token'));
+  assert.deepEqual(report.generation2.round1, { version: 2, status: 'incomplete', token: true, calls: 2, held: false,
+    judgedAvailable: true },
+  say('a provider round reads generation 2 with its receipt, replay token and the judged round its server serves'));
   assert.deepEqual(report.generation2.round2, { version: 2, ready: true, calls: 1, token: false },
     say('the judged answer round has the replayed candidate judged, ready, with no authoring call'));
   assert.deepEqual(report.generation2.preview, { version: 1, status: 'incomplete', token: false },

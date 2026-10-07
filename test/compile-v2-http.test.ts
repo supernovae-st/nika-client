@@ -25,7 +25,11 @@ import { healthResponse, jsonResponse, TOKEN_A } from './helpers/http-depth-harn
 const COMPILE_ENGINE = fileURLToPath(new URL('./fixtures/fake-nika-compile.mjs', import.meta.url));
 const argvLog = path.join(tmpdir(), `nika-sdk-compile-v2-http-${process.pid}.log`);
 const REPLAY = '0123456789abcdef'.repeat(4);
-const NATIVE_SERVER = ['check', 'executionSnapshot', 'eventStream', 'cancel', 'jobInputs', 'compile', 'compileNativeV2'];
+/** A native server on the engine line that judges answer rounds (b7dace1e5): both tokens. */
+const NATIVE_SERVER = ['check', 'executionSnapshot', 'eventStream', 'cancel', 'jobInputs', 'compile', 'compileNativeV2',
+  'compileJudgedAnswerRound'];
+/** A native server from before the judged answer round (released 0.121.0, 0.122.0). */
+const NATIVE_V2_SERVER = ['check', 'executionSnapshot', 'eventStream', 'cancel', 'jobInputs', 'compile', 'compileNativeV2'];
 const DEFAULT_SERVER = ['check', 'executionSnapshot', 'eventStream', 'cancel', 'jobInputs', 'compile'];
 const INTENT = 'Every morning at 9, summarize ./inbox/*.md into ./digest.md for the team';
 
@@ -181,7 +185,7 @@ describe('HTTP compile generation 2 (provider rounds and kept-round replay)', ()
     expect(init.method).toBe('POST');
     expect(init.headers.get('Authorization')).toBe(`Bearer ${TOKEN_A}`);
     expect(init.headers.has('Idempotency-Key')).toBe(false);
-    expect(outcome).toEqual({ ...fresh(), ready: false, replay_token: REPLAY });
+    expect(outcome).toEqual({ ...fresh(), ready: false, replay_token: REPLAY, judged_answer_round_available: true });
     expect(outcome.compile_version).toBe(2);
     expect(outcome.provenance.cognition).toBe('explicitProvider');
     expect(outcome.provenance.authoring?.calls).toBe(2);
@@ -203,6 +207,8 @@ describe('HTTP compile generation 2 (provider rounds and kept-round replay)', ()
     expect(round2).toMatchObject({ compile_version: 2, status: 'ready', ready: true });
     expect(round2.candidate).toContain('audience: "team"');
     expect(round2.provenance.authoring?.context).toEqual([expect.objectContaining({ role: 'judge_request' })]);
+    expect(round1.judged_answer_round_available).toBe(true);
+    expect(round2.judged_answer_round_available).toBe(true);
     expect(isNikaCompileHeld(round2)).toBe(false);
     expect(fetch).toHaveBeenCalledTimes(3); // the identity probe is not repeated
   });
@@ -273,7 +279,45 @@ describe('HTTP compile generation 2 (provider rounds and kept-round replay)', ()
     });
   });
 
-  it('types a server from before the judged answer round as a compatibility gap, nothing spent', async () => {
+  it('refuses the judged answer round on a server that does not advertise it, after /health alone', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(server(NATIVE_V2_SERVER));
+    const error = await failure(client(fetch).compile({
+      intent: INTENT, cognition: 'explicitProvider', replay_token: REPLAY, answers: { 'const.audience': 'team' },
+    }));
+    expect(error).toBeInstanceOf(NikaCompatibilityError);
+    expect(error).toMatchObject({ capability: 'compileJudgedAnswerRound', transport: 'http' });
+    expect(error.message).toMatch(/Nothing was posted/);
+    expect(error.message).toMatch(/cognition: 'deterministicOnly'/);
+    expect(error.message).not.toContain(REPLAY);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('still posts the zero-call replay to a server without the judged answer round', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(server(NATIVE_V2_SERVER))
+      .mockResolvedValueOnce(jsonResponse(replayed(), 200, noStore));
+    const outcome = await client(fetch).compile({ intent: INTENT, cognition: 'deterministicOnly', replay_token: REPLAY });
+    expect(outcome).toMatchObject({ status: 'incomplete', judged_answer_round_available: false });
+  });
+
+  it('answers a kept round by a fresh round carrying the answers where the server does not judge', async () => {
+    const authored = document(2, { status: 'ready', candidate: 'nika: morning-digest\nconst: { audience: "team" }\ntasks: {}\n' });
+    const fetch = vi.fn().mockResolvedValueOnce(server(NATIVE_V2_SERVER))
+      .mockResolvedValueOnce(jsonResponse(fresh(), 200, kept))
+      .mockResolvedValueOnce(jsonResponse(authored, 200, noStore));
+    const nika = client(fetch);
+    const first = { intent: INTENT, cognition: 'explicitProvider' as const, limits: { max_calls: 6 } };
+    const round1 = await nika.compile(first);
+    expect(round1).toMatchObject({ replay_token: REPLAY, judged_answer_round_available: false });
+    const round2 = await nika.compile(nextCompileRequest(first, round1, { 'const.audience': 'team' }));
+    expect(JSON.parse(posted(fetch, 2).body)).toEqual({
+      compile_version: 2, mode: 'create', cognition: 'explicitProvider', intent: INTENT,
+      answers: { 'const.audience': 'team' }, limits: { max_calls: 6 },
+    });
+    expect(round2).toMatchObject({ compile_version: 2, ready: true });
+    expect(round2).not.toHaveProperty('judged_answer_round_available');
+  });
+
+  it('keeps a defensive mapping when a server that advertised the round refuses it as malformed', async () => {
     const malformed = { error: { code: 'malformed_compile_request',
       message: 'use compile_version 2 with cognition explicitProvider (create {intent} or edit {source, change}; a text change also carries original_intent) or deterministicOnly with the replay_token of that round' } };
     const fetch = respond(jsonResponse(malformed, 422));
@@ -282,9 +326,10 @@ describe('HTTP compile generation 2 (provider rounds and kept-round replay)', ()
     }));
     expect(error).toBeInstanceOf(NikaCompatibilityError);
     expect(error).toMatchObject({ capability: 'compileJudgedAnswerRound', transport: 'http' });
-    expect(error.message).toMatch(/predates that round/);
-    expect(error.message).toMatch(/cognition: 'deterministicOnly'/);
+    expect(error.message).toMatch(/although its health report listed compileJudgedAnswerRound/);
+    expect(error.message).toMatch(/Nothing was authored or spent/);
     expect(error.message).not.toContain(REPLAY);
+    expect(fetch).toHaveBeenCalledTimes(2);
   });
 
   it.each([
@@ -308,6 +353,7 @@ describe('HTTP compile generation 2 (provider rounds and kept-round replay)', ()
     const first = { intent: INTENT, cognition: 'explicitProvider' as const, limits: { max_calls: 4 } };
     const outcome = await client(fetch).compile(first);
     expect(outcome).not.toHaveProperty('replay_token');
+    expect(outcome).not.toHaveProperty('judged_answer_round_available');
     expect(nextCompileRequest(first, outcome, { 'const.audience': 'lead' })).toEqual({
       ...first, answers: { 'const.audience': 'lead' },
     });

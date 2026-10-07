@@ -235,6 +235,15 @@ export class HttpTransport implements Transport {
             + 'native authoring model (nika serve --authoring-model). Nothing was posted, and the SDK '
             + 'never compiles locally as a substitute');
       }
+      if (planned.judged && !identity.supportedCapabilities.includes(COMPILE_JUDGED_ROUND)) {
+        throw this.gap(COMPILE_JUDGED_ROUND,
+          `The connected nika serve ${identity.engineVersion} does not advertise ${COMPILE_JUDGED_ROUND} `
+          + `(advertised: ${identity.supportedCapabilities.join(', ') || 'nothing'}): it does not judge a `
+          + "kept round's answer round (cognition 'explicitProvider' with a replay_token). Nothing was "
+          + 'posted, and the kept round is untouched. Answer it with its zero-call replay ({ cognition: '
+          + "'deterministicOnly' }) or with a new explicitProvider round carrying the answers, which may "
+          + 'spend; nextCompileRequest() chooses that round by default on such a server');
+      }
       const path = '/v1/compile';
       const response = await this.fetchResponse(path, {
         method: 'POST',
@@ -260,37 +269,46 @@ export class HttpTransport implements Transport {
           throw new NikaProtocolError(this.kind, 'HTTP compile returned a malformed refusal or non-contract status');
         }
         if (planned.judged && response.status === 422 && error.code === 'malformed_compile_request') {
-          // The SDK sends a judged answer round only in the shape the wire publishes,
-          // so this refusal names a server from before the round (released engines
-          // up to 0.122.0 parse explicitProvider + replay_token as malformed). The
-          // parse refuses before any slot or call: nothing was authored or spent.
+          // Defensive only: the gate above posts a judged answer round only to a
+          // server that advertised it. This client reads /health once, so the
+          // server may since have been replaced by one from before the round
+          // (released engines up to 0.122.0 parse explicitProvider + replay_token
+          // as malformed). The parse refuses before any slot or call.
           throw this.gap(COMPILE_JUDGED_ROUND,
             'The connected nika serve refused the judged answer round (cognition '
-            + "'explicitProvider' with a replay_token) as malformed_compile_request: it predates "
-            + 'that round (engine integration commit 158a961cd; no released engine serves it yet). '
-            + 'Nothing was authored or spent, and the kept round is untouched. Send its zero-call '
-            + "replay instead (nextCompileRequest(request, outcome, answers, { cognition: "
-            + "'deterministicOnly' })), and a new explicitProvider round carrying the answers to "
-            + 'have the candidate judged; that round may spend');
+            + "'explicitProvider' with a replay_token) as malformed_compile_request although its "
+            + `health report listed ${COMPILE_JUDGED_ROUND} when this client read it: the server was `
+            + 'probably replaced since by one from before that round (or an answer nests beyond the '
+            + "server's parser ceiling). Nothing was authored or spent, and the kept round is "
+            + "untouched. Answer it with its zero-call replay ({ cognition: 'deterministicOnly' }) or "
+            + 'a new explicitProvider round carrying the answers, which may spend');
         }
         throw this.refused(path, { operation: 'compile', status: response.status,
           refusal: { code: error.code, message: this.redact(error.message) } });
       }
       const outcome = compilePayloadFrom(object, this.kind, this.options.url, planned.accepted);
       const token = response.headers.get(COMPILE_REPLAY_HEADER);
-      if (token === null) return outcome;
-      // Only a provider round (fresh, or a kept round's judged answer round) may
-      // leave a kept plan. The token is never quoted: it is the handle of a round
-      // this server run keeps.
-      if (!planned.provider) {
-        throw new NikaProtocolError(this.kind,
-          `HTTP compile answered a ${COMPILE_REPLAY_HEADER} token to a request that keeps no round`);
+      if (token !== null) {
+        // Only a provider round (fresh, or a kept round's judged answer round) may
+        // leave a kept plan. The token is never quoted: it is the handle of a round
+        // this server run keeps.
+        if (!planned.provider) {
+          throw new NikaProtocolError(this.kind,
+            `HTTP compile answered a ${COMPILE_REPLAY_HEADER} token to a request that keeps no round`);
+        }
+        if (!/^[0-9a-f]{64}$/.test(token)) {
+          throw new NikaProtocolError(this.kind,
+            `HTTP compile answered a malformed ${COMPILE_REPLAY_HEADER} token`);
+        }
       }
-      if (!/^[0-9a-f]{64}$/.test(token)) {
-        throw new NikaProtocolError(this.kind,
-          `HTTP compile answered a malformed ${COMPILE_REPLAY_HEADER} token`);
-      }
-      return { ...outcome, replay_token: token };
+      // Beside a kept round, say whether this server judges its answer round, so
+      // nextCompileRequest() chooses a round the server serves.
+      if (token === null && request.replay_token === undefined) return outcome;
+      return {
+        ...outcome,
+        ...(token === null ? {} : { replay_token: token }),
+        judged_answer_round_available: identity.supportedCapabilities.includes(COMPILE_JUDGED_ROUND),
+      };
     } catch (cause) {
       if (signal?.aborted) {
         throw new NikaTransportError(this.kind, composed.timedOut()

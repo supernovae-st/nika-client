@@ -203,7 +203,8 @@ module.exports = async function compileScenario(sdk, engines) {
       if (pathname === '/health') {
         return Response.json({ status: 'ok', service: 'nika-serve', engineVersion: '0.122.0',
           machineProtocolVersion: 1, snapshotFormatVersion: 1, checkReportVersion: 1, eventFormatVersion: 1,
-          traceFormatVersion: 2, supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'compile', 'compileNativeV2'] });
+          traceFormatVersion: 2, supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'compile',
+            'compileNativeV2', 'compileJudgedAnswerRound'] });
       }
       const body = JSON.parse(init.body);
       const provenance = { ...ready.provenance, cognition: 'explicitProvider', strategy: 'native' };
@@ -235,7 +236,8 @@ module.exports = async function compileScenario(sdk, engines) {
       { cognition: 'deterministicOnly' }));
     report.generation2 = {
       round1: { version: round1.compile_version, status: round1.status, token: round1.replay_token === REPLAY,
-        calls: round1.provenance.authoring.calls, held: sdk.isNikaCompileHeld(round1) },
+        calls: round1.provenance.authoring.calls, held: sdk.isNikaCompileHeld(round1),
+        judgedAvailable: round1.judged_answer_round_available },
       round2: { version: round2.compile_version, ready: round2.ready, calls: round2.provenance.authoring.calls,
         token: 'replay_token' in round2 },
       preview: { version: preview.compile_version, status: preview.status, token: 'replay_token' in preview },

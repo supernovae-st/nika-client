@@ -84,11 +84,13 @@ export const COMPILE_PROVIDER_WIRE_VERSION = 2;
 export const COMPILE_REPLAY_HEADER = 'Nika-Compile-Replay';
 
 /**
- * The SDK's name for a server's judged answer round (`explicitProvider` with a
- * kept round's `replay_token`, engine integration commit 158a961cd), carried by
- * the `NikaCompatibilityError` of a server that predates it. No `/health`
- * capability advertises the round: a server from before it refuses the request
- * as `422 malformed_compile_request`.
+ * The capability a resident lists in `/health` once it serves a kept round's
+ * judged answer round (`explicitProvider` with the round's `replay_token`):
+ * engine `nika-serve/src/server/model.rs` `JUDGED_ANSWER_CAPABILITY`, beside
+ * `compileNativeV2` on every native server (integration commits 158a961cd and
+ * b7dace1e5, not yet released). A server from before it parses the request as
+ * `422 malformed_compile_request`; the SDK gates the round on the capability
+ * and keeps that refusal's mapping as a defensive path only.
  */
 export const COMPILE_JUDGED_ROUND = 'compileJudgedAnswerRound';
 
@@ -1090,17 +1092,21 @@ export function isNikaCompileHeld(outcome: NikaCompileOutcome): boolean {
  * - **A kept round** (HTTP): when `outcome` carries a `replay_token`, or the
  *   previous request already answered a kept round with one, the next request
  *   answers that round by its token with the exact input and the merged
- *   answers. After an `explicitProvider` round it is the judged answer round:
+ *   answers. After an `explicitProvider` round, on a server that serves it
+ *   (`outcome.judged_answer_round_available`, its `/health` capability
+ *   `compileJudgedAnswerRound`), it is the judged answer round:
  *   `cognition: 'explicitProvider'`, the token and the previous `limits`; the
  *   server replays the kept plan with the answers and its seat only judges the
  *   replayed bytes (judge calls, never an authoring call), answering `ready`
- *   or holding the candidate. With `{ cognition: 'deterministicOnly' }` it is
- *   the zero-call replay instead: no `limits`, no call, no judge, so a
- *   model-authored candidate comes back `incomplete` with its judgment
- *   pending. A previous zero-call replay stays one unless you pass
- *   `{ cognition: 'explicitProvider' }`. The judged answer round needs an
- *   engine that serves it (integration commit 158a961cd, not yet released);
- *   an older server refuses it, typed as `NikaCompatibilityError`.
+ *   or holding the candidate. On a server without it, the next request is a
+ *   new fresh round carrying the answers (no token): the one round there that
+ *   can judge them, which authors again and may spend. With `{ cognition:
+ *   'deterministicOnly' }` it is the zero-call replay instead: no `limits`, no
+ *   call, no judge, so a model-authored candidate comes back `incomplete` with
+ *   its judgment pending. A previous zero-call replay stays one unless you
+ *   pass `{ cognition: 'explicitProvider' }`, which asks for the judged round
+ *   whatever the server advertised (the client refuses it before posting
+ *   where the capability is missing).
  * - **No kept round**: the previous request is repeated with the merged
  *   answers. A local engine replays the plan it recorded under
  *   `.nika/compile/` in its working directory when the round carries at least
@@ -1142,6 +1148,13 @@ export function nextCompileRequest(
         'compile: this outcome carries a replay_token its request could not have opened',
       );
     }
+    // The judged answer round only where the answering server said it serves it.
+    const served = ownDataValue(outcome, 'judged_answer_round_available') === true;
+    if (chosen === undefined && request.cognition === 'explicitProvider' && !served) {
+      // That server does not judge a kept round's answer round: a new fresh round
+      // carrying the answers, the one round there that can judge them. It may spend.
+      return repeated(withoutToken(request), merged);
+    }
     const cognition = chosen ?? request.cognition;
     const judged = cognition === 'explicitProvider';
     const input: NikaCompileRequest = request.intent !== undefined
@@ -1169,11 +1182,25 @@ export function nextCompileRequest(
       + 'kept none (no replay_token came back)',
     );
   }
+  return repeated(request, merged);
+}
+
+/** The request again with these answers; `fresh` dropped so a local engine replays its plan. */
+function repeated(request: NikaCompileRequest, answers: Record<string, unknown>): NikaCompileRequest {
   if (request.intent !== undefined) {
     const { fresh: _fresh, ...create } = request;
-    return { ...create, answers: merged };
+    return { ...create, answers };
   }
-  return { ...request, answers: merged };
+  return { ...request, answers };
+}
+
+function withoutToken(request: NikaCompileRequest): NikaCompileRequest {
+  if (request.intent !== undefined) {
+    const { replay_token: _token, ...create } = request;
+    return create;
+  }
+  const { replay_token: _token, ...edit } = request;
+  return edit;
 }
 
 function nextCognition(options: NikaNextCompileOptions): NikaCompileRequestCognition | undefined {

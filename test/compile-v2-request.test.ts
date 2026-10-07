@@ -148,7 +148,8 @@ describe('nextCompileRequest', () => {
       limits: { max_calls: 6 },
       answers: { 'const.tone': 'short' },
     };
-    const next = nextCompileRequest(first, outcome({ replay_token: TOKEN }), { 'const.audience': 'team' });
+    const next = nextCompileRequest(first, outcome({ replay_token: TOKEN, judged_answer_round_available: true }),
+      { 'const.audience': 'team' });
     expect(next).toEqual({
       intent: first.intent,
       workflow_id: 'digest',
@@ -179,7 +180,8 @@ describe('nextCompileRequest', () => {
       cognition: 'explicitProvider' as const,
       limits: { repairs: 0 },
     };
-    expect(nextCompileRequest(first, outcome({ replay_token: TOKEN }), { 'trigger.timezone': 'Europe/Paris' })).toEqual({
+    expect(nextCompileRequest(first, outcome({ replay_token: TOKEN, judged_answer_round_available: true }),
+      { 'trigger.timezone': 'Europe/Paris' })).toEqual({
       workflow: first.workflow,
       change: first.change,
       original_intent: first.original_intent,
@@ -192,7 +194,7 @@ describe('nextCompileRequest', () => {
 
   it('keeps answering a judged round by its token while no new one comes back', () => {
     const judged = { intent: 'x', cognition: 'explicitProvider' as const, replay_token: TOKEN, limits: { max_calls: 2 }, answers: { a: 1 } };
-    expect(nextCompileRequest(judged, outcome({ compile_version: 2 }), { b: 2 })).toEqual({
+    expect(nextCompileRequest(judged, outcome({ compile_version: 2, judged_answer_round_available: true }), { b: 2 })).toEqual({
       intent: 'x', answers: { a: 1, b: 2 }, cognition: 'explicitProvider', limits: { max_calls: 2 }, replay_token: TOKEN,
     });
   });
@@ -200,7 +202,36 @@ describe('nextCompileRequest', () => {
   it('follows the newest token a round answered', () => {
     const newer = 'fedcba9876543210'.repeat(4);
     const judged = { intent: 'x', cognition: 'explicitProvider' as const, replay_token: TOKEN };
-    expect(nextCompileRequest(judged, outcome({ replay_token: newer }), {})).toMatchObject({ replay_token: newer });
+    expect(nextCompileRequest(judged, outcome({ replay_token: newer, judged_answer_round_available: true }), {}))
+      .toMatchObject({ replay_token: newer });
+  });
+
+  it.each([
+    ['says it does not serve it', { judged_answer_round_available: false }],
+    ['says nothing about it', {}],
+  ])('falls back to a fresh round carrying the answers where the server %s', (_case, served) => {
+    const first = { intent: 'x', workflow_id: 'digest', cognition: 'explicitProvider' as const, limits: { max_calls: 6 } };
+    expect(nextCompileRequest(first, outcome({ replay_token: TOKEN, ...served }), { 'const.audience': 'team' })).toEqual({
+      intent: 'x', workflow_id: 'digest', cognition: 'explicitProvider', limits: { max_calls: 6 },
+      answers: { 'const.audience': 'team' },
+    });
+    const edit = { workflow: 'nika: w\n', change: 'weekly', original_intent: 'x', cognition: 'explicitProvider' as const,
+      replay_token: TOKEN };
+    expect(nextCompileRequest(edit, outcome(served), { a: 1 })).toEqual({
+      workflow: 'nika: w\n', change: 'weekly', original_intent: 'x', cognition: 'explicitProvider', answers: { a: 1 },
+    });
+  });
+
+  it('keeps both kept-round answers one option away where the server does not judge', () => {
+    const first = { intent: 'x', cognition: 'explicitProvider' as const, limits: { max_calls: 6 } };
+    const unjudged = outcome({ replay_token: TOKEN, judged_answer_round_available: false });
+    expect(nextCompileRequest(first, unjudged, { a: 1 }, { cognition: 'deterministicOnly' })).toEqual({
+      intent: 'x', answers: { a: 1 }, cognition: 'deterministicOnly', replay_token: TOKEN,
+    });
+    // Asked for explicitly, the judged round is built; the client then refuses it before posting.
+    expect(nextCompileRequest(first, unjudged, { a: 1 }, { cognition: 'explicitProvider' })).toEqual({
+      intent: 'x', answers: { a: 1 }, cognition: 'explicitProvider', limits: { max_calls: 6 }, replay_token: TOKEN,
+    });
   });
 
   it('turns a zero-call replay into its judged answer round only on request', () => {

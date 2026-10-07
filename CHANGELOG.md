@@ -20,10 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the kept round's judged answer round (the server replays the kept plan with
   the answers and its seat only judges it, no authoring call; held, it
   forgets the token) and `cognition: 'deterministicOnly'` its zero-call
-  replay. The judged answer round needs engine integration commit
-  `158a961cd`, in no release yet: an older server's
-  `422 malformed_compile_request` to it is reported as
-  `NikaCompatibilityError` (`compileJudgedAnswerRound`). On a local engine,
+  replay. The judged answer round is gated on the `/health` capability
+  `compileJudgedAnswerRound` (engine integration commits `158a961cd` and
+  `b7dace1e5`, in no release yet): a server without it gets a
+  `NikaCompatibilityError` before anything is posted, and an older server's
+  `422 malformed_compile_request` to the round maps to the same error,
+  defensively. `outcome.judged_answer_round_available` says, beside a kept
+  round, whether its server judges answer rounds. On a local engine,
   `authoringModel`, `decisionModel`, `fresh`, `output`, `original_intent` and
   `limits` map onto the CLI's own flags. The outcome reads both generations:
   `compile_version` 2 exactly when `provenance.authoring` carries the receipt,
@@ -33,9 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `declined_record_error`. A ready outcome carrying the verifier's
   `verify_held` or `verify_resume` marker is a protocol fault: a held
   candidate never reads as ready. New exports: `nextCompileRequest()` builds
-  an answer round (the judged answer round after a provider round that kept
-  its plan, the zero-call replay with `{ cognition: 'deterministicOnly' }`;
-  it refuses a held outcome), `isNikaCompileHeld()` reads the held marker,
+  an answer round (after a provider round that kept its plan, the judged
+  answer round where the server serves it, else a fresh round carrying the
+  answers; the zero-call replay with `{ cognition: 'deterministicOnly' }`; it
+  refuses a held outcome), `isNikaCompileHeld()` reads the held marker,
   and the request, options, receipt, trigger and refusal-code types. A
   provider round waits for its `limits.deadline_ms` plus the server's handoff
   and one `requestTimeout`, and without that limit or `timeoutMs` gets no SDK

@@ -940,9 +940,10 @@ if (candidate.ready && candidate.candidate !== null) {
 server must advertise `compileNativeV2`); on a local engine, `authoringModel`
 seats the model you name, with the engine's own credentials. Answer the
 questions with `nextCompileRequest()`: over HTTP, after a provider round that
-kept its plan, it sends that round's judged answer round, where the server
-replays the kept plan with your answers and its seat only judges it, with no
-second authoring call (see [docs/compile.md](docs/compile.md)).
+kept its plan, it sends that round's judged answer round where the server
+serves it, and the server replays the kept plan with your answers and its seat
+only judges it, with no second authoring call (see
+[docs/compile.md](docs/compile.md)).
 
 ```ts
 import { isNikaCompileHeld, nextCompileRequest, type NikaCompileRequest } from '@supernovae-st/nika';
@@ -968,10 +969,12 @@ console.log(outcome.ready ? outcome.candidate : outcome.diagnostics);
   outcome stays `incomplete` and `isNikaCompileHeld(outcome)` is true: the
   candidate is a preview, never a workflow to run, and a held judged round's
   token is forgotten (`409 compile_replay_unavailable` if sent again).
-- **Engines.** The judged answer round needs engine integration commit
-  `158a961cd`, in no release yet; an older server refuses it with
-  `NikaCompatibilityError` (`compileJudgedAnswerRound`) and spends nothing.
-  `{ cognition: 'deterministicOnly' }` asks for the zero-call replay instead.
+- **Engines.** The judged answer round needs a server whose `/health` lists
+  `compileJudgedAnswerRound` (engine integration commits `158a961cd` and
+  `b7dace1e5`, in no release yet); elsewhere the client refuses it before
+  posting, and `nextCompileRequest()` answers by a fresh round carrying the
+  answers, which may spend. `{ cognition: 'deterministicOnly' }` asks for the
+  zero-call replay instead.
 - **Refusals.** A server refusal is a `NikaOperationError` whose `code` is the
   engine's (`compile_limit`, `compile_new_intent_required`,
   `malformed_compile_request`, `compile_context_changed`…).

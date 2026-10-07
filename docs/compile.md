@@ -29,7 +29,7 @@ round (HTTP) and the CLI's own facts (local engine).
 | Provider round | `cognition: 'explicitProvider'`; `/health` must advertise `compileNativeV2` | `authoringModel: 'provider/name'` |
 | Who chooses the model | the server's operator (`nika serve --authoring-model`) | you, per request |
 | Credentials | the server's environment | the local engine's environment |
-| Answer round | the kept round's judged answer round by its `replay_token` (judge calls only), or its zero-call replay | the engine replays the plan it recorded under `.nika/compile/` |
+| Answer round | the kept round's judged answer round by its `replay_token` (judge calls only) where `/health` lists `compileJudgedAnswerRound`, else a fresh round carrying the answers; or its zero-call replay | the engine replays the plan it recorded under `.nika/compile/` |
 
 A door that lacks what a request needs refuses it with
 `NikaCompatibilityError` before anything is posted or spawned, and the SDK
@@ -107,7 +107,7 @@ Over HTTP the request picks the wire generation:
 | no `cognition` | `compile_version: 1` | `compile` |
 | `cognition: 'deterministicOnly'`, no token | `compile_version: 1` with that cognition | `compile` |
 | `cognition: 'explicitProvider'` | `compile_version: 2`, a fresh round | `compileNativeV2` |
-| `cognition: 'explicitProvider'` and `replay_token` | `compile_version: 2`, the kept round's judged answer round | `compileNativeV2`, and an engine with the judged answer round (below) |
+| `cognition: 'explicitProvider'` and `replay_token` | `compile_version: 2`, the kept round's judged answer round | `compileNativeV2` and `compileJudgedAnswerRound` |
 | `cognition: 'deterministicOnly'` and `replay_token` | `compile_version: 2`, the kept round's zero-call replay | `compileNativeV2` |
 
 The SDK refuses with `NikaConfigurationError`, before any request or process,
@@ -143,6 +143,7 @@ Not exposed: `--authoring-samples`, `--authoring-strategy`,
 | `check_preview` | the source-only Check report; never admission |
 | `provenance` | `compiler_version`, `spec_pin`, `skeleton`, `cognition`, and when present `strategy`, `suggested_file`, `plan`, `decision`, `authoring` |
 | `replay_token` | HTTP only: the `Nika-Compile-Replay` header of a provider round whose plan the server keeps |
+| `judged_answer_round_available` | HTTP only, beside a kept round: whether the server that answered lists `compileJudgedAnswerRound` in `/health`. An SDK fact, read by `nextCompileRequest()` |
 | `written`, `existing_destination` | local engine only, when the request named `output` |
 | `plan_record_error`, `declined_record_error` | local engine only: it could not keep or remove a record under `.nika/compile/` |
 
@@ -156,7 +157,9 @@ request: the same input with these answers merged over the previous ones. It
 maps; it judges nothing.
 
 - **HTTP, a kept round: the judged answer round.** When a provider round
-  answered a `replay_token`, the next request is that round's judged answer
+  answered a `replay_token` and its server serves the judged answer round
+  (`outcome.judged_answer_round_available`, from the `/health` capability
+  `compileJudgedAnswerRound`), the next request is that round's judged answer
   round: the exact input, the merged answers, `cognition: 'explicitProvider'`,
   the token and the previous `limits` (which may narrow it). The server
   replays the kept plan with the answers and asks its seat only to judge the
@@ -166,6 +169,13 @@ maps; it judges nothing.
   token: any later request with it answers `409 compile_replay_unavailable`.
   If the judged round answers new questions instead, the next request answers
   them by the same token (or by a newer one the round answered).
+- **HTTP, a kept round on a server that does not judge.** Where the server
+  does not list `compileJudgedAnswerRound`, the next request is a new fresh
+  round carrying the answers (no token): the one round there that can judge
+  them. It authors again and may spend. `{ cognition: 'deterministicOnly' }`
+  asks for the zero-call replay instead; `{ cognition: 'explicitProvider' }`
+  asks for the judged round whatever the server advertised, and the client
+  then refuses it before posting.
 - **HTTP, a kept round: the zero-call replay.** Pass `{ cognition:
   'deterministicOnly' }` for the replay that makes no call: the exact input,
   the token, no `limits`. It binds the answers into the kept plan but asks no
@@ -207,7 +217,8 @@ for (let round = 0; !outcome.ready && round < 4; round += 1) {
   if (isNikaCompileHeld(outcome) || outcome.status === 'refused') break;
   const answers = await askYourUser(outcome.questions); // your application's choice
   if (Object.keys(answers).length === 0) break;
-  // After a provider round that kept its plan: its judged answer round.
+  // After a provider round that kept its plan: its judged answer round where the
+  // server serves it, else a fresh round carrying the answers.
   request = nextCompileRequest(request, outcome, answers);
   outcome = await nika.compile(request);
 }
@@ -215,19 +226,24 @@ for (let round = 0; !outcome.ready && round < 4; round += 1) {
 
 ### Servers without the judged answer round
 
-The judged answer round needs an engine that serves it: engine integration
-commit `158a961cd` (`feat(serve): judge a kept round's answer round without
-authoring`), which no released engine carries yet. No `/health` capability
-advertises it. A server from before it, released 0.121.0 and 0.122.0
-included, parses `explicitProvider` with a `replay_token` as
-`422 malformed_compile_request`, before any slot or call: nothing is authored
-or spent and the kept round is untouched. The SDK sends that combination only
-in the shape the wire publishes, so it reports this refusal as a
-`NikaCompatibilityError` with `capability: 'compileJudgedAnswerRound'`. On such
-a server, send the zero-call replay (`{ cognition: 'deterministicOnly' }`) to
-bind the answers, and a new `explicitProvider` round carrying them (your first
-request with `answers`) to have the candidate judged; that round authors
-again and may spend.
+The judged answer round needs a server that serves it, which `/health` says
+with the capability `compileJudgedAnswerRound`, listed beside
+`compileNativeV2` by every native server of engine integration commits
+`158a961cd` (the round) and `b7dace1e5` (its capability). No released engine
+carries them yet. The SDK gates the round the way it gates generation 2: on a
+server without the capability it refuses a judged answer round with
+`NikaCompatibilityError` (`capability: 'compileJudgedAnswerRound'`) after
+`/health` alone, before anything is posted, and the kept round stays
+untouched. Beside every kept round it also sets
+`outcome.judged_answer_round_available`, so `nextCompileRequest()` chooses a
+round the server serves.
+
+A server from before the round, released 0.121.0 and 0.122.0 included, parses
+`explicitProvider` with a `replay_token` as `422 malformed_compile_request`,
+before any slot or call. The gate keeps that request from it. The SDK still
+reports that refusal to a judged answer round as the same
+`NikaCompatibilityError`, defensively, for a server replaced since this client
+read its `/health` (once per client).
 
 ## Held candidates
 
@@ -249,7 +265,7 @@ ready.
 | Error | When |
 |---|---|
 | `NikaConfigurationError` | the request or options break a shape law (above); nothing was sent or spawned |
-| `NikaCompatibilityError` | the door lacks `compile`, `compileNativeV2`, the judged answer round (`compileJudgedAnswerRound`) or a field (`compileOptions`), or the answer carries a wire generation this request cannot receive |
+| `NikaCompatibilityError` | the door lacks `compile`, `compileNativeV2`, `compileJudgedAnswerRound` or a field (`compileOptions`), or the answer carries a wire generation this request cannot receive |
 | `NikaProtocolError` | the answer breaks the contract: malformed JSON, a ready outcome without candidate or with a held marker, generation 2 without its receipt, a replay token where none can be, a destination the request never named |
 | `NikaTransportError` | aborted, timed out, the engine could not be spawned or was killed |
 | `NikaOperationError` | the engine refused: `code` is its machine code, `status` the HTTP status or the local exit code |
@@ -320,8 +336,9 @@ version bundles, speaks generation 1 only, without `requested_trigger` or
 `choice` questions, and its CLI has none of the seat flags. 0.121.0 adds the
 seat flags, `requested_trigger`, `choice` questions and Serve generation 2,
 without `limits.max_calls`. 0.122.0 adds `limits.max_calls` and
-`--authoring-max-calls`. The judged answer round is newer still: engine
-integration commit `158a961cd`, in no release yet. An engine without a flag
+`--authoring-max-calls`. The judged answer round and its capability are newer
+still: engine integration commits `158a961cd` and `b7dace1e5`, in no release
+yet. An engine without a flag
 answers with a usage error; a server without a field answers
 `422 malformed_compile_request`. Point `NIKA_BIN` (or `bin`) at the engine you
 mean to use.
@@ -330,7 +347,8 @@ The pinned `openapi.json` and `src/generated/openapi.d.ts` describe the
 released 0.120.3 resident and stay pinned to it. The generation-2 types are
 written by hand from the engine source: `nika-serve/src/server/compile/v2.rs`,
 `author.rs` and `openapi-native.json` (at `158a961cd` for the judged answer
-round), `nika-compile/src/wire.rs` and `nika-cli-host/src/compile.rs` with
+round), `nika-serve/src/server/model.rs` (at `b7dace1e5` for its capability),
+`nika-compile/src/wire.rs` and `nika-cli-host/src/compile.rs` with
 `compile/render.rs`.
 
 ## Example

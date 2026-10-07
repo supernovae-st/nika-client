@@ -26,9 +26,10 @@
  * Over HTTP, when the provider round kept its plan, the answers go to that
  * round's judged answer round: the server replays the kept plan with them and
  * its seat only judges the result (judge calls, never a second authoring call).
- * That needs a server with the judged answer round (engine integration commit
- * 158a961cd, not in a released engine yet); an older one refuses it with a
- * NikaCompatibilityError and nothing is spent.
+ * That needs a server whose /health lists compileJudgedAnswerRound (engine
+ * integration commits 158a961cd and b7dace1e5, in no release yet). On a server
+ * without it the next round is a fresh one carrying the answers, which authors
+ * again and may spend.
  *
  * Exit codes: 0 the run succeeded · 1 the run did not, or an SDK error ·
  * 2 compile stopped before a ready candidate · 64 usage.
@@ -101,7 +102,8 @@ async function main(): Promise<number> {
     }
     for (const key of Object.keys(reply)) given.add(key);
     // Over HTTP, a provider round that kept its plan gets its judged answer round
-    // (the seat judges the replayed candidate; no second authoring call). Locally
+    // where the server serves it (the seat judges the replayed candidate; no
+    // second authoring call), else a fresh round carrying the answers. Locally
     // the engine replays the plan it recorded under .nika/compile/.
     request = nextCompileRequest(request, outcome, reply);
     outcome = await nika.compile(request);

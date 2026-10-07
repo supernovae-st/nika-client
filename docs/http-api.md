@@ -108,10 +108,14 @@ answers with zero calls but asks no verifier, so a model-authored candidate
 stays `incomplete`. The judged answer round replays the kept plan with the
 answers and asks the seat only to judge it (judge calls, generation 2, no
 authoring call): `ready`, or held with its token forgotten (a later request
-with it answers 409 `compile_replay_unavailable`). It needs engine integration
-commit `158a961cd`, in no release yet; an older server answers it
-`422 malformed_compile_request`, which the SDK reports as a
-`NikaCompatibilityError` (`compileJudgedAnswerRound`).
+with it answers 409 `compile_replay_unavailable`). A server that serves it
+lists `compileJudgedAnswerRound` in `/health` (engine integration commits
+`158a961cd` and `b7dace1e5`, in no release yet); the SDK posts the round only
+there, refuses it elsewhere after `/health` alone with a
+`NikaCompatibilityError` (`compileJudgedAnswerRound`), and sets
+`outcome.judged_answer_round_available` beside every kept round. An older
+server's `422 malformed_compile_request` to the round maps to the same error,
+as a defensive path.
 The server sets no default deadline on a provider round: the client waits for
 `limits.deadline_ms` plus the server's 5 s handoff and one `requestTimeout`,
 or, without that limit, sets none unless `timeoutMs` is given. A

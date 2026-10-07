@@ -64,6 +64,13 @@ export interface HttpTransportOptions {
   url: string;
   token: string;
   fetch: typeof globalThis.fetch;
+  /**
+   * The fetch for a request with no deadline (a provider compile round without
+   * `timeoutMs` or `limits.deadline_ms`): the client's own `fetch` stops
+   * waiting for headers after 300 s. Absent when the caller injected `fetch`,
+   * whose own timeouts then apply.
+   */
+  unboundedFetch?: typeof globalThis.fetch;
   requestTimeout: number;
   machineBufferBytes: number;
   resolveEngine: () => ResolvedNikaEngine;
@@ -250,7 +257,7 @@ export class HttpTransport implements Transport {
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: planned.body,
         signal,
-      }, false, true, false);
+      }, false, true, false, timeoutMs === undefined);
       if (response.headers.get('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json') {
         await discardResponse(response);
         throw new NikaProtocolError(this.kind, 'HTTP compile returned an invalid content-type');
@@ -1533,6 +1540,7 @@ export class HttpTransport implements Transport {
     withTimeout: boolean,
     authenticated = true,
     requireOk = true,
+    unbounded = false,
   ): Promise<Response> {
     const controller = withTimeout ? new AbortController() : undefined;
     const timer = controller
@@ -1545,7 +1553,8 @@ export class HttpTransport implements Transport {
     const headers = new Headers(init.headers);
     if (authenticated) headers.set('Authorization', `Bearer ${this.options.token}`);
     try {
-      const response = await this.options.fetch(`${this.options.url}${path}`, {
+      const fetch = unbounded ? this.options.unboundedFetch ?? this.options.fetch : this.options.fetch;
+      const response = await fetch(`${this.options.url}${path}`, {
         ...init,
         headers,
         signal: controller?.signal ?? callerSignal,

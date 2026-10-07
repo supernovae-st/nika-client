@@ -15,6 +15,7 @@ import {
 } from '../src/index.js';
 import type { NikaCompileRequest } from '../src/index.js';
 import { COMPILE_SERVER_HANDOFF_MS, compileTimeoutMs } from '../src/lib/compile.js';
+import { HttpTransport } from '../src/lib/http-transport.js';
 import { healthResponse, jsonResponse, TOKEN_A } from './helpers/http-depth-harness.js';
 
 // `POST /v1/compile` generation 2 (engine 0.123 integration line,
@@ -142,6 +143,38 @@ function posted(fetch: ReturnType<typeof vi.fn>, index: number): { body: string;
   expect(url).toBe('https://nika.example/v1/compile');
   return { body: init.body as string, init };
 }
+
+describe('HTTP compile: the fetch a round with no deadline goes through', () => {
+  /** A transport over two fetches: the ordinary one and the one with no header deadline. */
+  function transport(fetch: typeof globalThis.fetch, unboundedFetch: typeof globalThis.fetch) {
+    return new HttpTransport({
+      url: 'https://nika.example', token: TOKEN_A, fetch, unboundedFetch, requestTimeout: 30_000,
+      machineBufferBytes: 64 * 1024, resolveEngine: () => { throw new Error('no local engine'); },
+    });
+  }
+
+  it('posts a provider round with no deadline through the unbounded fetch', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(server());
+    const unbounded = vi.fn().mockResolvedValueOnce(jsonResponse(fresh(), 200, kept));
+    const outcome = await transport(fetch, unbounded).compile({ intent: INTENT, cognition: 'explicitProvider' }, {});
+    expect(fetch).toHaveBeenCalledTimes(1); // /health only
+    expect(unbounded).toHaveBeenCalledTimes(1);
+    expect(unbounded.mock.calls[0]![0]).toBe('https://nika.example/v1/compile');
+    expect(outcome.replay_token).toBe(REPLAY);
+  });
+
+  it('keeps a round with a deadline, and a deterministic one, on the ordinary fetch', async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(server())
+      .mockResolvedValueOnce(jsonResponse(fresh(), 200, kept))
+      .mockResolvedValueOnce(jsonResponse(document(1), 200, noStore));
+    const unbounded = vi.fn();
+    const client = transport(fetch, unbounded);
+    await client.compile({ intent: INTENT, cognition: 'explicitProvider', limits: { deadline_ms: 600_000 } }, {});
+    await client.compile({ intent: INTENT }, {});
+    expect(unbounded).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+});
 
 describe('HTTP compile generation 2 (provider rounds and kept-round replay)', () => {
   afterEach(() => {

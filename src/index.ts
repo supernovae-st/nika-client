@@ -3,6 +3,7 @@ import {
   NikaRunOwnershipError,
 } from './errors.js';
 import { HttpTransport } from './lib/http-transport.js';
+import { fetchWithoutDeadline } from './lib/unbounded-fetch.js';
 import { NativeProcessTransport } from './lib/native-process-transport.js';
 import { NikaEngineUnavailable, resolveNikaEngine } from './lib/binary/index.js';
 import { RunSession } from './lib/run-session.js';
@@ -82,6 +83,7 @@ export class Nika {
         url,
         token: checkedToken(config.token),
         fetch: config.fetch ?? globalThis.fetch.bind(globalThis),
+        unboundedFetch: config.fetch === undefined ? fetchWithoutDeadline : undefined,
         requestTimeout: positiveInteger(
           config.requestTimeout ?? DEFAULT_REQUEST_TIMEOUT,
           'requestTimeout',

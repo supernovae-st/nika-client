@@ -305,12 +305,15 @@ reports it as `NikaProtocolError` quoting that error. The type
   (`nika serve --authoring-deadline`): the round runs until it settles.
 
 Stopping your wait stops neither the server's round nor its spend, and loses
-its answer and replay token. Node's built-in `fetch` stops waiting for
-response headers after 300 seconds by default, and the server sends its
-headers only when the round settles: keep `limits.deadline_ms` under that, or
-pass a `fetch` whose dispatcher allows longer `headersTimeout` and
-`bodyTimeout`. A local compile has no deadline unless you set one; a stopped
-child receives SIGTERM, then SIGKILL after two seconds.
+its answer and replay token. The server sends its headers only when the round
+settles, and Node's built-in `fetch` stops waiting for response headers after
+300 seconds. So a provider round with no deadline is posted through
+`node:http`/`node:https`, which set no header or body deadline: only your
+`signal` or the server ends the wait. A `fetch` you pass in the configuration
+is used for every request, this one included, with its own timeouts: give it
+a dispatcher that allows the round's length, or set `limits.deadline_ms`. A
+local compile has no deadline unless you set one; a stopped child receives
+SIGTERM, then SIGKILL after two seconds.
 
 Responses are bounded: 8 MiB for a local compile and for an HTTP
 generation-2 request, whose answer carries the round's plan, decision records

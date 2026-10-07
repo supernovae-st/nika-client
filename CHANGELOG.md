@@ -63,6 +63,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default. The depth ledger, evidence gate and replay fixtures now count six
   projects; the new row records behavioral verdicts only, never a job id.
 
+### Fixed
+
+- An HTTP provider compile round with no deadline no longer fails after
+  300 seconds. Node's built-in `fetch` stops waiting for response headers at
+  that point (`UND_ERR_HEADERS_TIMEOUT`), and the server answers a round only
+  when it settles, so a longer round failed with a transport error while it
+  went on spending, and its answer and replay token were lost. Such a round
+  is now posted through `node:http`/`node:https`, which set no header or body
+  deadline; the caller's `signal` still stops the wait. A `fetch` passed in
+  the configuration keeps its own timeouts.
+
 ## [0.120.3]
 
 ### Added

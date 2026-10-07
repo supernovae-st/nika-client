@@ -48,9 +48,23 @@ The historical paid-provider and three-pass trace ledgers remain useful prior
 evidence, but are explicitly labelled as historical 0.115 observations and are
 not release gates for the current candidate.
 
+## Public 0.122.0 replay
+
+The current replay uses public release engine `nika 0.122.0 (5660e683f)`
+with `supernovae-st-nika-0.122.0.tgz`. All six projects passed with canonical
+`.nika` files, including the incident controller's HTTP check and run, sealed
+journal verification, substituted-trace refusal, controlled cancellation,
+graceful resident shutdown, and the signed webhook intake's typed refusals,
+retried delivery, `attachRun` observation and `once` schedule. Every
+behavioral field matches the 0.120.3 ledger; only the engine and package
+identities, the package digest and the fresh trace identifier changed. Raw
+trace identifiers remain in the ledger; replay comparison validates their
+shape and compares the behavioral verdicts because each execution creates a
+fresh identity.
+
 ## Public 0.120.3 replay
 
-The current replay uses public release engine `nika 0.120.3 (578352a31)`
+The previous public replay used engine `nika 0.120.3 (578352a31)`
 with `supernovae-st-nika-0.120.3.tgz`. All six projects passed with canonical
 `.nika` files, including the incident controller's HTTP check and run, sealed
 journal verification, substituted-trace refusal, controlled cancellation, and
@@ -60,9 +74,8 @@ Webhooks signature over the raw bytes and admits the normalized payload as
 declared `inputs` under the sender's delivery id; the engine owns replay,
 typed input refusal, the durable job, SSE and the once schedule that starts
 the same program with its declared default. Its ledger row carries behavioral
-verdicts only, never a job id. Raw trace identifiers remain in the ledger; replay
-comparison validates their shape and compares the behavioral verdicts because
-each execution creates a fresh identity.
+verdicts only, never a job id. That ledger is historical; it is not the
+current release gate.
 
 ## Public 0.120.2 replay
 
@@ -112,9 +125,8 @@ Both platforms produced byte-identical uncompressed tar data (SHA-256
 `cab67f73531ce602502136523c6081881e69f5de3df6d9bf37bc97658849ae2d`),
 but different compressed bytes.
 
-The current 0.120.3 committed depth baseline is the local macOS observation
-against public engine `nika 0.120.3 (578352a31)`, regenerated when the sixth
-project landed. The measured macOS package
-SHA-256 is `d32c6eec85f603635cd4644c75a4a0ef04502102f3b53c6cf679025249dc17a8`.
+The current 0.122.0 committed depth baseline is the local macOS observation
+against public engine `nika 0.122.0 (5660e683f)`. The measured macOS package
+SHA-256 is `085c007fb5a7f0789d7f257d857fab65fe2a8428d2a1c24edf6a1852d45f35e5`.
 Linux CI `release-evidence-replay` still requires its exact compressed archive
 digest; that digest is not claimed here.

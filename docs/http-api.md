@@ -64,7 +64,7 @@ acknowledgement; no local check report or exit code is fabricated.
 Serve must advertise `compile` in `/health`. This route was added in engine
 commit `4334e58bddf539a6253f448eb05d562b6919f2b7`, after release 0.120.2, and
 first published in release 0.120.3.
-The bundled OpenAPI and generated types preserve that exact producer contract. The SDK then posts a v1 create
+The bundled OpenAPI and generated types are the released 0.122.0 resident's contract. The SDK then posts a v1 create
 intent or inline edit source to `/v1/compile`, with bearer authentication and
 JSON content type. A string change becomes `{text: change}`; a structured change
 preserves `{set_constant: {name, value}}`. Literal answers retain their JSON
@@ -81,6 +81,14 @@ The shared outcome contains candidate source, questions, diagnostics, requested
 boundary, source-only Check preview and provenance. It carries no process exit
 code or materialized destination. A candidate and its requested boundary grant
 nothing: execution needs a separate caller decision and normal `run` admission.
+
+Engine 0.122.0 extends that outcome: every outcome carries
+`requested_trigger`, a question may be a `choice` with `options`, and
+provenance may add `strategy`, `decision`, `plan` and `suggested_file`. This
+SDK version keeps the extra provenance fields untyped, does not project
+`requested_trigger`, and does not accept a `choice` question: an outcome that
+carries one, such as the `trigger.missed` and `trigger.overlap` questions of an
+intent that names a schedule, fails as `NikaProtocolError` on both transports.
 
 ## Settlement
 

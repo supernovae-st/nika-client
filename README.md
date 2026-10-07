@@ -1166,8 +1166,8 @@ pin checks. It reports the installed package, not a moving registry tag.
 
 **Package and engine move together.** Each package version bundles the
 engine with the same number, the exact one it was qualified against: one
-*release train*. This source tree is **0.120.3**, in lockstep with engine
-release `v0.120.3` (`578352a31`); a version in the source is not on npm until
+*release train*. This source tree is **0.122.0**, in lockstep with engine
+release `v0.122.0` (`5660e683f`); a version in the source is not on npm until
 the release workflow publishes it. The standalone CLI (GitHub releases,
 Homebrew, the install script) releases on its own clock, so its newest tag can
 be ahead of or behind the engine in the latest npm package. The

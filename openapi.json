@@ -136,6 +136,16 @@
               "compiler_version": {
                 "type": "string"
               },
+              "decision": {
+                "additionalProperties": true,
+                "description": "Bounded compiler decision evidence, including deterministic and replay outcomes; it grants no execution or spending authority.",
+                "type": "object"
+              },
+              "plan": {
+                "additionalProperties": true,
+                "description": "The compiler record retained in this outcome; a server replay uses its opaque token rather than accepting this object as authority.",
+                "type": "object"
+              },
               "skeleton": {
                 "type": [
                   "string",
@@ -144,6 +154,17 @@
               },
               "spec_pin": {
                 "type": "string"
+              },
+              "strategy": {
+                "description": "The compiler strategy that produced this outcome.",
+                "type": "string"
+              },
+              "suggested_file": {
+                "description": "A suggested candidate file name, never a file written by compilation.",
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
@@ -165,12 +186,34 @@
                   "type": "string"
                 },
                 "mandatory": {
+                  "description": "false: the value belongs to a binding outside the program (a schedule's timezone, missed-run and overlap policies, per-run ceiling) and never blocks a ready candidate",
                   "type": "boolean"
                 },
+                "options": {
+                  "description": "Present on a choice question only: the admissible answers, keys spelled by the owning grammar",
+                  "items": {
+                    "properties": {
+                      "key": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "label"
+                    ],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
                 "type": {
+                  "description": "text: a JSON string · literal: one JSON value · choice: a JSON string that is the `key` of one of `options`",
                   "enum": [
                     "text",
-                    "literal"
+                    "literal",
+                    "choice"
                   ],
                   "type": "string"
                 },
@@ -197,6 +240,14 @@
               "null"
             ]
           },
+          "requested_trigger": {
+            "additionalProperties": true,
+            "description": "The trigger the request names (kind · source_hint · event_hint · cadence · at · payload_input · status · timezone · missed · overlap · ceiling · cron), stated beside the candidate whose bytes carry no cadence, host or event. A requirement the operator binds through the schedule contract, never a grant or a schedule row. timezone, missed, overlap and ceiling are the answered binding values (null until answered). cron is the exact five-field schedule projection when supported and fully specified, otherwise null; older engines omit it. It never supplies a missing time or timezone.",
+            "type": [
+              "object",
+              "null"
+            ]
+          },
           "status": {
             "description": "Completeness of authoring, never permission to execute",
             "enum": [
@@ -214,6 +265,7 @@
           "questions",
           "diagnostics",
           "requested_boundary",
+          "requested_trigger",
           "check_preview",
           "provenance"
         ],
@@ -990,6 +1042,23 @@
             ],
             "type": "string"
           },
+          "inputs": {
+            "additionalProperties": {
+              "oneOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "description": "Per-fire inputs bound on every resident fire (#1370): one scalar per key the workflow declares under `inputs:`, coerced by the declared type exactly as the CLI `--var` edge does, then judged by the same literal admission validator as POST /v1/jobs. Unknown keys, values the declared type refuses, missing required inputs and the `@env:` channel are refused at PUT and again at fire.",
+            "type": "object"
+          },
           "jitter": {
             "enum": [
               "hash"
@@ -1254,7 +1323,7 @@
   "info": {
     "description": "Authenticated loopback remote execution, declarative schedules and stateless source-only authoring (POST /v1/compile never runs, admits or writes). Artifacts, schedule list/delete/trigger/backfill, /v1/arm, and POST /v1/run are absent.",
     "title": "nika serve",
-    "version": "0.120.3"
+    "version": "0.122.0"
   },
   "openapi": "3.1.0",
   "paths": {

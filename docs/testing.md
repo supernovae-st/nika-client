@@ -203,8 +203,11 @@ nonexistent local engine path, proving that it cannot use a fallback. The report
 records binary and package hashes and is green only after owned-process cleanup.
 A source binary containing engine commit
 `4334e58bddf539a6253f448eb05d562b6919f2b7` is required for both doors.
-Released engine 0.120.3 supports native compile and its Serve advertises HTTP
-compile; 0.120.2 and older predate the route. This is a foundation test, not general intent authoring
+Released engines from 0.120.3 support native compile and their Serve advertises
+HTTP compile; 0.120.2 and older predate the route. The same 14 cases hold
+against released engine 0.122.0, whose pinned contract adds `choice` questions
+and `requested_trigger` that this SDK version does not accept yet (see
+[Compile foundation](http-api.md#compile-foundation)). This is a foundation test, not general intent authoring
 or execution admission qualification.
 
 The [2026-09-19 source-build receipt](../evidence/compile-4334e58b-20260919.json)

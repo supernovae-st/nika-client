@@ -1008,20 +1008,45 @@ export interface components {
                 /** @constant */
                 cognition: "deterministicOnly";
                 compiler_version: string;
+                /** @description Bounded compiler decision evidence, including deterministic and replay outcomes; it grants no execution or spending authority. */
+                decision?: {
+                    [key: string]: unknown;
+                };
+                /** @description The compiler record retained in this outcome; a server replay uses its opaque token rather than accepting this object as authority. */
+                plan?: {
+                    [key: string]: unknown;
+                };
                 skeleton: string | null;
                 spec_pin: string;
+                /** @description The compiler strategy that produced this outcome. */
+                strategy?: string;
+                /** @description A suggested candidate file name, never a file written by compilation. */
+                suggested_file?: string | null;
             };
             questions: {
                 /** @description Stable semantic hole path such as `const.request`, never a session id */
                 key: string;
                 label: string;
+                /** @description false: the value belongs to a binding outside the program (a schedule's timezone, missed-run and overlap policies, per-run ceiling) and never blocks a ready candidate */
                 mandatory: boolean;
-                /** @enum {string} */
-                type: "text" | "literal";
+                /** @description Present on a choice question only: the admissible answers, keys spelled by the owning grammar */
+                options?: {
+                    key: string;
+                    label: string;
+                }[];
+                /**
+                 * @description text: a JSON string · literal: one JSON value · choice: a JSON string that is the `key` of one of `options`
+                 * @enum {string}
+                 */
+                type: "text" | "literal" | "choice";
                 why: string;
             }[];
             /** @description The candidate's requested permits, derived by Check. Requested, never granted */
             requested_boundary: {
+                [key: string]: unknown;
+            } | null;
+            /** @description The trigger the request names (kind · source_hint · event_hint · cadence · at · payload_input · status · timezone · missed · overlap · ceiling · cron), stated beside the candidate whose bytes carry no cadence, host or event. A requirement the operator binds through the schedule contract, never a grant or a schedule row. timezone, missed, overlap and ceiling are the answered binding values (null until answered). cron is the exact five-field schedule projection when supported and fully specified, otherwise null; older engines omit it. It never supplies a missing time or timezone. */
+            requested_trigger: {
                 [key: string]: unknown;
             } | null;
             /**
@@ -1252,6 +1277,10 @@ export interface components {
             active?: boolean;
             /** @enum {string} */
             afterSkip?: "next_slot" | "on_completion";
+            /** @description Per-fire inputs bound on every resident fire (#1370): one scalar per key the workflow declares under `inputs:`, coerced by the declared type exactly as the CLI `--var` edge does, then judged by the same literal admission validator as POST /v1/jobs. Unknown keys, values the declared type refuses, missing required inputs and the `@env:` channel are refused at PUT and again at fire. */
+            inputs?: {
+                [key: string]: string | number | boolean;
+            };
             /** @enum {string} */
             jitter?: "hash";
             maxCostUsd: number;

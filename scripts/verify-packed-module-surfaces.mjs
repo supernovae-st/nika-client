@@ -213,7 +213,8 @@ try {
 
   const typedConsumer = [
     `import { Nika, isNikaRunSucceeded, type NikaConfig, type NikaRunOptions, type NikaRunResult } from '${packageName}';`,
-    `import type { NikaCompileOutcome, NikaCompileRequest } from '${packageName}';`,
+    `import { isNikaCompileHeld, nextCompileRequest } from '${packageName}';`,
+    `import type { NikaCompileOutcome, NikaCompileRequest, NikaCompileRefusalCode } from '${packageName}';`,
     `import type { NikaEvent, NikaJournalEvidence, NikaRun, NikaRunEvent, NikaRunEventKind } from '${packageName}';`,
     `import type { NikaEventBufferOverflowError } from '${packageName}';`,
     "const config: NikaConfig = { bin: '/tmp/nika' };",
@@ -289,11 +290,30 @@ try {
     'declare const compileOutcome: NikaCompileOutcome;',
     'const compileReady: boolean = compileOutcome.ready;',
     'const compileSource: string | null = compileOutcome.candidate;',
-    '// @ts-expect-error compile has no process-only fields',
-    'compileOutcome.written;',
-    '// @ts-expect-error compile has no process-only fields',
+    '// A destination is written only where a local request named one.',
+    'const compileWritten: string | null | undefined = compileOutcome.written;',
+    '// @ts-expect-error compile has no process exit code',
     'compileOutcome.exitCode;',
-    'void compileReady; void compileSource;',
+    'void compileReady; void compileSource; void compileWritten;',
+    '// Generation 2: a provider round, its receipt, and the replay of a kept round.',
+    'const compileGeneration: 1 | 2 = compileOutcome.compile_version;',
+    'const compileCalls: number | undefined = compileOutcome.provenance.authoring?.calls;',
+    'const compileToken: string | undefined = compileOutcome.replay_token;',
+    'const compileHeld: boolean = isNikaCompileHeld(compileOutcome);',
+    'void compileGeneration; void compileCalls; void compileToken; void compileHeld;',
+    `const compileFresh: NikaCompileRequest = { intent: 'x', cognition: 'explicitProvider', limits: { max_calls: 6, deadline_ms: 60000 } };`,
+    `const compileSeat: NikaCompileRequest = { intent: 'x', authoringModel: 'mistral/mistral-small-latest', fresh: true };`,
+    `const compileRevision: NikaCompileRequest = { workflow: 'src', change: 'weekly', original_intent: 'x', cognition: 'explicitProvider' };`,
+    `const compileNext: NikaCompileRequest = nextCompileRequest(compileFresh, compileOutcome, { 'const.audience': 'team' });`,
+    "const compileRefusal: NikaCompileRefusalCode = 'compile_limit';",
+    'void compileFresh; void compileSeat; void compileRevision; void compileNext; void compileRefusal;',
+    '// @ts-expect-error workflow_id names a created workflow: never an edit',
+    `const compileEditId: NikaCompileRequest = { workflow: 'src', change: 'c', workflow_id: 'w' };`,
+    '// @ts-expect-error the wire knows two request cognitions',
+    `const compileWord: NikaCompileRequest = { intent: 'x', cognition: 'implicitProvider' };`,
+    '// @ts-expect-error a limit is a number of the wire, never text',
+    `const compileLimit: NikaCompileRequest = { intent: 'x', cognition: 'explicitProvider', limits: { max_calls: '6' } };`,
+    'void compileEditId; void compileWord; void compileLimit;',
     `const compileCreate: NikaCompileRequest = { intent: 'x', answers: { 'const.request': 42 } };`,
     `const compileEdit: NikaCompileRequest = { workflow: 'src', change: 'c' };`,
     `const compileConstant: NikaCompileRequest = { workflow: 'src', change: { set_constant: { name: 'request', value: null } } };`,
@@ -512,5 +532,29 @@ function assertCompile(report, moduleSystem) {
     source: 'nika: packed\nconst: { request: "é" }\n',
     change: { set_constant: { name: 'request', value: ['雪', null, true, 1.25] } } },
   say('HTTP structured edits use the accepted wire'));
+
+  const REPLAY = '0123456789abcdef'.repeat(4);
+  assert.deepEqual(report.generation2.round1, { version: 2, status: 'incomplete', token: true, calls: 2, held: false },
+    say('a provider round reads generation 2 with its receipt and replay token'));
+  assert.deepEqual(report.generation2.round2, { version: 1, status: 'incomplete', token: false },
+    say('the replay binds the answers with no call and keeps no new round'));
+  assert.deepEqual(report.generation2.round3, { version: 2, ready: true, calls: 2 },
+    say('a provider round carrying the answers has the candidate judged'));
+  assert.deepEqual(report.generation2.bodies, [
+    { compile_version: 2, mode: 'create', cognition: 'explicitProvider', intent: 'Every morning, summarize ./inbox',
+      limits: { max_calls: 6 } },
+    { compile_version: 2, mode: 'create', cognition: 'deterministicOnly', intent: 'Every morning, summarize ./inbox',
+      answers: { 'const.audience': 'team' }, replay_token: REPLAY },
+    { compile_version: 2, mode: 'create', cognition: 'explicitProvider', intent: 'Every morning, summarize ./inbox',
+      answers: { 'const.audience': 'team' }, limits: { max_calls: 6 } },
+  ], say('nextCompileRequest replays the kept round with zero-call cognition, no limits'));
+  const { message: unseatedMessage, ...unseated } = report.generation2Unseated;
+  assert.deepEqual(unseated, {
+    name: 'NikaCompatibilityError',
+    capability: 'compileNativeV2',
+    transport: 'http',
+    ...typed('compatibility'),
+  }, say('a resident without a native seat refuses a provider round after /health alone'));
+  assert.match(unseatedMessage, /Nothing was posted/, say('the refusal says nothing was sent'));
 
 }

@@ -187,6 +187,58 @@ module.exports = async function compileScenario(sdk, engines) {
         report.signalOverrides.push({ door, key, calls, error });
       }
     }
+
+    // Generation 2 over HTTP: a provider round on a seated resident answers
+    // its replay token, and the answer round replays it with zero calls.
+    const REPLAY = '0123456789abcdef'.repeat(4);
+    const receipt = { model: 'mistral/mistral-small-latest', calls: 2, input_tokens: 10, output_tokens: 20,
+      elapsed_ms: 30, sampling: { temperature: null, seed: null, effective: 'providerDefaultUnknown' },
+      context: [{ role: 'author' }], backend: null };
+    const question = { key: 'const.audience', label: 'Who reads it?', type: 'choice', why: 'w', mandatory: true,
+      options: [{ key: 'team', label: 'The team' }] };
+    const seatedRequests = [];
+    const seated = async (url, init = {}) => {
+      const { pathname } = new URL(String(url));
+      seatedRequests.push({ path: pathname, body: init.body ?? null });
+      if (pathname === '/health') {
+        return Response.json({ status: 'ok', service: 'nika-serve', engineVersion: '0.122.0',
+          machineProtocolVersion: 1, snapshotFormatVersion: 1, checkReportVersion: 1, eventFormatVersion: 1,
+          traceFormatVersion: 2, supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'compile', 'compileNativeV2'] });
+      }
+      const body = JSON.parse(init.body);
+      const provenance = { ...ready.provenance, cognition: 'explicitProvider', strategy: 'native' };
+      const noStore = { 'Cache-Control': 'no-store' };
+      if (body.cognition === 'deterministicOnly') {
+        // As the engine's own test pins a replay: the answers bound, no call, no
+        // verifier asked, so the candidate stays a preview with its judgment pending.
+        return Response.json({ ...ready, status: 'incomplete', requested_trigger: null,
+          diagnostics: [{ kind: 'unknown', target: 'semantic_verification', message: 'pending' }],
+          provenance: { ...provenance, cognition: 'deterministicOnly', decision: { pending: { open: ['request'] } } } },
+        { headers: noStore });
+      }
+      if (body.answers === undefined) {
+        return Response.json({ ...ready, compile_version: 2, status: 'incomplete', candidate: null,
+          questions: [question], requested_trigger: null, provenance: { ...provenance, authoring: receipt } },
+        { headers: { ...noStore, 'Nika-Compile-Replay': REPLAY } });
+      }
+      return Response.json({ ...ready, compile_version: 2, requested_trigger: null,
+        provenance: { ...provenance, authoring: receipt } }, { headers: noStore });
+    };
+    const generation2 = new sdk.Nika({ url: 'https://nika.example', token: TOKEN, bin: '/missing-packed-v2-engine', fetch: seated });
+    const first = { intent: 'Every morning, summarize ./inbox', cognition: 'explicitProvider', limits: { max_calls: 6 } };
+    const round1 = await generation2.compile(first);
+    const round2 = await generation2.compile(sdk.nextCompileRequest(first, round1, { 'const.audience': 'team' }));
+    const round3 = await generation2.compile({ ...first, answers: { 'const.audience': 'team' } });
+    report.generation2 = {
+      round1: { version: round1.compile_version, status: round1.status, token: round1.replay_token === REPLAY,
+        calls: round1.provenance.authoring.calls, held: sdk.isNikaCompileHeld(round1) },
+      round2: { version: round2.compile_version, status: round2.status, token: 'replay_token' in round2 },
+      round3: { version: round3.compile_version, ready: round3.ready, calls: round3.provenance.authoring.calls },
+      bodies: seatedRequests.filter(({ path }) => path === '/v1/compile').map(({ body }) => JSON.parse(body)),
+    };
+    report.generation2Unseated = await refusal(sdk, () => new sdk.Nika({
+      url: 'https://nika.example', token: TOKEN, bin: '/missing-packed-v2-engine', fetch: resident(ready).fetch,
+    }).compile(first));
     return report;
   } finally {
     delete process.env.NIKA_FAKE_ARGV_LOG;

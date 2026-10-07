@@ -91,8 +91,10 @@ async function abortWhenCompileSpawned(log: string, controller: AbortController)
   const deadline = Date.now() + 10_000;
   for (;;) {
     if (existsSync(log)) {
-      const argvs = readFileSync(log, 'utf8').trim().split('\n')
-        .map((line) => JSON.parse(line) as string[]);
+      // Only newline-terminated lines: the fixture may still be appending the last one.
+      const lines = readFileSync(log, 'utf8').split('\n');
+      lines.pop();
+      const argvs = lines.map((line) => JSON.parse(line) as string[]);
       if (argvs.length >= 2) {
         controller.abort();
         return argvs;

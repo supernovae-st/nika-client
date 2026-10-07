@@ -134,8 +134,9 @@ export class Nika {
    * 'explicitProvider'` over `{ url }` (the server's seated model, generation
    * 2, capability `compileNativeV2`) or `authoringModel` on a local engine.
    * Answer the outcome's questions with `nextCompileRequest(request, outcome,
-   * answers)`: over HTTP it replays a kept round by its `replay_token` with
-   * zero calls.
+   * answers)`: over HTTP, after a provider round that kept its plan, it sends
+   * that round's judged answer round (the seat only judges, no authoring call),
+   * or with `{ cognition: 'deterministicOnly' }` its zero-call replay.
    *
    * The candidate is ordinary `.nika` SOURCE, proposed only when `ready`.
    * `run()` consumes a path, so the caller materializes the candidate and
@@ -409,6 +410,7 @@ export type {
   NikaCompileSetConstant,
   NikaCompileStrategy,
   NikaCompileTrigger,
+  NikaNextCompileOptions,
   NikaConfig,
   NikaLocalConfig,
   NikaRemoteConfig,

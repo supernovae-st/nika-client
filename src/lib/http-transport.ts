@@ -41,6 +41,7 @@ import {
 import { literalInputs } from './literal-inputs.js';
 import {
   COMPILE_CAPABILITY,
+  COMPILE_JUDGED_ROUND,
   COMPILE_REPLAY_HEADER,
   COMPILE_RESPONSE_MAX_BYTES,
   COMPILE_PROVIDER_WIRE_VERSION,
@@ -258,14 +259,29 @@ export class HttpTransport implements Transport {
           || Object.keys(object).some((key) => key !== 'error')) {
           throw new NikaProtocolError(this.kind, 'HTTP compile returned a malformed refusal or non-contract status');
         }
+        if (planned.judged && response.status === 422 && error.code === 'malformed_compile_request') {
+          // The SDK sends a judged answer round only in the shape the wire publishes,
+          // so this refusal names a server from before the round (released engines
+          // up to 0.122.0 parse explicitProvider + replay_token as malformed). The
+          // parse refuses before any slot or call: nothing was authored or spent.
+          throw this.gap(COMPILE_JUDGED_ROUND,
+            'The connected nika serve refused the judged answer round (cognition '
+            + "'explicitProvider' with a replay_token) as malformed_compile_request: it predates "
+            + 'that round (engine integration commit 158a961cd; no released engine serves it yet). '
+            + 'Nothing was authored or spent, and the kept round is untouched. Send its zero-call '
+            + "replay instead (nextCompileRequest(request, outcome, answers, { cognition: "
+            + "'deterministicOnly' })), and a new explicitProvider round carrying the answers to "
+            + 'have the candidate judged; that round may spend');
+        }
         throw this.refused(path, { operation: 'compile', status: response.status,
           refusal: { code: error.code, message: this.redact(error.message) } });
       }
       const outcome = compilePayloadFrom(object, this.kind, this.options.url, planned.accepted);
       const token = response.headers.get(COMPILE_REPLAY_HEADER);
       if (token === null) return outcome;
-      // Only a fresh provider round may leave a kept plan. The token is never
-      // quoted: it is the handle of a round this server run keeps.
+      // Only a provider round (fresh, or a kept round's judged answer round) may
+      // leave a kept plan. The token is never quoted: it is the handle of a round
+      // this server run keeps.
       if (!planned.provider) {
         throw new NikaProtocolError(this.kind,
           `HTTP compile answered a ${COMPILE_REPLAY_HEADER} token to a request that keeps no round`);

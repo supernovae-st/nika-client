@@ -216,24 +216,29 @@ module.exports = async function compileScenario(sdk, engines) {
           provenance: { ...provenance, cognition: 'deterministicOnly', decision: { pending: { open: ['request'] } } } },
         { headers: noStore });
       }
-      if (body.answers === undefined) {
-        return Response.json({ ...ready, compile_version: 2, status: 'incomplete', candidate: null,
-          questions: [question], requested_trigger: null, provenance: { ...provenance, authoring: receipt } },
-        { headers: { ...noStore, 'Nika-Compile-Replay': REPLAY } });
+      if (body.replay_token === REPLAY) {
+        // The judged answer round: the kept plan replayed with the answers, judged, ready.
+        return Response.json({ ...ready, compile_version: 2, requested_trigger: null,
+          provenance: { ...provenance, authoring: { ...receipt, calls: 1, context: [{ role: 'judge_request' }] } } },
+        { headers: noStore });
       }
-      return Response.json({ ...ready, compile_version: 2, requested_trigger: null,
-        provenance: { ...provenance, authoring: receipt } }, { headers: noStore });
+      return Response.json({ ...ready, compile_version: 2, status: 'incomplete', candidate: null,
+        questions: [question], requested_trigger: null, provenance: { ...provenance, authoring: receipt } },
+      { headers: { ...noStore, 'Nika-Compile-Replay': REPLAY } });
     };
     const generation2 = new sdk.Nika({ url: 'https://nika.example', token: TOKEN, bin: '/missing-packed-v2-engine', fetch: seated });
     const first = { intent: 'Every morning, summarize ./inbox', cognition: 'explicitProvider', limits: { max_calls: 6 } };
     const round1 = await generation2.compile(first);
+    // The judged answer round by default; the zero-call replay on request.
     const round2 = await generation2.compile(sdk.nextCompileRequest(first, round1, { 'const.audience': 'team' }));
-    const round3 = await generation2.compile({ ...first, answers: { 'const.audience': 'team' } });
+    const preview = await generation2.compile(sdk.nextCompileRequest(first, round1, { 'const.audience': 'team' },
+      { cognition: 'deterministicOnly' }));
     report.generation2 = {
       round1: { version: round1.compile_version, status: round1.status, token: round1.replay_token === REPLAY,
         calls: round1.provenance.authoring.calls, held: sdk.isNikaCompileHeld(round1) },
-      round2: { version: round2.compile_version, status: round2.status, token: 'replay_token' in round2 },
-      round3: { version: round3.compile_version, ready: round3.ready, calls: round3.provenance.authoring.calls },
+      round2: { version: round2.compile_version, ready: round2.ready, calls: round2.provenance.authoring.calls,
+        token: 'replay_token' in round2 },
+      preview: { version: preview.compile_version, status: preview.status, token: 'replay_token' in preview },
       bodies: seatedRequests.filter(({ path }) => path === '/v1/compile').map(({ body }) => JSON.parse(body)),
     };
     report.generation2Unseated = await refusal(sdk, () => new sdk.Nika({

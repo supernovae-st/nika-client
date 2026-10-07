@@ -325,6 +325,11 @@ try {
     `const compileSeat: NikaCompileRequest = { intent: 'x', authoringModel: 'mistral/mistral-small-latest', fresh: true };`,
     `const compileRevision: NikaCompileRequest = { workflow: 'src', change: 'weekly', original_intent: 'x', cognition: 'explicitProvider' };`,
     `const compileNext: NikaCompileRequest = nextCompileRequest(compileFresh, compileOutcome, { 'const.audience': 'team' });`,
+    `const compileReplay: NikaCompileRequest = nextCompileRequest(compileFresh, compileOutcome, {}, { cognition: 'deterministicOnly' });`,
+    `const compileJudged: NikaCompileRequest = { intent: 'x', cognition: 'explicitProvider', replay_token: 'f'.repeat(64), limits: { max_calls: 2 } };`,
+    'void compileReplay; void compileJudged;',
+    '// @ts-expect-error the next round answers a kept round with one of the two wire cognitions',
+    `nextCompileRequest(compileFresh, compileOutcome, {}, { cognition: 'judged' });`,
     "const compileRefusal: NikaCompileRefusalCode = 'compile_limit';",
     'void compileFresh; void compileSeat; void compileRevision; void compileNext; void compileRefusal;',
     '// @ts-expect-error workflow_id names a created workflow: never an edit',
@@ -557,18 +562,18 @@ function assertCompile(report, moduleSystem) {
   const REPLAY = '0123456789abcdef'.repeat(4);
   assert.deepEqual(report.generation2.round1, { version: 2, status: 'incomplete', token: true, calls: 2, held: false },
     say('a provider round reads generation 2 with its receipt and replay token'));
-  assert.deepEqual(report.generation2.round2, { version: 1, status: 'incomplete', token: false },
-    say('the replay binds the answers with no call and keeps no new round'));
-  assert.deepEqual(report.generation2.round3, { version: 2, ready: true, calls: 2 },
-    say('a provider round carrying the answers has the candidate judged'));
+  assert.deepEqual(report.generation2.round2, { version: 2, ready: true, calls: 1, token: false },
+    say('the judged answer round has the replayed candidate judged, ready, with no authoring call'));
+  assert.deepEqual(report.generation2.preview, { version: 1, status: 'incomplete', token: false },
+    say('the zero-call replay binds the answers with no call and no judge'));
   assert.deepEqual(report.generation2.bodies, [
     { compile_version: 2, mode: 'create', cognition: 'explicitProvider', intent: 'Every morning, summarize ./inbox',
       limits: { max_calls: 6 } },
+    { compile_version: 2, mode: 'create', cognition: 'explicitProvider', intent: 'Every morning, summarize ./inbox',
+      answers: { 'const.audience': 'team' }, limits: { max_calls: 6 }, replay_token: REPLAY },
     { compile_version: 2, mode: 'create', cognition: 'deterministicOnly', intent: 'Every morning, summarize ./inbox',
       answers: { 'const.audience': 'team' }, replay_token: REPLAY },
-    { compile_version: 2, mode: 'create', cognition: 'explicitProvider', intent: 'Every morning, summarize ./inbox',
-      answers: { 'const.audience': 'team' }, limits: { max_calls: 6 } },
-  ], say('nextCompileRequest replays the kept round with zero-call cognition, no limits'));
+  ], say('nextCompileRequest answers the kept round judged by default, zero-call on request'));
   const { message: unseatedMessage, ...unseated } = report.generation2Unseated;
   assert.deepEqual(unseated, {
     name: 'NikaCompatibilityError',

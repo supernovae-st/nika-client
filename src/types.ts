@@ -865,12 +865,31 @@ export type NikaCompileRequest = NikaCompileCreateRequest | NikaCompileEditReque
  * The cognition a compile request names (wire `cognition`, HTTP only):
  *
  * - `explicitProvider`: one fresh generation-2 round under the server's
- *   seated authoring model (it may spend). Needs `compileNativeV2`.
+ *   seated authoring model (it may spend). Needs `compileNativeV2`. With a
+ *   kept round's `replay_token` it is that round's judged answer round: the
+ *   kept plan replayed with the answers, the seat asked only to judge the
+ *   replayed bytes (judge calls, never an authoring call); needs an engine
+ *   with the judged answer round (integration commit 158a961cd, not yet
+ *   released).
  * - `deterministicOnly`: with `replay_token`, a zero-call generation-2 replay
- *   of a round the server kept; without it, the generation-1 door with its
- *   explicit (and only) cognition word.
+ *   of a round the server kept (no judge); without it, the generation-1 door
+ *   with its explicit (and only) cognition word.
  */
 export type NikaCompileRequestCognition = 'explicitProvider' | 'deterministicOnly';
+
+/** How `nextCompileRequest()` builds the next round of a kept round. */
+export interface NikaNextCompileOptions {
+  /**
+   * The cognition of the next round when it answers a kept round (a
+   * `replay_token` came back, or the previous request carried one):
+   * `explicitProvider` is its judged answer round (the server's seat judges
+   * the replayed bytes: judge calls, no authoring call, it may spend);
+   * `deterministicOnly` is its zero-call replay (no call, no judge, so a
+   * model-authored candidate stays a preview). By default the next round keeps
+   * the previous request's cognition. Refused when no kept round is involved.
+   */
+  cognition?: NikaCompileRequestCognition;
+}
 
 /**
  * The caller's narrowing of one provider round's bounds (wire `limits`). Over
@@ -916,14 +935,16 @@ interface NikaCompileRequestFields {
   cognition?: NikaCompileRequestCognition;
   /**
    * The bounds of a provider round: over HTTP with `cognition:
-   * 'explicitProvider'`, natively with `authoringModel`. A replay
-   * (`deterministicOnly`) makes no call and refuses limits.
+   * 'explicitProvider'` (a fresh round or a judged answer round), natively with
+   * `authoringModel`. A zero-call replay (`deterministicOnly`) refuses limits.
    */
   limits?: NikaCompileLimits;
   /**
-   * HTTP only: the `Nika-Compile-Replay` token a fresh round of the same
-   * server run answered (`outcome.replay_token`), sent with `cognition:
-   * 'deterministicOnly'` and the round's exact input. Not an execution grant.
+   * HTTP only: the `Nika-Compile-Replay` token a round of the same server run
+   * answered (`outcome.replay_token`), sent with the round's exact input: with
+   * `cognition: 'explicitProvider'` it is the judged answer round, with
+   * `'deterministicOnly'` the zero-call replay. A held judged round forgets it.
+   * Not an execution grant.
    */
   replay_token?: string;
   /**
@@ -1239,10 +1260,12 @@ export interface NikaCompileOutcome {
   check_preview: NikaCompilePreview | null;
   provenance: NikaCompileProvenance;
   /**
-   * HTTP only: the `Nika-Compile-Replay` header of a fresh generation-2 round
-   * that left a native plan the server keeps. Send it back with
-   * `cognition: 'deterministicOnly'` (see `nextCompileRequest`). It is valid
-   * only on that server run, for that exact input; do not log it.
+   * HTTP only: the `Nika-Compile-Replay` header of a provider round that left
+   * a native plan the server keeps. Send it back with the round's exact input
+   * (see `nextCompileRequest`): `cognition: 'explicitProvider'` for its judged
+   * answer round, `'deterministicOnly'` for its zero-call replay. It is valid
+   * only on that server run, until a judged round holds its candidate; do not
+   * log it.
    */
   replay_token?: string;
   /**

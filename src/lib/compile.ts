@@ -13,6 +13,8 @@ import {
 import type {
   NikaCheckResult,
   NikaCompileAuthoringReceipt,
+  NikaCompileRequestCognition,
+  NikaNextCompileOptions,
   NikaCompileCreateRequest,
   NikaCompileDiagnostic,
   NikaCompileEditRequest,
@@ -80,6 +82,15 @@ export const COMPILE_PROVIDER_WIRE_VERSION = 2;
 
 /** The response header of a fresh generation-2 round whose native plan the server keeps. */
 export const COMPILE_REPLAY_HEADER = 'Nika-Compile-Replay';
+
+/**
+ * The SDK's name for a server's judged answer round (`explicitProvider` with a
+ * kept round's `replay_token`, engine integration commit 158a961cd), carried by
+ * the `NikaCompatibilityError` of a server that predates it. No `/health`
+ * capability advertises the round: a server from before it refuses the request
+ * as `422 malformed_compile_request`.
+ */
+export const COMPILE_JUDGED_ROUND = 'compileJudgedAnswerRound';
 
 /**
  * Finite bound for one compile response (the candidate plus its full Check
@@ -252,10 +263,13 @@ function sharedFields(record: Record<string, unknown>): SharedRequestFields {
         'compile: replay_token must be the 64 lowercase hexadecimal digits of a Nika-Compile-Replay header',
       );
     }
-    if (cognition !== 'deterministicOnly') {
+    // The wire's two uses of a kept round: deterministicOnly replays it with
+    // zero calls; explicitProvider is its judged answer round. A bare token
+    // names neither, and the server requires the cognition word.
+    if (cognition === undefined) {
       throw new NikaConfigurationError(
-        "compile: a replay_token rides cognition 'deterministicOnly' (a zero-call replay of a "
-        + 'kept round), never a fresh round',
+        "compile: a replay_token rides a cognition: 'explicitProvider' for the judged answer "
+        + "round of the kept round, 'deterministicOnly' for its zero-call replay",
       );
     }
     fields.replay_token = token;
@@ -583,8 +597,14 @@ export interface CompileHttpRequest {
   readonly capability: string;
   /** The wire generations its answer may carry. */
   readonly accepted: readonly number[];
-  /** A fresh provider round: it may spend, and only its answer may carry a replay token. */
+  /**
+   * A round under the server's seat (`explicitProvider`): a fresh round or a
+   * kept round's judged answer round. It may spend, and only its answer may
+   * carry a replay token.
+   */
   readonly provider: boolean;
+  /** The judged answer round of a kept round: `explicitProvider` with its replay token. */
+  readonly judged: boolean;
 }
 
 /**
@@ -619,8 +639,10 @@ export function compileTimeoutMs(
  * The exact Serve envelope (engine `nika-serve/src/server/compile.rs` for
  * generation 1, `compile/v2.rs` for generation 2); no local capture or
  * compiler is involved. Generation 2 is the provider round
- * (`explicitProvider`) and the replay of a kept one (`deterministicOnly` +
- * `replay_token`); everything else is generation 1, byte for byte as before.
+ * (`explicitProvider`), the judged answer round of a kept one
+ * (`explicitProvider` + `replay_token`) and its zero-call replay
+ * (`deterministicOnly` + `replay_token`); everything else is generation 1,
+ * byte for byte as before.
  */
 export function compileRequest(request: NikaCompileRequest): CompileHttpRequest {
   refuseNativeOnlyFields(request);
@@ -670,6 +692,7 @@ export function compileRequest(request: NikaCompileRequest): CompileHttpRequest 
       ? [COMPILE_WIRE_VERSION, COMPILE_PROVIDER_WIRE_VERSION]
       : [COMPILE_WIRE_VERSION],
     provider,
+    judged: provider && request.replay_token !== undefined,
   };
 }
 
@@ -1050,8 +1073,8 @@ function authoringFrom(
  * bytes against the request and did not accept them (the engine's `applied`
  * diagnostic targeting `verify_held`). Such an outcome is `incomplete` and its
  * `candidate` is a preview to show at most — never run it or save it as an
- * accepted result. A server keeps no replay token for it, so asking again is a
- * fresh round.
+ * accepted result. A server keeps no replay token for it and forgets the token
+ * of a held judged answer round, so asking again is a fresh round.
  */
 export function isNikaCompileHeld(outcome: NikaCompileOutcome): boolean {
   return outcome.diagnostics.some(
@@ -1062,25 +1085,35 @@ export function isNikaCompileHeld(outcome: NikaCompileOutcome): boolean {
 /**
  * The request of the next round of a compile: the same input with these
  * answers added to the previous ones (a later answer to the same key wins).
- * It maps; it judges nothing and never decides to spend for you.
+ * It maps; it judges nothing.
  *
- * - When `outcome` carries a `replay_token` (HTTP, a fresh round whose native
- *   plan the server keeps), the next request replays that round with zero
- *   provider calls: the exact input, `cognition: 'deterministicOnly'`, the
- *   token, and no `limits`. A replay binds the answers into the kept plan but
- *   asks no verifier, so a model-authored candidate stays `incomplete`, a
- *   preview whose judgment is pending (`provenance.decision.pending`). A
- *   judged, ready candidate needs a new `explicitProvider` round carrying the
- *   answers — your first request with `answers` — and that round may spend.
- * - Otherwise the previous request is repeated with the merged answers. A
- *   replay request keeps its token. A local engine replays the plan it
- *   recorded under `.nika/compile/` in its working directory when the round
- *   carries at least one answer (so `fresh` is dropped), and the seat's judge
- *   may then decide it; a local round with no answer reads the intent again.
- *   An HTTP `explicitProvider` request without a token is a new fresh round:
- *   it may spend again. A deterministic request is stateless.
+ * - **A kept round** (HTTP): when `outcome` carries a `replay_token`, or the
+ *   previous request already answered a kept round with one, the next request
+ *   answers that round by its token with the exact input and the merged
+ *   answers. After an `explicitProvider` round it is the judged answer round:
+ *   `cognition: 'explicitProvider'`, the token and the previous `limits`; the
+ *   server replays the kept plan with the answers and its seat only judges the
+ *   replayed bytes (judge calls, never an authoring call), answering `ready`
+ *   or holding the candidate. With `{ cognition: 'deterministicOnly' }` it is
+ *   the zero-call replay instead: no `limits`, no call, no judge, so a
+ *   model-authored candidate comes back `incomplete` with its judgment
+ *   pending. A previous zero-call replay stays one unless you pass
+ *   `{ cognition: 'explicitProvider' }`. The judged answer round needs an
+ *   engine that serves it (integration commit 158a961cd, not yet released);
+ *   an older server refuses it, typed as `NikaCompatibilityError`.
+ * - **No kept round**: the previous request is repeated with the merged
+ *   answers. A local engine replays the plan it recorded under
+ *   `.nika/compile/` in its working directory when the round carries at least
+ *   one answer (so `fresh` is dropped), and its seat's judge may decide it; a
+ *   local round with no answer reads the intent again. An HTTP
+ *   `explicitProvider` request without a token is a new fresh round: it may
+ *   spend again. A deterministic request is stateless.
  *
- * A loop over rounds should stop when a round brings no new answer. An
+ * A held outcome (`isNikaCompileHeld`) has no next round: the server forgot
+ * the token of a held judged round (a request with it answers 409
+ * `compile_replay_unavailable`), and asking again would author anew. That is
+ * refused here; author a new request if you mean to, or stop. A loop over
+ * rounds should also stop when a round brings no new answer. An
  * `intent.clarification` answer replaces the request: a server refuses it as
  * an answer (`compile_new_intent_required`, `compile_replay_input_changed`);
  * start a new create request with the replacement intent instead.
@@ -1089,35 +1122,96 @@ export function nextCompileRequest(
   previous: string | NikaCompileRequest,
   outcome: NikaCompileOutcome,
   answers: Record<string, unknown>,
+  options: NikaNextCompileOptions = {},
 ): NikaCompileRequest {
   const request = normalizeCompileRequest(previous);
   encodeLiteralInputs(answers, 'compile({ answers })');
+  const chosen = nextCognition(options);
+  if (outcomeHeld(outcome)) {
+    throw new NikaConfigurationError(
+      'compile: the verifier held this outcome\'s candidate (verify_held): a held round has no '
+      + 'answer round and a server forgets its token. Stop here, or author a new request '
+      + '(a fresh round may spend)',
+    );
+  }
   const merged: Record<string, unknown> = { ...request.answers, ...answers };
-  const token = replayTokenOf(outcome);
+  const token = replayTokenOf(outcome) ?? request.replay_token;
   if (token !== undefined) {
-    if (request.intent !== undefined) {
-      return {
+    if (request.cognition === undefined) {
+      throw new NikaConfigurationError(
+        'compile: this outcome carries a replay_token its request could not have opened',
+      );
+    }
+    const cognition = chosen ?? request.cognition;
+    const judged = cognition === 'explicitProvider';
+    const input: NikaCompileRequest = request.intent !== undefined
+      ? {
         intent: request.intent,
         ...(request.workflow_id === undefined ? {} : { workflow_id: request.workflow_id }),
-        answers: merged,
-        cognition: 'deterministicOnly',
-        replay_token: token,
+      }
+      : {
+        workflow: request.workflow,
+        change: request.change,
+        ...(request.original_intent === undefined ? {} : { original_intent: request.original_intent }),
       };
-    }
     return {
-      workflow: request.workflow,
-      change: request.change,
-      ...(request.original_intent === undefined ? {} : { original_intent: request.original_intent }),
+      ...input,
       answers: merged,
-      cognition: 'deterministicOnly',
+      cognition,
+      // Limits narrow a round that may call; the zero-call replay refuses them.
+      ...(judged && request.limits !== undefined ? { limits: request.limits } : {}),
       replay_token: token,
     };
+  }
+  if (chosen !== undefined) {
+    throw new NikaConfigurationError(
+      'compile: the cognition option chooses how a kept round is answered, and this round '
+      + 'kept none (no replay_token came back)',
+    );
   }
   if (request.intent !== undefined) {
     const { fresh: _fresh, ...create } = request;
     return { ...create, answers: merged };
   }
   return { ...request, answers: merged };
+}
+
+function nextCognition(options: NikaNextCompileOptions): NikaCompileRequestCognition | undefined {
+  const record = dataRecord(options, 'options');
+  for (const key of Reflect.ownKeys(record)) {
+    if (key !== 'cognition') {
+      throw new NikaConfigurationError(`compile: unknown option ${String(key)}`);
+    }
+  }
+  const cognition = record.cognition;
+  if (cognition !== undefined && cognition !== 'explicitProvider' && cognition !== 'deterministicOnly') {
+    throw new NikaConfigurationError('compile: cognition must be explicitProvider or deterministicOnly');
+  }
+  return cognition;
+}
+
+/** `isNikaCompileHeld` over a caller-held object, read from own data descriptors only. */
+function outcomeHeld(outcome: NikaCompileOutcome): boolean {
+  if (outcome === null || typeof outcome !== 'object' || utilTypes.isProxy(outcome)) {
+    throw new NikaConfigurationError('compile: the outcome must be the object compile() resolved');
+  }
+  const diagnostics = ownDataValue(outcome, 'diagnostics');
+  // A Proxy first: Array.isArray throws on a revoked one.
+  if (utilTypes.isProxy(diagnostics) || !Array.isArray(diagnostics)) {
+    throw new NikaConfigurationError('compile: the outcome must be the object compile() resolved');
+  }
+  for (let index = 0; index < diagnostics.length; index += 1) {
+    const diagnostic = ownDataValue(diagnostics, String(index));
+    if (diagnostic !== null && typeof diagnostic === 'object' && !utilTypes.isProxy(diagnostic)
+      && ownDataValue(diagnostic, 'kind') === 'applied'
+      && ownDataValue(diagnostic, 'target') === HELD_TARGET) return true;
+  }
+  return false;
+}
+
+function ownDataValue(target: object, key: string): unknown {
+  const descriptor = Object.getOwnPropertyDescriptor(target, key);
+  return descriptor !== undefined && 'value' in descriptor ? descriptor.value : undefined;
 }
 
 /** The outcome's replay token, read from its own data descriptor only. */

@@ -7,6 +7,7 @@ import {
   nextCompileRequest,
 } from '../src/index.js';
 import type { NikaCompileOutcome, NikaCompileRequest } from '../src/index.js';
+import { normalizeCompileRequest } from '../src/lib/compile.js';
 
 // The generation-2 request vocabulary and the answer-round helper, judged with
 // no engine and no network: every refusal here is a caller mistake or a field
@@ -60,8 +61,7 @@ describe('compile request vocabulary (no engine, no network)', () => {
     [{ intent: 'x', cognition: 'explicitProvider', limits: [6] }, /limits must be a plain object/],
     [{ intent: 'x', limits: { max_calls: 2 } }, /limits bound a provider round: name cognition 'explicitProvider'/],
     [{ intent: 'x', cognition: 'deterministicOnly', replay_token: TOKEN, limits: { max_calls: 2 } }, /deterministicOnly request makes no call/],
-    [{ intent: 'x', cognition: 'explicitProvider', replay_token: TOKEN }, /replay_token rides cognition 'deterministicOnly'/],
-    [{ intent: 'x', replay_token: TOKEN }, /replay_token rides cognition 'deterministicOnly'/],
+    [{ intent: 'x', replay_token: TOKEN }, /a replay_token rides a cognition/],
     [{ intent: 'x', cognition: 'deterministicOnly', replay_token: TOKEN.toUpperCase() }, /64 lowercase hexadecimal digits/],
     [{ intent: 'x', original_intent: 'y' }, /a create request carries its own intent/],
     [{ workflow: 'nika: w\n', change: { set_constant: { name: 'a', value: 1 } }, original_intent: 'y' }, /set_constant edit is applied without it/],
@@ -76,6 +76,14 @@ describe('compile request vocabulary (no engine, no network)', () => {
     const error = await refusal(local().compile(request as unknown as NikaCompileRequest));
     expect(error).toBeInstanceOf(NikaConfigurationError);
     expect(error.message).toMatch(message);
+  });
+
+  it('accepts the judged answer round: explicitProvider with a kept round\'s token, limits narrowing it', () => {
+    const judged = { intent: 'x', cognition: 'explicitProvider' as const, replay_token: TOKEN, limits: { max_calls: 2 } };
+    expect(normalizeCompileRequest(judged)).toEqual(judged);
+    const edit = { workflow: 'nika: w\n', change: 'weekly', original_intent: 'x', cognition: 'explicitProvider' as const,
+      replay_token: TOKEN };
+    expect(normalizeCompileRequest(edit)).toEqual(edit);
   });
 
   it('never quotes a malformed replay token', async () => {
@@ -132,7 +140,7 @@ describe('compile request vocabulary (no engine, no network)', () => {
 });
 
 describe('nextCompileRequest', () => {
-  it('replays a kept round: exact input, the token, zero-call cognition, no limits', () => {
+  it('answers a kept round with its judged answer round: exact input, the token, the limits', () => {
     const first = {
       intent: 'Every morning, summarize ./inbox into ./digest.md',
       workflow_id: 'digest',
@@ -145,15 +153,25 @@ describe('nextCompileRequest', () => {
       intent: first.intent,
       workflow_id: 'digest',
       answers: { 'const.tone': 'short', 'const.audience': 'team' },
-      cognition: 'deterministicOnly',
+      cognition: 'explicitProvider',
+      limits: { max_calls: 6 },
       replay_token: TOKEN,
     });
     // The previous request is left as it was.
     expect(first.answers).toEqual({ 'const.tone': 'short' });
-    expect(first.cognition).toBe('explicitProvider');
+    expect(first).not.toHaveProperty('replay_token');
   });
 
-  it('replays a kept edit round with its original intent', () => {
+  it('asks for the zero-call replay on request: deterministicOnly, no limits', () => {
+    const first = { intent: 'x', workflow_id: 'digest', cognition: 'explicitProvider' as const, limits: { max_calls: 6 } };
+    expect(nextCompileRequest(first, outcome({ replay_token: TOKEN }), { 'const.audience': 'team' },
+      { cognition: 'deterministicOnly' })).toEqual({
+      intent: 'x', workflow_id: 'digest', answers: { 'const.audience': 'team' },
+      cognition: 'deterministicOnly', replay_token: TOKEN,
+    });
+  });
+
+  it('answers a kept edit round with its original intent', () => {
     const first = {
       workflow: 'nika: digest\n',
       change: 'make it weekly',
@@ -166,8 +184,29 @@ describe('nextCompileRequest', () => {
       change: first.change,
       original_intent: first.original_intent,
       answers: { 'trigger.timezone': 'Europe/Paris' },
-      cognition: 'deterministicOnly',
+      cognition: 'explicitProvider',
+      limits: { repairs: 0 },
       replay_token: TOKEN,
+    });
+  });
+
+  it('keeps answering a judged round by its token while no new one comes back', () => {
+    const judged = { intent: 'x', cognition: 'explicitProvider' as const, replay_token: TOKEN, limits: { max_calls: 2 }, answers: { a: 1 } };
+    expect(nextCompileRequest(judged, outcome({ compile_version: 2 }), { b: 2 })).toEqual({
+      intent: 'x', answers: { a: 1, b: 2 }, cognition: 'explicitProvider', limits: { max_calls: 2 }, replay_token: TOKEN,
+    });
+  });
+
+  it('follows the newest token a round answered', () => {
+    const newer = 'fedcba9876543210'.repeat(4);
+    const judged = { intent: 'x', cognition: 'explicitProvider' as const, replay_token: TOKEN };
+    expect(nextCompileRequest(judged, outcome({ replay_token: newer }), {})).toMatchObject({ replay_token: newer });
+  });
+
+  it('turns a zero-call replay into its judged answer round only on request', () => {
+    const replay = { intent: 'x', cognition: 'deterministicOnly' as const, replay_token: TOKEN, answers: { a: 1 } };
+    expect(nextCompileRequest(replay, outcome({ compile_version: 1 }), {}, { cognition: 'explicitProvider' })).toEqual({
+      intent: 'x', answers: { a: 1 }, cognition: 'explicitProvider', replay_token: TOKEN,
     });
   });
 
@@ -203,6 +242,48 @@ describe('nextCompileRequest', () => {
       output: 'out/x.nika',
       answers: { 'const.audience': 'team' },
     });
+  });
+
+  it('refuses a held outcome: no answer round, its token is forgotten, asking again would author anew', () => {
+    const held = outcome({
+      candidate: 'nika: preview\n',
+      diagnostics: [{ kind: 'applied', target: 'verify_held', message: 'held' }],
+    });
+    const judged = { intent: 'x', cognition: 'explicitProvider' as const, replay_token: TOKEN };
+    expect(() => nextCompileRequest(judged, held, { a: 1 })).toThrow(NikaConfigurationError);
+    expect(() => nextCompileRequest(judged, held, { a: 1 })).toThrow(/held/);
+    expect(() => nextCompileRequest('x', held, {})).toThrow(/held/);
+  });
+
+  it('refuses the cognition option when no kept round is involved', () => {
+    expect(() => nextCompileRequest({ intent: 'x', cognition: 'explicitProvider' }, outcome(), { a: 1 },
+      { cognition: 'deterministicOnly' })).toThrow(/kept none/);
+    expect(() => nextCompileRequest('x', outcome({ compile_version: 1 }), {}, { cognition: 'explicitProvider' }))
+      .toThrow(/kept none/);
+  });
+
+  it.each([
+    [{ cognition: 'implicitProvider' }, /cognition must be explicitProvider or deterministicOnly/],
+    [{ judge: true }, /unknown option judge/],
+    [[], /options must be a plain object/],
+  ])('refuses the options %j', (options, message) => {
+    expect(() => nextCompileRequest({ intent: 'x', cognition: 'explicitProvider' }, outcome({ replay_token: TOKEN }), {},
+      options as never)).toThrow(message);
+  });
+
+  it('reads the held marker without running caller code, a revoked Proxy included', () => {
+    const revocable = Proxy.revocable([], {});
+    revocable.revoke();
+    expect(() => nextCompileRequest('x', outcome({ diagnostics: revocable.proxy as never }), {}))
+      .toThrow(NikaConfigurationError);
+    const get = vi.fn(() => 'applied');
+    const accessor = Object.defineProperty({ target: 'verify_held', message: 'm' }, 'kind', { get, enumerable: true });
+    expect(nextCompileRequest('x', outcome({ diagnostics: [accessor as never] }), {})).toEqual({ intent: 'x', answers: {} });
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it('refuses a token its request could not have opened', () => {
+    expect(() => nextCompileRequest('hello', outcome({ replay_token: TOKEN }), {})).toThrow(/could not have opened/);
   });
 
   it('accepts the bare-string shorthand as the previous request', () => {

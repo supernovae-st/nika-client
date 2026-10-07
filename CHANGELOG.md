@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `compile()` reaches provider-backed authoring on both doors, mirroring the
+  engine's compile wire generation 2. Over HTTP, `cognition:
+  'explicitProvider'` posts one fresh `compile_version: 2` round under the
+  server's seated model (gated by the `compileNativeV2` capability, refused
+  after `/health` alone otherwise), with optional `limits` (`max_calls`,
+  `repairs`, `max_tokens`, `call_timeout_ms`, `deadline_ms`), `workflow_id`
+  and an edit's `original_intent`; its `Nika-Compile-Replay` header becomes
+  `outcome.replay_token`. With that token, `cognition: 'explicitProvider'` is
+  the kept round's judged answer round (the server replays the kept plan with
+  the answers and its seat only judges it, no authoring call; held, it
+  forgets the token) and `cognition: 'deterministicOnly'` its zero-call
+  replay. The judged answer round is gated on the `/health` capability
+  `compileJudgedAnswerRound` (engine integration commits `158a961cd` and
+  `b7dace1e5`, in no release yet): a server without it gets a
+  `NikaCompatibilityError` before anything is posted, and an older server's
+  `422 malformed_compile_request` to the round maps to the same error,
+  defensively. `outcome.judged_answer_round_available` says, beside a kept
+  round, whether its server judges answer rounds. On a local engine,
+  `authoringModel`, `decisionModel`, `fresh`, `output`, `original_intent` and
+  `limits` map onto the CLI's own flags. The outcome reads both generations:
+  `compile_version` 2 exactly when `provenance.authoring` carries the receipt,
+  `choice` questions with `options`, `requested_trigger`, the provenance
+  `strategy`, `suggested_file`, `plan` and `decision`, and the CLI's
+  `written`, `existing_destination`, `plan_record_error` and
+  `declined_record_error`. A ready outcome carrying the verifier's
+  `verify_held` or `verify_resume` marker is a protocol fault: a held
+  candidate never reads as ready. New exports: `nextCompileRequest()` builds
+  an answer round (after a provider round that kept its plan, the judged
+  answer round where the server serves it, else a fresh round carrying the
+  answers; the zero-call replay with `{ cognition: 'deterministicOnly' }`; it
+  refuses a held outcome), `isNikaCompileHeld()` reads the held marker,
+  and the request, options, receipt, trigger and refusal-code types. A
+  provider round waits for its `limits.deadline_ms` plus the server's handoff
+  and one `requestTimeout`, and without that limit or `timeoutMs` gets no SDK
+  deadline, as the engine sets none by default; its answer is read up to the
+  8 MiB compile bound. The generation-2 types are hand-written from the engine
+  source, ahead of the pinned `openapi.json` (engine 0.120.3); see
+  `docs/compile.md` and `examples/compile-then-run.ts`.
 - Packed depth project `signed-webhook-intake` — the app-owned webhook
   qualification (engine nika#1719 names it as the path that stays
   first-class). A loopback receiver verifies a Standard Webhooks
@@ -24,6 +62,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   webhook, a manual `run()` and a `once` schedule that fires the declared
   default. The depth ledger, evidence gate and replay fixtures now count six
   projects; the new row records behavioral verdicts only, never a job id.
+
+### Fixed
+
+- An HTTP provider compile round with no deadline no longer fails after
+  300 seconds. Node's built-in `fetch` stops waiting for response headers at
+  that point (`UND_ERR_HEADERS_TIMEOUT`), and the server answers a round only
+  when it settles, so a longer round failed with a transport error while it
+  went on spending, and its answer and replay token were lost. Such a round
+  is now posted through `node:http`/`node:https`, which set no header or body
+  deadline; the caller's `signal` still stops the wait. A `fetch` passed in
+  the configuration keeps its own timeouts.
 
 ## [0.120.3]
 

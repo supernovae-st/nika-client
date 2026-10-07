@@ -211,9 +211,30 @@ try {
     );
   }
 
+  // The documented compile example, verbatim from examples/: typechecked below
+  // against the packed types, then run from the tarball against the fixture
+  // engine (compile, answer from a JSON file, materialize, run).
+  const COMPILE_EXAMPLE = 'compile-then-run.mts';
+  await copyFile(path.join(root, 'examples', 'compile-then-run.ts'), path.join(consumer, COMPILE_EXAMPLE));
+  if (process.platform !== 'win32') {
+    const exampleLog = path.join(scratch, 'example.argv');
+    await writeFile(path.join(consumer, 'answers.json'), '{"const.request":"An outage affects support customers."}\n');
+    const exampleEnv = { ...consumerEnv, NIKA_BIN: path.join(root, 'test/fixtures/fake-nika-compile.mjs'),
+      NIKA_FAKE_ARGV_LOG: exampleLog };
+    const printed = run(process.execPath, [COMPILE_EXAMPLE, 'classify-and-route', 'answers.json', 'out/triage.nika'],
+      { cwd: consumer, env: exampleEnv }).stdout;
+    assertCompileExample(printed, await readFile(exampleLog, 'utf8'),
+      await readFile(path.join(consumer, 'out', 'triage.nika'), 'utf8'));
+    process.stdout.write(
+      `Packed ${packageName}@${expectedVersion} runs examples/compile-then-run.ts: `
+      + 'compile, answer from a file, materialize, run\n',
+    );
+  }
+
   const typedConsumer = [
     `import { Nika, isNikaRunSucceeded, type NikaConfig, type NikaRunOptions, type NikaRunResult } from '${packageName}';`,
-    `import type { NikaCompileOutcome, NikaCompileRequest } from '${packageName}';`,
+    `import { isNikaCompileHeld, nextCompileRequest } from '${packageName}';`,
+    `import type { NikaCompileOutcome, NikaCompileRequest, NikaCompileRefusalCode } from '${packageName}';`,
     `import type { NikaEvent, NikaJournalEvidence, NikaRun, NikaRunEvent, NikaRunEventKind } from '${packageName}';`,
     `import type { NikaEventBufferOverflowError } from '${packageName}';`,
     "const config: NikaConfig = { bin: '/tmp/nika' };",
@@ -289,11 +310,37 @@ try {
     'declare const compileOutcome: NikaCompileOutcome;',
     'const compileReady: boolean = compileOutcome.ready;',
     'const compileSource: string | null = compileOutcome.candidate;',
-    '// @ts-expect-error compile has no process-only fields',
-    'compileOutcome.written;',
-    '// @ts-expect-error compile has no process-only fields',
+    '// A destination is written only where a local request named one.',
+    'const compileWritten: string | null | undefined = compileOutcome.written;',
+    '// @ts-expect-error compile has no process exit code',
     'compileOutcome.exitCode;',
-    'void compileReady; void compileSource;',
+    'void compileReady; void compileSource; void compileWritten;',
+    '// Generation 2: a provider round, its receipt, and the replay of a kept round.',
+    'const compileGeneration: 1 | 2 = compileOutcome.compile_version;',
+    'const compileCalls: number | undefined = compileOutcome.provenance.authoring?.calls;',
+    'const compileToken: string | undefined = compileOutcome.replay_token;',
+    'const compileJudgedServed: boolean | undefined = compileOutcome.judged_answer_round_available;',
+    'void compileJudgedServed;',
+    'const compileHeld: boolean = isNikaCompileHeld(compileOutcome);',
+    'void compileGeneration; void compileCalls; void compileToken; void compileHeld;',
+    `const compileFresh: NikaCompileRequest = { intent: 'x', cognition: 'explicitProvider', limits: { max_calls: 6, deadline_ms: 60000 } };`,
+    `const compileSeat: NikaCompileRequest = { intent: 'x', authoringModel: 'mistral/mistral-small-latest', fresh: true };`,
+    `const compileRevision: NikaCompileRequest = { workflow: 'src', change: 'weekly', original_intent: 'x', cognition: 'explicitProvider' };`,
+    `const compileNext: NikaCompileRequest = nextCompileRequest(compileFresh, compileOutcome, { 'const.audience': 'team' });`,
+    `const compileReplay: NikaCompileRequest = nextCompileRequest(compileFresh, compileOutcome, {}, { cognition: 'deterministicOnly' });`,
+    `const compileJudged: NikaCompileRequest = { intent: 'x', cognition: 'explicitProvider', replay_token: 'f'.repeat(64), limits: { max_calls: 2 } };`,
+    'void compileReplay; void compileJudged;',
+    '// @ts-expect-error the next round answers a kept round with one of the two wire cognitions',
+    `nextCompileRequest(compileFresh, compileOutcome, {}, { cognition: 'judged' });`,
+    "const compileRefusal: NikaCompileRefusalCode = 'compile_limit';",
+    'void compileFresh; void compileSeat; void compileRevision; void compileNext; void compileRefusal;',
+    '// @ts-expect-error workflow_id names a created workflow: never an edit',
+    `const compileEditId: NikaCompileRequest = { workflow: 'src', change: 'c', workflow_id: 'w' };`,
+    '// @ts-expect-error the wire knows two request cognitions',
+    `const compileWord: NikaCompileRequest = { intent: 'x', cognition: 'implicitProvider' };`,
+    '// @ts-expect-error a limit is a number of the wire, never text',
+    `const compileLimit: NikaCompileRequest = { intent: 'x', cognition: 'explicitProvider', limits: { max_calls: '6' } };`,
+    'void compileEditId; void compileWord; void compileLimit;',
     `const compileCreate: NikaCompileRequest = { intent: 'x', answers: { 'const.request': 42 } };`,
     `const compileEdit: NikaCompileRequest = { workflow: 'src', change: 'c' };`,
     `const compileConstant: NikaCompileRequest = { workflow: 'src', change: { set_constant: { name: 'request', value: null } } };`,
@@ -328,6 +375,7 @@ try {
     'consumer.cts',
     'lifecycle-app.mts',
     'lifecycle-app.cts',
+    COMPILE_EXAMPLE,
   ], { cwd: consumer });
 
   process.stdout.write(
@@ -513,4 +561,59 @@ function assertCompile(report, moduleSystem) {
     change: { set_constant: { name: 'request', value: ['雪', null, true, 1.25] } } },
   say('HTTP structured edits use the accepted wire'));
 
+  const REPLAY = '0123456789abcdef'.repeat(4);
+  assert.deepEqual(report.generation2.round1, { version: 2, status: 'incomplete', token: true, calls: 2, held: false,
+    judgedAvailable: true },
+  say('a provider round reads generation 2 with its receipt, replay token and the judged round its server serves'));
+  assert.deepEqual(report.generation2.round2, { version: 2, ready: true, calls: 1, token: false },
+    say('the judged answer round has the replayed candidate judged, ready, with no authoring call'));
+  assert.deepEqual(report.generation2.preview, { version: 1, status: 'incomplete', token: false },
+    say('the zero-call replay binds the answers with no call and no judge'));
+  assert.deepEqual(report.generation2.bodies, [
+    { compile_version: 2, mode: 'create', cognition: 'explicitProvider', intent: 'Every morning, summarize ./inbox',
+      limits: { max_calls: 6 } },
+    { compile_version: 2, mode: 'create', cognition: 'explicitProvider', intent: 'Every morning, summarize ./inbox',
+      answers: { 'const.audience': 'team' }, limits: { max_calls: 6 }, replay_token: REPLAY },
+    { compile_version: 2, mode: 'create', cognition: 'deterministicOnly', intent: 'Every morning, summarize ./inbox',
+      answers: { 'const.audience': 'team' }, replay_token: REPLAY },
+  ], say('nextCompileRequest answers the kept round judged by default, zero-call on request'));
+  const { message: unseatedMessage, ...unseated } = report.generation2Unseated;
+  assert.deepEqual(unseated, {
+    name: 'NikaCompatibilityError',
+    capability: 'compileNativeV2',
+    transport: 'http',
+    ...typed('compatibility'),
+  }, say('a resident without a native seat refuses a provider round after /health alone'));
+  assert.match(unseatedMessage, /Nothing was posted/, say('the refusal says nothing was sent'));
+
+}
+
+/**
+ * What the documented compile example did from the packed package: one
+ * deterministic incomplete round, the answer from the JSON file on the next
+ * round's argv, the ready candidate written where it was told, then one run
+ * of that file. The engine is the compile fixture; nothing else is spawned.
+ */
+function assertCompileExample(printed, argvLog, written) {
+  const lines = printed.trim().split('\n');
+  assert.deepEqual(lines.filter((line) => line.startsWith('compile · ')), [
+    'compile · incomplete · generation 1 · no provider call',
+    'compile · ready · generation 1 · no provider call',
+  ], 'the example reports each compile round');
+  assert.ok(lines.includes('? const.request · What request should this workflow classify?'),
+    'the example shows the question it answers');
+  assert.ok(lines.includes('event · run.settled · succeeded'), 'the example observes the run');
+  assert.match(lines.at(-1), /^run · succeeded · outputs \{"source_bytes":\d+\}$/, 'the example reads the result');
+  const argvs = argvLog.trim().split('\n').map((line) => JSON.parse(line));
+  assert.deepEqual(argvs.slice(0, 3), [
+    ['--sdk-identity'],
+    ['compile', '--json', '--', 'classify-and-route'],
+    ['compile', '--json', '--answer=const.request="An outage affects support customers."', '--', 'classify-and-route'],
+  ], 'the answer from the file rides the next round once');
+  assert.equal(argvs.length, 4, 'compile twice, then run once');
+  assert.equal(argvs[3][0], 'run');
+  assert.match(argvs[3][1], /\/out\/triage\.nika$/, 'run() receives the materialized candidate');
+  assert.equal(argvs[3][2], '--json');
+  assert.match(written, /const: \{ request: "An outage affects support customers\." \}/,
+    'the written file is the ready candidate');
 }

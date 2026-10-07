@@ -835,8 +835,11 @@ export interface NikaScheduleApplyResult {
 
 /* ------------------------------------------------------------------ */
 /* Compile (issue #128) — the SDK projection of the engine's one       */
-/* authoring capability. Field names mirror the engine's               */
-/* `compile_version: 1` wire verbatim; the SDK invents none of them.   */
+/* authoring capability. Field names mirror the engine's wire          */
+/* (`compile_version` 1 and 2) verbatim; the SDK invents none of them. */
+/* Wire fields keep their wire spelling (`workflow_id`, `limits`,      */
+/* `replay_token`); native-only fields are named after the CLI flag    */
+/* they become (`authoringModel` is `--authoring-model`).              */
 /* ------------------------------------------------------------------ */
 
 /**
@@ -848,25 +851,143 @@ export interface NikaScheduleApplyResult {
  *   change request — optionally with `answers`.
  *
  * The two shapes never mix, and there is no session: every call is a fresh
- * request carrying everything the engine needs.
+ * request carrying everything the engine needs. `nextCompileRequest()` builds
+ * the request of an answer round from the previous request and its outcome.
+ *
+ * Who makes a provider call is explicit and per request, never ambient:
+ * `cognition: 'explicitProvider'` over HTTP (the server's operator seated the
+ * model), `authoringModel` on a local engine (the model you name). Without
+ * either, compile is deterministic and contacts no provider.
  */
 export type NikaCompileRequest = NikaCompileCreateRequest | NikaCompileEditRequest;
 
-export interface NikaCompileCreateRequest {
-  /** Intent text, or an exact embedded skeleton name in this foundation. */
-  intent: string;
+/**
+ * The cognition a compile request names (wire `cognition`, HTTP only):
+ *
+ * - `explicitProvider`: one fresh generation-2 round under the server's
+ *   seated authoring model (it may spend). Needs `compileNativeV2`. With a
+ *   kept round's `replay_token` it is that round's judged answer round: the
+ *   kept plan replayed with the answers, the seat asked only to judge the
+ *   replayed bytes (judge calls, never an authoring call); needs an engine
+ *   with the judged answer round (integration commit 158a961cd, not yet
+ *   released).
+ * - `deterministicOnly`: with `replay_token`, a zero-call generation-2 replay
+ *   of a round the server kept (no judge); without it, the generation-1 door
+ *   with its explicit (and only) cognition word.
+ */
+export type NikaCompileRequestCognition = 'explicitProvider' | 'deterministicOnly';
+
+/** How `nextCompileRequest()` builds the next round of a kept round. */
+export interface NikaNextCompileOptions {
   /**
-   * Answers to engine questions, by stable question key (`const.request`),
-   * as strict JSON values — never pre-serialized text. The SDK serializes
-   * each value exactly once onto the argv `KEY=JSON` channel; a value JSON
-   * cannot carry refuses with `NikaConfigurationError` before any spawn.
+   * The cognition of the next round when it answers a kept round (a
+   * `replay_token` came back, or the previous request carried one):
+   * `explicitProvider` is its judged answer round (the server's seat judges
+   * the replayed bytes: judge calls, no authoring call, it may spend);
+   * `deterministicOnly` is its zero-call replay (no call, no judge, so a
+   * model-authored candidate stays a preview). By default, after an
+   * `explicitProvider` round: the judged answer round where the server serves
+   * it (`outcome.judged_answer_round_available`), else a new fresh round
+   * carrying the answers (it may spend); after a zero-call replay: another
+   * one. Refused when no kept round is involved.
    */
-  answers?: Record<string, unknown>;
-  workflow?: never;
-  change?: never;
+  cognition?: NikaCompileRequestCognition;
 }
 
-export interface NikaCompileEditRequest {
+/**
+ * The caller's narrowing of one provider round's bounds (wire `limits`). Over
+ * HTTP each value may only narrow the operator's bound (above it the server
+ * answers 422 `compile_limit`, never a clamp); on a local engine the values
+ * become the `--authoring-*` flags. Integers only.
+ */
+export interface NikaCompileLimits {
+  /** Physical requests and model invocations of the round, 1–4294967295 (`--authoring-max-calls`). */
+  max_calls?: number;
+  /** Repair rounds, 0–4294967295; zero disables repairs (`--authoring-repairs`). */
+  repairs?: number;
+  /** Output tokens per completion, 1–4294967295 (`--authoring-max-tokens`). */
+  max_tokens?: number;
+  /**
+   * The wait for one model invocation, in milliseconds (≥ 1). A local engine
+   * takes whole seconds (`--authoring-timeout`), so a value that is not a
+   * multiple of 1000 is refused there.
+   */
+  call_timeout_ms?: number;
+  /**
+   * The whole round's deadline, in milliseconds (≥ 1), absolute from the
+   * server's admission; past it the server answers 408
+   * `compile_deadline_exceeded`. Without it (and without an operator
+   * deadline) nothing bounds the round on the server. The client then waits
+   * for it plus the server's 5 s handoff and one `requestTimeout`, unless
+   * `timeoutMs` says otherwise. HTTP only: the local engine has no such flag.
+   */
+  deadline_ms?: number;
+}
+
+/** Fields both request shapes may carry. */
+interface NikaCompileRequestFields {
+  /**
+   * Answers to engine questions, by stable question key (`const.request`),
+   * as strict JSON values — never pre-serialized text. Natively each value is
+   * serialized exactly once onto the argv `--answer=KEY=JSON` channel; over
+   * HTTP it rides `answers` with its type preserved. A value JSON cannot
+   * carry refuses with `NikaConfigurationError` before any spawn or request.
+   */
+  answers?: Record<string, unknown>;
+  /** HTTP only: the wire's cognition word (see `NikaCompileRequestCognition`). */
+  cognition?: NikaCompileRequestCognition;
+  /**
+   * The bounds of a provider round: over HTTP with `cognition:
+   * 'explicitProvider'` (a fresh round or a judged answer round), natively with
+   * `authoringModel`. A zero-call replay (`deterministicOnly`) refuses limits.
+   */
+  limits?: NikaCompileLimits;
+  /**
+   * HTTP only: the `Nika-Compile-Replay` token a round of the same server run
+   * answered (`outcome.replay_token`), sent with the round's exact input: with
+   * `cognition: 'explicitProvider'` it is the judged answer round, with
+   * `'deterministicOnly'` the zero-call replay. A held judged round forgets it.
+   * Not an execution grant.
+   */
+  replay_token?: string;
+  /**
+   * Local engine only (`--authoring-model provider/name`): the model that
+   * interprets free intent. Its key comes from the engine's environment,
+   * never from the SDK. Over HTTP the server's operator seats the model.
+   */
+  authoringModel?: string;
+  /**
+   * Local engine only (`--output`): where the engine writes a READY
+   * candidate, atomically; relative paths resolve against the client's
+   * `cwd`. The engine never writes anything that is not ready. The outcome
+   * then carries `written` (and `existing_destination` when a file was left
+   * in place).
+   */
+  output?: string;
+}
+
+export interface NikaCompileCreateRequest extends NikaCompileRequestFields {
+  /** Intent text, or an exact embedded skeleton name (`hello`, `chain`…). */
+  intent: string;
+  /** HTTP only (wire `workflow_id`): names the created workflow. */
+  workflow_id?: string;
+  /**
+   * Local engine only (`--decision-model`): one bounded-decision seat
+   * (`typesafe/<jev>` or `provider/name`) for finite ambiguities. Create only.
+   */
+  decisionModel?: string;
+  /**
+   * Local engine only (`--fresh`): ignore the plan an earlier round recorded
+   * for this intent under `.nika/compile/` and read or sample it again.
+   * Create only. `nextCompileRequest()` drops it so an answer round replays.
+   */
+  fresh?: boolean;
+  workflow?: never;
+  change?: never;
+  original_intent?: never;
+}
+
+export interface NikaCompileEditRequest extends NikaCompileRequestFields {
   /** The accepted workflow's exact source bytes (as a string). */
   workflow: string;
   /**
@@ -876,8 +997,17 @@ export interface NikaCompileEditRequest {
    * the same law as `answers`.
    */
   change: string | NikaCompileSetConstant;
-  answers?: Record<string, unknown>;
+  /**
+   * The request the base answered (wire `original_intent`; natively the
+   * intent positional beside `--base`). A text change is read against it.
+   * Required with a text change on an HTTP generation-2 round, absent from
+   * the generation-1 wire, refused beside `set_constant`.
+   */
+  original_intent?: string;
   intent?: never;
+  workflow_id?: never;
+  decisionModel?: never;
+  fresh?: never;
 }
 
 /** One structured constant edit, mirroring the engine's `set_constant`. */
@@ -892,34 +1022,106 @@ export interface NikaCompileSetConstant {
 
 export interface NikaCompileOptions {
   /**
-   * Aborts this authoring process only. Compile owns no Run: this never
-   * touches `run.cancel()` semantics (client#126), and no workflow effect
-   * exists to interrupt.
+   * Aborts this authoring request or process only. Compile owns no Run: this
+   * never touches `run.cancel()` semantics (client#126). Stopping an HTTP
+   * provider round stops this client's wait, not the server's round or its
+   * spend.
    */
   signal?: AbortSignal;
-  /** Positive integer milliseconds before the compile child or HTTP request is stopped. */
+  /**
+   * Positive integer milliseconds before the compile child or HTTP request is
+   * stopped. Without it, an HTTP generation-1 request or replay is bounded by
+   * the client's `requestTimeout`; an `explicitProvider` round by its
+   * `limits.deadline_ms` plus the server's handoff and one `requestTimeout`,
+   * or, without that limit, by nothing the SDK sets (Node's built-in fetch
+   * still stops waiting for response headers after 300 s by default); a local
+   * compile by `signal` alone.
+   */
   timeoutMs?: number;
 }
 
 /** The engine's own completeness words; `ready` is never derived from confidence. */
 export type NikaCompileStatus = 'ready' | 'incomplete' | 'refused';
 
+/** One admissible answer of a `choice` question, spelled by the owning grammar. */
+export interface NikaCompileQuestionOption {
+  key: string;
+  label: string;
+  [key: string]: unknown;
+}
+
 /** One authoring question, exactly as the engine emitted it. */
 export interface NikaCompileQuestion {
   /** Stable semantic hole path (`const.request`), never a session id. */
   key: string;
   label: string;
-  type: 'text' | 'literal';
+  /**
+   * `text`: a JSON string · `literal`: one JSON value · `choice`: a JSON
+   * string that is the `key` of one of `options`.
+   */
+  type: 'text' | 'literal' | 'choice';
   why: string;
+  /**
+   * `false`: the value belongs to a binding outside the program (a
+   * schedule's timezone, missed-run and overlap policies, per-run ceiling)
+   * and never blocks a ready candidate.
+   */
   mandatory: boolean;
+  /** Present on a `choice` question only. */
+  options?: NikaCompileQuestionOption[];
   [key: string]: unknown;
 }
 
-/** One structured authoring finding, exactly as the engine emitted it. */
+/**
+ * One structured authoring finding, exactly as the engine emitted it.
+ * Compiler targets include `semantic_verification`, `verify_held` (the
+ * verifier did not accept the candidate: it is a preview, see
+ * `isNikaCompileHeld`) and `verify_resume` (no admitted judgment was made:
+ * the candidate is withdrawn and the round's record kept).
+ */
 export interface NikaCompileDiagnostic {
   kind: 'applied' | 'missed' | 'unknown' | 'requiresHuman' | 'refused';
   target: string;
+  /** For a reader; never parsed to recover compiler state. */
   message: string;
+  [key: string]: unknown;
+}
+
+/**
+ * The authoring cognition the engine records in provenance:
+ * `explicitDecision` is a bounded decision seat (local `decisionModel`).
+ */
+export type NikaCompileCognition = 'deterministicOnly' | 'explicitProvider' | 'explicitDecision';
+
+/** The internal strategy that settled the request: observational, never authority. */
+export type NikaCompileStrategy =
+  | 'skeleton'
+  | 'support'
+  | 'hot'
+  | 'warm'
+  | 'cold'
+  | 'native'
+  | (string & {});
+
+/**
+ * The receipt of a round's provider calls (`provenance.authoring`, present
+ * exactly on a `compile_version: 2` outcome). It is never workflow authority
+ * or run evidence, and token usage is not an invoice.
+ */
+export interface NikaCompileAuthoringReceipt {
+  /** The seated authoring model (`provider/name`). */
+  model: string;
+  /** LOGICAL calls of the round. */
+  calls: number;
+  /** Sum of reported counters; `null` when no call reported both counters. */
+  input_tokens: number | null;
+  output_tokens: number | null;
+  elapsed_ms: number;
+  sampling: Record<string, unknown>;
+  /** What each logical call received, in call order. */
+  context: Record<string, unknown>[];
+  /** Provider, model identities, request authority and usage completeness. */
+  backend: Record<string, unknown> | null;
   [key: string]: unknown;
 }
 
@@ -928,7 +1130,17 @@ export interface NikaCompileProvenance {
   compiler_version: string;
   spec_pin: string;
   skeleton: string | null;
-  cognition: 'deterministicOnly';
+  cognition: NikaCompileCognition;
+  /** The strategy that settled a free intent, when one was engaged. */
+  strategy?: NikaCompileStrategy;
+  /** A file name for the candidate, never a path the compiler touched. */
+  suggested_file?: string | null;
+  /** The plan record the round produced; a server keeps it behind its replay token. */
+  plan?: Record<string, unknown>;
+  /** Bounded decision records, `semantic_verification` attempts included. */
+  decision?: Record<string, unknown>;
+  /** The provider-call receipt: present exactly when `compile_version` is 2. */
+  authoring?: NikaCompileAuthoringReceipt;
   [key: string]: unknown;
 }
 
@@ -941,18 +1153,102 @@ export interface NikaCompilePreview {
 }
 
 /**
+ * The trigger the request names, stated beside the candidate whose bytes
+ * carry no cadence, host or event: a requirement an operator binds through
+ * the schedule contract, never a grant or a schedule row.
+ */
+export interface NikaCompileTrigger {
+  kind: 'manual' | 'schedule' | 'webhook' | 'event' | (string & {});
+  status: 'satisfied' | 'requires_binding' | 'unsupported' | (string & {});
+  source_hint?: string | null;
+  event_hint?: string | null;
+  cadence?: string | null;
+  /** The exact five-field projection when supported; older engines omit it. */
+  cron?: string | null;
+  at?: string | null;
+  payload_input?: string | null;
+  timezone?: string | null;
+  missed?: string | null;
+  overlap?: string | null;
+  ceiling?: string | null;
+  [key: string]: unknown;
+}
+
+/** A local engine's failure to keep or remove one of its `.nika/compile/` records. */
+export interface NikaCompileRecordError {
+  path: string;
+  message: string;
+  [key: string]: unknown;
+}
+
+/**
+ * The machine codes a compile refusal carries on `NikaOperationError.code`.
+ * HTTP (`POST /v1/compile`): `unauthorized` (401) · `request_timeout`,
+ * `compile_deadline_exceeded` (408) · `compile_replay_unavailable`,
+ * `compile_replay_input_changed`, `compile_context_changed` (409) ·
+ * `body_too_large` (413) · `unsupported_media_type`,
+ * `unsupported_content_encoding` (415) · `malformed_compile_request`,
+ * `compile_version_unsupported`, `compile_mode_unsupported`,
+ * `compile_cognition_unsupported`, `compile_limit`,
+ * `compile_new_intent_required` (422) · `internal_error`,
+ * `compile_disclosure_refused` (500) · `compile_busy`,
+ * `compile_replay_capacity`, `stopping` (503). Local engine (exit 2 or 3):
+ * `destination_name`, `invalid_answer`, `authoring_authority`, `read_base`,
+ * `knowledge`, `authoring_config`, `compile_error`, `destination`. The
+ * vocabulary is the engine's and stays open.
+ */
+export type NikaCompileRefusalCode =
+  | 'unauthorized'
+  | 'request_timeout'
+  | 'compile_deadline_exceeded'
+  | 'compile_replay_unavailable'
+  | 'compile_replay_input_changed'
+  | 'compile_context_changed'
+  | 'body_too_large'
+  | 'unsupported_media_type'
+  | 'unsupported_content_encoding'
+  | 'malformed_compile_request'
+  | 'compile_version_unsupported'
+  | 'compile_mode_unsupported'
+  | 'compile_cognition_unsupported'
+  | 'compile_limit'
+  | 'compile_new_intent_required'
+  | 'internal_error'
+  | 'compile_disclosure_refused'
+  | 'compile_busy'
+  | 'compile_replay_capacity'
+  | 'stopping'
+  | 'destination_name'
+  | 'invalid_answer'
+  | 'authoring_authority'
+  | 'read_base'
+  | 'knowledge'
+  | 'authoring_config'
+  | 'compile_error'
+  | 'destination'
+  | (string & {});
+
+/**
  * The reviewable authoring result. `candidate` is ordinary `.nika`
  * SOURCE in memory — it is not a `Workflow` handle, and `run()` does not
  * accept raw source: the caller materializes the candidate and `run(path)`
- * re-admits it. The SDK never writes the candidate for you in this slice
- * (no `dest`/`force`), and the engine never executes it.
+ * re-admits it. The engine never executes it.
+ *
+ * A candidate is proposed only when `status` is `ready`. Under `incomplete`
+ * a non-null `candidate` is a preview: it may still carry holes, or the
+ * verifier held it (`isNikaCompileHeld(outcome)`); a preview is never to be
+ * run or saved as an accepted result.
  *
  * `incomplete` and `refused` are data, not exceptions: the SDK throws only
  * on transport, protocol, compatibility and engine-stamped failures.
  */
 export interface NikaCompileOutcome {
-  /** The wire generation this payload was validated against. Always 1. */
-  compile_version: 1;
+  /**
+   * The wire generation of this payload: 2 exactly when a provider call
+   * happened (`provenance.authoring` is its receipt), 1 otherwise — a
+   * skeleton, a structured constant, a replay and every deterministic round.
+   */
+  compile_version: 1 | 2;
   status: NikaCompileStatus;
   /** Exactly `status === 'ready'` — the engine's word, not a client judgment. */
   ready: boolean;
@@ -962,6 +1258,36 @@ export interface NikaCompileOutcome {
   diagnostics: NikaCompileDiagnostic[];
   /** The boundary the candidate requests (from its pure report); never a grant. */
   requested_boundary: Record<string, unknown> | null;
+  /** The trigger the request names; absent on engines before the field (0.120.x). */
+  requested_trigger?: NikaCompileTrigger | null;
   check_preview: NikaCompilePreview | null;
   provenance: NikaCompileProvenance;
+  /**
+   * HTTP only: the `Nika-Compile-Replay` header of a provider round that left
+   * a native plan the server keeps. Send it back with the round's exact input
+   * (see `nextCompileRequest`): `cognition: 'explicitProvider'` for its judged
+   * answer round, `'deterministicOnly'` for its zero-call replay. It is valid
+   * only on that server run, until a judged round holds its candidate; do not
+   * log it.
+   */
+  replay_token?: string;
+  /**
+   * HTTP only, beside a kept round (this outcome carries a `replay_token`, or
+   * its request answered one): whether the server that answered serves that
+   * round's judged answer round, as its `/health` lists
+   * `compileJudgedAnswerRound`. An SDK fact, not part of the engine's
+   * document; `nextCompileRequest()` reads it.
+   */
+  judged_answer_round_available?: boolean;
+  /**
+   * Local engine only, and only when the request named `output`: the
+   * destination the engine wrote (`null` when nothing was written).
+   */
+  written?: string | null;
+  /** Local engine only: the named `output` that already existed and was left untouched. */
+  existing_destination?: string;
+  /** Local engine only: the plan record under `.nika/compile/` could not be kept or removed. */
+  plan_record_error?: NikaCompileRecordError;
+  /** Local engine only: this round's rejections could not be kept under `.nika/compile/`. */
+  declined_record_error?: NikaCompileRecordError;
 }

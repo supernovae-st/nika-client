@@ -3,6 +3,7 @@ import {
   NikaRunOwnershipError,
 } from './errors.js';
 import { HttpTransport } from './lib/http-transport.js';
+import { fetchWithoutDeadline } from './lib/unbounded-fetch.js';
 import { NativeProcessTransport } from './lib/native-process-transport.js';
 import { NikaEngineUnavailable, resolveNikaEngine } from './lib/binary/index.js';
 import { RunSession } from './lib/run-session.js';
@@ -82,6 +83,7 @@ export class Nika {
         url,
         token: checkedToken(config.token),
         fetch: config.fetch ?? globalThis.fetch.bind(globalThis),
+        unboundedFetch: config.fetch === undefined ? fetchWithoutDeadline : undefined,
         requestTimeout: positiveInteger(
           config.requestTimeout ?? DEFAULT_REQUEST_TIMEOUT,
           'requestTimeout',
@@ -126,15 +128,24 @@ export class Nika {
    * Authoring (issue #128): describe work — or name an accepted workflow plus
    * a change — and get the engine's checked candidate back, without running
    * anything. `compile()` never means `run()`: the outcome is data (candidate
-   * source, questions, diagnostics, requested boundary, source-only Check
-   * preview, provenance), `incomplete`/`refused` resolve instead of throwing,
-   * and no workflow effect, approval or Proof exists.
+   * source, questions, diagnostics, requested boundary and trigger,
+   * source-only Check preview, provenance), `incomplete`/`refused` resolve
+   * instead of throwing, and no workflow effect, approval or Proof exists.
    *
-   * The candidate is ordinary `.nika` SOURCE. `run()` consumes a path,
-   * so the caller materializes the candidate and `run(path)` re-admits it —
-   * the compile preview is a review, never admission. Over `{ url }` this calls
-   * the authenticated Serve compile door, gated by its advertised capability;
-   * the SDK never compiles locally as a fallback.
+   * A provider call happens only when the request opts in: `cognition:
+   * 'explicitProvider'` over `{ url }` (the server's seated model, generation
+   * 2, capability `compileNativeV2`) or `authoringModel` on a local engine.
+   * Answer the outcome's questions with `nextCompileRequest(request, outcome,
+   * answers)`: over HTTP, after a provider round that kept its plan, it sends
+   * that round's judged answer round (the seat only judges, no authoring call),
+   * or with `{ cognition: 'deterministicOnly' }` its zero-call replay.
+   *
+   * The candidate is ordinary `.nika` SOURCE, proposed only when `ready`.
+   * `run()` consumes a path, so the caller materializes the candidate and
+   * `run(path)` re-admits it — the compile preview is a review, never
+   * admission. A held candidate (`isNikaCompileHeld`) is a preview: never run
+   * it. Over `{ url }` this calls the authenticated Serve compile door, gated
+   * by its advertised capability; the SDK never compiles locally as a fallback.
    */
   async compile(
     request: string | NikaCompileRequest,
@@ -367,6 +378,8 @@ export { NikaEngineUnavailable };
 
 export { isNikaRunSucceeded } from './results.js';
 
+export { isNikaCompileHeld, nextCompileRequest } from './lib/compile.js';
+
 export {
   isNikaRunSealedEvent,
   isNikaRunSettledEvent,
@@ -379,15 +392,27 @@ export type {
   NikaCheckFinding,
   NikaCheckOptions,
   NikaCheckResult,
+  NikaCompileAuthoringReceipt,
+  NikaCompileCognition,
+  NikaCompileCreateRequest,
   NikaCompileDiagnostic,
+  NikaCompileEditRequest,
+  NikaCompileLimits,
   NikaCompileOptions,
   NikaCompileOutcome,
   NikaCompilePreview,
   NikaCompileProvenance,
   NikaCompileQuestion,
+  NikaCompileQuestionOption,
+  NikaCompileRecordError,
+  NikaCompileRefusalCode,
   NikaCompileRequest,
+  NikaCompileRequestCognition,
   NikaCompileStatus,
   NikaCompileSetConstant,
+  NikaCompileStrategy,
+  NikaCompileTrigger,
+  NikaNextCompileOptions,
   NikaConfig,
   NikaLocalConfig,
   NikaRemoteConfig,

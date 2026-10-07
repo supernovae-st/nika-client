@@ -39,7 +39,17 @@ import {
   type NikaEngineIdentity,
 } from './engine-identity.js';
 import { literalInputs } from './literal-inputs.js';
-import { COMPILE_CAPABILITY, COMPILE_RESPONSE_MAX_BYTES, compileBody, compilePayloadFrom, compileSignal } from './compile.js';
+import {
+  COMPILE_CAPABILITY,
+  COMPILE_JUDGED_ROUND,
+  COMPILE_REPLAY_HEADER,
+  COMPILE_RESPONSE_MAX_BYTES,
+  COMPILE_PROVIDER_WIRE_VERSION,
+  compilePayloadFrom,
+  compileRequest,
+  compileSignal,
+  compileTimeoutMs,
+} from './compile.js';
 import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
 import { readSettlement } from './settlement.js';
 import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
@@ -54,6 +64,13 @@ export interface HttpTransportOptions {
   url: string;
   token: string;
   fetch: typeof globalThis.fetch;
+  /**
+   * The fetch for a request with no deadline (a provider compile round without
+   * `timeoutMs` or `limits.deadline_ms`): the client's own `fetch` stops
+   * waiting for headers after 300 s. Absent when the caller injected `fetch`,
+   * whose own timeouts then apply.
+   */
+  unboundedFetch?: typeof globalThis.fetch;
   requestTimeout: number;
   machineBufferBytes: number;
   resolveEngine: () => ResolvedNikaEngine;
@@ -191,36 +208,65 @@ export class HttpTransport implements Transport {
    * Stateless authoring through the authenticated Serve compile door.
    * A remote connection never falls back to a local compile — the candidate
    * must come from the server the caller connected to, or not exist.
+   *
+   * Generation 1 needs `/health` to advertise `compile`; generation 2 (a
+   * provider round, or the replay of a kept one) needs `compileNativeV2`, so
+   * an older or unseated resident is refused before anything is posted. The
+   * client's deadline follows `compileTimeoutMs`: a provider round without
+   * `timeoutMs` or `limits.deadline_ms` has none, because the server sets no
+   * default deadline either and a client that stops waiting stops neither the
+   * round nor its spend. A generation-2 answer carries the round's plan,
+   * decision records and receipt, so it is read up to the 8 MiB compile bound
+   * rather than `machineBufferBytes`.
    */
   async compile(
     request: NikaCompileRequest,
     options: NikaCompileOptions,
   ): Promise<NikaCompileOutcome> {
-    const body = compileBody(request);
-    const timeoutMs = options.timeoutMs ?? this.options.requestTimeout;
+    const planned = compileRequest(request);
+    const timeoutMs = compileTimeoutMs(request, planned.provider, options.timeoutMs,
+      this.options.requestTimeout);
     const composed = compileSignal({ ...options, timeoutMs });
-    const signal = composed.signal!;
+    const signal = composed.signal;
     try {
-      if (signal.aborted) throw new NikaTransportError(this.kind, 'compile aborted');
-      const identity = this.remoteIdentity ?? await this.probeServerIdentity(signal);
-      if (!identity.supportedCapabilities.includes(COMPILE_CAPABILITY)) {
-        throw this.gap(COMPILE_CAPABILITY,
-          'The connected engine does not advertise compile; the SDK never compiles locally as a substitute');
+      if (signal?.aborted) throw new NikaTransportError(this.kind, 'compile aborted');
+      // Negotiation keeps requestTimeout unless the operation itself has a deadline.
+      const identity = this.remoteIdentity
+        ?? await this.probeServerIdentity(signal, timeoutMs !== undefined);
+      if (!identity.supportedCapabilities.includes(planned.capability)) {
+        throw this.gap(planned.capability, planned.capability === COMPILE_CAPABILITY
+          ? 'The connected engine does not advertise compile; the SDK never compiles locally as a substitute'
+          : `The connected nika serve ${identity.engineVersion} does not advertise ${planned.capability} `
+            + `(advertised: ${identity.supportedCapabilities.join(', ') || 'nothing'}); a provider round `
+            + "(cognition 'explicitProvider') or a replay_token needs a server whose operator seated a "
+            + 'native authoring model (nika serve --authoring-model). Nothing was posted, and the SDK '
+            + 'never compiles locally as a substitute');
+      }
+      if (planned.judged && !identity.supportedCapabilities.includes(COMPILE_JUDGED_ROUND)) {
+        throw this.gap(COMPILE_JUDGED_ROUND,
+          `The connected nika serve ${identity.engineVersion} does not advertise ${COMPILE_JUDGED_ROUND} `
+          + `(advertised: ${identity.supportedCapabilities.join(', ') || 'nothing'}): it does not judge a `
+          + "kept round's answer round (cognition 'explicitProvider' with a replay_token). Nothing was "
+          + 'posted, and the kept round is untouched. Answer it with its zero-call replay ({ cognition: '
+          + "'deterministicOnly' }) or with a new explicitProvider round carrying the answers, which may "
+          + 'spend; nextCompileRequest() chooses that round by default on such a server');
       }
       const path = '/v1/compile';
       const response = await this.fetchResponse(path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-        body,
+        body: planned.body,
         signal,
-      }, false, true, false);
+      }, false, true, false, timeoutMs === undefined);
       if (response.headers.get('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase() !== 'application/json') {
         await discardResponse(response);
         throw new NikaProtocolError(this.kind, 'HTTP compile returned an invalid content-type');
       }
       const object = await this.readObservationObject(response, path, signal,
-        Math.min(this.options.machineBufferBytes, COMPILE_RESPONSE_MAX_BYTES), false);
-      if (signal.aborted) throw new NikaTransportError(this.kind, 'compile aborted');
+        planned.generation === COMPILE_PROVIDER_WIRE_VERSION
+          ? COMPILE_RESPONSE_MAX_BYTES
+          : Math.min(this.options.machineBufferBytes, COMPILE_RESPONSE_MAX_BYTES), false);
+      if (signal?.aborted) throw new NikaTransportError(this.kind, 'compile aborted');
       if (response.status !== 200) {
         const error = machineObject(object.error);
         if (response.ok || !error || typeof error.code !== 'string'
@@ -229,12 +275,49 @@ export class HttpTransport implements Transport {
           || Object.keys(object).some((key) => key !== 'error')) {
           throw new NikaProtocolError(this.kind, 'HTTP compile returned a malformed refusal or non-contract status');
         }
+        if (planned.judged && response.status === 422 && error.code === 'malformed_compile_request') {
+          // Defensive only: the gate above posts a judged answer round only to a
+          // server that advertised it. This client reads /health once, so the
+          // server may since have been replaced by one from before the round
+          // (released engines up to 0.122.0 parse explicitProvider + replay_token
+          // as malformed). The parse refuses before any slot or call.
+          throw this.gap(COMPILE_JUDGED_ROUND,
+            'The connected nika serve refused the judged answer round (cognition '
+            + "'explicitProvider' with a replay_token) as malformed_compile_request although its "
+            + `health report listed ${COMPILE_JUDGED_ROUND} when this client read it: the server was `
+            + 'probably replaced since by one from before that round (or an answer nests beyond the '
+            + "server's parser ceiling). Nothing was authored or spent, and the kept round is "
+            + "untouched. Answer it with its zero-call replay ({ cognition: 'deterministicOnly' }) or "
+            + 'a new explicitProvider round carrying the answers, which may spend');
+        }
         throw this.refused(path, { operation: 'compile', status: response.status,
           refusal: { code: error.code, message: this.redact(error.message) } });
       }
-      return compilePayloadFrom(object, this.kind, this.options.url);
+      const outcome = compilePayloadFrom(object, this.kind, this.options.url, planned.accepted);
+      const token = response.headers.get(COMPILE_REPLAY_HEADER);
+      if (token !== null) {
+        // Only a provider round (fresh, or a kept round's judged answer round) may
+        // leave a kept plan. The token is never quoted: it is the handle of a round
+        // this server run keeps.
+        if (!planned.provider) {
+          throw new NikaProtocolError(this.kind,
+            `HTTP compile answered a ${COMPILE_REPLAY_HEADER} token to a request that keeps no round`);
+        }
+        if (!/^[0-9a-f]{64}$/.test(token)) {
+          throw new NikaProtocolError(this.kind,
+            `HTTP compile answered a malformed ${COMPILE_REPLAY_HEADER} token`);
+        }
+      }
+      // Beside a kept round, say whether this server judges its answer round, so
+      // nextCompileRequest() chooses a round the server serves.
+      if (token === null && request.replay_token === undefined) return outcome;
+      return {
+        ...outcome,
+        ...(token === null ? {} : { replay_token: token }),
+        judged_answer_round_available: identity.supportedCapabilities.includes(COMPILE_JUDGED_ROUND),
+      };
     } catch (cause) {
-      if (signal.aborted) {
+      if (signal?.aborted) {
         throw new NikaTransportError(this.kind, composed.timedOut()
           ? `compile timed out after ${timeoutMs} ms` : 'compile aborted by caller',
         { cause: cause instanceof Error ? cause : undefined });
@@ -1058,12 +1141,16 @@ export class HttpTransport implements Transport {
     return this.serverIdentity;
   }
 
-  private async probeServerIdentity(signal?: AbortSignal): Promise<NikaEngineIdentity> {
+  private async probeServerIdentity(
+    signal?: AbortSignal,
+    bounded = signal !== undefined,
+  ): Promise<NikaEngineIdentity> {
     // Compile supplies one operation-wide deadline, including negotiation.
     // Do not reapply the client's shorter default during headers or body reads.
-    // Other callers retain their existing per-request timeout.
+    // An operation without a deadline (a provider round given only a caller
+    // signal) and every other caller retain the per-request timeout.
     const outcome = await this.jsonOutcome('/health', { method: 'GET', signal },
-      false, [200], undefined, false, signal === undefined);
+      false, [200], undefined, false, !bounded);
     if ('refusal' in outcome) throw this.refused('/health', outcome);
     const health = outcome.object;
     if (health.status !== 'ok' || health.service !== 'nika-serve') {
@@ -1453,6 +1540,7 @@ export class HttpTransport implements Transport {
     withTimeout: boolean,
     authenticated = true,
     requireOk = true,
+    unbounded = false,
   ): Promise<Response> {
     const controller = withTimeout ? new AbortController() : undefined;
     const timer = controller
@@ -1465,7 +1553,8 @@ export class HttpTransport implements Transport {
     const headers = new Headers(init.headers);
     if (authenticated) headers.set('Authorization', `Bearer ${this.options.token}`);
     try {
-      const response = await this.options.fetch(`${this.options.url}${path}`, {
+      const fetch = unbounded ? this.options.unboundedFetch ?? this.options.fetch : this.options.fetch;
+      const response = await fetch(`${this.options.url}${path}`, {
         ...init,
         headers,
         signal: controller?.signal ?? callerSignal,

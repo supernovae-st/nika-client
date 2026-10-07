@@ -129,9 +129,11 @@ export class NativeProcessTransport implements Transport {
    * Authoring, not execution (issue #128): one bounded `nika compile --json`
    * invocation, projected verbatim. The engine must advertise the compile
    * capability — an engine from before the door is refused here, before any
-   * spawn, and there is never a TypeScript fallback. No destination is passed:
-   * the candidate stays source in memory, nothing is written, and no Run
-   * exists; `signal`/`timeoutMs` only stop this one child.
+   * spawn, and there is never a TypeScript fallback. A destination is passed
+   * only when the request names `output`; otherwise the candidate stays
+   * source in memory. No Run exists; `signal`/`timeoutMs` only stop this one
+   * child. A provider call happens only beside `authoringModel` (or a
+   * `decisionModel` seat), with the engine's own environment credentials.
    */
   async compile(
     request: NikaCompileRequest,
@@ -170,7 +172,10 @@ export class NativeProcessTransport implements Transport {
         label: 'compile',
         killGraceMs: COMPILE_KILL_GRACE_MS,
       });
-      return compileOutcomeFrom(captured, this.kind, this.options.engine.bin);
+      return compileOutcomeFrom(captured, this.kind, this.options.engine.bin, {
+        accepted: invocation.accepted,
+        ...(request.output === undefined ? {} : { output: request.output }),
+      });
     } catch (cause) {
       if (composed.signal?.aborted && cause instanceof NikaTransportError) {
         throw new NikaTransportError(

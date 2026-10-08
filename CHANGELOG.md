@@ -66,7 +66,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   authored it, the Save landed the proposed bytes and ran nothing, the EDIT
   revises the created bytes, the observed Run of the saved bytes succeeded and
   its report names exactly the tickets each threshold selects), never by byte
-  parity with another generation.
+  parity with another generation. `NIKA_SESSION_JOURNEY_WORLD` names a world
+  module that replaces the tickets with another case (its project, services,
+  words, persona rules, captured paths and its own per-leg judgment), kept
+  outside the repository when its data is private; each leg's world is copied
+  after its Run, and the saved bytes are checked by the engine itself.
 - Compile outcomes type the record of a document the engine's 0.123
   complete-document door created: `plan.document`
   (`NikaCompileCreatedDocument`, settled on a ready outcome only: version 1,

@@ -1,6 +1,7 @@
 'use strict';
+const { spawnSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
-const { existsSync, readFileSync } = require('node:fs');
+const { cpSync, existsSync, mkdirSync, readFileSync } = require('node:fs');
 const path = require('node:path');
 const { frameRow, landedExactly } = require('./session-scenario.cjs');
 
@@ -74,9 +75,14 @@ async function journey(sdk, config, steps, open) {
     const landed = saved?.workflow === undefined ? null : read(saved.workflow);
     const previewed = files.find((file) => file.path === saved?.workflow);
     const savedSha = landed === null ? null : sha256(landed);
+    const ranNothing = reportSha() === reportBefore && !frameRow(consent).outcomes.some((kind) => kind.startsWith('run'));
+    // The engine's own check of the exact saved bytes in the project world, as a person runs it: a
+    // world's oracle reads this real verdict, never a status assumed for it.
+    const check = config.checkBin && saved?.workflow ? checked(config.checkBin, config.project, saved.workflow) : null;
     record(`${name}_save`, { ...frameRow(consent), saved_bytes_are_previewed: landedExactly(previewed, landed),
-      saved_sha256: savedSha, save_ran_nothing: reportSha() === reportBefore
-        && !frameRow(consent).outcomes.some((kind) => kind.startsWith('run')) });
+      saved_sha256: savedSha, saved_base64: landed === null ? null : landed.toString('base64'),
+      save_ran_nothing: ranNothing, check });
+    const runStartedAt = Date.now();
     let run = await session.submit(consent.snapshot, 'run it', { command: `${name}-run`, signal: signal() });
     record(`${name}_run`, frameRow(run));
     if (run.snapshot.work.waiting.kind === 'run_review') {
@@ -94,6 +100,7 @@ async function journey(sdk, config, steps, open) {
       await new Promise((resolve) => setTimeout(resolve, 500));
       after = await session.snapshot({ signal: signal() });
     }
+    const window = { started_at: runStartedAt, observed_at: Date.now() };
     const report = read('out/report.json');
     let parsed = null;
     try {
@@ -103,8 +110,21 @@ async function journey(sdk, config, steps, open) {
     }
     record(`${name}_run_observed`, { deadline: unsettled(), busy: after.busy !== null, run: after.work.run,
       saved: saved?.workflow ?? null, saved_sha256: savedSha, report: parsed,
-      report_sha256: report === null ? null : sha256(report) });
+      report_sha256: report === null ? null : sha256(report), window, snapshot: capture(name) });
     return { shown, savedSha };
+  }
+
+  /**
+   * The project world's paths a world judges, copied as this leg's Run left them, before the next
+   * leg changes them; outside the project, so the copy is never part of the world.
+   */
+  function capture(name) {
+    if (!config.snapshots || !Array.isArray(config.capture)) return null;
+    const dir = path.join(config.snapshots, name);
+    mkdirSync(dir, { recursive: true });
+    const captured = config.capture.filter((relative) => existsSync(world(relative)));
+    for (const relative of captured) cpSync(world(relative), path.join(dir, relative), { recursive: true });
+    return { dir, captured };
   }
 
   // CREATE: a new Session, words alone.
@@ -140,8 +160,9 @@ async function advance(session, snapshot, line, persona, signal, report) {
       [next, said] = [persona.choice, 'intelligence_choice'];
     } else if (waiting.kind === 'cost_choice' && persona.acceptCost) {
       [next, said] = ['yes', 'cost_choice'];
-    } else if (waiting.kind === 'question' && typeof persona.answers[waiting.key] === 'string') {
-      [next, said] = [persona.answers[waiting.key], `answer ${waiting.key}`];
+    } else if (waiting.kind === 'question' && answerFor(persona.answers, waiting, result) !== null) {
+      const answer = answerFor(persona.answers, waiting, result);
+      [next, said] = [answer.line, `answer ${waiting.key} (${answer.why})`];
     } else {
       return { waiting: waiting.kind, snapshot: shown,
         summary: { waiting: waiting.kind, key: waiting.key ?? null, outcomes: frameRow(result).outcomes,
@@ -149,6 +170,31 @@ async function advance(session, snapshot, line, persona, signal, report) {
     }
   }
   return { waiting: 'turn_bound', snapshot: shown, summary: { waiting: 'turn_bound', turns: 24 } };
+}
+
+/**
+ * The persona's answer to one authoring question: an exact key from an answer table
+ * (`{ key: line }`), or the first rule (`[{ key, text, line, why }]`, `key` and `text` regular
+ * expressions over the question's key and its asking words) that matches. `null` when nothing
+ * the persona was told answers it.
+ */
+function answerFor(answers, waiting, result) {
+  if (Array.isArray(answers)) {
+    const asked = (result.outcomes ?? []).find((outcome) => outcome.kind === 'question')?.text ?? '';
+    const rule = answers.find((each) => (each.key !== undefined && new RegExp(each.key, 'i').test(waiting.key ?? ''))
+      || (each.text !== undefined && new RegExp(each.text, 'i').test(asked)));
+    return rule === undefined ? null : { line: rule.line, why: rule.why ?? 'a persona rule' };
+  }
+  const line = answers?.[waiting.key];
+  return typeof line === 'string' ? { line, why: 'the answer table' } : null;
+}
+
+/** The engine's own check of one saved workflow, run where it lives; its words are kept as said. */
+function checked(bin, cwd, workflow) {
+  const result = spawnSync(bin, ['check', workflow], { cwd, env: process.env, encoding: 'utf8', timeout: 120_000,
+    maxBuffer: 8 * 1024 * 1024 });
+  return { rc: result.status, signal: result.signal, error: result.error?.code ?? null,
+    text: `${result.stdout ?? ''}`.slice(0, 65_536) };
 }
 
 /** What a snapshot says of who prepared the candidate and of the candidate itself. */
@@ -161,6 +207,8 @@ function evidence(work) {
       elapsed_ms: calls.elapsed_ms, backend: calls.backend ?? null },
     authoring_status: work.authoring?.status ?? null,
     questions: work.authoring?.questions ?? null,
+    diagnostics: (work.authoring?.diagnostics ?? []).map((note) => ({ kind: note.kind ?? null,
+      target: note.target ?? null, message: note.message ?? null })),
     files: (work.candidate?.files ?? []).map((file) => ({ path: file.path, landing: file.landing ?? null,
       content_sha256: typeof file.content === 'string' ? sha256(Buffer.from(file.content, 'utf8')) : null })),
     revision: work.candidate?.revision ?? null,
@@ -215,7 +263,7 @@ function isRequestedSeat(selected, requested) {
  * names the first-screen answer, the journey counts for that seat only if the Session's own
  * selection is it: a choice kept from elsewhere is never relabelled as the one requested.
  */
-function judgeJourney(report, expected, requested = null) {
+function judgeJourney(report, expected, requested = null, worldChecks = null) {
   if (report.error !== null) {
     return { verdict: 'failed', checks: [{ name: 'the journey completed', verdict: 'failed', observed: report.error }] };
   }
@@ -244,7 +292,8 @@ function judgeJourney(report, expected, requested = null) {
     }
   }
 
-  for (const [name, ids, base] of [['create', expected.create, null], ['edit', expected.edit, 'create']]) {
+  // The tickets ids judge the built-in world only; a world module brings its own checks instead.
+  for (const [name, ids, base] of [['create', expected?.create ?? [], null], ['edit', expected?.edit ?? [], 'create']]) {
     const reached = step(`${name}_reached`);
     if (reached === undefined) {
       gap(`the ${name.toUpperCase()} leg reached a proposal`, 'an earlier leg stopped first', null);
@@ -288,10 +337,13 @@ function judgeJourney(report, expected, requested = null) {
     const unobserved = runs.flatMap((entry) => entry.outcomes)
       .filter((kind) => kind === 'run_not_started' || kind === 'run_unobserved');
     const observed = step(`${name}_run_observed`);
+    // A world module states its own postconditions; the built-in world's are the tickets report.
+    const worldName = `the ${name.toUpperCase()} world postconditions hold`;
     if (unobserved.length > 0) {
       gap(`the ${name.toUpperCase()} Run of the saved bytes succeeded`, `the Session said ${unobserved.join(', ')}`,
         observed);
-      gap(`the ${name.toUpperCase()} report holds exactly the expected tickets`, 'no Run was observed', observed);
+      gap(worldChecks ? worldName : `the ${name.toUpperCase()} report holds exactly the expected tickets`,
+        'no Run was observed', observed);
       continue;
     }
     const ran = observed.run;
@@ -299,6 +351,18 @@ function judgeJourney(report, expected, requested = null) {
       && observed.busy === false && ran?.current === true && path.posix.normalize(String(ran.workflow))
         === path.posix.normalize(String(observed.saved)) && ran.workflow_sha256 === observed.saved_sha256
       && ran.end?.end === 'succeeded', observed);
+    if (worldChecks) {
+      const stated = worldChecks[name];
+      if (!Array.isArray(stated) || stated.length === 0) gap(worldName, 'the world judged nothing for this leg', null);
+      for (const entry of stated ?? []) {
+        if (['passed', 'failed', 'not_exercised'].includes(entry?.verdict) && typeof entry.name === 'string') {
+          checks.push(entry);
+        } else {
+          check(worldName, false, { malformed_world_check: entry ?? null });
+        }
+      }
+      continue;
+    }
     check(`the ${name.toUpperCase()} report holds exactly the expected tickets`, observed.report !== null
       && observed.report.count === ids.length && JSON.stringify(observed.report.ids) === JSON.stringify(ids),
     { report: observed.report, expected: ids });

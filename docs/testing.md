@@ -343,6 +343,26 @@ stops the leg as `not_exercised` with what the Session waits on. Each leg is
 judged by its own evidence: a model authored the proposal (the call receipt
 and the author seat, never the selection alone), the Save landed exactly the
 proposed `content` and ran nothing, the EDIT proposal revises the created
-bytes (its revision's base is their sha256 and its candidate digest the
-proposed content's), and the Session observed a successful Run of the saved
-bytes. Separate generations are never compared byte for byte.
+bytes into the saved workflow (its revision's base is their sha256, its
+candidate digest the saved bytes' sha256, proposed under the saved path), and
+the Session observed a successful Run of the saved bytes. Separate generations
+are never compared byte for byte.
+
+`NIKA_SESSION_JOURNEY_WORLD` (an absolute path to an ES module) replaces the
+built-in tickets world with another case, kept outside this repository when its
+data is private. Its `prepare({ door, project, scratch, binary })` seeds the
+door's project and starts any service the case needs, and returns the CREATE
+and EDIT words, the persona's answers (an object by question key, or rules
+`{ key, text, line, why }` whose regular expressions match the question's key
+or its asking words), extra engine variables, the paths to `capture`, the
+`expectations` it judges by (named with their sha256), `judge(transcript)` and
+`close()`. The journey copies the captured paths after each leg's Run, outside
+the project, so a later leg cannot change what an earlier one is judged on; it
+records the exact saved bytes, the engine's own `nika check` of them in the
+project world and each Run's time window. `judge` returns each leg's checks
+(`passed`, `failed` or `not_exercised`), which replace the tickets report
+check; the journey's own checks (a reached proposal, a model's call receipt,
+the exact Save, a revision bound to the saved workflow, an observed successful
+Run of the saved bytes) stay. A leg the world does not judge is not exercised,
+and a malformed check fails. The report names the module by its file name and
+sha256, never by its path.

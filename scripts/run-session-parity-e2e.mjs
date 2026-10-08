@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
+import { pathToFileURL } from 'node:url';
 import { OwnedProcesses } from './one-door/process.mjs';
 import { stopResident, waitForHealth } from './one-door/resident.mjs';
 
@@ -178,45 +179,82 @@ try {
     // The tickets the words read, and the report each leg must write: strictly older than 48, then 72 hours.
     const expected = { create: TICKETS.filter((row) => row.age_hours > 48).map((row) => row.id),
       edit: TICKETS.filter((row) => row.age_hours > 72).map((row) => row.id) };
+    // A world module (NIKA_SESSION_JOURNEY_WORLD, an absolute path) replaces the built-in tickets
+    // world: per door it prepares the project and its services, states the words, the persona's
+    // answers and what to capture, then judges each leg and closes. It is named in the report by
+    // its file name and sha256 only.
+    const worldFile = process.env.NIKA_SESSION_JOURNEY_WORLD;
+    let world = null;
+    if (worldFile) {
+      assert(path.isAbsolute(worldFile), 'NIKA_SESSION_JOURNEY_WORLD names an absolute module path');
+      world = await import(pathToFileURL(worldFile).href);
+      assert(typeof world.prepare === 'function', 'a journey world exports prepare()');
+    }
     const doors = [];
     for (const door of JOURNEY_DOORS) {
       doors.push(await journeyWalk(door));
     }
-    return { ran: true, choice, key_env: keyNames, seats, accept_cost: acceptCost, answers: Object.keys(answers),
-      // Named relative to the repository, or by its file name alone: a report never carries a private path.
-      create_source: path.relative(root, createFile).startsWith('..') ? `<outside the repository>/${path.basename(createFile)}`
-        : path.relative(root, createFile),
-      create_sha256: createHash('sha256').update(create).digest('hex'), edit, expected,
+    return { ran: true, choice, key_env: keyNames, seats, accept_cost: acceptCost,
+      world: world === null ? 'built-in tickets' : { module: path.basename(worldFile), sha256: await sha256(worldFile) },
+      ...(world === null ? {
+        answers: Object.keys(answers),
+        // Named relative to the repository, or by its file name alone: a report never carries a private path.
+        create_source: path.relative(root, createFile).startsWith('..')
+          ? `<outside the repository>/${path.basename(createFile)}` : path.relative(root, createFile),
+        create_sha256: createHash('sha256').update(create).digest('hex'), edit, expected,
+      } : {}),
       law: 'each generation judged by its own evidence and the project world, never byte-compared with another',
       doors };
 
     async function journeyWalk(door) {
       const base = path.join(scratch, 'journey', door);
       const project = path.join(base, 'project');
-      mkdirSync(path.join(project, 'in'), { recursive: true });
-      writeFileSync(path.join(project, 'in', 'tickets.json'), `${JSON.stringify(TICKETS, null, 2)}\n`);
+      mkdirSync(project, { recursive: true });
       const home = path.join(base, 'home');
       mkdirSync(home, { recursive: true });
+      // The world this door walks: a module's (its services already listening), or the tickets.
+      let prepared;
+      if (world !== null) {
+        prepared = await world.prepare({ door, project, scratch: base, binary });
+      } else {
+        mkdirSync(path.join(project, 'in'), { recursive: true });
+        writeFileSync(path.join(project, 'in', 'tickets.json'), `${JSON.stringify(TICKETS, null, 2)}\n`);
+        prepared = { label: 'built-in tickets', create, edit, answers, env: {}, capture: ['out'] };
+      }
       const env = { ...baseEnv, HOME: home, NIKA_KEYCHAIN: 'off', ...seats,
-        ...Object.fromEntries(keyNames.map((name) => [name, process.env[name]])) };
+        ...Object.fromEntries(keyNames.map((name) => [name, process.env[name]])), ...(prepared.env ?? {}) };
       // With the person's own HOME the Session's first screen would keep its answer there
       // (`~/.nika/session-intelligence.json`): the persona then never answers it, and the
       // judge reports a choice kept from elsewhere as such.
       const personHome = keyNames.includes('HOME');
-      const row = { door, home: personHome ? 'the person\'s own HOME: no first-screen answer' : 'isolated' };
-      if (door === 'native' && !identity.supportedCapabilities.includes('sessionHost')) {
-        return { ...row, exercised: false, why: 'the engine identity lists no sessionHost' };
-      }
-      const served = door === 'http' ? await serve(base, project, env) : { server: undefined };
+      const row = { door, home: personHome ? 'the person\'s own HOME: no first-screen answer' : 'isolated',
+        world: prepared.label ?? null, expectations: prepared.expectations ?? null };
+      let served = { server: undefined };
+      let outcome;
       try {
+        outcome = await walkDoor();
+      } finally {
+        await release(served.server);
+        // The world's own observations (its services' records), kept beside the door's verdict.
+        const observations = typeof prepared.close === 'function' ? await prepared.close() : undefined;
+        if (outcome !== undefined && observations !== undefined) outcome.observations = observations;
+      }
+      return outcome;
+
+      async function walkDoor() {
+        if (door === 'native' && !identity.supportedCapabilities.includes('sessionHost')) {
+          return { ...row, exercised: false, why: 'the engine identity lists no sessionHost' };
+        }
+        served = door === 'http' ? await serve(base, project, env) : served;
         if (served.why !== undefined) return { ...row, exercised: false, why: served.why };
         const config = path.join(base, 'config.json');
         writeFileSync(config, JSON.stringify({ door, bin: binary, project, url: served.url, token, moduleSystem: 'esm',
-          choice: personHome ? null : choice, acceptCost, answers, create, edit }));
+          choice: personHome ? null : choice, acceptCost, answers: prepared.answers, create: prepared.create,
+          edit: prepared.edit, checkBin: binary, snapshots: path.join(base, 'legs'), capture: prepared.capture }));
         const transcript = JSON.parse(await consume('esm', 'session-journey', config, env));
-        return { ...row, exercised: true, ...judgeJourney(transcript, expected, choice), transcript };
-      } finally {
-        await release(served.server);
+        // A world judges its own postconditions per leg; the identity checks stay the journey's.
+        const worldChecks = typeof prepared.judge === 'function' ? await prepared.judge(transcript) : null;
+        return { ...row, exercised: true, ...judgeJourney(transcript, expected, choice, worldChecks), transcript };
       }
     }
   }

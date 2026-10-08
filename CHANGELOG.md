@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Compile outcomes type the revision, reuse and intelligence evidence the
+  engine records inside `provenance` (0.123 integration carrier `7d98023f9`):
+  `plan.source_revision`, `plan.intent_sha256`, `plan.document_revision` and
+  `decision.document_revision` (`NikaCompileDocumentRevision`, with each
+  component receipt's identity, bindings and node digests),
+  `decision.knowledge_qualification.reuse` (`NikaCompileReuse`: consulted,
+  expanded, invoked, revised, absent or unreadable, witnessed on the
+  candidate's bytes) and `authoring.backend` (`NikaCompileAuthoringBackend`,
+  keeping requested, transmitted, configured, reported and attested model
+  identities apart). Both doors check a present record's known members and
+  refuse a malformed one with `NikaProtocolError` naming its path; absent
+  records, unknown members, new vocabulary words and explicit `null` ride
+  through untouched, and the outcome still holds the engine's own objects.
 - Over HTTP, a generation-2 compile request carries what the local engine
   observes of the files the request names (`nika compile --observe-only`,
   run in the client's `cwd`: headers, keys, short repeated values, never a

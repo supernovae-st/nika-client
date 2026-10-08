@@ -246,6 +246,52 @@ module.exports = async function compileScenario(sdk, engines) {
     report.generation2Unseated = await refusal(sdk, () => new sdk.Nika({
       url: 'https://nika.example', token: TOKEN, bin: '/missing-packed-v2-engine', fetch: resident(ready).fetch,
     }).compile(first));
+
+    // NIK-17: a document revision's evidence (the fixture's VALUES are synthetic,
+    // its shapes the engine's) decodes to the engine's own objects on both doors.
+    const evidence = JSON.parse(readFileSync(engines.evidence, 'utf8'));
+    const revise = { workflow: evidence.base, change: evidence.change, original_intent: evidence.original_intent };
+    const evidenceResident = (document) => async (url) => {
+      const { pathname } = new URL(String(url));
+      if (pathname === '/health') {
+        return Response.json({ status: 'ok', service: 'nika-serve', engineVersion: '0.122.0',
+          machineProtocolVersion: 1, snapshotFormatVersion: 1, checkReportVersion: 1, eventFormatVersion: 1,
+          traceFormatVersion: 2, supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'compile', 'compileNativeV2',
+            'compileJudgedAnswerRound'] });
+      }
+      return Response.json(document, { headers: { 'Cache-Control': 'no-store', 'Nika-Compile-Replay': REPLAY } });
+    };
+    const remoteRevision = (document) => new sdk.Nika({ url: 'https://nika.example', token: TOKEN,
+      bin: '/missing-packed-evidence-engine', fetch: evidenceResident(document) })
+      .compile({ ...revise, cognition: 'explicitProvider' });
+    const localRevision = await native.compile({ ...revise, authoringModel: 'deepseek/deepseek-flash' });
+    const { replay_token: _token, judged_answer_round_available: _judged, ...remoteRevised } = await remoteRevision(evidence.document);
+    assert.deepStrictEqual(remoteRevised, localRevision, 'both doors decode the same evidence');
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(localRevision.provenance)), evidence.document.provenance,
+      'every provenance member survives, additive ones included');
+    const revision = localRevision.provenance.plan.document_revision;
+    const backend = localRevision.provenance.authoring.backend;
+    const reuse = localRevision.provenance.decision.knowledge_qualification.reuse;
+    const malformedRevision = structuredClone(evidence.document);
+    malformedRevision.provenance.plan.document_revision.base_sha256 = 48;
+    report.evidence = {
+      candidateExact: localRevision.candidate === evidence.document.candidate
+        && remoteRevised.candidate === evidence.document.candidate,
+      revision: { mode: revision.mode, base: revision.base_sha256, candidate: revision.candidate_sha256,
+        changed: revision.changed, decisionSame: JSON.stringify(localRevision.provenance.decision.document_revision) === JSON.stringify(revision),
+        components: revision.components.map((receipt) => ({ id: receipt.component.id, release: receipt.component.release.version,
+          bindings: receipt.bindings.map((binding) => [binding.path, binding.hole, binding.component_literal, binding.bound]),
+          invocation: receipt.invocation ?? null, child: receipt.child?.candidate_sha256 ?? null })) },
+      source: localRevision.provenance.plan.source_revision,
+      reuse: { counts: [reuse.expanded, reuse.invoked, reuse.revised, reuse.absent, reuse.consulted],
+        uses: reuse.references.map((reference) => [reference.id, reference.use]) },
+      backend: { requested: backend.requested_model, decision: backend.decision_model, observed: backend.observed_models,
+        unreported: backend.unreported_models, served: backend.served_model, forwardedAbsent: !('forwarded_model' in backend),
+        selection: backend.selection },
+      malformedNative: await refusal(sdk, () => native.compile({ ...revise, change: 'evidence-malformed',
+        authoringModel: 'deepseek/deepseek-flash' })),
+      malformedHttp: await refusal(sdk, () => remoteRevision(malformedRevision)),
+    };
     return report;
   } finally {
     delete process.env.NIKA_FAKE_ARGV_LOG;

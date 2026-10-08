@@ -351,6 +351,22 @@ async function compile() {
     return;
   }
 
+  if (change !== undefined && change.startsWith('evidence-')) {
+    // A document revision with its full evidence (fixture `compile-evidence/document-revision.json`:
+    // SYNTHETIC values in the engine's shapes). The base must arrive byte for byte.
+    const fixture = JSON.parse(readFileSync(new URL('./compile-evidence/document-revision.json', import.meta.url), 'utf8'));
+    if (readFileSync(base, 'utf8') !== fixture.base || intent !== fixture.original_intent) {
+      failure('read_base', 'the fixture base or original intent did not arrive byte for byte', 3);
+      return;
+    }
+    const document = structuredClone(fixture.document);
+    if (change === 'evidence-malformed') document.provenance.plan.document_revision.base_sha256 = 48;
+    if (change === 'evidence-null-revision') document.provenance.decision.document_revision = null;
+    // The native render adds its CLI-only fact.
+    outcome({ ...document, written: null }, document.status === 'ready' ? 0 : 2);
+    return;
+  }
+
   if (change !== undefined) {
     // EDIT: echo proves the exact base bytes, change text and original intent that arrived.
     const baseBytes = readFileSync(base, 'utf8');

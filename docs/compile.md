@@ -192,6 +192,50 @@ Not exposed: `--authoring-samples`, `--authoring-strategy`,
 Showing or hiding any of these is your application's choice; the SDK imposes
 no display or masking.
 
+## Revision, reuse and intelligence evidence
+
+A provider round can record how it revised a workflow, what of the recalled
+knowledge the candidate's bytes really hold, and which intelligence answered.
+The engine writes these records inside `provenance`; the SDK types them, checks
+their known members and hands you the engine's own objects. It adds, removes,
+copies, recomputes and corrects nothing.
+
+| Where | Type | What it states |
+|---|---|---|
+| `provenance.plan.source_revision` | `NikaCompileSourceRevision` | `base_sha256` (the bytes revised), `candidate_sha256` (the bytes written), `resolved` (the words they now answer) |
+| `provenance.plan.intent_sha256` | `string` | the digest of the words the record answers |
+| `provenance.plan.document_revision`, `provenance.decision.document_revision` | `NikaCompileDocumentRevision` | `mode` (`operations` or `replaced`), both digests, `changed` in order, the `preservation` claimed, the `components` receipts |
+| `…document_revision.components[]` | `NikaCompileComponentReceipt` | the component's identity in its release, each hole bound (`component_literal`, `bound`), node digests, the candidate digest, and for an invoked component its calling task and child program apart |
+| `provenance.decision.knowledge_qualification.reuse` | `NikaCompileReuse` | per reference: `consulted`, `expanded`, `invoked`, `revised`, `absent` or `unreadable`, each component witnessed on the candidate's own bytes |
+| `provenance.authoring.backend` | `NikaCompileAuthoringBackend` | the seated backend and its model identities, kept apart: requested (`requested_model`), transmitted (`forwarded_model`), configured (`decision_model`, `host`, `endpoint_basis`), reported (`observed_models`, `unreported_models`, a harness's `observed` rows) and attested (`served_model`, `null` when unknown) |
+
+Every record is optional: an older engine, a creation or a deterministic
+round carries none, and its outcome reads exactly as before. A present record
+must have its producer's shape: a digest that is not 64 lowercase hex
+characters, a count that is not a non-negative integer, `null` where the
+engine never writes `null`, or a missing digest, id, binding or count fails the
+compile with `NikaProtocolError` naming the member's path (never its value).
+Members the SDK does not know and new vocabulary words (`mode`, `use`,
+`verdict`, `kind`) ride through untouched, and explicit `null` stays distinct
+from an absent member.
+
+Read the evidence for what it says:
+
+- The plan is the round's replayable record. The engine drops it whole when
+  its verifier holds, withdraws or doubts the candidate; the decision record
+  then still states the revision that was made, for a preview or for a
+  withdrawn candidate whose digest names bytes you never received.
+- `base_sha256` identifies the source parent: it is not a session sequence and
+  does not prove that earlier revisions are kept.
+- A digest is the engine's sha256 of the UTF-8 bytes. Comparing it with your
+  own `sha256(candidate)` or `sha256(base)` is your check to make; the SDK
+  never makes it for you.
+- At engine `7d98023f9` (the 0.123 integration carrier), neither `nika compile`
+  nor `POST /v1/compile` lends a component catalogue: a compile revision
+  carries `components: []`, and receipts with bindings come from the Session's
+  authoring. A receipt is evidence of construction, never a grant: a component's
+  permits, model and name are not inherited.
+
 ## Answer rounds
 
 `nextCompileRequest(request, outcome, answers, options?)` builds the next
@@ -399,7 +443,12 @@ written by hand from the engine source: `nika-serve/src/server/compile/v2.rs`,
 `author.rs` and `openapi-native.json` (at `158a961cd` for the judged answer
 round), `nika-serve/src/server/model.rs` (at `b7dace1e5` for its capability),
 `nika-compile/src/wire.rs` and `nika-cli-host/src/compile.rs` with
-`compile/render.rs`.
+`compile/render.rs`. The evidence types follow their producers at the
+integration carrier `7d98023f9`: `nika-compile-seats` `foundry/document.rs`,
+`instance.rs`, `invoke.rs`, `witness.rs` and `foundry.rs`, and the authoring
+backend of `nika-providers` `authoring.rs`, `nika-cli-host`
+`compile/authoring.rs`, `nika-serve` `compile/author.rs` with its
+`openapi-native.json` and `nika-harness`; no release writes them yet.
 
 ## Example
 

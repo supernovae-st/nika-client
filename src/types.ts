@@ -1126,7 +1126,7 @@ export type NikaCompileStrategy =
  * or run evidence, and token usage is not an invoice.
  */
 export interface NikaCompileAuthoringReceipt {
-  /** The seated authoring model (`provider/name`). */
+  /** The seated authoring model (`provider/name`): what was asked for, not what answered. */
   model: string;
   /** LOGICAL calls of the round. */
   calls: number;
@@ -1137,8 +1137,347 @@ export interface NikaCompileAuthoringReceipt {
   sampling: Record<string, unknown>;
   /** What each logical call received, in call order. */
   context: Record<string, unknown>[];
-  /** Provider, model identities, request authority and usage completeness. */
-  backend: Record<string, unknown> | null;
+  /**
+   * The backend that answered, as the door that seated it states it; `null`
+   * when that door said nothing.
+   */
+  backend: NikaCompileAuthoringBackend | null;
+  [key: string]: unknown;
+}
+
+/**
+ * The backend of one authoring round (`provenance.authoring.backend`), as
+ * the seating door states it: a direct provider (`direct_api`) or an agent
+ * harness (`harness_infer`, `acp_harness`). Every member is optional and the
+ * record stays open: older engines omit members and the vocabulary grows.
+ *
+ * The model identities are separate facts and never stand in for one
+ * another:
+ *
+ * - requested: `requested_model` (and the receipt's `model`), what the
+ *   operator or caller asked for;
+ * - transmitted: `forwarded_model`, what a harness was sent;
+ * - configured: `decision_model`, `host`, `base_url_overridden` and
+ *   `endpoint_basis`, the seats and endpoint the operator configured;
+ * - reported: `observed_models` (with `unreported_models`, the responses
+ *   that named no model) and a harness's per-call `observed` rows;
+ * - attested: `served_model`, `null` when no response proved which model
+ *   served.
+ *
+ * Usage completeness, the physical request account (`authority`) and the
+ * cost basis are evidence of the round, never an invoice.
+ */
+export interface NikaCompileAuthoringBackend {
+  /** `direct_api` · `harness_infer` · `acp_harness`; the vocabulary stays open. */
+  kind?: 'direct_api' | 'harness_infer' | 'acp_harness' | (string & {});
+  /** The provider the seat resolved; `null` when the door could not name one. */
+  provider?: string | null;
+  /** Requested: the model the operator or caller asked for; `null` when none was named. */
+  requested_model?: string | null;
+  /** Transmitted: the model a harness was sent. */
+  forwarded_model?: string;
+  /** Configured: the decision model seated beside the author. */
+  decision_model?: string;
+  /** Configured: the endpoint host (and port) only. It authenticates no peer. */
+  host?: string | null;
+  /** Configured: the endpoint differs from the provider's seed; `null` when not comparable. */
+  base_url_overridden?: boolean | null;
+  /** What the endpoint members describe: `operator_configuration`. */
+  endpoint_basis?: string;
+  /** Reported: the model identities the responses named. */
+  observed_models?: string[];
+  /** Reported: how many responses named no model; never assumed to be the requested one. */
+  unreported_models?: number;
+  /** Reported by a harness, one row per call. */
+  observed?: Record<string, unknown>[];
+  /** Attested: the model a response proved served; `null` when unknown. */
+  served_model?: string | null;
+  /** Whether every call reported its usage (or was refused before sending). */
+  usage_complete?: boolean;
+  /** Whether a harness reported numeric usage at all. */
+  numeric_usage_reported?: boolean;
+  /** How cost is known (`unpriced; billing_unverified`, `subscription-backed/unknown`). */
+  cost_basis?: string;
+  /** A billed amount, when one was established; `null` when not. */
+  billed_cost_usd?: number | null;
+  /** The request authority's account of the round. */
+  authority?: NikaCompileAuthority;
+  [key: string]: unknown;
+}
+
+/**
+ * The request authority's account of one authoring round: logical
+ * invocations and physical HTTP requests counted apart.
+ */
+export interface NikaCompileAuthority {
+  /** The request bound the round ran under; `null` when none was configured. */
+  max_calls?: number | null;
+  /** Where that bound came from. */
+  source?: string;
+  /** Logical invocations sent and refused. */
+  invocations?: { sent: number; refused: number; [key: string]: unknown };
+  /**
+   * Physical requests sent and refused; both `null`, with the reason in
+   * `unknown`, for a seat that makes its own (an ACP harness).
+   */
+  http_requests?: {
+    sent?: number | null;
+    refused?: number | null;
+    unknown?: string | null;
+    [key: string]: unknown;
+  };
+  /** What the door configured. */
+  configured?: Record<string, unknown>;
+  /** What the receipt states about a seated decision model's own client. */
+  decision_seat?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * The record a round's plan carries (`provenance.plan`). A server keeps it
+ * behind the round's replay token; a caller never sends it back as
+ * authority. Its revision members, when present, bind the candidate bytes
+ * the round produced. The engine drops the whole record (no replay) when its
+ * verifier holds, withdraws or doubts the candidate: the decision record
+ * then still states the revision that was made.
+ */
+export interface NikaCompilePlanRecord {
+  /** The lineage of a revised source: which bytes it revised and which it wrote. */
+  source_revision?: NikaCompileSourceRevision;
+  /** The digest of the words the record answers (engine-normalized, not a plain hash of `intent`). */
+  intent_sha256?: string;
+  /** How the source was revised over its complete document. */
+  document_revision?: NikaCompileDocumentRevision;
+  [key: string]: unknown;
+}
+
+/**
+ * The compiler's bounded decision records (`provenance.decision`): seats,
+ * questions, verification attempts, the native conversation and, when a
+ * revision or a qualification ran, its evidence.
+ */
+export interface NikaCompileDecisionRecord {
+  /**
+   * The document revision the round made: the plan's own when the plan is
+   * kept. It stays when the plan is dropped, so it may describe a held
+   * candidate (a preview) or a withdrawn one (`candidate` is `null` and its
+   * digest names bytes no caller received): evidence of the attempt, never
+   * an accepted result.
+   */
+  document_revision?: NikaCompileDocumentRevision;
+  /** How recalled knowledge was qualified, and what of it the candidate's bytes hold. */
+  knowledge_qualification?: NikaCompileKnowledgeQualification;
+  [key: string]: unknown;
+}
+
+/**
+ * The lineage a revision record states (`provenance.plan.source_revision`):
+ * the digest of the bytes revised and of the bytes written. The base digest
+ * names the source parent; it is no session sequence and does not prove that
+ * any earlier revision is retained. A destination revision states more
+ * (`edit`, `path`, `by`, `original`, `change`, `supersedes`, `adds`, `like`,
+ * `slots`), kept as the engine wrote them.
+ */
+export interface NikaCompileSourceRevision {
+  /** sha256 (lowercase hex) of the base source's UTF-8 bytes. */
+  base_sha256: string;
+  /** sha256 (lowercase hex) of the candidate source's UTF-8 bytes. */
+  candidate_sha256: string;
+  /** The words the revised bytes now answer. */
+  resolved?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * A revision applied over the complete base document (engine
+ * `nika-compile-seats` `foundry/document.rs`). It states what the compiler
+ * did and claims, never that the result is what the request meant: that is
+ * the judge's and the run's to say.
+ */
+export interface NikaCompileDocumentRevision {
+  /** The route that made it. */
+  route?: string;
+  /** `operations` (edits and component merges) or `replaced` (the whole source). */
+  mode: 'operations' | 'replaced' | (string & {});
+  /** sha256 (lowercase hex) of the base source's UTF-8 bytes. */
+  base_sha256: string;
+  /** sha256 (lowercase hex) of the candidate source's UTF-8 bytes. */
+  candidate_sha256: string;
+  /** The node paths and components changed, in the operations' order. */
+  changed: string[];
+  /** The preservation claimed, in words; none for a replacement. */
+  preservation?: string;
+  /** The receipts of the components the revised bytes hold: new, rebound or carried. */
+  components: NikaCompileComponentReceipt[];
+  [key: string]: unknown;
+}
+
+/**
+ * The receipt of one admitted component in a candidate: expanded into the
+ * document, or invoked behind a child-workflow call (`invocation`, `child`).
+ * Composing a component grants nothing: its permits, model and name are not
+ * inherited.
+ */
+export interface NikaCompileComponentReceipt {
+  /** The law the receipt states. */
+  law?: string;
+  /** The component's identity in its release: never its bytes again. */
+  component: NikaCompileComponentIdentity;
+  /** Each hole bound, in order. */
+  bindings: NikaCompileComponentBinding[];
+  /** The holes no binding closed. */
+  open?: string[];
+  /** What of the component the document does not inherit (`nika`, `model`, `permits`). */
+  not_inherited?: Record<string, unknown>;
+  /** The authority the component declares and the document needs: never granted. */
+  authority?: Record<string, unknown>;
+  /**
+   * The digest of every node the expansion produced, by section and name:
+   * sha256 (lowercase hex) of the node's compact JSON, `null` for a node the
+   * expanded document did not hold.
+   */
+  nodes: Record<string, Record<string, string | null>>;
+  /** sha256 (lowercase hex) of the candidate the receipt was made on. */
+  candidate_sha256: string;
+  /** The candidate's Check, as the receipt saw it. */
+  check?: NikaCompileComponentCheck;
+  /** The calling task and the child workflow path of an invoked component. */
+  invocation?: { task: string; workflow: string; [key: string]: unknown };
+  /** The child program's own receipt members, witnessed apart. */
+  child?: Record<string, unknown>;
+  /** The candidate digest a rebinding revised; `null` when the earlier receipt named none. */
+  revises?: string | null;
+  [key: string]: unknown;
+}
+
+/** A component's identity as a receipt names it. */
+export interface NikaCompileComponentIdentity {
+  /** `block:<name>`. */
+  id: string;
+  /** The admitted release it was resolved from. */
+  release?: NikaCompileComponentRelease;
+  /** The release row's canonical digest. */
+  row_sha256?: string;
+  /** The program file under the release root. */
+  file?: string;
+  /** The digest the release pins for that file. */
+  file_sha256?: string;
+  /** The row's status (`EXPERIMENTAL`, `QUALIFIED`, …). */
+  status?: string;
+  /** The row's proof level (`CHECKED`, …). */
+  proof_level?: string;
+  [key: string]: unknown;
+}
+
+/** The admitted release a component was resolved from. */
+export interface NikaCompileComponentRelease {
+  /** The release's knowledge version. */
+  version?: string;
+  /** The release's snapshot digest. */
+  snapshot_sha256?: string;
+  /** The admission profile that verified it. */
+  profile?: string;
+  [key: string]: unknown;
+}
+
+/** One hole bound in a component. */
+export interface NikaCompileComponentBinding {
+  /** The hole's key path in the component (`const.max_age_hours`). */
+  path: string;
+  /** The hole that covers the path; `null` when none does. */
+  hole?: string | null;
+  /** Who fills that hole; `null` when no hole covers the path. */
+  owner?: string | null;
+  /** The component's own literal at the path (any JSON value, `null` included). */
+  component_literal?: unknown;
+  /** The literal bound there (any JSON value, `null` included). */
+  bound: unknown;
+  [key: string]: unknown;
+}
+
+/** A Check summary a component receipt keeps. */
+export interface NikaCompileComponentCheck {
+  ready?: boolean;
+  findings?: Record<string, unknown>[];
+  diagnostics?: Record<string, unknown>[];
+  [key: string]: unknown;
+}
+
+/**
+ * How the knowledge recalled for a round was qualified
+ * (`provenance.decision.knowledge_qualification`), and what of it the
+ * candidate's bytes hold. Older engines record a lexical `trace` instead of
+ * `reuse`: a measure of shared lines, never evidence of reuse.
+ */
+export interface NikaCompileKnowledgeQualification {
+  /** What the candidate's bytes hold of each shown reference and composed component. */
+  reuse?: NikaCompileReuse;
+  [key: string]: unknown;
+}
+
+/**
+ * The reuse witness of one candidate (engine `foundry/witness.rs`):
+ * established from the candidate's own bytes, never from the knowledge an
+ * author was shown or from lines the candidate shares with a reference.
+ * The counts cover `expanded`, `invoked`, `revised`, `absent` and
+ * `consulted`; a reference whose witness was `unreadable` is listed, not
+ * counted.
+ */
+export interface NikaCompileReuse {
+  /** The law the record states. */
+  law?: string;
+  expanded: number;
+  invoked: number;
+  revised: number;
+  absent: number;
+  consulted: number;
+  references: NikaCompileReuseReference[];
+  [key: string]: unknown;
+}
+
+/**
+ * What the candidate holds of one reference: `consulted` (shown, its use
+ * unobservable), `expanded`, `invoked`, `revised` (every node present, some
+ * changed since), `absent` (a node missing) or `unreadable`.
+ */
+export type NikaCompileReuseUse =
+  | 'consulted'
+  | 'expanded'
+  | 'invoked'
+  | 'revised'
+  | 'absent'
+  | 'unreadable'
+  | (string & {});
+
+/** One shown reference or composed component, and its use. */
+export interface NikaCompileReuseReference {
+  /** The reference id, or the component id a receipt names (`null` when it names none). */
+  id: string | null;
+  /** The reference kind (`block` for a witnessed component). */
+  kind?: string;
+  use: NikaCompileReuseUse;
+  /** The witness of a composed component, re-derived from the candidate's bytes. */
+  witness?: NikaCompileReuseWitness;
+  [key: string]: unknown;
+}
+
+/** What one candidate holds of one component receipt. */
+export interface NikaCompileReuseWitness {
+  /** The component id the receipt names; `null` when it names none. */
+  component: string | null;
+  verdict: 'expanded' | 'invoked' | 'revised' | 'absent' | 'unreadable' | (string & {});
+  /** The release the receipt names; `null` when it names none (a child program). */
+  release?: NikaCompileComponentRelease | null;
+  /** The child workflow path of an invoked component; `null` otherwise. */
+  workflow?: string | null;
+  /** sha256 (lowercase hex) of the candidate witnessed. */
+  candidate_sha256?: string;
+  /** The candidate digest the receipt was made on; `null` when it names none. */
+  receipt_candidate_sha256?: string | null;
+  /** The receipt's nodes found as receipted, changed since, or missing. */
+  nodes?: { kept: string[]; changed: string[]; missing: string[]; [key: string]: unknown };
+  /** The bound literals the candidate no longer holds. */
+  bindings_not_held?: string[];
   [key: string]: unknown;
 }
 
@@ -1153,9 +1492,9 @@ export interface NikaCompileProvenance {
   /** A file name for the candidate, never a path the compiler touched. */
   suggested_file?: string | null;
   /** The plan record the round produced; a server keeps it behind its replay token. */
-  plan?: Record<string, unknown>;
+  plan?: NikaCompilePlanRecord;
   /** Bounded decision records, `semantic_verification` attempts included. */
-  decision?: Record<string, unknown>;
+  decision?: NikaCompileDecisionRecord;
   /** The provider-call receipt: present exactly when `compile_version` is 2. */
   authoring?: NikaCompileAuthoringReceipt;
   [key: string]: unknown;
@@ -1269,7 +1608,10 @@ export interface NikaCompileOutcome {
   status: NikaCompileStatus;
   /** Exactly `status === 'ready'` — the engine's word, not a client judgment. */
   ready: boolean;
-  /** The candidate source; may still carry unfilled holes when not ready. */
+  /**
+   * The candidate source, exactly as the engine wrote it (comments, Unicode
+   * and line endings included); may still carry unfilled holes when not ready.
+   */
   candidate: string | null;
   questions: NikaCompileQuestion[];
   diagnostics: NikaCompileDiagnostic[];

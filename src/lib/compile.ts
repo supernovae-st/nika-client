@@ -31,6 +31,7 @@ import type {
   NikaCompileTrigger,
   NikaTransportKind,
 } from '../types.js';
+import { validateCompileEvidence } from './compile-evidence.js';
 import type { EngineCapture } from './engine-capture.js';
 import { encodeLiteralInputs } from './literal-inputs.js';
 import { machineObject } from './machine.js';
@@ -1150,6 +1151,8 @@ function provenanceFrom(
       : 'a compile_version 2 outcome carries no provenance.authoring receipt');
   }
   if (receipt) authoringFrom(provenance.authoring, protocol);
+  // Revision, reuse and backend evidence: judged in place, returned as the engine wrote it.
+  validateCompileEvidence(provenance, protocol);
   return provenance as unknown as NikaCompileProvenance;
 }
 

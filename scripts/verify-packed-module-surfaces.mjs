@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -182,6 +184,7 @@ try {
   const compileEngines = JSON.stringify({
     compile: path.join(root, 'test/fixtures/fake-nika-compile.mjs'),
     old: path.join(root, 'test/fixtures/fake-nika.mjs'),
+    evidence: path.join(root, 'test/fixtures/compile-evidence/document-revision.json'),
   });
   await copyFile(
     path.join(root, 'scripts/packed-consumers', COMPILE_SCENARIO),
@@ -235,6 +238,7 @@ try {
     `import { Nika, isNikaRunSucceeded, type NikaConfig, type NikaRunOptions, type NikaRunResult } from '${packageName}';`,
     `import { isNikaCompileHeld, nextCompileRequest } from '${packageName}';`,
     `import type { NikaCompileOutcome, NikaCompileRequest, NikaCompileRefusalCode } from '${packageName}';`,
+    `import type { NikaCompileAuthoringBackend, NikaCompileDocumentRevision, NikaCompileReuse } from '${packageName}';`,
     `import type { NikaEvent, NikaJournalEvidence, NikaRun, NikaRunEvent, NikaRunEventKind } from '${packageName}';`,
     `import type { NikaEventBufferOverflowError } from '${packageName}';`,
     "const config: NikaConfig = { bin: '/tmp/nika' };",
@@ -323,6 +327,22 @@ try {
     'void compileJudgedServed;',
     'const compileHeld: boolean = isNikaCompileHeld(compileOutcome);',
     'void compileGeneration; void compileCalls; void compileToken; void compileHeld;',
+    '// NIK-17: revision, reuse and backend evidence is typed, optional and open.',
+    'const evidenceRevision: NikaCompileDocumentRevision | undefined = compileOutcome.provenance.plan?.document_revision;',
+    'const evidenceBase: string | undefined = evidenceRevision?.base_sha256;',
+    'const evidenceBound: unknown = evidenceRevision?.components[0]?.bindings[0]?.bound;',
+    'const evidenceHole: string | null | undefined = evidenceRevision?.components[0]?.bindings[0]?.hole;',
+    'const evidenceReuse: NikaCompileReuse | undefined = compileOutcome.provenance.decision?.knowledge_qualification?.reuse;',
+    'const evidenceUse: string | undefined = evidenceReuse?.references[0]?.use;',
+    'const evidenceBackend: NikaCompileAuthoringBackend | null | undefined = compileOutcome.provenance.authoring?.backend;',
+    'const evidenceServed: string | null | undefined = evidenceBackend?.served_model;',
+    'const evidenceAdditive: unknown = evidenceBackend?.selection;',
+    'void evidenceBase; void evidenceBound; void evidenceHole; void evidenceUse; void evidenceServed; void evidenceAdditive;',
+    '// @ts-expect-error a digest is text, never a number',
+    'const evidenceDigest: number | undefined = evidenceRevision?.candidate_sha256;',
+    '// @ts-expect-error the count of responses that named no model is a number',
+    'const evidenceUnreported: string | undefined = evidenceBackend?.unreported_models;',
+    'void evidenceDigest; void evidenceUnreported;',
     `const compileFresh: NikaCompileRequest = { intent: 'x', cognition: 'explicitProvider', limits: { max_calls: 6, deadline_ms: 60000 } };`,
     `const compileSeat: NikaCompileRequest = { intent: 'x', authoringModel: 'mistral/mistral-small-latest', fresh: true };`,
     `const compileRevision: NikaCompileRequest = { workflow: 'src', change: 'weekly', original_intent: 'x', cognition: 'explicitProvider' };`,
@@ -586,6 +606,38 @@ function assertCompile(report, moduleSystem) {
   }, say('a resident without a native seat refuses a provider round after /health alone'));
   assert.match(unseatedMessage, /Nothing was posted/, say('the refusal says nothing was sent'));
 
+  // NIK-17: a document revision's evidence (synthetic values, the engine's shapes).
+  const evidence = JSON.parse(readFileSync(path.join(root, 'test/fixtures/compile-evidence/document-revision.json'), 'utf8'));
+  const digest = (text) => createHash('sha256').update(text, 'utf8').digest('hex');
+  const { malformedNative, malformedHttp, ...decoded } = report.evidence;
+  assert.deepEqual(decoded, {
+    candidateExact: true,
+    revision: {
+      mode: 'operations', base: digest(evidence.base), candidate: digest(evidence.document.candidate),
+      changed: ['const.window_hours', 'const.max_age_hours', 'component block:notify-digest'], decisionSame: true,
+      components: [
+        { id: 'block:stock-window', release: 'foundry-2026.10.08',
+          bindings: [['const.max_age_hours', 'const.max_age_hours', 48, 72], ['const.label', null, null, 'Relevé — semaine']],
+          invocation: null, child: null },
+        { id: 'block:notify-digest', release: 'foundry-2026.10.08',
+          bindings: [['const.channel', 'const.channel', 'email', 'webhook']],
+          invocation: { task: 'notify_digest', workflow: 'children/notify-digest.nika' },
+          child: evidence.document.provenance.plan.document_revision.components[1].child.candidate_sha256 },
+      ],
+    },
+    source: evidence.document.provenance.plan.source_revision,
+    reuse: { counts: [1, 1, 0, 1, 1], uses: [['pattern:paginated-read', 'consulted'], ['block:stock-window', 'expanded'],
+      ['block:notify-digest', 'invoked'], ['block:legacy-copy', 'absent'], [null, 'unreadable']] },
+    backend: { requested: 'deepseek/deepseek-flash', decision: 'typesafe/jev', observed: ['deepseek-v4-flash'],
+      unreported: 1, served: null, forwardedAbsent: true,
+      selection: { role: 'author', scope: 'round', future: 'access-owner additive evidence' } },
+  }, say('revision, component, reuse and backend evidence decode identically on both doors, null and absence kept apart'));
+  for (const [door, refused, transport] of [['native', malformedNative, 'native-process'], ['HTTP', malformedHttp, 'http']]) {
+    const { message, ...error } = refused;
+    assert.deepEqual(error, { name: 'NikaProtocolError', transport, ...typed('protocol') },
+      say(`${door}: malformed known evidence is a protocol fault`));
+    assert.match(message, /document_revision\.base_sha256 is not a sha256 digest/, say(`${door}: the fault names its path`));
+  }
 }
 
 /**

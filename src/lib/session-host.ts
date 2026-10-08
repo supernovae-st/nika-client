@@ -254,7 +254,109 @@ function snapshotBody(value: unknown, transport: NikaTransportKind): NikaSession
   for (const key of ['authoring', 'candidate', 'saved', 'requested', 'run']) {
     if (work[key] !== null && !machineObject(work[key])) throw fail(`work.${key} is neither an object nor null`);
   }
+  workMembers(work, fail);
   return body as unknown as NikaSessionSnapshot;
+}
+
+/** A BLAKE3 or sha256 witness: 32 bytes as lowercase hex. */
+const WITNESS = /^[0-9a-f]{64}$/;
+
+/**
+ * The work members the SDK names (engine `nika-session-change` `work.rs`;
+ * candidate `content`, `authoring.draft`/`calls` and `intelligence` from the
+ * 0.123 integration `1b47f34c0`), judged where they are. A member present
+ * with another shape is a protocol fault naming its path, never its value;
+ * an absent one, `null` where the engine writes it and every unknown member
+ * ride through. Nothing is copied or rebuilt.
+ */
+function workMembers(work: Record<string, unknown>, fail: (what: string) => NikaProtocolError): void {
+  const member = (record: Record<string, unknown>, key: string, at: string,
+    check: (value: unknown, path: string) => void, required = false) => {
+    if (Object.hasOwn(record, key)) check(record[key], `${at}.${key}`);
+    else if (required) throw fail(`${at}.${key} is absent`);
+  };
+  const object = (value: unknown, path: string) => {
+    const found = machineObject(value);
+    if (!found) throw fail(`${path} is not an object`);
+    return found;
+  };
+  const text = (nullable = false) => (value: unknown, path: string) => {
+    if (typeof value !== 'string' && !(nullable && value === null)) {
+      throw fail(`${path} is ${nullable ? 'neither text nor null' : 'not text'}`);
+    }
+  };
+  const count = (nullable = false) => (value: unknown, path: string) => {
+    if (!(nullable && value === null)
+      && !(typeof value === 'number' && Number.isSafeInteger(value) && value >= 0)) {
+      throw fail(`${path} is ${nullable ? 'neither a count nor null' : 'not a count'}`);
+    }
+  };
+  const flag = (value: unknown, path: string) => {
+    if (typeof value !== 'boolean') throw fail(`${path} is not a boolean`);
+  };
+  const witness = (nullable = false) => (value: unknown, path: string) => {
+    if (!(nullable && value === null) && !(typeof value === 'string' && WITNESS.test(value))) {
+      throw fail(`${path} is ${nullable ? 'neither a witness nor null' : 'not a witness'}`);
+    }
+  };
+
+  const candidate = machineObject(work.candidate);
+  if (candidate) {
+    member(candidate, 'files', 'work.candidate', (files, path) => {
+      if (!Array.isArray(files)) throw fail(`${path} is not a list`);
+      files.forEach((entry, index) => {
+        const at = `${path}[${index}]`;
+        const file = object(entry, at);
+        member(file, 'path', at, text(), true);
+        member(file, 'bytes', at, witness(), true);
+        member(file, 'content', at, text());
+        member(file, 'replaces', at, witness(true));
+        member(file, 'landing', at, text());
+        member(file, 'workflow', at, flag);
+      });
+    }, true);
+  }
+  const authoring = machineObject(work.authoring);
+  if (authoring) {
+    member(authoring, 'candidate', 'work.authoring', witness(true));
+    member(authoring, 'draft', 'work.authoring', text(true));
+    member(authoring, 'calls', 'work.authoring', (value, path) => {
+      if (value === null) return;
+      const calls = object(value, path);
+      member(calls, 'requested_model', path, text(), true);
+      member(calls, 'calls', path, count(), true);
+      member(calls, 'elapsed_ms', path, count(), true);
+      member(calls, 'input_tokens', path, count(true));
+      member(calls, 'output_tokens', path, count(true));
+      member(calls, 'backend', path, (backend, at) => {
+        if (backend !== null) object(backend, at);
+      });
+    });
+  }
+  member(work, 'intelligence', 'work', (value, path) => {
+    if (value === null) return;
+    const intelligence = object(value, path);
+    member(intelligence, 'author', path, (author, at) => {
+      const seat = object(author, at);
+      member(seat, 'kind', at, text(), true);
+      for (const key of ['model', 'seat', 'transport', 'why']) member(seat, key, at, text(true));
+    }, true);
+    member(intelligence, 'selected', path, (selected, at) => {
+      if (selected === null) return;
+      const chosen = object(selected, at);
+      member(chosen, 'kind', at, text(), true);
+      for (const key of ['via', 'transport', 'model', 'refusal']) member(chosen, key, at, text(true));
+      member(chosen, 'locus', at, text());
+      member(chosen, 'ready', at, flag);
+    });
+    member(intelligence, 'decision', path, (decision, at) => {
+      if (decision === null) return;
+      const seat = object(decision, at);
+      member(seat, 'model', at, text(), true);
+      member(seat, 'refusal', at, text(true));
+    });
+    member(intelligence, 'effort', path, text(true));
+  });
 }
 
 /** A refusal frame as the typed error its owner receives, the refused line kept. */

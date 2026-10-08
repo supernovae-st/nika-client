@@ -38,6 +38,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refuse a malformed one with `NikaProtocolError` naming its path; absent
   records, unknown members, new vocabulary words and explicit `null` ride
   through untouched, and the outcome still holds the engine's own objects.
+- Session snapshots type what the 0.123 integration engine (`1b47f34c0`) adds
+  to `nika/session-work@0`: each candidate file's exact `content` (beside its
+  BLAKE3 `bytes` witness), `authoring.draft`, the `authoring.calls` receipt
+  (`NikaSessionAuthoringCalls`: requested model, calls, reported usage with
+  unknown kept `null`, the backend as reported) and the configured
+  `intelligence` (`NikaSessionIntelligence`: selection, author seat, decision
+  seat, effort). Both doors check these members where they are; a malformed
+  one is a `NikaProtocolError` naming its path, and absent members, explicit
+  `null` and unknown members ride through.
 - `scripts/run-session-parity-e2e.mjs` walks the authoring Session through
   both real doors of one frozen binary (`nika session --json` and a served
   project's `/v1/sessions`) from the packed CommonJS and ESM faces, keyless on

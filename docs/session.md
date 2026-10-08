@@ -52,6 +52,22 @@ a consent would land, `saved` the last Save and `requested`/`run` the Run
 requested and the Run observed. A preview is not a Save, and a Save is not a
 Run.
 
+From the 0.123 integration engine on, the snapshot also carries what a remote
+interface needs to show and verify without reading anything else:
+
+| Member | Type | What it states |
+|---|---|---|
+| `candidate.files[].content` | `string` | the exact bytes a consent lands; `bytes` stays their BLAKE3 witness (not a sha256) |
+| `authoring.draft` | `string \| null` | the compiler's candidate bytes, proposed or not: what to show while a question waits; showing it consents to nothing |
+| `authoring.calls` | `NikaSessionAuthoringCalls \| null` | the compiler's receipt of its authoring calls: the model they asked for (`requested_model`, never what served them), how many, the reported usage (`null` when unknown, never `0`) and the `backend` as its transport named it; `null` when the compile made no call |
+| `intelligence` | `NikaSessionIntelligence` | configured facts: the person's `selected` intelligence as the engine's machine resolved it, the `author` seat, the `decision` seat selected and the `effort`; a selection is never the model that served a call |
+
+The SDK checks these members where they are, as it checks a compile's
+evidence: a present member of another shape fails with `NikaProtocolError`
+naming its path (never its value), while absent members (an older engine),
+`null` where the engine writes it and every member the SDK does not know ride
+through untouched.
+
 ## Commands, waits and Stop
 
 `submit` and `stop` are commands. Each carries an identity (`command`,

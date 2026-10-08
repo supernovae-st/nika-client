@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 
 /**
@@ -42,6 +42,10 @@ if (argv[0] !== 'session' || argv[1] !== '--json') {
 }
 
 const session = 'ses_' + '5e'.repeat(16);
+// `NIKA_FAKE_SESSION_WORK` names a JSON file whose `authoring` and `intelligence` every snapshot's work carries.
+const RICH = process.env.NIKA_FAKE_SESSION_WORK
+  ? JSON.parse(readFileSync(process.env.NIKA_FAKE_SESSION_WORK, 'utf8'))
+  : undefined;
 const CONTENT = '# Digest 🦋\nnika: digest\n# « Relevé — semaine »\ntasks: {}\n';
 let event = 0;
 let seq = 0;
@@ -83,7 +87,8 @@ function publish() {
       contract: 'nika/session-work@0',
       root: process.cwd(),
       request: { goal: null, decisions: [], unresolved: [] },
-      authoring: null,
+      authoring: RICH?.authoring ?? null,
+      ...(RICH ? { intelligence: RICH.intelligence } : {}),
       waiting,
       candidate,
       saved,

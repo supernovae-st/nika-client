@@ -1,0 +1,40 @@
+{
+  "note": "SYNTHETIC values in the shapes engine carrier 1b47f34c0 serializes under nika/session-work@0 (nika-session-change work.rs: Authoring.draft and .calls, Intelligence, CandidateFile.content; nika-session runtime/work.rs). Witnesses are placeholders, not BLAKE3 digests of these bytes. Decoder evidence only: no engine produced these bytes.",
+  "authoring": {
+    "status": "ready",
+    "questions": [],
+    "diagnostics": [
+      { "kind": "applied", "target": "intent", "message": "The author composed the complete document." }
+    ],
+    "candidate": "5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e",
+    "draft": "# Digest 🦋\nnika: digest\n# « Relevé — semaine »\ntasks: {}\n",
+    "calls": {
+      "requested_model": "claude-code/opus",
+      "calls": 2,
+      "input_tokens": null,
+      "output_tokens": null,
+      "elapsed_ms": 41234,
+      "backend": {
+        "kind": "acp_harness",
+        "adapter": "@agentclientprotocol/claude-code-acp",
+        "observed_model": "claude-opus"
+      },
+      "future_calls_member": "kept"
+    }
+  },
+  "intelligence": {
+    "selected": {
+      "kind": "harness",
+      "via": "claude-code",
+      "transport": "acp",
+      "model": null,
+      "locus": "Your Claude app on this computer reads the request and the project files it names.",
+      "ready": true,
+      "refusal": null
+    },
+    "author": { "kind": "harness", "model": null, "seat": "claude-code", "transport": "acp", "why": null },
+    "decision": { "model": "typesafe/jev", "refusal": null },
+    "effort": "max",
+    "future_intelligence_member": { "additive": true }
+  }
+}

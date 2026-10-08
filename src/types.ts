@@ -1833,11 +1833,18 @@ export interface NikaSessionWork {
   /** The request as the Session keeps it: goal, decisions, open questions. */
   request: Record<string, unknown>;
   /** The compiler's last word on the request, when the Session holds one. */
-  authoring: Record<string, unknown> | null;
+  authoring: NikaSessionAuthoring | null;
+  /**
+   * The intelligence the Session prepares with, as selected and resolved on
+   * the engine's machine: configured facts, never a receipt of what served a
+   * call (that is `authoring.calls`). Absent on engines before the 0.123
+   * integration.
+   */
+  intelligence?: NikaSessionIntelligence | null;
   /** What the next line answers, by the Session's own precedence. */
   waiting: NikaSessionWaiting;
   /** The candidate under review: the exact changes a consent lands. */
-  candidate: Record<string, unknown> | null;
+  candidate: NikaSessionCandidate | null;
   /** The workflow the last consent saved. Save is never a Run. */
   saved: Record<string, unknown> | null;
   /** The Run this Session requested last: a request, never an observation. */
@@ -1846,6 +1853,127 @@ export interface NikaSessionWork {
   run: Record<string, unknown> | null;
   /** The automation rail, each field at its own stage. */
   rail: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/**
+ * The compiler's last word on the request (`work.authoring`): its status,
+ * questions and notes as the engine wrote them, the candidate it drafted and
+ * the receipt of its authoring calls.
+ */
+export interface NikaSessionAuthoring {
+  /**
+   * The compiler's candidate bytes, proposed or not: what to show while a
+   * question waits. Showing it consents to nothing; only `work.candidate` is
+   * consentable. `null` when the compiler drafted nothing.
+   */
+  draft?: string | null;
+  /**
+   * What the compile's authoring calls reported, read from the compiler's
+   * receipt: the snapshot's one actual-call evidence. `null` when the compile
+   * made no authoring call.
+   */
+  calls?: NikaSessionAuthoringCalls | null;
+  [key: string]: unknown;
+}
+
+/** The receipt of one compile's authoring calls, never re-derived. */
+export interface NikaSessionAuthoringCalls {
+  /** Requested: the model the calls asked for, never the one that served them. */
+  requested_model: string;
+  /** The provider calls attempted. */
+  calls: number;
+  /** Reported input tokens; `null` when the provider omitted usage (never `0` for unknown). */
+  input_tokens?: number | null;
+  /** Reported output tokens; `null` when the provider omitted usage. */
+  output_tokens?: number | null;
+  /** The wall time spent awaiting the provider. */
+  elapsed_ms: number;
+  /**
+   * Reported: the backend that answered as its transport named it
+   * (`direct_api`, or `acp_harness` with the model it observed); `null` when
+   * the transport said nothing.
+   */
+  backend?: Record<string, unknown> | null;
+  [key: string]: unknown;
+}
+
+/**
+ * The intelligence a Session prepares with (`work.intelligence`): the
+ * selection, the authoring seat, the decision seat selected and the explicit
+ * reasoning effort. Configured facts only: a selected seat is not one that
+ * answered, and a selection is never the model that served a call.
+ */
+export interface NikaSessionIntelligence {
+  /** The person's selection as the engine's machine resolved it; `null` before one was made. */
+  selected?: NikaSessionSelectedIntelligence | null;
+  /** The seat that authors under that selection. */
+  author: NikaSessionAuthor;
+  /** The decision seat selected for finite choices; whether it answered is the compile's record. */
+  decision?: { model: string; refusal?: string | null; [key: string]: unknown } | null;
+  /** The explicit reasoning effort (`low`, `high`, `max`); `null` keeps each route's default. */
+  effort?: string | null;
+  [key: string]: unknown;
+}
+
+/** A person's selection, as the engine's machine resolved it. */
+export interface NikaSessionSelectedIntelligence {
+  /** `harness` (an AI app the person has), `api` (a metered provider), `local` or `none`. */
+  kind: 'harness' | 'api' | 'local' | 'none' | (string & {});
+  /** The harness seat or the provider; `null` for `none`. */
+  via?: string | null;
+  /** How a harness seat is reached (`native`, `acp`); `null` for every other kind. */
+  transport?: string | null;
+  /** The model the selection names; `null` lets the provider choose. */
+  model?: string | null;
+  /** Where the context goes, in the words the person read before the first turn. */
+  locus?: string;
+  /** Whether that machine can serve the selection now. */
+  ready?: boolean;
+  /** Why it cannot, with the fix, when it cannot. */
+  refusal?: string | null;
+  [key: string]: unknown;
+}
+
+/** The seat that authors: a provider model, a harness seat, the deterministic reading, or none. */
+export interface NikaSessionAuthor {
+  /** `provider`, `harness`, `deterministic` or `unavailable`. */
+  kind: 'provider' | 'harness' | 'deterministic' | 'unavailable' | (string & {});
+  /** The model it authors with, when one is named (`<provider>/<name>`). */
+  model?: string | null;
+  /** The harness seat, for a harness (`codex`, `claude-code`). */
+  seat?: string | null;
+  /** How the harness seat is reached (`native`, `acp`). */
+  transport?: string | null;
+  /** Why no model authors, or why the selection cannot be honored. */
+  why?: string | null;
+  [key: string]: unknown;
+}
+
+/** The candidate under review (`work.candidate`): the exact changes a consent lands. */
+export interface NikaSessionCandidate {
+  files: NikaSessionCandidateFile[];
+  [key: string]: unknown;
+}
+
+/** One file of a candidate. */
+export interface NikaSessionCandidateFile {
+  /** Relative to `work.root`. */
+  path: string;
+  /** The BLAKE3 witness (64 lowercase hex) of the exact bytes a consent lands; not a sha256. */
+  bytes: string;
+  /**
+   * Those exact bytes, as the Session holds them: what to render, parse or
+   * hash without reading anything else. Absent on engines before the 0.123
+   * integration.
+   */
+  content?: string;
+  /** `create` or `update`. */
+  landing?: string;
+  /** The BLAKE3 witness of the bytes an update replaces; `null` for a creation. */
+  replaces?: string | null;
+  /** Whether the file is a workflow. */
+  workflow?: boolean;
   [key: string]: unknown;
 }
 

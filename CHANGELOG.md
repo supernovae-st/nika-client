@@ -67,7 +67,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   A round still waiting on a mandatory question carries no `plan.document`; a
   settled record of another version rides through unjudged. Both doors check
   the known members as they do a revision's, and the packed CommonJS and ESM
-  consumers decode the same objects on both doors.
+  consumers decode the same objects on both doors, including outcome documents
+  the engine itself recorded for a creation and for a later revision of the
+  created bytes (its component receipt rebound from 48 to 72).
 - `scripts/run-compile-parity-e2e.mjs` gains an opt-in real-provider phase
   (`NIKA_COMPILE_PROVIDER_MODEL`, `NIKA_COMPILE_PROVIDER_ENV`): each packed
   module system revises one rich base (EDIT) and creates one document from

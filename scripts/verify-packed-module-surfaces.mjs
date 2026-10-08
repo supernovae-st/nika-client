@@ -186,6 +186,7 @@ try {
     old: path.join(root, 'test/fixtures/fake-nika.mjs'),
     evidence: path.join(root, 'test/fixtures/compile-evidence/document-revision.json'),
     created: path.join(root, 'test/fixtures/compile-evidence/document-create.json'),
+    recorded: path.join(root, 'test/fixtures/compile-evidence/recorded-fcdd44292'),
   });
   await copyFile(
     path.join(root, 'scripts/packed-consumers', COMPILE_SCENARIO),
@@ -694,6 +695,23 @@ function assertCompile(report, moduleSystem) {
     assert.match(message, /plan\.document\.candidate_sha256 is not a sha256 digest/,
       say(`${door}: the creation fault names its path`));
   }
+
+  // NIK-17: outcome documents the engine itself wrote, decoded alike on both doors.
+  const recordedDir = path.join(root, 'test/fixtures/compile-evidence/recorded-fcdd44292');
+  const recordedCandidate = (leg) => JSON.parse(readFileSync(path.join(recordedDir, `${leg}.outcome.json`), 'utf8'))
+    .candidate;
+  const createdSha = digest(recordedCandidate('edit-created'));
+  assert.deepEqual(report.recorded, {
+    'ready-composed': { status: 'ready', candidateExact: true, settled: digest(recordedCandidate('ready-composed')),
+      revision: null },
+    'ready-written': { status: 'ready', candidateExact: true, settled: digest(recordedCandidate('ready-written')),
+      revision: null },
+    continuation: { status: 'incomplete', candidateExact: true, settled: null, revision: null },
+    'edit-created': { status: 'ready', candidateExact: true, settled: createdSha, revision: null },
+    'edit-revised': { status: 'ready', candidateExact: true, settled: null,
+      revision: { base: createdSha, candidate: digest(recordedCandidate('edit-revised')),
+        rebound: [['block:stale-filter-report', 48, 72, createdSha]] } },
+  }, say('the engine\'s recorded creation and revision outcomes decode alike on both doors, the receipt rebound 48 to 72'));
 }
 
 /**

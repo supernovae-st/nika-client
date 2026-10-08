@@ -185,6 +185,8 @@ class Judge {
     for (const key of ['route', 'resolved', 'preservation']) {
       this.optional(section, key, path, (member, at) => this.text(member, at));
     }
+    this.optional(section, 'base_sha256', path, (digest, at) => this.digest(digest, at, true));
+    this.optional(section, 'operations', path, (count, at) => this.count(count, at));
   }
 
   /** `decision.document_create`: how the door made the document (`document_create.rs::record`). */

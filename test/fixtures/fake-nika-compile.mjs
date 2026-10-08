@@ -383,6 +383,14 @@ async function compile() {
     return;
   }
 
+  if (process.env.NIKA_FAKE_COMPILE_OUTCOME) {
+    // A recorded engine outcome document, carried as the engine wrote it; the native render adds
+    // its CLI-only fact.
+    const document = JSON.parse(readFileSync(process.env.NIKA_FAKE_COMPILE_OUTCOME, 'utf8'));
+    outcome({ ...document, written: null }, document.status === 'ready' ? 0 : 2);
+    return;
+  }
+
   if (intent !== undefined && flags.authoringModel !== undefined) {
     // A complete-document creation with its full evidence (fixture `compile-evidence/document-create.json`:
     // SYNTHETIC values in the engine's shapes). The request must arrive byte for byte.

@@ -327,6 +327,36 @@ module.exports = async function compileScenario(sdk, engines) {
     report.created.malformedNative = await refusal(sdk, () => native.compile({ intent: 'create-evidence-malformed',
       authoringModel: 'claude-code/opus' }));
     report.created.malformedHttp = await refusal(sdk, () => remoteCreation(malformedCreation, created.ready.intent));
+
+    // NIK-17: outcome documents the engine itself wrote (recorded with scripted seats): every
+    // member through both doors, and the created bytes revised 48 → 72 by a later change.
+    report.recorded = {};
+    for (const leg of ['ready-composed', 'ready-written', 'continuation', 'edit-created', 'edit-revised']) {
+      const file = path.join(engines.recorded, `${leg}.outcome.json`);
+      const document = JSON.parse(readFileSync(file, 'utf8'));
+      process.env.NIKA_FAKE_COMPILE_OUTCOME = file;
+      let local;
+      try {
+        local = await native.compile({ intent: 'recorded', authoringModel: 'mock/authoring' });
+      } finally {
+        delete process.env.NIKA_FAKE_COMPILE_OUTCOME;
+      }
+      const { replay_token: _recorded, judged_answer_round_available: _judgedRecorded, ...remote } =
+        await new sdk.Nika({ url: 'https://nika.example', token: TOKEN, bin: '/missing-packed-recorded-engine',
+          fetch: evidenceResident(document) }).compile({ intent: 'recorded', cognition: 'explicitProvider' });
+      assert.deepStrictEqual(remote, local, `${leg}: both doors decode the recorded outcome alike`);
+      assert.deepStrictEqual(JSON.parse(JSON.stringify(local.provenance)), document.provenance,
+        `${leg}: every recorded provenance member survives`);
+      const revision = local.provenance.plan?.document_revision;
+      report.recorded[leg] = {
+        status: local.status,
+        candidateExact: local.candidate === document.candidate && remote.candidate === document.candidate,
+        settled: local.provenance.plan?.document?.candidate_sha256 ?? null,
+        revision: revision === undefined ? null : { base: revision.base_sha256, candidate: revision.candidate_sha256,
+          rebound: revision.components.map((receipt) => [receipt.component.id, receipt.bindings[0].component_literal,
+            receipt.bindings[0].bound, receipt.revises]) },
+      };
+    }
     return report;
   } finally {
     delete process.env.NIKA_FAKE_ARGV_LOG;

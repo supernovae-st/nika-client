@@ -54,6 +54,8 @@
             "route": "native: document",
             "mode": "composed",
             "resolved": "Create a new workflow named stale-tickets. Read ./in/tickets.json, keep the tickets older than 48 hours in their input order, and write their count and ids to ./out/report.json, labelled « Relevé — semaine ». Use an admitted Foundry component when the catalogue has one.",
+            "base_sha256": "38a6e6ac0f29167c5aa24dadd113396d2509ea6bdc7d013107c521bea92981e9",
+            "operations": 3,
             "changed": [
               "component block:stale-filter",
               "const.label",
@@ -605,6 +607,8 @@
             "route": "native: document",
             "mode": "written",
             "resolved": "Create a new workflow named page-count. Every Monday at 8, count the pages of ./docs/guide.md and return the count as « pages ».",
+            "base_sha256": null,
+            "operations": 0,
             "changed": [],
             "preservation": "none claimed: the author wrote the whole document",
             "components": []
@@ -752,6 +756,8 @@
             "route": "native: document",
             "mode": "written",
             "resolved": "Create a new workflow named digest-sender that sends the weekly digest « Relevé » as a JSON POST to our team webhook; its address is not known yet.",
+            "base_sha256": null,
+            "operations": 0,
             "changed": [],
             "preservation": "none claimed: the author wrote the whole document",
             "components": []

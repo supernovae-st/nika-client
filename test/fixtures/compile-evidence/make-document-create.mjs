@@ -163,7 +163,8 @@ const composed = {
   provenance: provenance('stale-tickets.nika', {
     strategy: 'native',
     intent_sha256: sha(intent),
-    document_create: { route: ROUTE, mode: 'composed', resolved: intent, changed, preservation, components: [receipt] },
+    document_create: { route: ROUTE, mode: 'composed', resolved: intent, base_sha256: sha(authored), operations: 3,
+      changed, preservation, components: [receipt] },
     document: { version: 1, candidate_sha256: candidateSha, request: intent, base_sha256: null, mode: 'composed',
       components: [receipt], future_document_member: 'kept' },
   }, {
@@ -212,8 +213,8 @@ const written = {
   provenance: provenance('page-count.nika', {
     strategy: 'native',
     intent_sha256: sha(writtenIntent),
-    document_create: { route: ROUTE, mode: 'written', resolved: writtenIntent, changed: [], preservation: WRITTEN,
-      components: [] },
+    document_create: { route: ROUTE, mode: 'written', resolved: writtenIntent, base_sha256: null, operations: 0,
+      changed: [], preservation: WRITTEN, components: [] },
     document: { version: 1, candidate_sha256: sha(writtenCandidate), request: writtenIntent, base_sha256: null,
       mode: 'written', components: [] },
   }, {
@@ -240,8 +241,8 @@ const continuation = {
   provenance: provenance('digest-sender.nika', {
     strategy: 'native',
     intent_sha256: sha(waitingIntent),
-    document_create: { route: ROUTE, mode: 'written', resolved: waitingIntent, changed: [], preservation: WRITTEN,
-      components: [] },
+    document_create: { route: ROUTE, mode: 'written', resolved: waitingIntent, base_sha256: null, operations: 0,
+      changed: [], preservation: WRITTEN, components: [] },
   }, {
     document_create: { route: ROUTE, mode: 'written', base_sha256: null, operations: 0, changed: [],
       preservation: WRITTEN, components: [], reuse: empty, candidate_sha256: null },

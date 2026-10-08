@@ -1385,6 +1385,10 @@ export interface NikaCompileDocumentCreateSection {
   mode: NikaCompileDocumentCreateMode;
   /** The request the door answered. */
   resolved?: string;
+  /** sha256 of the document a `composed` answer's operations applied to inside the creation; `null` when written. */
+  base_sha256?: string | null;
+  /** How many operations the answer stated. */
+  operations?: number;
   /** The node paths and components the operations changed, in their order; empty when written. */
   changed: string[];
   /** The preservation claimed, in words. */

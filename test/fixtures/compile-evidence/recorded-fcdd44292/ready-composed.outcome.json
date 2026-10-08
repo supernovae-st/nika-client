@@ -1,0 +1,1609 @@
+{
+  "candidate": "nika: stale-tickets-report\nconst:\n  records_path: \"./in/tickets.json\"\n  report_path: \"./out/report.json\"\n  max_age_hours: { type: integer, value: 48 }\npermits:\n  fs: { read: [\"./in/tickets.json\"], write: [\"./out/report.json\"] }\n  tools: [\"nika:read\", \"nika:jq\", \"nika:write\"]\ntasks:\n  read_records:\n    invoke: { tool: \"nika:read\", args: { path: \"${{ const.records_path }}\" } }\n  parse_records:\n    with: { raw: \"${{ tasks.read_records.output }}\" }\n    invoke: { tool: \"nika:jq\", args: { input: \"${{ with.raw }}\", expression: \"fromjson\" } }\n  stale:\n    with: { rows: \"${{ tasks.parse_records.output }}\", hours: \"${{ const.max_age_hours }}\" }\n    invoke:\n      tool: \"nika:jq\"\n      args:\n        input: { rows: \"${{ with.rows }}\", hours: \"${{ with.hours }}\" }\n        expression: \"(.hours | tonumber) as $h | [.rows[] | select(.age_hours > $h)]\"\n  report_text:\n    with: { stale: \"${{ tasks.stale.output }}\" }\n    invoke: { tool: \"nika:jq\", args: { input: { stale: \"${{ with.stale }}\" }, expression: \"{count: (.stale | length), ids: [.stale[].id]} | tojson\" } }\n  write_report:\n    with: { content: \"${{ tasks.report_text.output }}\" }\n    invoke: { tool: \"nika:write\", args: { path: \"${{ const.report_path }}\", content: \"${{ with.content }}\" } }\noutputs:\n  stale: ${{ tasks.stale.output }}\n",
+  "check_preview": {
+    "report": {
+      "analysis": {
+        "blast_radius": [
+          {
+            "blocks": 4,
+            "task": "read_records"
+          },
+          {
+            "blocks": 3,
+            "task": "parse_records"
+          },
+          {
+            "blocks": 2,
+            "task": "stale"
+          },
+          {
+            "blocks": 1,
+            "task": "report_text"
+          }
+        ],
+        "pinch_points": [
+          "read_records",
+          "parse_records",
+          "stale",
+          "report_text",
+          "write_report"
+        ],
+        "width": 1,
+        "width_witness": [
+          "write_report"
+        ]
+      },
+      "capability_escapes": [],
+      "certificate": {
+        "derivation": [
+          {
+            "attempts": 1,
+            "deps": [],
+            "fanout": {
+              "known": 1
+            },
+            "finally_effect": 0,
+            "finally_llm": 0,
+            "finally_spend_micros": 0,
+            "main_effect": 1,
+            "main_llm": 0,
+            "main_spend_micros": 0,
+            "task": "read_records"
+          },
+          {
+            "attempts": 1,
+            "deps": [
+              "read_records"
+            ],
+            "fanout": {
+              "known": 1
+            },
+            "finally_effect": 0,
+            "finally_llm": 0,
+            "finally_spend_micros": 0,
+            "main_effect": 1,
+            "main_llm": 0,
+            "main_spend_micros": 0,
+            "task": "parse_records"
+          },
+          {
+            "attempts": 1,
+            "deps": [
+              "parse_records"
+            ],
+            "fanout": {
+              "known": 1
+            },
+            "finally_effect": 0,
+            "finally_llm": 0,
+            "finally_spend_micros": 0,
+            "main_effect": 1,
+            "main_llm": 0,
+            "main_spend_micros": 0,
+            "task": "stale"
+          },
+          {
+            "attempts": 1,
+            "deps": [
+              "stale"
+            ],
+            "fanout": {
+              "known": 1
+            },
+            "finally_effect": 0,
+            "finally_llm": 0,
+            "finally_spend_micros": 0,
+            "main_effect": 1,
+            "main_llm": 0,
+            "main_spend_micros": 0,
+            "task": "report_text"
+          },
+          {
+            "attempts": 1,
+            "deps": [
+              "report_text"
+            ],
+            "fanout": {
+              "known": 1
+            },
+            "finally_effect": 0,
+            "finally_llm": 0,
+            "finally_spend_micros": 0,
+            "main_effect": 1,
+            "main_llm": 0,
+            "main_spend_micros": 0,
+            "task": "write_report"
+          }
+        ],
+        "effect_calls": {
+          "constant": 5,
+          "terms": []
+        },
+        "effects": {
+          "boundary_declared": true,
+          "escapes": 0,
+          "needed": {
+            "exec": false,
+            "fs": {
+              "read": [
+                "./in/tickets.json"
+              ],
+              "write": [
+                "./out/report.json"
+              ]
+            },
+            "tools": [
+              "nika:jq",
+              "nika:read",
+              "nika:write"
+            ]
+          }
+        },
+        "llm_calls": {
+          "constant": 0,
+          "terms": []
+        },
+        "span_attempts": 5,
+        "task_attempts": {
+          "constant": 5,
+          "terms": []
+        },
+        "usd_micros": {
+          "constant": 0,
+          "terms": []
+        }
+      },
+      "composition": [],
+      "conformance": [],
+      "consent_findings": [],
+      "cost": {
+        "bounded_total_usd": 0.0,
+        "has_unbounded": false,
+        "min_path_total_usd": 0.0,
+        "tasks": []
+      },
+      "data_journey": {
+        "classification": "internal",
+        "consents": [],
+        "destinations": [
+          {
+            "kind": "fs.write",
+            "target": "./out/report.json",
+            "tasks": [
+              "write_report"
+            ]
+          }
+        ],
+        "model_endpoints": [],
+        "secrets_used": [],
+        "sources": [
+          {
+            "kind": "fs.read",
+            "target": "./in/tickets.json",
+            "tasks": [
+              "read_records"
+            ]
+          }
+        ],
+        "trace_retention": [],
+        "writes": [
+          "./out/report.json"
+        ]
+      },
+      "energy": {
+        "counts": {
+          "never_runs": 0,
+          "total": 0,
+          "uncapped": 0,
+          "unpriced": 0,
+          "unpriced_local": 0
+        },
+        "scope_subtotals": [],
+        "tasks": []
+      },
+      "exec_floor_findings": [],
+      "findings": [],
+      "gate_findings": [],
+      "hints": [],
+      "lift_findings": [],
+      "missing_args": [],
+      "order_findings": [],
+      "permit_taints": [],
+      "permits": {
+        "declared": {
+          "fs": {
+            "read": [
+              "./in/tickets.json"
+            ],
+            "write": [
+              "./out/report.json"
+            ]
+          },
+          "tools": [
+            "nika:read",
+            "nika:jq",
+            "nika:write"
+          ]
+        },
+        "needed": {
+          "exec": false,
+          "fs": {
+            "read": [
+              "./in/tickets.json"
+            ],
+            "write": [
+              "./out/report.json"
+            ]
+          },
+          "tools": [
+            "nika:jq",
+            "nika:read",
+            "nika:write"
+          ]
+        },
+        "notes": [],
+        "partial": {
+          "composed": false,
+          "exec": false,
+          "fs": false,
+          "net": false
+        },
+        "source": "declared"
+      },
+      "report_version": 1,
+      "requirements": {
+        "inputs_read": [],
+        "inputs_required": [],
+        "models": [],
+        "secrets": []
+      },
+      "retry_safety_findings": [],
+      "run_decl_findings": [],
+      "schema_findings": [],
+      "schema_lints": [],
+      "secret_egresses": [],
+      "secret_leaks": [],
+      "sink_findings": [],
+      "slot_findings": [],
+      "trifecta_findings": [],
+      "trifecta_mitigations": [],
+      "unknown_args": [],
+      "unknown_tools": [],
+      "unverifiable_output_refs": [],
+      "waves": [
+        [
+          0
+        ],
+        [
+          1
+        ],
+        [
+          2
+        ],
+        [
+          3
+        ],
+        [
+          4
+        ]
+      ],
+      "workflow_semantic": null,
+      "write_conflicts": []
+    },
+    "scope": "sourceOnly"
+  },
+  "compile_version": 2,
+  "diagnostics": [
+    {
+      "kind": "applied",
+      "message": "The authoring conversation recorded 1 round(s), including 1 candidate or sketch judgment(s): round 0: accepted.",
+      "target": "authoring_native"
+    }
+  ],
+  "provenance": {
+    "authoring": {
+      "backend": null,
+      "calls": 2,
+      "context": [
+        {
+          "call": "document",
+          "elapsed_ms": 0,
+          "instruction_sha256": "4e984f8aa44c8ffb43318756f7b0e74d590351d74a440bb865ac3c87cfa1bd30",
+          "max_output_tokens": 8192,
+          "message_bytes": 83402,
+          "reasoning": {
+            "configured": null,
+            "reasoning_tokens": null,
+            "response_model": null,
+            "served": "unknown",
+            "transmitted": "unobserved"
+          },
+          "references": [
+            {
+              "bytes": 97,
+              "id": "family:F25",
+              "kind": "family",
+              "sha256": "522f2c4a6d502e028368ddef08063760dd606ce9effce186dd83d714c673b764"
+            },
+            {
+              "bytes": 5705,
+              "id": "skeleton:fanout",
+              "kind": "skeleton",
+              "sha256": "2cabcf17dc639f384a6be3d1cbe058059b88b1245573c4438c8257d4f3f35687"
+            },
+            {
+              "bytes": 3150,
+              "id": "skeleton:docker-report",
+              "kind": "skeleton",
+              "sha256": "c25d4621373172a2e4206bed74ae2e038168fa3971b332949977dac49db312ba"
+            },
+            {
+              "bytes": 78,
+              "id": "family:F15",
+              "kind": "family",
+              "sha256": "c2e5784e73be9882550822e6381ee0911295680474de00f8c8519055407d2f8d"
+            },
+            {
+              "bytes": 60,
+              "id": "family:F16",
+              "kind": "family",
+              "sha256": "e5804ad3d7cf408a84f99f7eaa3ae2f5aa9473d7c230ed4eac13d9c0f6384373"
+            },
+            {
+              "bytes": 44,
+              "id": "skill:report-writing",
+              "kind": "skill",
+              "sha256": "923210a2cc86683572f9724bc2ef07684ae5cff0f28be2a34d14dc70e52e561a"
+            },
+            {
+              "bytes": 602,
+              "id": "nika:read",
+              "kind": "callable",
+              "sha256": "fff39e4ea07d3c4ae37554df32320f3542c27e15a1b293a37a9c5e760122116d"
+            },
+            {
+              "bytes": 3590,
+              "id": "nika:write",
+              "kind": "callable",
+              "sha256": "48206ce8d11614bb26afa73617a45746f4a517976930d180dafc054867735d57"
+            },
+            {
+              "bytes": 502,
+              "id": "nika:glob",
+              "kind": "callable",
+              "sha256": "95aa17cfe1ab03216099821a2eaeecca2c56c13e7d9e1d698e9921f93e589bdc"
+            },
+            {
+              "bytes": 1751,
+              "id": "nika:jq",
+              "kind": "callable",
+              "sha256": "8428da51891358a9ac13278f6c3cc19867ec6c068d58a4e5580889d4058970b2"
+            },
+            {
+              "bytes": 3570,
+              "id": "nika:convert",
+              "kind": "callable",
+              "sha256": "a5f950e3865f8dd37753c89d412d582f88fb9cf01979f26c2e148cc1ab0b63e5"
+            },
+            {
+              "bytes": 2007,
+              "id": "nika:prompt",
+              "kind": "callable",
+              "sha256": "3d3d85d621bb318d37173505b31880bf63cdc38d3b16db94fad6794d137c62f0"
+            },
+            {
+              "bytes": 8733,
+              "id": "nika:fetch",
+              "kind": "callable",
+              "sha256": "e5ff229470c56700025334f15fc7ba9071aa27ef738781d89339e85dfb9d4ae2"
+            },
+            {
+              "bytes": 1712,
+              "id": "nika:notify",
+              "kind": "callable",
+              "sha256": "cb41dd7856f2cbaa3de5c554dc94787fffbbfa5b0d649a7e8831694acf871bd2"
+            },
+            {
+              "bytes": 853,
+              "id": "nika:assert",
+              "kind": "callable",
+              "sha256": "e8f64df0086ba485d35232b77f54aef17351388efb172cb5c825642ccd6b9666"
+            },
+            {
+              "bytes": 26574,
+              "id": "spec:workflow.schema.json",
+              "kind": "language",
+              "sha256": "2ee485310a02d13e97798e0985ba68a21c16c9ae046758f82a9771b360e630ce"
+            },
+            {
+              "bytes": 405,
+              "count": 1,
+              "id": "catalogue:components",
+              "kind": "components",
+              "release": "fixture-document-r1",
+              "sha256": "a0aef9bce9926e96717f01e29a145e7bf7d4022e6d9bfb905cdb645403e5ebab"
+            }
+          ],
+          "response": {
+            "blocks": 1,
+            "bytes": 492,
+            "sha256": "78b9970c362a3356b4cd8b2b208c2f326952c9cfeaf2d0ab2bbd9588b760d6c5"
+          },
+          "result": {
+            "input_tokens": 10,
+            "output_tokens": 5,
+            "stop_reason": "EndTurn",
+            "usage_reported": true
+          },
+          "schema_sha256": "ea9a1facb84d7c6aa379aa2a055117db1702fef135a5347c59824f330df4aa85",
+          "timeout_ms": 5000
+        },
+        {
+          "call": "judge_request",
+          "elapsed_ms": 0,
+          "instruction_sha256": "1352c259af0a1aa619e31279ec545adb1f1a6c2059f881f7c8ccde7058af628d",
+          "max_output_tokens": 8192,
+          "message_bytes": 16741,
+          "reasoning": {
+            "configured": null,
+            "reasoning_tokens": null,
+            "response_model": null,
+            "served": "unknown",
+            "transmitted": "unobserved"
+          },
+          "references": [
+            {
+              "bytes": 5332,
+              "id": "conventions",
+              "kind": "conventions",
+              "sha256": "758b93f062817682977a8d632e56bede4d94b000df312619b1236d56a68242cb"
+            },
+            {
+              "bytes": 1529,
+              "id": "card#language",
+              "kind": "language",
+              "sha256": "e3faae4b2d792dd4b8a25926fed381a2587ee78772bd1a3b15f503e6ae629ad5"
+            },
+            {
+              "bytes": 1751,
+              "id": "nika:jq",
+              "kind": "callable",
+              "sha256": "8428da51891358a9ac13278f6c3cc19867ec6c068d58a4e5580889d4058970b2"
+            },
+            {
+              "bytes": 602,
+              "id": "nika:read",
+              "kind": "callable",
+              "sha256": "fff39e4ea07d3c4ae37554df32320f3542c27e15a1b293a37a9c5e760122116d"
+            },
+            {
+              "bytes": 3590,
+              "id": "nika:write",
+              "kind": "callable",
+              "sha256": "48206ce8d11614bb26afa73617a45746f4a517976930d180dafc054867735d57"
+            }
+          ],
+          "response": {
+            "blocks": 1,
+            "bytes": 21,
+            "sha256": "d7e167e00be468f1025fede5e6563e3901d5f1194333fcc26e5a912e67474164"
+          },
+          "result": {
+            "input_tokens": 10,
+            "output_tokens": 5,
+            "stop_reason": "EndTurn",
+            "usage_reported": true
+          },
+          "schema_sha256": "ec698c79e4e8aed9febbae3dfdd14aebe1ca7c93129c5383ff51251bbd53b9ae",
+          "timeout_ms": 5000
+        }
+      ],
+      "elapsed_ms": 0,
+      "input_tokens": 20,
+      "model": "mock/authoring",
+      "output_tokens": 10,
+      "sampling": {
+        "effective": "providerDefaultUnknown",
+        "seed": null,
+        "temperature": null
+      }
+    },
+    "cognition": "explicitProvider",
+    "compiler_version": "0.122.0",
+    "decision": {
+      "agenda": [
+        {
+          "action": "compose: document",
+          "missing": {
+            "open_readings": false,
+            "untyped_clauses": 10,
+            "whole_reading": true
+          }
+        }
+      ],
+      "cold": {
+        "diagnostics": [],
+        "questions": [],
+        "status": "incomplete"
+      },
+      "document_create": {
+        "base_sha256": "9db88b238b58854cc770c6558b3920deca2797e11e332ac161c893393f01e739",
+        "candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+        "changed": [
+          "component block:stale-filter-report"
+        ],
+        "components": [
+          {
+            "authority": {
+              "component_declares": {
+                "authority": [],
+                "callables": [],
+                "effects": []
+              },
+              "document_needs": {
+                "exec": false,
+                "fs": {
+                  "read": [
+                    "./in/tickets.json"
+                  ],
+                  "write": [
+                    "./out/report.json"
+                  ]
+                },
+                "tools": [
+                  "nika:jq",
+                  "nika:read",
+                  "nika:write"
+                ]
+              },
+              "inherited": false
+            },
+            "bindings": [
+              {
+                "bound": 48,
+                "component_literal": 48,
+                "hole": "const.max_age_hours",
+                "owner": "human",
+                "path": "const.max_age_hours"
+              },
+              {
+                "bound": "./in/tickets.json",
+                "component_literal": "./data/tickets.json",
+                "hole": "const.records_path",
+                "owner": "human",
+                "path": "const.records_path"
+              },
+              {
+                "bound": "./out/report.json",
+                "component_literal": "./out/stale.json",
+                "hole": "const.report_path",
+                "owner": "human",
+                "path": "const.report_path"
+              }
+            ],
+            "candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+            "check": {
+              "diagnostics": [],
+              "findings": [],
+              "ready": true
+            },
+            "component": {
+              "file": "blocks/stale-filter-report.nika",
+              "file_sha256": "59b183ac40dea9887f5917c73847322d82c54a069011b526062d79e19eaba59d",
+              "id": "block:stale-filter-report",
+              "proof_level": "",
+              "release": {
+                "profile": "nika-knowledge-release-profile/r1",
+                "snapshot_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "version": "fixture-document-r1"
+              },
+              "row_sha256": "",
+              "status": ""
+            },
+            "law": "expanded: an admitted component's exact bytes, bound at its holes by literal edits the parser proved, merged into the document; its permits, model and name are not inherited",
+            "nodes": {
+              "const": {
+                "max_age_hours": "98761444ae86d454b4da4912722020b447a2f7b3d6c99916ca50b4ccb272ebe2",
+                "records_path": "f30e0ffc62066fc63d351731080f9fbd8e88abf7fc455b77b6af4954350ecc0c",
+                "report_path": "d9dfc8e6391562bca00fc763a9fde5c4f861a3d56d308713f3f6a792410cc8d9"
+              },
+              "outputs": {
+                "stale": "9855652c2947a4db8d17f687017d595a92f57311e1c07881c95cab672c7e14d5"
+              },
+              "tasks": {
+                "parse_records": "6559be59860130bc4bfcba9f2b87c372ad6b04c5b45a4c4d3a99b01bd4a72e65",
+                "read_records": "251f7e8a898e27095c97f1386ca2f29c52e1beda846b02b61226ec2070192c80",
+                "report_text": "aab0080290f6661ee65cc149795fc45475076b63f462b4448910a467d78ebb65",
+                "stale": "2d2f5196fcf46402414e038feaae7b5d866b5acab0d1532e87c0cbaf61998ba2",
+                "write_report": "2e89182d47a0b40cc48c93aefa0374d03b3d37a43a18588549c09431e32a9689"
+              }
+            },
+            "not_inherited": {
+              "model": "mock/echo",
+              "nika": "p90-stale-filter-report",
+              "permits": {
+                "fs": {
+                  "read": [
+                    "./data/tickets.json"
+                  ],
+                  "write": [
+                    "./out/stale.json"
+                  ]
+                },
+                "tools": [
+                  "nika:read",
+                  "nika:jq",
+                  "nika:write"
+                ]
+              }
+            },
+            "open": []
+          }
+        ],
+        "mode": "composed",
+        "operations": 1,
+        "preservation": "by construction: each component's entries inserted into the author's document; not re-verified byte by byte",
+        "reuse": {
+          "absent": 0,
+          "consulted": 0,
+          "expanded": 1,
+          "invoked": 0,
+          "law": "reuse: a component is expanded (or invoked) when every node its receipt names is re-derived, digest for digest, from the candidate's own bytes, and every bound literal holds; a shown reference no receipt names is consulted; lexical overlap never decides",
+          "references": [
+            {
+              "id": "block:stale-filter-report",
+              "kind": "block",
+              "use": "expanded",
+              "witness": {
+                "bindings_not_held": [],
+                "candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+                "component": "block:stale-filter-report",
+                "nodes": {
+                  "changed": [],
+                  "kept": [
+                    "const.max_age_hours",
+                    "const.records_path",
+                    "const.report_path",
+                    "tasks.parse_records",
+                    "tasks.read_records",
+                    "tasks.report_text",
+                    "tasks.stale",
+                    "tasks.write_report",
+                    "outputs.stale"
+                  ],
+                  "missing": []
+                },
+                "receipt_candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+                "release": {
+                  "profile": "nika-knowledge-release-profile/r1",
+                  "snapshot_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                  "version": "fixture-document-r1"
+                },
+                "verdict": "expanded",
+                "workflow": null
+              }
+            }
+          ],
+          "revised": 0
+        },
+        "route": "native: document"
+      },
+      "forensic": {
+        "attempts": [
+          {
+            "call": null,
+            "candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+            "diagnostics": 0,
+            "phase": "document",
+            "round": 0,
+            "sketch_sha256": null
+          }
+        ],
+        "calls": {
+          "decision_seat": {
+            "cold_choice": false,
+            "verification": [
+              {
+                "attempt": 0,
+                "attempted": 1,
+                "judge": "authoring_provider",
+                "returned": 1
+              }
+            ],
+            "warm_questions": 0
+          },
+          "generative": {
+            "by_role": {
+              "document": 1,
+              "judge_request": 1
+            },
+            "count": 2,
+            "delivery": {
+              "answered": 2
+            },
+            "failed": 0,
+            "input_tokens": 20,
+            "output_tokens": 10,
+            "usage": "complete"
+          }
+        },
+        "door": {
+          "name": "native_source",
+          "reason": "complete_document_door",
+          "source_owner": "model"
+        },
+        "doors_tried": {
+          "cold_plan": "not_tried",
+          "hot": {
+            "rejected": "9 unresolved clause(s); `compute` object is not explicit: Keep records whose age_hours is strictly greater than 48, preserve their input order; 1 prose clause(s) the reader cannot parse; `./in/tickets.json` is named by the request and nothing opens it: no step reads it and no effect writes it"
+          },
+          "warm": "not_tried"
+        },
+        "evidence": {
+          "behavioral_judge": {
+            "state": "not_run",
+            "why": "rehearsal observes execution; no behavioral judge ran in this compile"
+          },
+          "candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+          "check": "clean",
+          "rehearsal": {
+            "state": "not_offered"
+          },
+          "satisfaction": "UNKNOWN",
+          "semantic_judge": {
+            "attempts": 1,
+            "candidate_binding": "bound",
+            "last_contested": 0,
+            "last_declined": false,
+            "last_defects": 0,
+            "last_settled_by": "verify-request",
+            "last_unknown": 0,
+            "state": "recorded"
+          },
+          "status": "ready"
+        },
+        "foundry": {
+          "attached": [
+            {
+              "bytes": 44,
+              "id": "skill:report-writing",
+              "kind": "skill",
+              "sha256": "923210a2cc86683572f9724bc2ef07684ae5cff0f28be2a34d14dc70e52e561a"
+            }
+          ],
+          "attached_not_presented": [],
+          "delivery_unknown": [],
+          "prepared": [
+            "family:F25",
+            "skeleton:fanout",
+            "skeleton:docker-report",
+            "family:F15",
+            "family:F16",
+            "skill:report-writing",
+            "nika:read",
+            "nika:write",
+            "nika:glob",
+            "nika:jq",
+            "nika:convert",
+            "nika:prompt",
+            "nika:fetch",
+            "nika:notify",
+            "nika:assert",
+            "spec:workflow.schema.json",
+            "catalogue:components",
+            "conventions",
+            "card#language"
+          ],
+          "presented": [
+            "family:F25",
+            "skeleton:fanout",
+            "skeleton:docker-report",
+            "family:F15",
+            "family:F16",
+            "skill:report-writing",
+            "nika:read",
+            "nika:write",
+            "nika:glob",
+            "nika:jq",
+            "nika:convert",
+            "nika:prompt",
+            "nika:fetch",
+            "nika:notify",
+            "nika:assert",
+            "spec:workflow.schema.json",
+            "catalogue:components",
+            "conventions",
+            "card#language"
+          ]
+        },
+        "identity": {
+          "card_sha256": "7c88a86714dd954795f01666f5c536bf51982d3e4420185557b27d9506bdac1b",
+          "conventions_sha256": "758b93f062817682977a8d632e56bede4d94b000df312619b1236d56a68242cb",
+          "engine": "0.122.0",
+          "foundry": {
+            "identity": null,
+            "selection": null
+          },
+          "pack": "0.2.0-draft",
+          "spec_pin": "41eab15111f7e3826d8fa525f4ac99052492e9bf"
+        },
+        "intent": {
+          "effective_sha256": "4fcbe0224457165eef02d786b2376b312ced8ec69c10aa3b5f324a3c1e80bb50",
+          "kind": "create",
+          "original_sha256": "4fcbe0224457165eef02d786b2376b312ced8ec69c10aa3b5f324a3c1e80bb50",
+          "replaced_by_clarification": false
+        },
+        "not_captured": [
+          "transform_program_proposals: the verified-transform calls keep their journal entries, not their decoded programs",
+          "decision_seat_usage: a caller's seat reports usage in its own receipt, outside this compile",
+          "behavioral_satisfaction: no behavioral judge compares observations with the request's obligations"
+        ],
+        "proposal": {
+          "author": "model",
+          "kind": "source",
+          "payload": "decision.native.rounds[*].candidate",
+          "state": "NOT_CAPTURED",
+          "why": "source-direct generation: the model wrote the candidate itself and no private semantic plan exists"
+        },
+        "universe": {
+          "state": "not_applicable",
+          "why": "this route built no finite candidate universe"
+        },
+        "version": 1
+      },
+      "intent_sha256": "4fcbe0224457165eef02d786b2376b312ced8ec69c10aa3b5f324a3c1e80bb50",
+      "knowledge_qualification": {
+        "by": null,
+        "coverage": {
+          "complete": false,
+          "why": "no catalogue was lent: only the recalled pack was asked, so an admitted entry sharing no word with the request was never a candidate"
+        },
+        "found": 6,
+        "lexical_overlap": {
+          "law": "lexical overlap: a shown reference's code lines found in the candidate bytes; a measure, never evidence of reuse",
+          "most_lines": 0,
+          "no_code": 4,
+          "no_lines": 0,
+          "references": [
+            {
+              "found": 0,
+              "id": "family:F25",
+              "lines": 0,
+              "overlap": "no_code"
+            },
+            {
+              "found": 1,
+              "id": "skeleton:fanout",
+              "lines": 40,
+              "overlap": "some_lines"
+            },
+            {
+              "found": 1,
+              "id": "skeleton:docker-report",
+              "lines": 23,
+              "overlap": "some_lines"
+            },
+            {
+              "found": 0,
+              "id": "family:F15",
+              "lines": 0,
+              "overlap": "no_code"
+            },
+            {
+              "found": 0,
+              "id": "family:F16",
+              "lines": 0,
+              "overlap": "no_code"
+            },
+            {
+              "found": 0,
+              "id": "skill:report-writing",
+              "lines": 0,
+              "overlap": "no_code"
+            }
+          ],
+          "some_lines": 2
+        },
+        "references": null,
+        "reuse": {
+          "absent": 0,
+          "consulted": 6,
+          "expanded": 1,
+          "invoked": 0,
+          "law": "reuse: a component is expanded (or invoked) when every node its receipt names is re-derived, digest for digest, from the candidate's own bytes, and every bound literal holds; a shown reference no receipt names is consulted; lexical overlap never decides",
+          "references": [
+            {
+              "id": "family:F25",
+              "kind": "family",
+              "use": "consulted"
+            },
+            {
+              "id": "skeleton:fanout",
+              "kind": "skeleton",
+              "use": "consulted"
+            },
+            {
+              "id": "skeleton:docker-report",
+              "kind": "skeleton",
+              "use": "consulted"
+            },
+            {
+              "id": "family:F15",
+              "kind": "family",
+              "use": "consulted"
+            },
+            {
+              "id": "family:F16",
+              "kind": "family",
+              "use": "consulted"
+            },
+            {
+              "id": "skill:report-writing",
+              "kind": "skill",
+              "use": "consulted"
+            },
+            {
+              "id": "block:stale-filter-report",
+              "kind": "block",
+              "use": "expanded",
+              "witness": {
+                "bindings_not_held": [],
+                "candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+                "component": "block:stale-filter-report",
+                "nodes": {
+                  "changed": [],
+                  "kept": [
+                    "const.max_age_hours",
+                    "const.records_path",
+                    "const.report_path",
+                    "tasks.parse_records",
+                    "tasks.read_records",
+                    "tasks.report_text",
+                    "tasks.stale",
+                    "tasks.write_report",
+                    "outputs.stale"
+                  ],
+                  "missing": []
+                },
+                "receipt_candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+                "release": {
+                  "profile": "nika-knowledge-release-profile/r1",
+                  "snapshot_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                  "version": "fixture-document-r1"
+                },
+                "verdict": "expanded",
+                "workflow": null
+              }
+            }
+          ],
+          "revised": 0
+        },
+        "shown": 6,
+        "unqualified": 6,
+        "why": "no decision seat was selected: the recall is shown unqualified"
+      },
+      "native": {
+        "accepted": true,
+        "identity": {
+          "card_sha256": "7c88a86714dd954795f01666f5c536bf51982d3e4420185557b27d9506bdac1b",
+          "conventions_sha256": "758b93f062817682977a8d632e56bede4d94b000df312619b1236d56a68242cb",
+          "engine": "0.122.0",
+          "pack": "0.2.0-draft",
+          "spec_pin": "41eab15111f7e3826d8fa525f4ac99052492e9bf"
+        },
+        "knowledge": {
+          "identity": null,
+          "selection": {
+            "embedded_recall": "folded into the pack and qualified with it"
+          }
+        },
+        "references": [
+          {
+            "bytes": 97,
+            "id": "family:F25",
+            "kind": "family",
+            "sha256": "522f2c4a6d502e028368ddef08063760dd606ce9effce186dd83d714c673b764"
+          },
+          {
+            "bytes": 5705,
+            "id": "skeleton:fanout",
+            "kind": "skeleton",
+            "sha256": "2cabcf17dc639f384a6be3d1cbe058059b88b1245573c4438c8257d4f3f35687"
+          },
+          {
+            "bytes": 3150,
+            "id": "skeleton:docker-report",
+            "kind": "skeleton",
+            "sha256": "c25d4621373172a2e4206bed74ae2e038168fa3971b332949977dac49db312ba"
+          },
+          {
+            "bytes": 78,
+            "id": "family:F15",
+            "kind": "family",
+            "sha256": "c2e5784e73be9882550822e6381ee0911295680474de00f8c8519055407d2f8d"
+          },
+          {
+            "bytes": 60,
+            "id": "family:F16",
+            "kind": "family",
+            "sha256": "e5804ad3d7cf408a84f99f7eaa3ae2f5aa9473d7c230ed4eac13d9c0f6384373"
+          },
+          {
+            "bytes": 44,
+            "id": "skill:report-writing",
+            "kind": "skill",
+            "sha256": "923210a2cc86683572f9724bc2ef07684ae5cff0f28be2a34d14dc70e52e561a"
+          },
+          {
+            "bytes": 602,
+            "id": "nika:read",
+            "kind": "callable",
+            "sha256": "fff39e4ea07d3c4ae37554df32320f3542c27e15a1b293a37a9c5e760122116d"
+          },
+          {
+            "bytes": 3590,
+            "id": "nika:write",
+            "kind": "callable",
+            "sha256": "48206ce8d11614bb26afa73617a45746f4a517976930d180dafc054867735d57"
+          },
+          {
+            "bytes": 502,
+            "id": "nika:glob",
+            "kind": "callable",
+            "sha256": "95aa17cfe1ab03216099821a2eaeecca2c56c13e7d9e1d698e9921f93e589bdc"
+          },
+          {
+            "bytes": 1751,
+            "id": "nika:jq",
+            "kind": "callable",
+            "sha256": "8428da51891358a9ac13278f6c3cc19867ec6c068d58a4e5580889d4058970b2"
+          },
+          {
+            "bytes": 3570,
+            "id": "nika:convert",
+            "kind": "callable",
+            "sha256": "a5f950e3865f8dd37753c89d412d582f88fb9cf01979f26c2e148cc1ab0b63e5"
+          },
+          {
+            "bytes": 2007,
+            "id": "nika:prompt",
+            "kind": "callable",
+            "sha256": "3d3d85d621bb318d37173505b31880bf63cdc38d3b16db94fad6794d137c62f0"
+          },
+          {
+            "bytes": 8733,
+            "id": "nika:fetch",
+            "kind": "callable",
+            "sha256": "e5ff229470c56700025334f15fc7ba9071aa27ef738781d89339e85dfb9d4ae2"
+          },
+          {
+            "bytes": 1712,
+            "id": "nika:notify",
+            "kind": "callable",
+            "sha256": "cb41dd7856f2cbaa3de5c554dc94787fffbbfa5b0d649a7e8831694acf871bd2"
+          },
+          {
+            "bytes": 853,
+            "id": "nika:assert",
+            "kind": "callable",
+            "sha256": "e8f64df0086ba485d35232b77f54aef17351388efb172cb5c825642ccd6b9666"
+          },
+          {
+            "bytes": 26574,
+            "id": "spec:workflow.schema.json",
+            "kind": "language",
+            "sha256": "2ee485310a02d13e97798e0985ba68a21c16c9ae046758f82a9771b360e630ce"
+          },
+          {
+            "bytes": 405,
+            "count": 1,
+            "id": "catalogue:components",
+            "kind": "components",
+            "release": "fixture-document-r1",
+            "sha256": "a0aef9bce9926e96717f01e29a145e7bf7d4022e6d9bfb905cdb645403e5ebab"
+          }
+        ],
+        "refused_source": null,
+        "revision": null,
+        "rounds": [
+          {
+            "candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+            "changed": [
+              "component block:stale-filter-report"
+            ],
+            "components": [
+              "block:stale-filter-report"
+            ],
+            "diagnostics": [],
+            "mode": "composed",
+            "notes": {
+              "bytes": 8,
+              "reason": "document notes",
+              "sha256": "f4e1a209c1327917d06c4480845518078fe28345dde2a986ff4d1e5d43971c96",
+              "shape": {
+                "type": "not_json"
+              },
+              "withheld": true
+            },
+            "operations": 1,
+            "phase": "document",
+            "round": 0
+          }
+        ]
+      },
+      "retrieval": {
+        "by_intent": [
+          {
+            "id": "F25",
+            "kind": "family",
+            "score": 21.51
+          },
+          {
+            "id": "fanout",
+            "kind": "skeleton",
+            "score": 20.506
+          },
+          {
+            "id": "docker-report",
+            "kind": "skeleton",
+            "score": 17.711
+          },
+          {
+            "id": "bounded-batch",
+            "kind": "skeleton",
+            "score": 17.4
+          },
+          {
+            "id": "api-upload-and-create",
+            "kind": "skeleton",
+            "score": 16.839
+          },
+          {
+            "id": "aggregate-by-key",
+            "kind": "skeleton",
+            "score": 16.092
+          },
+          {
+            "id": "F15",
+            "kind": "family",
+            "score": 15.914
+          },
+          {
+            "id": "F16",
+            "kind": "family",
+            "score": 14.792
+          },
+          {
+            "id": "F30",
+            "kind": "family",
+            "score": 14.26
+          },
+          {
+            "id": "D24",
+            "kind": "family",
+            "score": 13.874
+          }
+        ]
+      },
+      "route": [
+        "hot rejected: 9 unresolved clause(s); `compute` object is not explicit: Keep records whose age_hours is strictly greater than 48, preserve their input order; 1 prose clause(s) the reader cannot parse; `./in/tickets.json` is named by the request and nothing opens it: no step reads it and no effect writes it",
+        "native: document",
+        "native: accepted",
+        "verify: judged (authoring_provider)"
+      ],
+      "semantic_verification": [
+        {
+          "attempt": 0,
+          "attempted": 1,
+          "candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+          "carried": false,
+          "consumed": 1,
+          "contested": [],
+          "context_sha256": "44a18c6385a31c169cf7c2ab72d2351359bdd00228685ee79e945c68232e9137",
+          "declined": false,
+          "defects": [],
+          "doubt": [],
+          "judge": {
+            "kind": "authoring_provider",
+            "seat": "mock/authoring"
+          },
+          "notes": [],
+          "questions": [
+            {
+              "choice": "faithful",
+              "confidence": null,
+              "input_tokens": 10,
+              "model": "mock/authoring",
+              "options": [
+                "faithful",
+                "unfaithful",
+                "none"
+              ],
+              "output_tokens": 5,
+              "probabilities": {},
+              "question": "verify-request",
+              "reasoning": {
+                "configured": null,
+                "reasoning_tokens": null,
+                "response_model": null,
+                "served": "unknown",
+                "transmitted": "unobserved"
+              },
+              "role": "judge_request"
+            }
+          ],
+          "read_back": 0,
+          "reference": {
+            "bytes": 13217,
+            "candidate": "parsed",
+            "identity": {
+              "card_sha256": "7c88a86714dd954795f01666f5c536bf51982d3e4420185557b27d9506bdac1b",
+              "conventions_sha256": "758b93f062817682977a8d632e56bede4d94b000df312619b1236d56a68242cb",
+              "engine": "0.122.0",
+              "pack": "0.2.0-draft",
+              "spec_pin": "41eab15111f7e3826d8fa525f4ac99052492e9bf"
+            },
+            "references": [
+              {
+                "bytes": 5332,
+                "id": "conventions",
+                "kind": "conventions",
+                "sha256": "758b93f062817682977a8d632e56bede4d94b000df312619b1236d56a68242cb"
+              },
+              {
+                "bytes": 1529,
+                "id": "card#language",
+                "kind": "language",
+                "sha256": "e3faae4b2d792dd4b8a25926fed381a2587ee78772bd1a3b15f503e6ae629ad5"
+              },
+              {
+                "bytes": 1751,
+                "id": "nika:jq",
+                "kind": "callable",
+                "sha256": "8428da51891358a9ac13278f6c3cc19867ec6c068d58a4e5580889d4058970b2"
+              },
+              {
+                "bytes": 602,
+                "id": "nika:read",
+                "kind": "callable",
+                "sha256": "fff39e4ea07d3c4ae37554df32320f3542c27e15a1b293a37a9c5e760122116d"
+              },
+              {
+                "bytes": 3590,
+                "id": "nika:write",
+                "kind": "callable",
+                "sha256": "48206ce8d11614bb26afa73617a45746f4a517976930d180dafc054867735d57"
+              }
+            ],
+            "sha256": "0f7fa9a68b94d814f1b39b65d2e4073edd6390de123075cb94f16276b69887cd",
+            "tools": [
+              "nika:jq",
+              "nika:read",
+              "nika:write"
+            ],
+            "uncovered": []
+          },
+          "rejected": false,
+          "request": "Create a new workflow that reads ./in/tickets.json. Each row has an id and a numeric age_hours. Keep records whose age_hours is strictly greater than 48, preserve their input order, and write a JSON object containing count and ids to ./out/report.json. Expose the selected records as the named output stale. Use an applicable admitted Foundry component when the catalogue provides one, with these exact paths and threshold bound; otherwise construct the same requested work. Missing catalogue coverage must not remove the report requirement. The request authorizes only the stated file read/write and the read, jq and write tools.",
+          "returned": 1,
+          "same_bytes_as": null,
+          "settled": true,
+          "settled_by": "verify-request",
+          "stopped": false,
+          "unknown": [],
+          "unsettled": [],
+          "usage": {
+            "calls": 1,
+            "complete": true,
+            "input_tokens": 10,
+            "output_tokens": 5
+          },
+          "whole_asked": true
+        }
+      ]
+    },
+    "plan": {
+      "bindings": [],
+      "document": {
+        "base_sha256": null,
+        "candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+        "components": [
+          {
+            "authority": {
+              "component_declares": {
+                "authority": [],
+                "callables": [],
+                "effects": []
+              },
+              "document_needs": {
+                "exec": false,
+                "fs": {
+                  "read": [
+                    "./in/tickets.json"
+                  ],
+                  "write": [
+                    "./out/report.json"
+                  ]
+                },
+                "tools": [
+                  "nika:jq",
+                  "nika:read",
+                  "nika:write"
+                ]
+              },
+              "inherited": false
+            },
+            "bindings": [
+              {
+                "bound": 48,
+                "component_literal": 48,
+                "hole": "const.max_age_hours",
+                "owner": "human",
+                "path": "const.max_age_hours"
+              },
+              {
+                "bound": "./in/tickets.json",
+                "component_literal": "./data/tickets.json",
+                "hole": "const.records_path",
+                "owner": "human",
+                "path": "const.records_path"
+              },
+              {
+                "bound": "./out/report.json",
+                "component_literal": "./out/stale.json",
+                "hole": "const.report_path",
+                "owner": "human",
+                "path": "const.report_path"
+              }
+            ],
+            "candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+            "check": {
+              "diagnostics": [],
+              "findings": [],
+              "ready": true
+            },
+            "component": {
+              "file": "blocks/stale-filter-report.nika",
+              "file_sha256": "59b183ac40dea9887f5917c73847322d82c54a069011b526062d79e19eaba59d",
+              "id": "block:stale-filter-report",
+              "proof_level": "",
+              "release": {
+                "profile": "nika-knowledge-release-profile/r1",
+                "snapshot_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "version": "fixture-document-r1"
+              },
+              "row_sha256": "",
+              "status": ""
+            },
+            "law": "expanded: an admitted component's exact bytes, bound at its holes by literal edits the parser proved, merged into the document; its permits, model and name are not inherited",
+            "nodes": {
+              "const": {
+                "max_age_hours": "98761444ae86d454b4da4912722020b447a2f7b3d6c99916ca50b4ccb272ebe2",
+                "records_path": "f30e0ffc62066fc63d351731080f9fbd8e88abf7fc455b77b6af4954350ecc0c",
+                "report_path": "d9dfc8e6391562bca00fc763a9fde5c4f861a3d56d308713f3f6a792410cc8d9"
+              },
+              "outputs": {
+                "stale": "9855652c2947a4db8d17f687017d595a92f57311e1c07881c95cab672c7e14d5"
+              },
+              "tasks": {
+                "parse_records": "6559be59860130bc4bfcba9f2b87c372ad6b04c5b45a4c4d3a99b01bd4a72e65",
+                "read_records": "251f7e8a898e27095c97f1386ca2f29c52e1beda846b02b61226ec2070192c80",
+                "report_text": "aab0080290f6661ee65cc149795fc45475076b63f462b4448910a467d78ebb65",
+                "stale": "2d2f5196fcf46402414e038feaae7b5d866b5acab0d1532e87c0cbaf61998ba2",
+                "write_report": "2e89182d47a0b40cc48c93aefa0374d03b3d37a43a18588549c09431e32a9689"
+              }
+            },
+            "not_inherited": {
+              "model": "mock/echo",
+              "nika": "p90-stale-filter-report",
+              "permits": {
+                "fs": {
+                  "read": [
+                    "./data/tickets.json"
+                  ],
+                  "write": [
+                    "./out/stale.json"
+                  ]
+                },
+                "tools": [
+                  "nika:read",
+                  "nika:jq",
+                  "nika:write"
+                ]
+              }
+            },
+            "open": []
+          }
+        ],
+        "mode": "composed",
+        "request": "Create a new workflow that reads ./in/tickets.json. Each row has an id and a numeric age_hours. Keep records whose age_hours is strictly greater than 48, preserve their input order, and write a JSON object containing count and ids to ./out/report.json. Expose the selected records as the named output stale. Use an applicable admitted Foundry component when the catalogue provides one, with these exact paths and threshold bound; otherwise construct the same requested work. Missing catalogue coverage must not remove the report requirement. The request authorizes only the stated file read/write and the read, jq and write tools.",
+        "version": 1
+      },
+      "document_create": {
+        "base_sha256": "9db88b238b58854cc770c6558b3920deca2797e11e332ac161c893393f01e739",
+        "changed": [
+          "component block:stale-filter-report"
+        ],
+        "components": [
+          {
+            "authority": {
+              "component_declares": {
+                "authority": [],
+                "callables": [],
+                "effects": []
+              },
+              "document_needs": {
+                "exec": false,
+                "fs": {
+                  "read": [
+                    "./in/tickets.json"
+                  ],
+                  "write": [
+                    "./out/report.json"
+                  ]
+                },
+                "tools": [
+                  "nika:jq",
+                  "nika:read",
+                  "nika:write"
+                ]
+              },
+              "inherited": false
+            },
+            "bindings": [
+              {
+                "bound": 48,
+                "component_literal": 48,
+                "hole": "const.max_age_hours",
+                "owner": "human",
+                "path": "const.max_age_hours"
+              },
+              {
+                "bound": "./in/tickets.json",
+                "component_literal": "./data/tickets.json",
+                "hole": "const.records_path",
+                "owner": "human",
+                "path": "const.records_path"
+              },
+              {
+                "bound": "./out/report.json",
+                "component_literal": "./out/stale.json",
+                "hole": "const.report_path",
+                "owner": "human",
+                "path": "const.report_path"
+              }
+            ],
+            "candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+            "check": {
+              "diagnostics": [],
+              "findings": [],
+              "ready": true
+            },
+            "component": {
+              "file": "blocks/stale-filter-report.nika",
+              "file_sha256": "59b183ac40dea9887f5917c73847322d82c54a069011b526062d79e19eaba59d",
+              "id": "block:stale-filter-report",
+              "proof_level": "",
+              "release": {
+                "profile": "nika-knowledge-release-profile/r1",
+                "snapshot_sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+                "version": "fixture-document-r1"
+              },
+              "row_sha256": "",
+              "status": ""
+            },
+            "law": "expanded: an admitted component's exact bytes, bound at its holes by literal edits the parser proved, merged into the document; its permits, model and name are not inherited",
+            "nodes": {
+              "const": {
+                "max_age_hours": "98761444ae86d454b4da4912722020b447a2f7b3d6c99916ca50b4ccb272ebe2",
+                "records_path": "f30e0ffc62066fc63d351731080f9fbd8e88abf7fc455b77b6af4954350ecc0c",
+                "report_path": "d9dfc8e6391562bca00fc763a9fde5c4f861a3d56d308713f3f6a792410cc8d9"
+              },
+              "outputs": {
+                "stale": "9855652c2947a4db8d17f687017d595a92f57311e1c07881c95cab672c7e14d5"
+              },
+              "tasks": {
+                "parse_records": "6559be59860130bc4bfcba9f2b87c372ad6b04c5b45a4c4d3a99b01bd4a72e65",
+                "read_records": "251f7e8a898e27095c97f1386ca2f29c52e1beda846b02b61226ec2070192c80",
+                "report_text": "aab0080290f6661ee65cc149795fc45475076b63f462b4448910a467d78ebb65",
+                "stale": "2d2f5196fcf46402414e038feaae7b5d866b5acab0d1532e87c0cbaf61998ba2",
+                "write_report": "2e89182d47a0b40cc48c93aefa0374d03b3d37a43a18588549c09431e32a9689"
+              }
+            },
+            "not_inherited": {
+              "model": "mock/echo",
+              "nika": "p90-stale-filter-report",
+              "permits": {
+                "fs": {
+                  "read": [
+                    "./data/tickets.json"
+                  ],
+                  "write": [
+                    "./out/stale.json"
+                  ]
+                },
+                "tools": [
+                  "nika:read",
+                  "nika:jq",
+                  "nika:write"
+                ]
+              }
+            },
+            "open": []
+          }
+        ],
+        "mode": "composed",
+        "operations": 1,
+        "preservation": "by construction: each component's entries inserted into the author's document; not re-verified byte by byte",
+        "resolved": "Create a new workflow that reads ./in/tickets.json. Each row has an id and a numeric age_hours. Keep records whose age_hours is strictly greater than 48, preserve their input order, and write a JSON object containing count and ids to ./out/report.json. Expose the selected records as the named output stale. Use an applicable admitted Foundry component when the catalogue provides one, with these exact paths and threshold bound; otherwise construct the same requested work. Missing catalogue coverage must not remove the report requirement. The request authorizes only the stated file read/write and the read, jq and write tools.",
+        "route": "native: document"
+      },
+      "effects": [
+        {
+          "evidence": "tasks.write_report",
+          "policy": "automatic",
+          "policy_literal": null,
+          "target": "${{ const.report_path }}",
+          "verb": "write"
+        }
+      ],
+      "gaps": [],
+      "intent_sha256": "4fcbe0224457165eef02d786b2376b312ced8ec69c10aa3b5f324a3c1e80bb50",
+      "obligations": [],
+      "operations": [],
+      "operations_from": "candidate",
+      "questions": [],
+      "source": "nika: stale-tickets-report\nconst:\n  records_path: \"./in/tickets.json\"\n  report_path: \"./out/report.json\"\n  max_age_hours: { type: integer, value: 48 }\npermits:\n  fs: { read: [\"./in/tickets.json\"], write: [\"./out/report.json\"] }\n  tools: [\"nika:read\", \"nika:jq\", \"nika:write\"]\ntasks:\n  read_records:\n    invoke: { tool: \"nika:read\", args: { path: \"${{ const.records_path }}\" } }\n  parse_records:\n    with: { raw: \"${{ tasks.read_records.output }}\" }\n    invoke: { tool: \"nika:jq\", args: { input: \"${{ with.raw }}\", expression: \"fromjson\" } }\n  stale:\n    with: { rows: \"${{ tasks.parse_records.output }}\", hours: \"${{ const.max_age_hours }}\" }\n    invoke:\n      tool: \"nika:jq\"\n      args:\n        input: { rows: \"${{ with.rows }}\", hours: \"${{ with.hours }}\" }\n        expression: \"(.hours | tonumber) as $h | [.rows[] | select(.age_hours > $h)]\"\n  report_text:\n    with: { stale: \"${{ tasks.stale.output }}\" }\n    invoke: { tool: \"nika:jq\", args: { input: { stale: \"${{ with.stale }}\" }, expression: \"{count: (.stale | length), ids: [.stale[].id]} | tojson\" } }\n  write_report:\n    with: { content: \"${{ tasks.report_text.output }}\" }\n    invoke: { tool: \"nika:write\", args: { path: \"${{ const.report_path }}\", content: \"${{ with.content }}\" } }\noutputs:\n  stale: ${{ tasks.stale.output }}\n",
+      "strategy": "native",
+      "trigger": null
+    },
+    "skeleton": null,
+    "spec_pin": "41eab15111f7e3826d8fa525f4ac99052492e9bf",
+    "strategy": "native",
+    "suggested_file": null
+  },
+  "questions": [],
+  "requested_boundary": {
+    "declared": {
+      "fs": {
+        "read": [
+          "./in/tickets.json"
+        ],
+        "write": [
+          "./out/report.json"
+        ]
+      },
+      "tools": [
+        "nika:read",
+        "nika:jq",
+        "nika:write"
+      ]
+    },
+    "needed": {
+      "exec": false,
+      "fs": {
+        "read": [
+          "./in/tickets.json"
+        ],
+        "write": [
+          "./out/report.json"
+        ]
+      },
+      "tools": [
+        "nika:jq",
+        "nika:read",
+        "nika:write"
+      ]
+    },
+    "notes": [],
+    "partial": {
+      "composed": false,
+      "exec": false,
+      "fs": false,
+      "net": false
+    },
+    "source": "declared"
+  },
+  "requested_trigger": null,
+  "status": "ready"
+}

@@ -62,7 +62,10 @@ async function journey(sdk, config, steps, open) {
   };
   const persona = { choice: config.choice, acceptCost: config.acceptCost === true, answers: config.answers ?? {} };
   const opening = async () => {
-    const handle = await client.openSession({ signal: signal() });
+    // With the conversation's own intelligence the engine opens on it and keeps nothing for the
+    // operator; without, the persona may answer the first screen (`choice`).
+    const handle = await client.openSession({ signal: signal(),
+      ...(config.intelligence ? { intelligence: config.intelligence } : {}) });
     open.push(handle);
     return handle;
   };
@@ -193,19 +196,35 @@ async function journey(sdk, config, steps, open) {
     return { dir, captured };
   }
 
+  // The operator's kept choice, by digest only, before anything opens: a journey opened with the
+  // conversation's own intelligence must leave it exactly as it found it.
+  record('operator_choice', { when: 'before', ...keptChoice() });
+  const opened = config.intelligence ? 'intelligence' : 'first_screen';
+
   // CREATE: a new Session, words alone.
   const first = await opening();
-  record('create_open', { ...frameRow(first.opened), intelligence: first.opened.snapshot.work.intelligence ?? null });
+  record('create_open', { ...frameRow(first.opened), intelligence: first.opened.snapshot.work.intelligence ?? null,
+    opened_with: opened });
   const created = await leg('create', first, config.create);
   await closing(first);
-  if (created === null) return;
+  if (created !== null) {
+    // EDIT: a new Session over the same project world; the change in words.
+    const second = await opening();
+    record('edit_open', { ...frameRow(second.opened), intelligence: second.opened.snapshot.work.intelligence ?? null,
+      created_sha256: created.savedSha, opened_with: opened });
+    await leg('edit', second, config.edit);
+    await closing(second);
+  }
+  record('operator_choice', { when: 'after', ...keptChoice() });
+}
 
-  // EDIT: a new Session over the same project world; the change in words.
-  const second = await opening();
-  record('edit_open', { ...frameRow(second.opened), intelligence: second.opened.snapshot.work.intelligence ?? null,
-    created_sha256: created.savedSha });
-  await leg('edit', second, config.edit);
-  await closing(second);
+/**
+ * Whether the operator's kept choice (`~/.nika/session-intelligence.json` under the HOME this
+ * journey runs with) exists, and its sha256: never its content.
+ */
+function keptChoice() {
+  const file = path.join(process.env.HOME ?? '', '.nika', 'session-intelligence.json');
+  return existsSync(file) ? { present: true, sha256: sha256(readFileSync(file)) } : { present: false, sha256: null };
 }
 
 /**
@@ -353,20 +372,38 @@ function judgeJourney(report, expected, requested = null, worldChecks = null) {
     && ['provider', 'harness'].includes(evidence?.intelligence?.author?.kind);
   if (requested !== null) {
     const seat = requestedSeat(requested);
+    // Opened with the conversation's own intelligence, the selection is the opened frame's own.
+    const byOpener = step('create_open')?.opened_with === 'intelligence';
     const reached = step('create_reached');
-    const selected = reached?.evidence?.intelligence?.selected ?? null;
+    const selected = (byOpener ? step('create_open')?.intelligence?.selected
+      : reached?.evidence?.intelligence?.selected) ?? null;
     const answered = report.steps.some((entry) => entry.step === 'create_turn' && entry.said === 'intelligence_choice');
-    if (reached === undefined || selected === null) {
+    if (selected === null) {
       gap('the Session prepared with the requested intelligence', 'no selection was observed', reached ?? null);
     } else if (isRequestedSeat(selected, seat)) {
       check('the Session prepared with the requested intelligence', true, { requested: seat, selected });
-    } else if (answered) {
-      // The persona gave the first screen this answer and the Session selected another seat.
+    } else if (answered || byOpener) {
+      // The persona gave the first screen this answer, or the opener named it, and the Session
+      // selected another seat.
       check('the Session prepared with the requested intelligence', false, { requested: seat, selected });
     } else {
       gap('the Session prepared with the requested intelligence',
         'the Session opened on a choice kept before this journey, never asked the first screen', { requested: seat,
           selected });
+    }
+    if (byOpener) {
+      // The engine holds the opener's words for this conversation alone and keeps nothing for the
+      // operator: the kept choice reads the same at both ends of the journey.
+      check('the Session holds the requested intelligence for this conversation alone',
+        selected?.scope === 'conversation', { scope: selected?.scope ?? null });
+      const [before, after] = ['before', 'after'].map((when) =>
+        report.steps.find((entry) => entry.step === 'operator_choice' && entry.when === when));
+      const kept = 'the operator\'s kept choice is byte-identical across the journey';
+      if (before === undefined || after === undefined) {
+        gap(kept, 'the journey did not read it at both ends', { before: before ?? null, after: after ?? null });
+      } else {
+        check(kept, before.present === after.present && before.sha256 === after.sha256, { before, after });
+      }
     }
   }
 

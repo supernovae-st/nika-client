@@ -341,6 +341,14 @@ the person's own `HOME` the persona never answers that screen: the Session
 opens on the choice the person already keeps, and a journey counts for the
 requested seat only when the Session's own selection is that seat (a choice
 kept from elsewhere is reported as such, never relabelled).
+`NIKA_SESSION_JOURNEY_INTELLIGENCE` (instead of the choice; naming both is
+refused) opens each Session with the conversation's own intelligence
+(`openSession({ intelligence })`, an engine with `sessionIntelligence`):
+the first screen is never asked, nothing is kept for the operator, and the
+person's own `HOME` is then safe for an app seat's sign-in. The journey then
+also requires the opened selection to be the requested one with
+`scope: conversation`, and the operator's kept choice to read the same
+(presence and sha256, never its content) before and after the journey.
 `NIKA_SESSION_DECISION_MODEL` and `NIKA_AUTHORING_REASONING`, when set, seat
 the decision model and the reasoning effort through the engine's own
 environment.

@@ -32,7 +32,12 @@ const { judgeJourney, journeyDoors, sessionResult } = require('./packed-consumer
 // selection is refused, never reported as a journey that walked nothing.
 let JOURNEY_DOORS;
 try {
-  JOURNEY_DOORS = process.env.NIKA_SESSION_JOURNEY_CHOICE ? journeyDoors(process.env.NIKA_SESSION_JOURNEY_DOORS) : [];
+  const requested = process.env.NIKA_SESSION_JOURNEY_CHOICE || process.env.NIKA_SESSION_JOURNEY_INTELLIGENCE;
+  if (process.env.NIKA_SESSION_JOURNEY_CHOICE && process.env.NIKA_SESSION_JOURNEY_INTELLIGENCE) {
+    throw new Error('name the intelligence once: NIKA_SESSION_JOURNEY_CHOICE answers the first screen, '
+      + 'NIKA_SESSION_JOURNEY_INTELLIGENCE opens each Session with it');
+  }
+  JOURNEY_DOORS = requested ? journeyDoors(process.env.NIKA_SESSION_JOURNEY_DOORS) : [];
 } catch (error) {
   if (reportPath) writeFileSync(reportPath, JSON.stringify({ result: 'refused', message: error.message }, null, 2) + '\n');
   throw error;
@@ -156,12 +161,19 @@ try {
 
   /**
    * The journey phase, run only when NIKA_SESSION_JOURNEY_CHOICE names the first screen's
-   * answer (`2 deepseek/<model>`, `1 acp:claude-code/<model>`…, the Session's own words). One
-   * ESM consumer per door: a generation costs, and module parity is the walks' to prove.
+   * answer, or NIKA_SESSION_JOURNEY_INTELLIGENCE the conversation's own intelligence each
+   * Session opens with (`2 deepseek/<model>`, `1 acp:claude-code/<model>`…, the Session's own
+   * words either way). One ESM consumer per door: a generation costs, and module parity is the
+   * walks' to prove.
    */
   async function journeyPhase() {
-    const choice = process.env.NIKA_SESSION_JOURNEY_CHOICE;
-    if (!choice) return { ran: false, why: 'NIKA_SESSION_JOURNEY_CHOICE unset: deterministic transport parity only' };
+    const choice = process.env.NIKA_SESSION_JOURNEY_CHOICE || null;
+    const intelligence = process.env.NIKA_SESSION_JOURNEY_INTELLIGENCE || null;
+    if (!choice && !intelligence) {
+      return { ran: false, why: 'NIKA_SESSION_JOURNEY_CHOICE and NIKA_SESSION_JOURNEY_INTELLIGENCE unset: '
+        + 'deterministic transport parity only' };
+    }
+    const requested = intelligence ?? choice;
     // The variables the engine processes receive, by name only (keys, and HOME when an app seat
     // must find its sign-in); their values are never printed.
     const keyNames = (process.env.NIKA_SESSION_JOURNEY_ENV ?? '').split(',').filter(Boolean);
@@ -200,7 +212,7 @@ try {
     for (const door of JOURNEY_DOORS) {
       doors.push(await journeyWalk(door));
     }
-    return { ran: true, choice, key_env: keyNames, seats, accept_cost: acceptCost,
+    return { ran: true, choice, intelligence, key_env: keyNames, seats, accept_cost: acceptCost,
       observation_ms: waitMs ?? 'the journey default (1800000)',
       world: world === null ? 'built-in tickets' : { module: path.basename(worldFile), sha256: await sha256(worldFile) },
       ...(world === null ? {
@@ -233,9 +245,12 @@ try {
         ...Object.fromEntries(keyNames.map((name) => [name, process.env[name]])), ...(prepared.env ?? {}) };
       // With the person's own HOME the Session's first screen would keep its answer there
       // (`~/.nika/session-intelligence.json`): the persona then never answers it, and the
-      // judge reports a choice kept from elsewhere as such.
+      // judge reports a choice kept from elsewhere as such. Opened with the conversation's own
+      // intelligence, nothing is kept there, and the journey checks that byte for byte.
       const personHome = keyNames.includes('HOME');
-      const row = { door, home: personHome ? 'the person\'s own HOME: no first-screen answer' : 'isolated',
+      const homeWords = intelligence ? 'the person\'s own HOME: opened with the conversation\'s own intelligence'
+        : 'the person\'s own HOME: no first-screen answer';
+      const row = { door, home: personHome ? homeWords : 'isolated',
         world: prepared.label ?? null, expectations: prepared.expectations ?? null };
       let served = { server: undefined };
       let outcome;
@@ -257,12 +272,13 @@ try {
         if (served.why !== undefined) return { ...row, exercised: false, why: served.why };
         const config = path.join(base, 'config.json');
         writeFileSync(config, JSON.stringify({ door, bin: binary, project, url: served.url, token, moduleSystem: 'esm',
-          choice: personHome ? null : choice, acceptCost, waitMs, answers: prepared.answers, create: prepared.create,
+          choice: personHome || intelligence ? null : choice, intelligence, acceptCost, waitMs,
+          answers: prepared.answers, create: prepared.create,
           edit: prepared.edit, checkBin: binary, snapshots: path.join(base, 'legs'), capture: prepared.capture }));
         const transcript = JSON.parse(await consume('esm', 'session-journey', config, env));
         // A world judges its own postconditions per leg; the identity checks stay the journey's.
         const worldChecks = typeof prepared.judge === 'function' ? await prepared.judge(transcript) : null;
-        return { ...row, exercised: true, ...judgeJourney(transcript, expected, choice, worldChecks), transcript };
+        return { ...row, exercised: true, ...judgeJourney(transcript, expected, requested, worldChecks), transcript };
       }
     }
   }

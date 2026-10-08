@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, wr
 import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // The journey (scripts/packed-consumers/session-journey.cjs) walked end to end over a SCRIPTED
 // Session: no engine, no model. The scripted Session proposes, saves the proposed bytes into a
@@ -261,6 +261,68 @@ describe('a journey walked over a scripted Session', () => {
     expect(sent).toEqual(['Create the stale report']);
     expect(report.steps.find((entry) => entry.step === 'create_reached')).toMatchObject({ waiting: 'question',
       key: 'const.target' });
+  });
+});
+
+describe('a journey opened with the conversation\'s own intelligence', () => {
+  const WORDS = '2 deepseek/deepseek-v4-pro';
+  const selected = (extra: Record<string, unknown> = {}) => ({ kind: 'api', via: 'deepseek',
+    model: 'deepseek/deepseek-v4-pro', transport: null, ready: true, scope: 'conversation', ...extra });
+  /** A scripted SDK whose opened work names `chosen`, recording what openSession was asked; `onOpen` runs at each open. */
+  function chosenSdk(project: string, chosen: Record<string, unknown>, asked: unknown[], onOpen = () => {}) {
+    return { Nika: class {
+      openSession = async (options: unknown) => {
+        asked.push(options);
+        onOpen();
+        const session = scriptedSession(project, null, []);
+        session.opened.snapshot.work.intelligence = { ...session.opened.snapshot.work.intelligence, selected: chosen };
+        return session;
+      };
+    } };
+  }
+  function homeWithKeptChoice() {
+    const { dir, project, check } = world();
+    const home = path.join(dir, 'home');
+    mkdirSync(path.join(home, '.nika'), { recursive: true });
+    writeFileSync(path.join(home, '.nika', 'session-intelligence.json'), '{"kind":"api","via":"deepseek"}\n');
+    vi.stubEnv('HOME', home);
+    return { dir, project, check, home };
+  }
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+  const config = (dir: string, project: string, check: string) => ({ door: 'native', bin: '/x', project,
+    moduleSystem: 'esm', choice: null, intelligence: WORDS, answers: {}, create: 'Create the stale report',
+    edit: 'Raise to 72', checkBin: check, snapshots: path.join(dir, 'legs'), capture: ['out'] });
+  const verdict = (judged: { checks: { name: string; verdict: string }[] }, name: RegExp) =>
+    judged.checks.filter((entry) => name.test(entry.name)).map((entry) => entry.verdict);
+
+  it('opens each Session with the words, holds them for the conversation and keeps nothing for the operator', async () => {
+    const { dir, project, check } = homeWithKeptChoice();
+    const asked: unknown[] = [];
+    const report = await journey(chosenSdk(project, selected(), asked), config(dir, project, check));
+    expect(asked).toEqual([expect.objectContaining({ intelligence: WORDS }), expect.objectContaining({ intelligence: WORDS })]);
+    const judged = journey.judgeJourney(report, { create: ['stale-60', 'boundary-72', 'stale-90'], edit: ['stale-90'] },
+      WORDS);
+    expect(verdict(judged, /requested intelligence|conversation alone|kept choice/)).toEqual(['passed', 'passed', 'passed']);
+    expect(judged.verdict).toBe('passed');
+  });
+
+  it('fails another seat, an operator-scoped selection, or a kept choice the journey rewrote', async () => {
+    const other = homeWithKeptChoice();
+    const wrongSeat = await journey(chosenSdk(other.project, selected({ model: 'deepseek/deepseek-flash' }), []),
+      config(other.dir, other.project, other.check));
+    expect(verdict(journey.judgeJourney(wrongSeat, null, WORDS), /prepared with the requested intelligence/))
+      .toEqual(['failed']);
+    const operator = homeWithKeptChoice();
+    const operatorScoped = await journey(chosenSdk(operator.project, selected({ scope: 'operator_default' }), []),
+      config(operator.dir, operator.project, operator.check));
+    expect(verdict(journey.judgeJourney(operatorScoped, null, WORDS), /conversation alone/)).toEqual(['failed']);
+    const rewritten = homeWithKeptChoice();
+    const rewrote = await journey(chosenSdk(rewritten.project, selected(), [], () => writeFileSync(
+      path.join(rewritten.home, '.nika', 'session-intelligence.json'), '{"kind":"harness"}\n')),
+    config(rewritten.dir, rewritten.project, rewritten.check));
+    expect(verdict(journey.judgeJourney(rewrote, null, WORDS), /kept choice/)).toEqual(['failed']);
   });
 });
 

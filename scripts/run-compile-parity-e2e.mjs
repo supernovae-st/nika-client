@@ -106,6 +106,9 @@ try {
   const identity = JSON.parse(await run(binary, ['--sdk-identity'], project));
   assert(identity.supportedCapabilities.includes('compile'), 'native must advertise compile');
   const version = (await run(binary, ['--version'], project)).trim();
+  // The SDK source the package was built from; untracked files count (a scenario may be one).
+  const commit = (await run('git', ['rev-parse', 'HEAD'])).trim();
+  const dirty = (await run('git', ['status', '--porcelain'])).trim() !== '';
   await run('npm', ['run', 'build']);
   const [packed] = JSON.parse(await run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', scratch]));
   const tarball = path.join(scratch, packed.filename);
@@ -172,7 +175,7 @@ try {
   report = { result: exercised ? 'green' : 'not_exercised',
     scope: 'compile foundation; no general authoring or execution grant',
     engine: { version, binary_sha256: binarySha, identity, health },
-    sdk: { version: packed.version, package_sha256: await sha256(tarball) },
+    sdk: { version: packed.version, package_sha256: await sha256(tarball), commit, dirty },
     openapi_pin: openapiPin, compile_openapi: openapi.paths['/v1/compile'], resident_state_unchanged: true,
     results, provider };
 

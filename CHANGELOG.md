@@ -38,6 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refuse a malformed one with `NikaProtocolError` naming its path; absent
   records, unknown members, new vocabulary words and explicit `null` ride
   through untouched, and the outcome still holds the engine's own objects.
+- `scripts/run-session-parity-e2e.mjs` walks the authoring Session through
+  both real doors of one frozen binary (`nika session --json` and a served
+  project's `/v1/sessions`) from the packed CommonJS and ESM faces, keyless on
+  the engine's deterministic compiler: stale, cross-Session and restarted
+  answers, the same command with the same and other bytes, preview before
+  Save (the saved bytes are the previewed ones), Save versus Run in the same
+  project world, Stop, event resumption and close, judged check by check and
+  compared door to door and module system to module system. A door the binary
+  does not host is `not_exercised`, never a pass. The compile and Session
+  reports name the SDK commit and whether its tree was dirty.
 - Compile outcomes type the record of a document the engine's 0.123
   complete-document door created: `plan.document`
   (`NikaCompileCreatedDocument`, settled on a ready outcome only: version 1,

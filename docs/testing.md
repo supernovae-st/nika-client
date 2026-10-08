@@ -261,3 +261,40 @@ tarball is the unreleased PR candidate. The hashes identify those tested bytes.
 Compile source-build receipts live outside the published package, so recording
 a tarball hash does not change the bytes it identifies. They do not participate
 in the released-engine behavioral ledgers.
+
+## Authoring Session parity
+
+`scripts/run-session-parity-e2e.mjs` walks the authoring Session through both
+real doors of one frozen binary, from the packed package's CommonJS and ESM
+faces: `nika session --json` in a project, and a served project's
+`/v1/sessions` (the resident started with `NIKA_SESSION_SERVE_FLAGS`,
+`--sessions` by default). No Cargo, no provider: each walk gets a fresh
+project world (one `notes/brief.md`), its own `HOME` and a minimal environment,
+so the engine's deterministic compiler answers and every walk must say the
+same thing.
+
+```sh
+NIKA_BIN=/absolute/path/to/nika NIKA_SESSION_PARITY_REPORT=… node scripts/run-session-parity-e2e.mjs
+```
+
+Each walk (`scripts/packed-consumers/session-scenario.cjs`) opens a Session,
+proposes a copy, answers the opening snapshot late (`stale_snapshot`, line
+kept, nothing saved), repeats a command with the same bytes (the recorded
+result, `replayed: true`, same event) and with other bytes (refused, nothing
+changed: the local handle refuses before sending, a resident answers
+`command_conflict`), reads details, shows that another Session's snapshot
+answers nothing (natively a second project's Session; a resident refuses a
+second live Session with `session_live`), consents (the saved file's sha256 is
+the previewed candidate's, and nothing ran), stops with nothing under way,
+requests the Run and reads the same project world for its output, sends a
+request with a Stop right behind it, closes, compares the full event view with
+one resumed after the proposal, and after a restart answers the old snapshot
+(`unknown_snapshot`; a closed served Session cannot be attached).
+
+The report judges every walk check by check (`passed`, `failed`, or
+`not_exercised` with the engine's reason: a door this binary does not host, a
+Run the Session did not start or observe, a turn that settled before its
+Stop), compares the two doors up to the Save and the two module systems on
+each door, and names the engine binary's sha256, the SDK commit (and whether
+the tree was dirty), the package's sha256 and the scenario's own sha256. Its
+`result` is `green` only when every walk and comparison passed.

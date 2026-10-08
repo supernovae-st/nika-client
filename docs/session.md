@@ -98,13 +98,28 @@ stays open), the refused `line`, the current `snapshot` when the host sent one,
 and for `session_live` the live `session`. Over HTTP, `401`, `413` and `415`
 keep Serve's own error envelope (`NikaOperationError`).
 
+## Runs a Session requests
+
+A Save is never a Run: `run it` (or the person's own words) requests one, and
+the outcomes say what the engine did: `run_requested`, then the Session's own
+observation of the Run's end (`facts`, or `gate` when it paused),
+`run_not_started` when nothing ran, or `run_unobserved` when the Run was
+admitted but its end was not observed (its effects are unknown; it is never
+reported as an observed Run). A resident runs it as one of its jobs and may
+hold its cost review first (`run_review`: answer it with a line against that
+snapshot). The Run's own progress arrives as `activity` events; stopping a Run
+is the job's cancel (`POST /v1/jobs/{id}/cancel`), never the Session's
+`stop()`, whose receipt for a Run under way is `run_underway`.
+
 ## Status
 
 The handle follows contract `nika/session-host@1` as the engine's
-`nika-session-host` writes it (commits `e079f3e79`, `18479cf38`, `e849d08ea`;
-not yet integrated or released). Besides tests against a synthetic host, the
-handle is driven over frames that host recorded from its real native and HTTP
-doors at `e849d08ea` (`test/fixtures/session-host/`): it sends the recorded
-commands and decodes every recorded frame unchanged. Those doors ran
-in-process; `nika session --json` and the served `/v1/sessions` routes are not
-registered in a released binary yet.
+`nika-session-host` writes it (commits `e079f3e79`, `18479cf38`, `e849d08ea`,
+then `cc08ea08f` with `run_unobserved`; not yet released). Besides tests
+against a synthetic host, the handle is driven over frames that host recorded
+from its real native and HTTP doors at `e849d08ea`
+(`test/fixtures/session-host/`): it sends the recorded commands and decodes
+every recorded frame unchanged. The 0.123 integration engine registers
+`nika session --json` (`3688552f3`); the served `/v1/sessions` routes arrive
+with `nika serve --sessions`. `scripts/run-session-parity-e2e.mjs` qualifies
+both doors of one binary once it hosts them (see `docs/testing.md`).

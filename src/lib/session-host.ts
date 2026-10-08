@@ -45,6 +45,8 @@ export const SESSION_FRAME_MAX_BYTES = 16 * 1024 * 1024;
 
 /** A command identity, and the shape of every handle the SDK places in a URL path. */
 const IDENTITY = /^[A-Za-z0-9._:-]{1,128}$/;
+/** A refusal word, as Serve's own error codes are spelled. */
+const REFUSAL_WORD = /^[A-Za-z][A-Za-z0-9_.:-]{0,63}$/;
 
 export type SessionOp = 'submit' | 'stop' | 'close';
 
@@ -182,7 +184,8 @@ export function sessionFrame(
       snapshotBody(frame.snapshot, transport);
       break;
     case 'refused':
-      text('error');
+      // The host's word becomes an error code: an identifier, never free text.
+      if (typeof frame.error !== 'string' || !REFUSAL_WORD.test(frame.error)) throw fail('refused.error is not a word');
       text('message');
       if (frame.command !== undefined) text('command');
       if (frame.snapshot !== undefined) snapshotBody(frame.snapshot, transport);
@@ -251,8 +254,10 @@ export function sessionRefusal(
   line?: string,
 ): NikaSessionRefusedError {
   const code = frame.error as string;
+  // The host's sentence, bounded and on one line, as an error message may be logged.
+  const said = (frame.message as string).replace(/[\u0000-\u001f\u007f]+/g, ' ');
   return new NikaSessionRefusedError(transport, code,
-    `The Session host refused (${code}): ${frame.message as string}`, {
+    `The Session host refused (${code}): ${said.length > 240 ? `${said.slice(0, 240)}...` : said}`, {
       status,
       ...(typeof frame.command === 'string' ? { command: frame.command } : {}),
       ...(line === undefined ? {} : { line }),

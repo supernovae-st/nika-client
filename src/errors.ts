@@ -180,6 +180,10 @@ export class NikaEventBufferOverflowError extends NikaError {
  * runtime, so nothing is to undo: the refused `line` is returned to its
  * owner, never retried or re-targeted by the SDK. `snapshot`, when the host
  * sent one, is the current snapshot to show before anything is sent again.
+ *
+ * `line` and `snapshot` carry what a person wrote and the Session's work, so
+ * they are not enumerable: logging or serializing the error never prints
+ * them; read them by name.
  */
 export class NikaSessionRefusedError extends NikaOperationError {
   /** The command refused, when the refusal names one. */
@@ -206,9 +210,13 @@ export class NikaSessionRefusedError extends NikaOperationError {
     super('session', transport, code, message, { status: details.status, machineCode: code });
     this.name = 'NikaSessionRefusedError';
     if (details.command !== undefined) this.command = details.command;
-    if (details.line !== undefined) this.line = details.line;
-    if (details.snapshot !== undefined) this.snapshot = details.snapshot;
     if (details.session !== undefined) this.session = details.session;
+    // Content stays off the enumerable surface every logger and serializer reads.
+    for (const key of ['line', 'snapshot'] as const) {
+      if (details[key] !== undefined) {
+        Object.defineProperty(this, key, { value: details[key], enumerable: false, writable: false, configurable: false });
+      }
+    }
   }
 }
 

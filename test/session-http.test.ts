@@ -1,3 +1,4 @@
+import { inspect } from 'node:util';
 import { describe, expect, it, vi } from 'vitest';
 import {
   Nika,
@@ -140,6 +141,38 @@ describe('HTTP authoring Session', () => {
     expect(error).toMatchObject({ code: 'stale_snapshot', status: 409, command: 'c-2', line: 'yes' });
     expect((error as NikaSessionRefusedError).snapshot?.seq).toBe(5);
     expect(error.message).not.toContain(TOKEN_A);
+  });
+
+  it('keeps a refused line and the work it carried off every logged or serialized surface', async () => {
+    const secretLine = 'my private note: reorder 40 boxes for Café Lumière';
+    const { client } = server({
+      'POST /v1/sessions': opened,
+      [`POST ${base}/commands`]: () => jsonResponse(frame({ frame: 'refused', command: 'c-9', error: 'busy',
+        message: 'a turn runs\nsecond line', snapshot: snapshot(4, { request: { goal: 'confidential goal' } }) }), 409),
+    });
+    const session = await client.openSession();
+    const error = await failure(session.submit(session.opened!.snapshot, secretLine, { command: 'c-9' }));
+    expect(error).toMatchObject({ code: 'busy', line: secretLine });
+    for (const surface of [inspect(error, { depth: 10 }), JSON.stringify(error), String(error)]) {
+      expect(surface).not.toContain('Café Lumière');
+      expect(surface).not.toContain('confidential goal');
+    }
+    expect(error.message).not.toContain('\n');
+  });
+
+  it('refuses a refusal whose word is not an identifier, without echoing it', async () => {
+    const { client } = server({
+      'POST /v1/sessions': opened,
+      [`POST ${base}/commands`]: () => jsonResponse(frame({ frame: 'refused', error: `not a word ${TOKEN_A}`,
+        message: 'x' }), 409),
+      [`GET ${base}`]: () => jsonResponse(frame({ frame: `odd ${TOKEN_A}`, snapshot: snapshot(1) })),
+    });
+    const session = await client.openSession();
+    const refused = await failure(session.stop());
+    expect(refused).toBeInstanceOf(NikaProtocolError);
+    const odd = await failure(session.snapshot());
+    expect(odd).toBeInstanceOf(NikaProtocolError);
+    for (const error of [refused, odd]) expect(inspect(error, { depth: 10 })).not.toContain(TOKEN_A);
   });
 
   it('keeps Serve\'s own refusals apart from the host\'s', async () => {

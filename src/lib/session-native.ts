@@ -300,8 +300,9 @@ class NativeSessionChannel implements SessionChannel {
     let value: unknown;
     try {
       value = JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes));
-    } catch (error) {
-      this.#protocol('a Session line was not one UTF-8 JSON frame', error);
+    } catch {
+      // No cause: a JSON parse error quotes the line it read.
+      this.#protocol('a Session line was not one UTF-8 JSON frame');
       return;
     }
     let frame: Record<string, unknown> & { frame: string };

@@ -134,9 +134,9 @@ class HttpSessionChannel implements SessionChannel {
           let value: unknown;
           try {
             value = JSON.parse(sse.data);
-          } catch (cause) {
-            throw new NikaProtocolError(transport, `HTTP ${path} carried an event that is not JSON`,
-              { cause: cause as Error });
+          } catch {
+            // No cause: a JSON parse error quotes the text it read.
+            throw new NikaProtocolError(transport, `HTTP ${path} carried an event that is not JSON`);
           }
           const frame = sessionFrame(value, transport);
           channel.#own(frame, frame.frame);
@@ -153,7 +153,7 @@ class HttpSessionChannel implements SessionChannel {
 
   #own(frame: Record<string, unknown>, expected: string): void {
     if (frame.frame !== expected) {
-      throw new NikaProtocolError(transport, `session: expected a ${expected} frame, got ${String(frame.frame)}`);
+      throw new NikaProtocolError(transport, `session: expected a ${expected} frame, got another`);
     }
     if (frame.session !== this.session) throw new NikaProtocolError(transport, 'session: a frame named another Session');
   }

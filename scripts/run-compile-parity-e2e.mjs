@@ -7,8 +7,13 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { OwnedProcesses } from './one-door/process.mjs';
 import { stopResident, waitForHealth } from './one-door/resident.mjs';
 
-// Explicit frozen binary only; no Cargo, providers or paid calls. The SDK is
-// installed from its tarball and both public module faces drive both real doors.
+// Explicit frozen binary only; no Cargo. The SDK is installed from its tarball
+// and both public module faces drive both real doors. The deterministic phase
+// makes no provider call. The provider phase runs only when
+// NIKA_COMPILE_PROVIDER_MODEL names a seat and NIKA_COMPILE_PROVIDER_ENV names
+// the one variable holding its key (passed to the engine, never printed): one
+// document revision per door per module system, separate generations judged by
+// the evidence law alone, never compared byte for byte.
 const root = path.resolve(import.meta.dirname, '..');
 const binary = process.env.NIKA_BIN;
 const reportPath = process.env.NIKA_COMPILE_PARITY_REPORT;
@@ -19,6 +24,55 @@ const project = path.join(scratch, 'project');
 const consumer = path.join(scratch, 'consumer');
 const isolatedHome = path.join(scratch, 'home');
 const token = 'compile-parity-test-only-token-0123456789';
+// The provider phase's base: comments, Unicode, every envelope section and an
+// input the change does not touch (it checks clean on the 0.122 carrier).
+const REVISION_BASE = [
+  '# Stock watch: keeps a rolling window of the stock pages.',
+  '# Libellés en français : « Relevé — semaine » ✓ 🦋',
+  'nika: stock-watch',
+  'inputs:',
+  '  region:',
+  '    type: string',
+  '    default: eu-west',
+  'const:',
+  '  window_hours: 48 # hours of history kept',
+  '  label: "Relevé — semaine"',
+  '  pages_path: ./data/stock.json',
+  'permits:',
+  '  fs:',
+  '    read:',
+  '      - ./data/stock.json',
+  '  tools:',
+  '    - nika:read',
+  '    - nika:jq',
+  'tasks:',
+  '  read_pages:',
+  '    invoke:',
+  '      tool: nika:read',
+  '      args:',
+  '        path: ${{ const.pages_path }}',
+  '  window:',
+  '    after:',
+  '      read_pages: success',
+  '    with:',
+  '      pages: ${{ tasks.read_pages.output }}',
+  '    invoke:',
+  '      tool: nika:jq',
+  '      args:',
+  '        input: ${{ with.pages }}',
+  '        expression: "[.items[] | select(.age_hours <= ${{ const.window_hours }})] | length"',
+  'outputs:',
+  '  kept: ${{ tasks.window.output }}',
+  '  label: ${{ const.label }}',
+  '  region: ${{ inputs.region }}',
+  '',
+].join('\n');
+const REVISION_INTENT = 'Read ./data/stock.json, count the stock pages younger than two days and label the result '
+  + '« Relevé — semaine ».';
+const REVISION_CHANGE = 'Keep three days of history instead of two.';
+/** Lines the change does not touch: an operations revision keeps them byte for byte. */
+const REVISION_KEPT = ['# Stock watch: keeps a rolling window of the stock pages.',
+  '# Libellés en français : « Relevé — semaine » ✓ 🦋', '  label: "Relevé — semaine"', '    default: eu-west'];
 const env = { ...Object.fromEntries(['PATH', 'TMPDIR', 'TMP', 'TEMP', 'LANG', 'LC_ALL']
   .filter((key) => process.env[key] !== undefined).map((key) => [key, process.env[key]])),
 HOME: isolatedHome, NIKA_KEYCHAIN: 'off' };
@@ -30,6 +84,7 @@ const handlers = new Map(['SIGINT', 'SIGTERM', 'SIGHUP'].map((signal) => [signal
 }]));
 for (const [signal, handler] of handlers) process.on(signal, handler);
 let server;
+let seated;
 let report;
 try {
   for (const directory of [project, consumer, isolatedHome]) mkdirSync(directory);
@@ -81,8 +136,13 @@ try {
   assert(health.supportedCapabilities.includes('compile'), 'Serve must advertise compile');
   const openapi = await request('/v1/openapi.json', true);
   assert(openapi.paths['/v1/compile']?.post, 'the live OpenAPI must own POST /v1/compile');
-  assert.deepEqual(openapi, JSON.parse(readFileSync(path.join(root, 'openapi.json'), 'utf8')),
-    'the packed contract pin must match this frozen resident');
+  // The package's pin by default. A candidate engine ahead of that pin is compared with the
+  // document NIKA_COMPILE_PARITY_OPENAPI names instead, and the report says which one held.
+  const pinPath = path.resolve(process.env.NIKA_COMPILE_PARITY_OPENAPI ?? path.join(root, 'openapi.json'));
+  assert.deepEqual(openapi, JSON.parse(readFileSync(pinPath, 'utf8')),
+    'the contract pin must match this frozen resident');
+  const openapiPin = { path: pinPath, sha256: await sha256(pinPath),
+    package_pin: pinPath === path.join(root, 'openapi.json') };
   const stateRoot = path.join(scratch, 'state');
   const stateBefore = snapshot(stateRoot);
   const results = [];
@@ -93,23 +153,93 @@ try {
       [path.join(consumer, `consumer.${moduleSystem === 'esm' ? 'mjs' : 'cjs'}`), config], consumer)));
   }
   assert.deepEqual(snapshot(stateRoot), stateBefore, 'compile must not create or mutate resident job state');
+  const provider = await providerPhase();
   assert.equal(await sha256(binary), binarySha, 'frozen binary changed during parity');
   report = { result: 'green', scope: 'compile foundation; no general authoring or execution grant',
     engine: { version, binary_sha256: binarySha, identity, health },
     sdk: { version: packed.version, package_sha256: await sha256(tarball) },
-    compile_openapi: openapi.paths['/v1/compile'], resident_state_unchanged: true, results };
+    openapi_pin: openapiPin, compile_openapi: openapi.paths['/v1/compile'], resident_state_unchanged: true,
+    results, provider };
+
+  async function providerPhase() {
+    const model = process.env.NIKA_COMPILE_PROVIDER_MODEL;
+    if (!model) return { ran: false, why: 'NIKA_COMPILE_PROVIDER_MODEL unset: deterministic phase only' };
+    const keyName = process.env.NIKA_COMPILE_PROVIDER_ENV;
+    assert(keyName && /^[A-Z][A-Z0-9_]*$/.test(keyName) && process.env[keyName],
+      'NIKA_COMPILE_PROVIDER_ENV must name the set variable that holds the seat\'s key');
+    const seatedEnv = { ...env, [keyName]: process.env[keyName] };
+    // Its own project: a native provider round records its plan under .nika/compile/ there.
+    const seatedProject = path.join(scratch, 'seated-project');
+    mkdirSync(seatedProject);
+    writeFileSync(path.join(seatedProject, 'nika.yaml'), 'nika: compile-evidence\n');
+    copyFileSync(path.join(root, 'scripts/packed-consumers/compile-evidence.cjs'), path.join(consumer, 'evidence.cjs'));
+    writeFileSync(path.join(consumer, 'evidence-consumer.cjs'), [
+      "const sdk = require('@supernovae-st/nika');", "const scenario = require('./evidence.cjs');",
+      "const config = JSON.parse(require('node:fs').readFileSync(process.argv[2], 'utf8'));",
+      'scenario(sdk, config).then((result) => process.stdout.write(JSON.stringify(result)));',
+    ].join('\n'));
+    writeFileSync(path.join(consumer, 'evidence-consumer.mjs'), [
+      "import * as sdk from '@supernovae-st/nika';", "import scenario from './evidence.cjs';",
+      "import { readFileSync } from 'node:fs';",
+      'process.stdout.write(JSON.stringify(await scenario(sdk, JSON.parse(readFileSync(process.argv[2], "utf8")))));',
+    ].join('\n'));
+    seated = owned.start(binary, ['serve', '--bind', '127.0.0.1:0', '--workflows', seatedProject,
+      '--token-file', path.join(scratch, 'token'), '--state-root', path.join(scratch, 'seated-state'), '--plain',
+      '--authoring-model', model], { cwd: seatedProject, env: seatedEnv, timeoutMs: 3_600_000 });
+    let seatedUrl;
+    const until = Date.now() + 15000;
+    while (!seatedUrl && Date.now() < until) {
+      abort.signal.throwIfAborted();
+      assert.equal(seated.child.exitCode, null, `seated Serve exited: ${seated.stderr}`);
+      seatedUrl = `${seated.stdout}\n${seated.stderr}`.match(/nika serve[^\n]*listening (http:\/\/127\.0\.0\.1:\d+)/)?.[1];
+      if (!seatedUrl) await delay(25);
+    }
+    assert(seatedUrl, 'the seated Serve did not announce its listener');
+    await waitForHealth(seatedUrl, seated, abort.signal, { timeoutMs: 10000 });
+    const seatedHealth = await (await fetch(`${seatedUrl}/health`,
+      { signal: AbortSignal.any([abort.signal, AbortSignal.timeout(10000)]) })).json();
+    assert(seatedHealth.supportedCapabilities.includes('compileNativeV2'), 'the seated Serve must speak generation 2');
+    const rows = [];
+    for (const moduleSystem of ['cjs', 'esm']) {
+      const config = path.join(consumer, 'evidence.json');
+      writeFileSync(config, JSON.stringify({ bin: binary, project: seatedProject, url: seatedUrl, token, moduleSystem,
+        model, base: REVISION_BASE, change: REVISION_CHANGE, originalIntent: REVISION_INTENT, keptLines: REVISION_KEPT }));
+      const result = JSON.parse(await owned.run(process.execPath,
+        [path.join(consumer, `evidence-consumer.${moduleSystem === 'esm' ? 'mjs' : 'cjs'}`), config],
+        { cwd: consumer, env: seatedEnv, timeoutMs: 1_800_000, maxBuffer: 16 * 1024 * 1024 }));
+      for (const row of result.rows) {
+        // Operations claim every byte outside their spans: the base's comments and Unicode survive.
+        if (row.revision?.mode === 'operations') {
+          assert.equal(row.candidate_keeps_comments_and_unicode, true,
+            `${moduleSystem} ${row.door}: an operations revision kept the base's untouched lines`);
+        }
+      }
+      rows.push(result);
+    }
+    await stopResident(seated);
+    seated = undefined;
+    return { ran: true, model, key_env: keyName,
+      base_sha256: createHash('sha256').update(REVISION_BASE).digest('hex'),
+      change: REVISION_CHANGE, original_intent: REVISION_INTENT,
+      seated_capabilities: seatedHealth.supportedCapabilities, results: rows,
+      law: 'separate generations: each door judged by the evidence law, never compared byte for byte' };
+  }
 } catch (error) {
   if (reportPath) writeFileSync(reportPath, JSON.stringify({ result: 'failed', message: error.message }, null, 2) + '\n');
   throw error;
 } finally {
-  try { await stopResident(server); }
-  finally { await owned.close(); }
+  try {
+    if (seated) await stopResident(seated);
+    await stopResident(server);
+  } finally { await owned.close(); }
   rmSync(scratch, { recursive: true, force: true });
   for (const [signal, handler] of handlers) process.off(signal, handler);
 }
 abort.signal.throwIfAborted();
 if (reportPath) writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
-console.log(`compile parity green after owned cleanup: ${report.results[0].rows.length} cases × 2 doors × 2 module systems`);
+console.log(`compile parity green after owned cleanup: ${report.results[0].rows.length} cases × 2 doors × 2 module systems`
+  + (report.provider.ran
+    ? `; provider evidence ${report.provider.results.length} module systems × 2 doors on ${report.provider.model}` : ''));
 
 async function sha256(file) {
   const hash = createHash('sha256');

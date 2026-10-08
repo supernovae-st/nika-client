@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refuse a malformed one with `NikaProtocolError` naming its path; absent
   records, unknown members, new vocabulary words and explicit `null` ride
   through untouched, and the outcome still holds the engine's own objects.
+- `scripts/run-compile-parity-e2e.mjs` gains an opt-in real-provider phase
+  (`NIKA_COMPILE_PROVIDER_MODEL`, `NIKA_COMPILE_PROVIDER_ENV`): each packed
+  module system revises one rich base through a native seat and a seated
+  resident, and each round is judged by its evidence (exact base and candidate
+  digests, one revision in plan and decision, kept lines), never compared byte
+  for byte with another generation. `NIKA_COMPILE_PARITY_OPENAPI` compares a
+  candidate engine ahead of the package pin with its own exported OpenAPI, and
+  the report names the document that held.
 - Over HTTP, a generation-2 compile request carries what the local engine
   observes of the files the request names (`nika compile --observe-only`,
   run in the client's `cwd`: headers, keys, short repeated values, never a

@@ -207,6 +207,30 @@ Released engine 0.120.3 supports native compile and its Serve advertises HTTP
 compile; 0.120.2 and older predate the route. This is a foundation test, not general intent authoring
 or execution admission qualification.
 
+The live `/v1/openapi.json` must equal the package's `openapi.json`. A
+candidate engine ahead of that pin is compared with the document named by
+`NIKA_COMPILE_PARITY_OPENAPI` instead (its own live export, never a hand-edited
+copy), and the report's `openapi_pin` says which document held.
+
+The revision evidence of a real provider round runs only when you name a seat
+and the one variable holding its key; the key reaches the engine processes and
+is never printed:
+
+```sh
+NIKA_COMPILE_PROVIDER_MODEL=deepseek/deepseek-flash \
+NIKA_COMPILE_PROVIDER_ENV=DEEPSEEK_API_KEY \
+NIKA_BIN=… NIKA_COMPILE_PARITY_REPORT=… node scripts/run-compile-parity-e2e.mjs
+```
+
+Each packed module system then revises one rich base (comments, Unicode, every
+envelope section) once per door, through a native seat and a seated resident.
+These are separate generations, never compared byte for byte. Each must satisfy
+the evidence law: every revision stated binds the exact base sent and the exact
+candidate received by sha256, a kept plan states the decision's revision, a
+ready round keeps its plan, an `operations` revision keeps the base's untouched
+lines, and the backend's model identities stay apart. The report records each
+round's status, digests, calls, tokens and backend members.
+
 The [2026-09-19 source-build receipt](../evidence/compile-4334e58b-20260919.json)
 records 14 cases across both doors and both module systems at that producer,
 with exact outcome parity and no resident-state or project-file mutation. Its

@@ -96,6 +96,12 @@ class NativeSessionChannel implements SessionChannel {
   readonly #retention: number;
   readonly #reads: Read[] = [];
   readonly #waiters = new Map<string, Waiter[]>();
+  /**
+   * The bytes each identity this handle sent is bound to, as the host's ledger binds them:
+   * kept whether or not anyone still waits, released only by a refusal the host records nothing
+   * for. A frame names only the identity, so this is how a result is told to be its command's.
+   */
+  readonly #bound = new Map<string, string>();
   readonly #events: NikaSessionEvent[] = [];
   readonly #subscribers = new Set<Subscriber>();
   readonly #exited: Promise<number | null>;
@@ -159,15 +165,19 @@ class NativeSessionChannel implements SessionChannel {
         return;
       }
       const waiters = this.#waiters.get(command.command) ?? [];
-      // One identity names one command. A frame names only the identity, so a pending
-      // identity reused with other bytes could not be told apart: it is refused here,
-      // before anything is written. Identical bytes wait for the same result; any other
-      // reuse is the engine's ledger to judge.
-      if (waiters.some((pending) => pending.body !== command.body)) {
-        reject(new NikaConfigurationError(
-          `session: command ${command.command} is pending with other bytes on this handle; `
-          + 'a command identity names one command'));
-        return;
+      // One identity names one command. A frame names only the identity, so an identity this
+      // handle already sent with other bytes (waited for or not, settled or not) is refused
+      // here, before anything is written: a result could not be told apart. Identical bytes
+      // wait for the same result. A close carries no identity and binds nothing.
+      if (command.op !== 'close') {
+        const bound = this.#bound.get(command.command);
+        if (bound !== undefined && bound !== command.body) {
+          reject(new NikaConfigurationError(
+            `session: command ${command.command} was sent with other bytes on this handle; `
+            + 'a command identity names one command'));
+          return;
+        }
+        this.#bound.set(command.command, command.body);
       }
       const abort = () => {
         const kept = (this.#waiters.get(command.command) ?? []).filter((entry) => entry !== waiter);
@@ -376,7 +386,9 @@ class NativeSessionChannel implements SessionChannel {
       case 'refused': {
         const command = frame.command;
         if (typeof command === 'string') {
-          // A command's refusal; its caller may have stopped waiting already.
+          // A command's refusal; its caller may have stopped waiting already. A refusal the host
+          // records nothing for (busy, a stale or unknown snapshot, …) frees the identity again.
+          if (frame.error !== 'command_conflict') this.#bound.delete(command);
           const waiters = this.#waiters.get(command) ?? [];
           this.#waiters.delete(command);
           for (const waiter of waiters) waiter.reject(sessionRefusal(frame, transport, 0, waiter.line));

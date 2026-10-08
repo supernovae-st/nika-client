@@ -119,8 +119,25 @@ describe('native authoring Session', () => {
     expect(original.replayed).toBe(false);
     expect(again).toMatchObject({ replayed: true, command: 'c-1', outcomes: original.outcomes });
     expect(again.event).toBeUndefined();
+    // The handle binds an identity to its bytes as the host's ledger does: refused before sending.
     const conflict = await failure(session.submit(first, 'other words', { command: 'c-1' }));
-    expect(conflict).toMatchObject({ code: 'command_conflict', command: 'c-1', line: 'other words' });
+    expect(conflict).toBeInstanceOf(NikaConfigurationError);
+    expect(conflict.message).toMatch(/sent with other bytes/);
+  });
+
+  it('never hands a cancelled command\'s late result to another command under its identity', async () => {
+    const session = await open();
+    const first = await session.snapshot();
+    const controller = new AbortController();
+    // A fast turn: its result is already on its way when the identity is reused.
+    const cancelled = session.submit(first, 'draft a digest', { command: 'reused', signal: controller.signal });
+    controller.abort();
+    expect(await failure(cancelled)).toBeInstanceOf(NikaSessionWaitError);
+    // The identity stays bound to the cancelled command's bytes: other bytes never get its result.
+    const other = await failure(session.submit(first, 'other words', { command: 'reused' }));
+    expect(other).toBeInstanceOf(NikaConfigurationError);
+    const late = await session.submit(first, 'draft a digest', { command: 'reused' });
+    expect(late).toMatchObject({ command: 'reused', outcomes: [{ kind: 'proposal' }] });
   });
 
   it('keeps a pending identity to its own bytes: other bytes are refused before sending, the first completes', async () => {
@@ -129,7 +146,7 @@ describe('native authoring Session', () => {
     const accepted = session.submit(first, 'slow draft', { command: 'same-id' });
     const reused = await failure(session.submit(first, 'other words', { command: 'same-id' }));
     expect(reused).toBeInstanceOf(NikaConfigurationError);
-    expect(reused.message).toMatch(/pending with other bytes/);
+    expect(reused.message).toMatch(/sent with other bytes/);
     const settled = await accepted;
     expect(settled).toMatchObject({ command: 'same-id', replayed: false, outcomes: [{ kind: 'proposal' }] });
   });

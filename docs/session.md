@@ -69,8 +69,10 @@ and the stopped turn's own result settles it, ending with a `cancelled`
 outcome whose `withdrawn` lists the proposal or question it withdrew.
 `close()` ends the Session (natively, its process); it carries no identity and
 over HTTP is the route's `DELETE`. A second line while a turn runs is refused
-(`busy`) and returned to you. On one local handle, an identity still pending
-with other bytes is refused before anything is written.
+(`busy`) and returned to you. A local handle binds each identity to the bytes
+it first sent, as the engine's ledger does, so the same identity with other
+bytes is refused there before anything is written, even after its wait was
+cancelled.
 
 Reads (`snapshot()`, `details()`) and `stop()` never wait for the turn.
 

@@ -293,7 +293,8 @@ class NativeSessionChannel implements SessionChannel {
   }
 
   #cursor(after: string | undefined): number {
-    if (after === undefined) return (this.#events.at(-1)?.event ?? 0);
+    // No cursor: every event the handle still holds, as the HTTP door replays its whole log.
+    if (after === undefined) return (this.#events[0]?.event ?? 1) - 1;
     const [session, number] = typeof after === 'string' ? after.split(':') : [];
     const event = Number(number);
     if (session !== this.session || !Number.isSafeInteger(event) || event < 0) {

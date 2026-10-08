@@ -1690,10 +1690,12 @@ export interface NikaSessionCommandOptions {
 export interface NikaSessionEventsOptions {
   /**
    * Resume after this event cursor (`<session>:<event>`, a previous event's
-   * `cursor`). Over HTTP, a cursor the server cannot resume (another
-   * incarnation, beyond its log) yields one `resync` frame carrying the
-   * current snapshot, then live events. Natively the handle replays the
-   * events it still retains.
+   * `cursor`). Without it the view starts with every event the door still
+   * holds (the server's whole log, the events a local handle retains). Over
+   * HTTP, a cursor the server cannot resume (another incarnation, beyond its
+   * log) yields one `resync` frame carrying the current snapshot, then live
+   * events. Natively a cursor whose events the handle no longer retains is
+   * refused when iteration starts.
    */
   after?: string;
   /** Ends the iteration; it never stops or closes the Session. */
@@ -1799,7 +1801,6 @@ export interface NikaSessionResult extends NikaSessionFrameBase {
 
 export interface NikaSessionClosed extends NikaSessionFrameBase {
   frame: 'closed';
-  command?: string;
   snapshot: NikaSessionSnapshot;
 }
 
@@ -1814,10 +1815,10 @@ export interface NikaSessionDetails extends NikaSessionFrameBase {
 /**
  * One event of the Session (`opened`, `accepted`, `activity`, `result`,
  * `closed`, and over HTTP `resync`), as the engine wrote it. `cursor` is the
- * SDK's resume point for `events({ after })`.
+ * resume point for `events({ after })`.
  */
 export interface NikaSessionEvent extends NikaSessionFrameBase {
   frame: string;
-  /** `<session>:<event>`; absent on a `resync` frame. */
+  /** `<session>:<event>`; a `resync` carries the point it resynchronized to. */
   cursor?: string;
 }

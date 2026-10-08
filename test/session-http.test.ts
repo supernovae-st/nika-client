@@ -93,6 +93,22 @@ describe('HTTP authoring Session', () => {
     expect((await session.details()).text).toBe('d');
   });
 
+  it('closes with DELETE and reports an opening refusal that names no Session', async () => {
+    const closedFrame = frame({ frame: 'closed', event: 6, snapshot: snapshot(4) });
+    const { client, calls } = server({
+      'POST /v1/sessions': opened,
+      [`DELETE ${base}`]: () => jsonResponse(closedFrame),
+    });
+    const session = await client.openSession();
+    expect(await session.close()).toEqual(closedFrame);
+    expect(calls.some((call) => call.path === `${base}/commands`)).toBe(false);
+    const held = server({ 'POST /v1/sessions': () => jsonResponse({ contract: CONTRACT, frame: 'refused', session: '',
+      error: 'session_unavailable', message: 'the history is held by another nika' }, 409) });
+    const error = await failure(held.client.openSession());
+    expect(error).toBeInstanceOf(NikaSessionRefusedError);
+    expect(error).toMatchObject({ code: 'session_unavailable', status: 409 });
+  });
+
   it('names the live Session when one is open, and attaches to it', async () => {
     const live = `ses_${'cd'.repeat(16)}`;
     const { client, calls } = server({

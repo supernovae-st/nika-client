@@ -89,9 +89,10 @@ class HttpSessionChannel implements SessionChannel {
   }
 
   async send(command: SessionCommand, signal?: AbortSignal): Promise<NikaSessionResult | NikaSessionClosed> {
-    // Every command rides the same bytes as natively, so its identity is the host's ledger key.
-    const path = this.#path('/commands');
-    const init: RequestInit = {
+    // Submit and stop ride the same bytes as natively (their identity keys the host's ledger);
+    // a close is the Session route's DELETE.
+    const path = command.op === 'close' ? this.#path('') : this.#path('/commands');
+    const init: RequestInit = command.op === 'close' ? { method: 'DELETE', signal } : {
       method: 'POST', body: command.body, headers: { 'Content-Type': 'application/json' }, signal,
     };
     let frame: Record<string, unknown>;
@@ -107,9 +108,8 @@ class HttpSessionChannel implements SessionChannel {
       }
       throw error;
     }
-    const kind = frame.frame === 'closed' && command.op === 'close' ? 'closed' : 'result';
-    this.#own(frame, kind);
-    if (frame.command !== undefined && frame.command !== command.command) {
+    this.#own(frame, command.op === 'close' ? 'closed' : 'result');
+    if (command.op !== 'close' && frame.command !== command.command) {
       throw new NikaProtocolError(transport, `session: the answer named another command than ${command.command}`);
     }
     return frame as unknown as NikaSessionResult | NikaSessionClosed;

@@ -163,7 +163,8 @@ describe('native authoring Session', () => {
     const receipt = await session.stop({ command: 'stop-1' });
     expect(receipt).toMatchObject({ op: 'stop', receipt: 'stop_requested', target: 'slow-1' });
     const settled = await turn;
-    expect(settled.outcomes!.at(-1)).toEqual({ kind: 'cancelled', text: 'stopped', withdrawn: true });
+    // The stopped turn settles itself; its `cancelled` outcome lists what the Stop withdrew.
+    expect(settled.outcomes!.at(-1)).toMatchObject({ kind: 'cancelled', withdrawn: [{ kind: 'proposal' }] });
     expect(settled.snapshot.work.candidate).toBeNull();
     expect((await session.stop()).receipt).toBe('nothing_to_stop');
   });
@@ -220,12 +221,13 @@ describe('native authoring Session', () => {
     const gap = await failure((async () => { for await (const _ of view) break; })());
     expect(gap).toBeInstanceOf(NikaTransportError);
     expect(gap.message).toMatch(/no longer retained/);
-    const fresh = (async () => {
-      for await (const event of session.events()) if (event.frame === 'result') return event;
-      return undefined;
-    })();
-    await session.submit(shown, 'three');
-    expect(await fresh).toMatchObject({ frame: 'result', replayed: false });
+    const last = await session.submit(shown, 'three', { command: 'third' });
+    const fresh: string[] = [];
+    for await (const event of session.events({ after: `${session.id}:${last.event! - 2}` })) {
+      fresh.push(`${event.frame}:${event.command as string}`);
+      if (event.frame === 'result') break;
+    }
+    expect(fresh).toEqual(['activity:third', 'result:third']);
   });
 
   it('ends an event view aborted before it starts, before it iterates, or while it waits', async () => {
@@ -240,7 +242,9 @@ describe('native authoring Session', () => {
     for await (const event of view) seen.push(event.frame);
     const during = new AbortController();
     const waiting = (async () => {
-      for await (const event of session.events({ signal: during.signal })) seen.push(event.frame);
+      for await (const event of session.events({ after: `${session.id}:1`, signal: during.signal })) {
+        seen.push(event.frame);
+      }
     })();
     setTimeout(() => during.abort(), 20);
     await waiting;
@@ -253,8 +257,10 @@ describe('native authoring Session', () => {
 
   it('closes on its close command and refuses commands afterwards', async () => {
     const session = await open();
-    const closed = await session.close({ command: 'bye' });
-    expect(closed).toMatchObject({ frame: 'closed', command: 'bye' });
+    const closed = await session.close();
+    // A close carries no identity: the host keeps no ledger for it.
+    expect(closed).toMatchObject({ frame: 'closed' });
+    expect(closed.command).toBeUndefined();
     const error = await failure(session.submit(closed.snapshot, 'hello'));
     expect(error).toBeInstanceOf(NikaConfigurationError);
   });

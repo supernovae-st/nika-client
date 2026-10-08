@@ -75,12 +75,21 @@ export interface SessionChannel {
   events(after: string | undefined, signal?: AbortSignal): AsyncIterable<NikaSessionEvent>;
 }
 
-/** Encode one command with the contract's field names; the host judges the rest. */
+/** The key a close waits under on the native door: never an identity a caller can choose. */
+export const CLOSE_KEY = '\0close';
+
+/**
+ * Encode one command with the contract's field names; the host judges the rest. A close
+ * carries no identity (the host keeps no ledger for it): it is keyed locally only.
+ */
 export function sessionCommand(
   op: SessionOp,
   options: NikaSessionCommandOptions,
   submit?: { snapshot: string; line: string },
 ): SessionCommand {
+  if (op === 'close') {
+    return { op, command: CLOSE_KEY, body: JSON.stringify({ contract: SESSION_HOST_CONTRACT, op }) };
+  }
   const command = options.command ?? `sdk-${randomUUID()}`;
   if (typeof command !== 'string' || !IDENTITY.test(command)) {
     throw new NikaConfigurationError(
@@ -152,7 +161,9 @@ export function sessionFrame(
   }
   if (typeof frame.frame !== 'string' || frame.frame.length === 0) throw fail('names no frame');
   const kind = frame.frame;
-  if (kind !== 'refused' || frame.session !== undefined) sessionId(frame.session, transport);
+  // A refusal names the Session it concerns, or none (`""`) when no Session exists yet.
+  if (kind !== 'refused') sessionId(frame.session, transport);
+  else if (frame.session !== undefined && typeof frame.session !== 'string') throw fail('refused.session is not text');
   if (frame.event !== undefined
     && !(typeof frame.event === 'number' && Number.isSafeInteger(frame.event) && frame.event >= 1)) {
     throw fail('carries an event number that is not a positive integer');
@@ -329,12 +340,18 @@ export class NikaAuthoringSession {
     return this.#channel.send(sessionCommand('stop', options), options.signal) as Promise<NikaSessionResult>;
   }
 
-  /** End the Session; its history stays the engine's. */
-  async close(options: NikaSessionCommandOptions = {}): Promise<NikaSessionClosed | NikaSessionResult> {
-    return this.#channel.send(sessionCommand('close', options), options.signal);
+  /**
+   * End the Session (the native process with it); its history stays the engine's. A close
+   * carries no identity: the host keeps no ledger for it.
+   */
+  async close(options: { signal?: AbortSignal } = {}): Promise<NikaSessionClosed> {
+    return this.#channel.send(sessionCommand('close', {}), options.signal) as Promise<NikaSessionClosed>;
   }
 
-  /** The Session's events, from `after` (or from now) until it closes or `signal` ends the view. */
+  /**
+   * The Session's events, after `after` (or every event the door still holds), until it closes
+   * or `signal` ends the view.
+   */
   events(options: NikaSessionEventsOptions = {}): AsyncIterable<NikaSessionEvent> {
     return this.#channel.events(options.after, options.signal);
   }

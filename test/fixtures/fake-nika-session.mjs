@@ -4,9 +4,10 @@ import { createInterface } from 'node:readline';
 
 /**
  * A fake engine hosting the authoring Session over `nika session --json`, as
- * contract `nika/session-host@1` (v2, agreed 2026-10-08 with the engine's
- * Session transport lane) states it. SYNTHETIC: no engine produced these
- * bytes; recorded fixtures from the real doors replace them. It plays the
+ * contract `nika/session-host@1` states it and engine commit e079f3e79
+ * (`nika-session-host` `wire.rs`, `machine.rs`, `host.rs`) writes it.
+ * SYNTHETIC: no engine produced these bytes; recorded fixtures from the real
+ * doors replace them. It plays the
  * host's own laws (snapshot custody, the command ledger, one turn at a time,
  * Stop receipt vs settlement) so the SDK's handle can be driven, never the
  * Session's reading of a line: the scripted lines below stand in for it.
@@ -53,6 +54,10 @@ let saved = null;
 let waiting = { kind: 'free' };
 let candidate = null;
 
+function emitAs(name, frame, then) {
+  process.stdout.write(`${JSON.stringify({ contract: CONTRACT, ...frame, session: name })}\n`, then);
+}
+
 function emit(frame, withEvent = false, then = undefined) {
   const body = { contract: CONTRACT, ...frame, session };
   if (withEvent) body.event = ++event;
@@ -94,8 +99,9 @@ function publish() {
 
 if (process.env.NIKA_FAKE_SESSION_LOCKED) {
   // The project's Session history is held elsewhere: one refused line, exit 3.
-  await new Promise((resolve) => emit({ frame: 'refused', error: 'session_unavailable',
-    message: 'another nika holds this project\'s Session' }, false, resolve));
+  // As `open::run_stdio` refuses: no Session exists yet, so the frame names none.
+  await new Promise((resolve) => emitAs('', { frame: 'refused', error: 'session_unavailable',
+    message: 'another nika holds this project\'s Session' }, resolve));
   process.exit(3);
 }
 
@@ -111,7 +117,14 @@ input.on('line', (line) => {
     return;
   }
   if (command.contract !== CONTRACT) {
-    emit({ frame: 'refused', command: command.command, error: 'malformed', message: 'wrong contract' });
+    emit({ frame: 'refused', error: 'malformed', message: 'wrong contract' });
+    return;
+  }
+  // `deny_unknown_fields` and per-op members: close and reads take no command, snapshot or line.
+  const members = Object.keys(command).filter((key) => key !== 'contract' && key !== 'op').sort().join();
+  const expected = { submit: 'command,line,snapshot', stop: 'command', close: '', snapshot: '', details: '' };
+  if (!(command.op in expected) || members !== expected[command.op]) {
+    emit({ frame: 'refused', error: 'malformed', message: `\`${command.op}\` takes other members` });
     return;
   }
   if (command.op === 'snapshot') { emit({ frame: 'snapshot', snapshot: reading() }); return; }
@@ -123,12 +136,12 @@ input.on('line', (line) => {
   const known = ledger.get(command.command);
   if (known) {
     if (known.bytes !== bytes) {
-      emit({ frame: 'refused', command: command.command, error: 'command_conflict', message: 'other bytes', snapshot: current });
+      emit({ frame: 'refused', command: command.command, error: 'command_conflict', message: 'other bytes',
+        line: command.line, snapshot: current });
     } else if (known.result) {
       emit({ ...known.result, replayed: true, event: undefined });
-    } else {
-      known.awaiting = true;
     }
+    // In flight with the same bytes: the native door writes nothing; the result event answers both.
     return;
   }
   if (command.op === 'stop') {
@@ -141,7 +154,7 @@ input.on('line', (line) => {
     return;
   }
   if (command.op === 'close') {
-    emit({ frame: 'closed', command: command.command, snapshot: current }, true, () => process.exit(0));
+    emit({ frame: 'closed', snapshot: current }, true, () => process.exit(0));
     return;
   }
   if (command.op !== 'submit') {
@@ -149,13 +162,14 @@ input.on('line', (line) => {
     return;
   }
   if (busy) {
-    emit({ frame: 'refused', command: command.command, error: 'busy', message: 'a turn runs', snapshot: current });
+    emit({ frame: 'refused', command: command.command, error: 'busy', message: 'a turn runs', line: command.line,
+      snapshot: current });
     return;
   }
   if (command.snapshot !== current.snapshot) {
     emit({ frame: 'refused', command: command.command,
       error: published.has(command.snapshot) ? 'stale_snapshot' : 'unknown_snapshot',
-      message: 'the line answered another snapshot', snapshot: current });
+      message: 'the line answered another snapshot', line: command.line, snapshot: current });
     return;
   }
   const entry = { bytes };
@@ -167,7 +181,9 @@ input.on('line', (line) => {
   const settle = () => {
     let outcomes;
     if (stopRequested) {
-      outcomes = [{ kind: 'cancelled', text: 'stopped', withdrawn: true }];
+      // `Outcome::Cancelled { withdrawn }` lists what the Stop withdrew.
+      outcomes = [{ kind: 'cancelled', text: 'stopped',
+        withdrawn: [{ kind: 'proposal', proposal: 'p'.repeat(64), text: 'Save digest.nika?' }] }];
     } else if (command.line.startsWith('draft') || command.line.startsWith('slow')) {
       candidate = { proposal: 'p'.repeat(64), aside: false, rehearsed: false, run_after_save: false,
         files: [{ path: 'digest.nika', landing: 'create', workflow: true, bytes: 'b'.repeat(64), replaces: null,
@@ -186,7 +202,6 @@ input.on('line', (line) => {
     const result = emit({ frame: 'result', command: command.command, op: 'submit', replayed: false, outcomes,
       snapshot: publish() }, true);
     entry.result = result;
-    if (entry.awaiting) emit({ ...result, replayed: true, event: undefined });
   };
   if (command.line.startsWith('slow')) {
     const started = Date.now();

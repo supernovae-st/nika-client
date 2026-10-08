@@ -386,6 +386,9 @@ function legSelections(report, name, fromTurn, openRequired) {
   return frames;
 }
 
+/** How the harness seat ends one authoring call in its receipt (`HarnessAuthoring::infer`). */
+const CALL_ENDS = new Set(['returned', 'failed', 'cancelled', 'timed_out']);
+
 /**
  * The frames of one leg that may carry an authoring receipt, in order: each turn (each may hold
  * its own compile's calls), the frame the leg reached (required: its configured effort must be
@@ -438,12 +441,16 @@ function carriedEffort(frames, effort) {
     let call = -1;
     let open = false;
     for (const record of records) {
-      if (record?.status === 'invoking') {
+      const status = typeof record?.status === 'string' ? record.status : 'unnamed';
+      if (status === 'invoking') {
         if (open) incomplete.push(`${at} call ${call} has no end before the next invocation`);
         [call, open] = [call + 1, true];
         name(`${at} call ${call} requested_effort`, record.requested_effort);
+      } else if (!CALL_ENDS.has(status)) {
+        // Only the documented ends close a call: any other record is no end of it.
+        incomplete.push(`${at} ${status} record is neither an invocation nor a call end`);
       } else if (!open) {
-        incomplete.push(`${at} ${record?.status ?? 'unnamed'} record with no invocation before it`);
+        incomplete.push(`${at} ${status} record with no invocation before it`);
       } else {
         open = false;
         if (record.status !== 'returned') continue;

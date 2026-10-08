@@ -514,6 +514,16 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
       why: 'the receipts are incomplete: create_turn 0 call 0 has no end before the next invocation' });
   }, WALKS);
 
+  // Root review of a7de13c: only the documented ends close a call.
+  it('closes a call only on a documented end, never on another record', async () => {
+    const [invoking, end] = call('max', 'max', 'max');
+    const judged = journey.judgeJourney(await walked([invoking, { status: 'progress' }, invoking, end]), TICKETS, WORDS,
+      null, 'max');
+    expect(effortChecks(judged)[0]).toMatchObject({ verdict: 'not_exercised',
+      why: 'the receipts are incomplete: create_turn 0 progress record is neither an invocation nor a call end; '
+        + 'create_turn 0 call 0 has no end before the next invocation' });
+  });
+
   it('never passes a turn whose counted calls carry no receipt, nor a count its receipt does not hold', async () => {
     // CREATE asks a question first: that compile counts one call but names no backend receipt.
     const unreceipted = journey.judgeJourney(await walked((line) => (line === 0 ? { calls: 1, backend: null }

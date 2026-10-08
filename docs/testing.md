@@ -362,8 +362,10 @@ the last) to have carried it, by the engine's own receipts: each call's
 (`requested_effort`), a returned call had it taken by the ACP session
 (`transmitted_effort`) and read back (`configured_effort`), and the Session's
 configured `intelligence.effort` names it. Another value fails the leg; an
-incomplete receipt (a call with no end, an end with no invocation before it,
-calls counted that the receipt does not hold), receipts naming no effort, or
+incomplete receipt (a call with no end, an end with no invocation before it, a
+record that is neither an invocation nor a documented end `returned`,
+`failed`, `cancelled` or `timed_out`, calls counted that the receipt does not
+hold), receipts naming no effort, or
 a leg with no returned call leave it `not_exercised`.
 
 ```sh

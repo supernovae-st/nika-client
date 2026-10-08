@@ -36,6 +36,24 @@ export const SESSION_WORK_CONTRACT = 'nika/session-work@0';
 
 /** The capability a native engine identity and a resident's `/health` list once they host Sessions. */
 export const SESSION_HOST_CAPABILITY = 'sessionHost';
+/** The engine (identity) or resident (health) opens a Session with the conversation's own intelligence. */
+export const SESSION_INTELLIGENCE_CAPABILITY = 'sessionIntelligence';
+
+/**
+ * The first-screen words `openSession({ intelligence })` passes, checked for shape only (the
+ * engine reads them): one non-empty line, no control character. `undefined` when none is named.
+ */
+export function sessionIntelligence(options: { intelligence?: unknown }): string | undefined {
+  const words = options.intelligence;
+  if (words === undefined) return undefined;
+  // eslint-disable-next-line no-control-regex
+  if (typeof words !== 'string' || words.trim() === '' || /[\u0000-\u001f\u007f]/.test(words)) {
+    throw new NikaConfigurationError(
+      'openSession: intelligence must be the first-screen words as one non-empty line (no control characters)',
+    );
+  }
+  return words;
+}
 
 /**
  * One frame line or body may carry a whole work snapshot with candidate
@@ -381,6 +399,7 @@ function workMembers(work: Record<string, unknown>, fail: (what: string) => Nika
       for (const key of ['via', 'transport', 'model', 'refusal']) member(chosen, key, at, text(true));
       member(chosen, 'locus', at, text());
       member(chosen, 'ready', at, flag);
+      member(chosen, 'scope', at, text());
     });
     member(intelligence, 'decision', path, (decision, at) => {
       if (decision === null) return;

@@ -1787,6 +1787,17 @@ export interface NikaCompileOutcome {
 export interface NikaSessionOptions {
   /** Stops waiting for the door to open or answer; it never closes or stops the Session. */
   signal?: AbortSignal;
+  /**
+   * `openSession()` only: the intelligence this conversation prepares with,
+   * in the engine's own first-screen words (e.g. `2 deepseek/deepseek-v4-pro`
+   * or `1 acp:claude-code/opus[1m]`), passed as written. It holds for this
+   * conversation alone: the engine neither reads nor writes the operator's
+   * kept choice, and `work.intelligence.selected.scope` reads `conversation`.
+   * Words the engine does not read are a `session_unavailable` refusal in its
+   * own words. Needs the engine's `sessionIntelligence` capability: without
+   * it nothing is started or posted. `attachSession()` refuses it.
+   */
+  intelligence?: string;
 }
 
 /** Options of one command (`submit`, `stop`, `close`). */
@@ -1936,6 +1947,13 @@ export interface NikaSessionSelectedIntelligence {
   ready?: boolean;
   /** Why it cannot, with the fix, when it cannot. */
   refusal?: string | null;
+  /**
+   * Whose choice it is: `conversation` when this conversation's own (named
+   * by `openSession({ intelligence })`, chosen in it or kept by its history),
+   * held for it alone; `operator_default` when the operator's kept choice.
+   * Absent on engines before the conversation-scoped selection.
+   */
+  scope?: 'conversation' | 'operator_default' | (string & {});
   [key: string]: unknown;
 }
 

@@ -29,14 +29,17 @@ const IDENTITY = {
   eventFormatVersion: 1,
   traceFormatVersion: 2,
   supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'trace', 'inputsLiteral', 'compile',
-    ...(process.env.NIKA_FAKE_NO_SESSION_HOST ? [] : ['sessionHost'])],
+    ...(process.env.NIKA_FAKE_NO_SESSION_HOST ? [] : ['sessionHost']),
+    ...(process.env.NIKA_FAKE_SESSION_INTELLIGENCE ? ['sessionIntelligence'] : [])],
 };
 
 if (argv[0] === '--sdk-identity') {
   process.stdout.write(`${JSON.stringify(IDENTITY)}\n`);
   process.exit(0);
 }
-if (argv[0] !== 'session' || argv[1] !== '--json') {
+// `session --json`, optionally with one `--intelligence <words>` (host 92bc996c8 `machine_selection`).
+const selection = argv.length === 4 && argv[2] === '--intelligence' ? argv[3] : undefined;
+if (argv[0] !== 'session' || argv[1] !== '--json' || (argv.length !== 2 && selection === undefined)) {
   process.stderr.write(`fake-nika-session: unsupported argv ${JSON.stringify(argv)}\n`);
   process.exit(3);
 }
@@ -47,6 +50,13 @@ const RICH = process.env.NIKA_FAKE_SESSION_WORK
   ? JSON.parse(readFileSync(process.env.NIKA_FAKE_SESSION_WORK, 'utf8'))
   : undefined;
 const CONTENT = '# Digest 🦋\nnika: digest\n# « Relevé — semaine »\ntasks: {}\n';
+// The conversation's own choice, held here only (host 92bc996c8: `scope: conversation`).
+const CHOSEN = selection === undefined ? undefined : {
+  selected: { kind: 'api', via: 'deepseek', transport: null, model: selection.slice(2), locus: 'DeepSeek API',
+    ready: true, refusal: null, scope: 'conversation' },
+  author: { kind: 'provider', model: selection.slice(2), seat: null, transport: null, why: null },
+  decision: null, effort: null,
+};
 let event = 0;
 let seq = 0;
 let current;
@@ -89,6 +99,7 @@ function publish() {
       request: { goal: null, decisions: [], unresolved: [] },
       authoring: RICH?.authoring ?? null,
       ...(RICH ? { intelligence: RICH.intelligence } : {}),
+      ...(CHOSEN ? { intelligence: CHOSEN } : {}),
       waiting,
       candidate,
       saved,
@@ -100,6 +111,14 @@ function publish() {
     },
   };
   return current;
+}
+
+if (selection !== undefined && !/^2 deepseek\//.test(selection)) {
+  // Words the census does not read: one refused line in its own words, exit 3, no Session.
+  await new Promise((resolve) => emitAs('', { frame: 'refused', error: 'session_unavailable',
+    message: `the intelligence \`${selection}\` is not one this machine reads · choose one the first screen lists` },
+  resolve));
+  process.exit(3);
 }
 
 if (process.env.NIKA_FAKE_SESSION_LOCKED) {

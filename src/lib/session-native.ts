@@ -68,11 +68,14 @@ export interface NativeSessionOptions {
   signal?: AbortSignal;
   /** Events the handle retains for a view opened after them (the client's `eventBufferSize`). */
   retention: number;
+  /** The conversation's own first-screen words (`--intelligence`), when the opener names them. */
+  intelligence?: string;
 }
 
 export async function openNativeSession(options: NativeSessionOptions): Promise<SessionChannel> {
   options.signal?.throwIfAborted();
-  const child = spawn(options.bin, ['session', '--json'], {
+  const selection = options.intelligence === undefined ? [] : ['--intelligence', options.intelligence];
+  const child = spawn(options.bin, ['session', '--json', ...selection], {
     cwd: options.cwd,
     shell: false,
     stdio: ['pipe', 'pipe', 'pipe'],

@@ -28,7 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   frames the engine's host recorded from both doors at `e849d08ea` and on the
   merged `eb89e1893` (the current Work members, and a resident's Run cost
   review: a stale yes refused with its line, one admission and its replay, a
-  decline that admits nothing). The observed Run is typed (`NikaSessionRun`,
+  decline that admits nothing). `openSession({ intelligence })` opens the
+  Session with an intelligence held for this conversation alone, in the
+  engine's own first-screen words (natively `--intelligence`, over HTTP the
+  `intelligence` member of the open body), gated on `sessionIntelligence`
+  before anything starts or is posted; the operator's kept choice is neither
+  read nor written, and `selected.scope` (`conversation`,
+  `operator_default`) is typed and checked in place. The observed Run is typed (`NikaSessionRun`,
   `NikaSessionRunEnd`) and checked in place: every member written, `null`
   where its observation carried none, never filled by the SDK; a Run without
   `workflow_sha256` does not prove which bytes ran.

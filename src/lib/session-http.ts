@@ -51,10 +51,15 @@ export interface HttpSessionPort {
   sseLimits(maxBytes: number): SseLimits;
 }
 
-export async function openHttpSession(port: HttpSessionPort, signal?: AbortSignal): Promise<SessionChannel> {
+export async function openHttpSession(
+  port: HttpSessionPort,
+  signal?: AbortSignal,
+  intelligence?: string,
+): Promise<SessionChannel> {
   const path = '/v1/sessions';
-  // The host opens on no body or on the contract it speaks; the contract is stated, as JSON.
-  const body = JSON.stringify({ contract: SESSION_HOST_CONTRACT });
+  // The host opens on no body or on the contract it speaks; the contract is stated, as JSON, with
+  // the conversation's own first-screen words when the opener names them.
+  const body = JSON.stringify({ contract: SESSION_HOST_CONTRACT, ...(intelligence === undefined ? {} : { intelligence }) });
   const frame = await exchange(port, path,
     { method: 'POST', signal, body, headers: { 'Content-Type': 'application/json' } }, [201], false);
   if (frame.frame !== 'opened') throw new NikaProtocolError(transport, 'POST /v1/sessions did not answer opened');

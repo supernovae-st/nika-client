@@ -35,6 +35,24 @@ Without the capability, `openSession()` fails with `NikaCompatibilityError`
 before any process is started or request is posted. The SDK never falls back
 to the interactive terminal or to `compile()`.
 
+### The conversation's own intelligence
+
+`openSession({ intelligence: '2 deepseek/deepseek-v4-pro' })` opens the
+Session with an intelligence chosen for this conversation alone, in the
+engine's own first-screen words, passed as written: natively
+`nika session --json --intelligence <words>`, over HTTP the `intelligence`
+member beside the contract in `POST /v1/sessions`. The engine neither reads
+nor writes the operator's kept choice, so opening this way never changes what
+the person's next Session starts with; `work.intelligence.selected.scope`
+reads `conversation` (`operator_default` for the operator's kept choice).
+Words the engine does not read come back as a `session_unavailable` refusal
+in its own words (`NikaSessionRefusedError`; status 409 over HTTP). It needs
+the `sessionIntelligence` capability, in the engine identity or `/health`:
+without it, nothing is started or posted (`NikaCompatibilityError`), and the
+SDK never answers the first screen for you. `attachSession()` refuses the
+option: a live Session keeps its own choice, which `/intelligence <words>`
+changes from inside it.
+
 ## A line names the snapshot it answers
 
 Every published snapshot has an opaque handle. `submit(snapshot, line)` sends

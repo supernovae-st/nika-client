@@ -59,7 +59,13 @@ import {
 } from './compile.js';
 import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
 import { readSettlement } from './settlement.js';
-import { callerSessionId, SESSION_HOST_CAPABILITY, type SessionChannel } from './session-host.js';
+import {
+  callerSessionId,
+  SESSION_HOST_CAPABILITY,
+  SESSION_INTELLIGENCE_CAPABILITY,
+  sessionIntelligence,
+  type SessionChannel,
+} from './session-host.js';
 import { attachHttpSession, openHttpSession, type HttpSessionPort } from './session-http.js';
 import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
 import type { Transport, TransportRun } from './transport.js';
@@ -570,26 +576,41 @@ export class HttpTransport implements Transport {
    * project world and its runs; the client sends lines and reads frames.
    */
   async openSession(options: NikaSessionOptions, _retention: number): Promise<SessionChannel> {
-    await this.requireSessionHost();
-    return openHttpSession(this.sessionPort(), options.signal);
+    const intelligence = sessionIntelligence(options);
+    await this.requireSessionHost(intelligence !== undefined);
+    return openHttpSession(this.sessionPort(), options.signal, intelligence);
   }
 
   /** The live Session a `session_live` refusal (or an earlier `openSession`) named. */
   async attachSession(id: string, options: NikaSessionOptions): Promise<SessionChannel> {
     const session = callerSessionId(id);
+    if (options.intelligence !== undefined) {
+      throw new NikaConfigurationError(
+        'attachSession: a live Session keeps its own intelligence; choose another in it (`/intelligence <words>`)',
+      );
+    }
     await this.requireSessionHost();
     return attachHttpSession(this.sessionPort(), session, options.signal);
   }
 
-  private async requireSessionHost(): Promise<void> {
+  private async requireSessionHost(choosing = false): Promise<void> {
     const identity = await this.ensureServerIdentity();
-    if (identity.supportedCapabilities.includes(SESSION_HOST_CAPABILITY)) return;
-    throw this.gap(
-      SESSION_HOST_CAPABILITY,
-      `The connected nika serve ${identity.engineVersion} does not advertise ${SESSION_HOST_CAPABILITY} `
-      + `(advertised: ${identity.supportedCapabilities.join(', ') || 'nothing'}): it hosts no authoring `
-      + 'Session. Nothing was posted',
-    );
+    const advertised = identity.supportedCapabilities.join(', ') || 'nothing';
+    if (!identity.supportedCapabilities.includes(SESSION_HOST_CAPABILITY)) {
+      throw this.gap(
+        SESSION_HOST_CAPABILITY,
+        `The connected nika serve ${identity.engineVersion} does not advertise ${SESSION_HOST_CAPABILITY} `
+        + `(advertised: ${advertised}): it hosts no authoring Session. Nothing was posted`,
+      );
+    }
+    if (choosing && !identity.supportedCapabilities.includes(SESSION_INTELLIGENCE_CAPABILITY)) {
+      throw this.gap(
+        SESSION_INTELLIGENCE_CAPABILITY,
+        `The connected nika serve ${identity.engineVersion} does not advertise ${SESSION_INTELLIGENCE_CAPABILITY} `
+        + `(advertised: ${advertised}): it cannot open a Session with this conversation's own intelligence. `
+        + 'Nothing was posted',
+      );
+    }
   }
 
   /** What the Session door borrows: authenticated requests, bounded bodies, Serve's refusals. */

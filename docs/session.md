@@ -79,6 +79,7 @@ interface needs to show and verify without reading anything else:
 | `candidate.revision` | `NikaSessionDocumentRevision \| null` | how the candidate revised its complete document, bound to its bytes: `mode`, `base_sha256` and `candidate_sha256` (sha256), `changed` in order, `preservation`, and each component's identity, bindings and `witness`; a compact projection of the compile's record |
 | `authoring.draft` | `string \| null` | the compiler's candidate bytes, proposed or not: what to show while a question waits; showing it consents to nothing |
 | `authoring.calls` | `NikaSessionAuthoringCalls \| null` | the compiler's receipt of its authoring calls: the model they asked for (`requested_model`, never what served them), how many, the reported usage (`null` when unknown, never `0`) and the `backend` as its transport named it; `null` when the compile made no call |
+| `question` | `NikaSessionQuestion`, absent otherwise | the compiler's own question while `waiting` is a `question` naming the same key: `key`, `label`, `type` (`text`, `literal`, `choice`, or `other` for a shape the engine does not name), `why`, `mandatory`, and `options` (`[{ key, label }]`, in the compiler's order) for a choice that has some; absent when no question waits, never `null` (host `46817419a`). The answer still names `waiting.id` |
 | `intelligence` | `NikaSessionIntelligence` | configured facts: the person's `selected` intelligence as the engine's machine resolved it, the `author` seat, the `decision` seat selected and the `effort`; a selection is never the model that served a call |
 | `run` | `NikaSessionRun \| null` | the last observed Run with only the identities its observation carried: `current` (the Run of the workflow saved last), `workflow`, `end` (`{ end }`, plus `exit` for `unknown`), `trace`, `execution`, `workflow_sha256` (the source hash its start named), `chain_head`, `chain_len`; every member written, `null` where unobserved. A Run without `workflow_sha256` does not prove which bytes ran: both session-host doors observed none up to host `4271f09ef`; from host `b5d844d84` a run names what it observed of itself (recorded here from a real resident over HTTP at `312c3d5a8`: the sha256 of the bytes it ran, the job's execution uuid and opaque trace, the receipt head) |
 
@@ -155,10 +156,10 @@ then `cc08ea08f` with `run_unobserved`; not yet released). Besides tests
 against a synthetic host, the handle is driven over frames that host recorded
 from its real native and HTTP doors at `e849d08ea`, again on the merged
 `eb89e1893`, whose Work carries the current members, with a resident's Run
-cost review, and at `312c3d5a8`, whose selection names its scope, with one Run
-of a real resident through its HTTP Session door
-(`test/fixtures/session-host/`): it sends the recorded commands and decodes
-every recorded frame unchanged. The 0.123 integration engine registers
+cost review, at `312c3d5a8`, whose selection names its scope, with one Run
+of a real resident through its HTTP Session door, and at `46817419a`, whose
+Work names the question that waits (`test/fixtures/session-host/`): it sends
+the recorded commands and decodes every recorded frame unchanged. The 0.123 integration engine registers
 `nika session --json` (`3688552f3`); the served `/v1/sessions` routes arrive
 with `nika serve --sessions`. `scripts/run-session-parity-e2e.mjs` qualifies
 both doors of one binary once it hosts them (see `docs/testing.md`).

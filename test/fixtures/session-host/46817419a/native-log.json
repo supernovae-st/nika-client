@@ -1,0 +1,481 @@
+[
+  {
+    "contract": "nika/session-host@1",
+    "event": 1,
+    "frame": "opened",
+    "notices": [],
+    "session": "ses_566f58050556a6079f39c20fe7cf0083",
+    "snapshot": {
+      "busy": null,
+      "seq": 1,
+      "snapshot": "snp_0245e75bb3178d0f70d56a79390c487b",
+      "work": {
+        "authoring": null,
+        "candidate": null,
+        "contract": "nika/session-work@0",
+        "intelligence": {
+          "author": {
+            "kind": "deterministic",
+            "model": null,
+            "seat": null,
+            "transport": null,
+            "why": null
+          },
+          "decision": null,
+          "effort": null,
+          "selected": {
+            "kind": "local",
+            "locus": "local · private · project context stays on this machine",
+            "model": null,
+            "ready": true,
+            "refusal": null,
+            "scope": "operator_default",
+            "transport": null,
+            "via": "ollama"
+          }
+        },
+        "rail": {
+          "active": "pending",
+          "checked": "pending",
+          "draft": "pending",
+          "run": "pending",
+          "saved": "pending"
+        },
+        "request": {
+          "decisions": [],
+          "goal": null,
+          "unresolved": []
+        },
+        "requested": null,
+        "root": "/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpthrjgA",
+        "run": null,
+        "saved": null,
+        "waiting": {
+          "kind": "free"
+        }
+      }
+    }
+  },
+  {
+    "command": "c-1",
+    "contract": "nika/session-host@1",
+    "event": 2,
+    "frame": "accepted",
+    "op": "submit",
+    "session": "ses_566f58050556a6079f39c20fe7cf0083"
+  },
+  {
+    "command": "c-1",
+    "contract": "nika/session-host@1",
+    "done": true,
+    "event": 3,
+    "frame": "activity",
+    "note": "recorded 1 requirement",
+    "phase": "understanding",
+    "session": "ses_566f58050556a6079f39c20fe7cf0083"
+  },
+  {
+    "command": "c-1",
+    "contract": "nika/session-host@1",
+    "event": 4,
+    "frame": "result",
+    "op": "submit",
+    "outcomes": [
+      {
+        "kind": "proposal",
+        "proposal": "0bf7aa9d6449a0e567e68cb449423fbf63f1d5c3ebc0e591548d7d65746e3975",
+        "text": "Nika proposes `compiled-workflow.nika`:\nDoes\n  1. read_source · reads a file\n  2. write_output · writes a file\nRuns\n  when you ask (« run it ») · no schedule was asked\nCan touch\n  external effects · none\n  human approval at run · none\nChanges\n  + `compiled-workflow.nika` · 33 lines · new\nNeeds\n  nothing more from you\nNothing has run yet · `yes` saves these exact bytes and checks them · running is its own line (« run it »)\nproposed change · Read ./notes/brief.md and write it to ./out/copy.md\n  creates `compiled-workflow.nika` (33 lines)\n  ┌─ `compiled-workflow.nika`\n  │ const:\n  │   output_path: ./out/copy.md\n  │   source_path: ./notes/brief.md\n  │ nika: compiled-workflow\n  │ outputs:\n  │   write_status: ${{ tasks.write_output.status }}\n  │ permits:\n  │   fs:\n  │     read:\n  │     - ./notes/brief.md\n  │     write:\n  │     - ./out/copy.md\n  │   tools:\n  │   - nika:read\n  │   - nika:write\n  │ tasks: 2 (in run order above)\n  └─ `/show` prints the exact 33 lines\n  check of these bytes · `compiled-workflow.nika` · clean ✔\n  when it runs:\n    · reads ./notes/brief.md\n    · writes ./out/copy.md\n    · tools nika:read · nika:write\n    · model output estimate · $0 · no direct model task in these checked bytes\napply this? (yes applies · no discards · questions keep it pending · nothing is written until you say yes)  identity 0bf7aa9d6449 · `/show` the exact bytes · `/meaning` your request clause by clause · `yes` applies · `no` discards\nmoney: $0.25 USD · session default · proposal/Run ceiling · no project default · policy cap unknown · machine cap unknown · execution requires a separate Run and downstream admission\nSession inference: no Session budget; no aggregate inference allowance; qualified priced calls observed at catalog estimates, never capped; separate from the proposal/Run ceiling; catalog estimates are not invoices or a hard billing cap; billed cost unknown\n"
+      }
+    ],
+    "replayed": false,
+    "session": "ses_566f58050556a6079f39c20fe7cf0083",
+    "snapshot": {
+      "busy": null,
+      "seq": 2,
+      "snapshot": "snp_c4c24261e511f74c69d4be1ba84de3b9",
+      "work": {
+        "authoring": {
+          "calls": null,
+          "candidate": "51835c93e564b92cd838bb291ac0ef3d9d4fb51da10021f402931e6bac0fd1cd",
+          "diagnostics": [],
+          "draft": "const:\n  output_path: ./out/copy.md\n  source_path: ./notes/brief.md\nnika: compiled-workflow\noutputs:\n  write_status: ${{ tasks.write_output.status }}\npermits:\n  fs:\n    read:\n    - ./notes/brief.md\n    write:\n    - ./out/copy.md\n  tools:\n  - nika:read\n  - nika:write\ntasks:\n  read_source:\n    invoke:\n      args:\n        path: ${{ const.source_path }}\n      tool: nika:read\n  write_output:\n    after:\n      read_source: success\n    invoke:\n      args:\n        content: ${{ with.content }}\n        create_dirs: true\n        overwrite: true\n        path: ${{ const.output_path }}\n      tool: nika:write\n    with:\n      content: ${{ tasks.read_source.output }}\n",
+          "questions": [],
+          "status": "ready"
+        },
+        "candidate": {
+          "aside": false,
+          "files": [
+            {
+              "audit": {
+                "clean": true,
+                "findings": [],
+                "world": {
+                  "basis": "declared",
+                  "credentials": [],
+                  "places": [
+                    {
+                      "kind": "file_read",
+                      "target": "./notes/brief.md",
+                      "tasks": [
+                        "read_source"
+                      ]
+                    },
+                    {
+                      "kind": "file_write",
+                      "target": "./out/copy.md",
+                      "tasks": [
+                        "write_output"
+                      ]
+                    }
+                  ],
+                  "reach": "local"
+                }
+              },
+              "bytes": "51835c93e564b92cd838bb291ac0ef3d9d4fb51da10021f402931e6bac0fd1cd",
+              "content": "const:\n  output_path: ./out/copy.md\n  source_path: ./notes/brief.md\nnika: compiled-workflow\noutputs:\n  write_status: ${{ tasks.write_output.status }}\npermits:\n  fs:\n    read:\n    - ./notes/brief.md\n    write:\n    - ./out/copy.md\n  tools:\n  - nika:read\n  - nika:write\ntasks:\n  read_source:\n    invoke:\n      args:\n        path: ${{ const.source_path }}\n      tool: nika:read\n  write_output:\n    after:\n      read_source: success\n    invoke:\n      args:\n        content: ${{ with.content }}\n        create_dirs: true\n        overwrite: true\n        path: ${{ const.output_path }}\n      tool: nika:write\n    with:\n      content: ${{ tasks.read_source.output }}\n",
+              "landing": "create",
+              "path": "compiled-workflow.nika",
+              "replaces": null,
+              "workflow": true
+            }
+          ],
+          "proposal": "0bf7aa9d6449a0e567e68cb449423fbf63f1d5c3ebc0e591548d7d65746e3975",
+          "rehearsed": false,
+          "revision": null,
+          "run_after_save": false
+        },
+        "contract": "nika/session-work@0",
+        "intelligence": {
+          "author": {
+            "kind": "deterministic",
+            "model": null,
+            "seat": null,
+            "transport": null,
+            "why": null
+          },
+          "decision": null,
+          "effort": null,
+          "selected": {
+            "kind": "local",
+            "locus": "local · private · project context stays on this machine",
+            "model": null,
+            "ready": true,
+            "refusal": null,
+            "scope": "operator_default",
+            "transport": null,
+            "via": "ollama"
+          }
+        },
+        "rail": {
+          "active": "pending",
+          "checked": "pending",
+          "draft": "done",
+          "run": "pending",
+          "saved": "pending"
+        },
+        "request": {
+          "decisions": [],
+          "goal": "Read ./notes/brief.md and write it to ./out/copy.md",
+          "unresolved": []
+        },
+        "requested": null,
+        "root": "/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpthrjgA",
+        "run": null,
+        "saved": null,
+        "waiting": {
+          "kind": "consent",
+          "proposal": "0bf7aa9d6449a0e567e68cb449423fbf63f1d5c3ebc0e591548d7d65746e3975"
+        }
+      }
+    }
+  },
+  {
+    "command": "c-3",
+    "contract": "nika/session-host@1",
+    "event": 5,
+    "frame": "accepted",
+    "op": "submit",
+    "session": "ses_566f58050556a6079f39c20fe7cf0083"
+  },
+  {
+    "command": "c-3",
+    "contract": "nika/session-host@1",
+    "event": 6,
+    "frame": "result",
+    "op": "submit",
+    "outcomes": [
+      {
+        "kind": "facts",
+        "text": "applied · wrote `compiled-workflow.nika`\n  source freshness not judged: the compiler recorded no source fact these bytes rely on (they read `./notes/brief.md`)\n  check · `compiled-workflow.nika` · clean ✔\nSaved · checked · not active · nothing has run\n  say « run it » to run it once (a ceiling is announced first)"
+      }
+    ],
+    "replayed": false,
+    "session": "ses_566f58050556a6079f39c20fe7cf0083",
+    "snapshot": {
+      "busy": null,
+      "seq": 3,
+      "snapshot": "snp_99dfea8e70750057c51ac91a0f64b5a8",
+      "work": {
+        "authoring": {
+          "calls": null,
+          "candidate": "51835c93e564b92cd838bb291ac0ef3d9d4fb51da10021f402931e6bac0fd1cd",
+          "diagnostics": [],
+          "draft": "const:\n  output_path: ./out/copy.md\n  source_path: ./notes/brief.md\nnika: compiled-workflow\noutputs:\n  write_status: ${{ tasks.write_output.status }}\npermits:\n  fs:\n    read:\n    - ./notes/brief.md\n    write:\n    - ./out/copy.md\n  tools:\n  - nika:read\n  - nika:write\ntasks:\n  read_source:\n    invoke:\n      args:\n        path: ${{ const.source_path }}\n      tool: nika:read\n  write_output:\n    after:\n      read_source: success\n    invoke:\n      args:\n        content: ${{ with.content }}\n        create_dirs: true\n        overwrite: true\n        path: ${{ const.output_path }}\n      tool: nika:write\n    with:\n      content: ${{ tasks.read_source.output }}\n",
+          "questions": [],
+          "status": "ready"
+        },
+        "candidate": null,
+        "contract": "nika/session-work@0",
+        "intelligence": {
+          "author": {
+            "kind": "deterministic",
+            "model": null,
+            "seat": null,
+            "transport": null,
+            "why": null
+          },
+          "decision": null,
+          "effort": null,
+          "selected": {
+            "kind": "local",
+            "locus": "local · private · project context stays on this machine",
+            "model": null,
+            "ready": true,
+            "refusal": null,
+            "scope": "operator_default",
+            "transport": null,
+            "via": "ollama"
+          }
+        },
+        "rail": {
+          "active": "pending",
+          "checked": "done",
+          "draft": "done",
+          "run": "pending",
+          "saved": "done"
+        },
+        "request": {
+          "decisions": [
+            "applied proposal 0bf7aa9d6449 · wrote `compiled-workflow.nika`"
+          ],
+          "goal": "Read ./notes/brief.md and write it to ./out/copy.md",
+          "unresolved": []
+        },
+        "requested": null,
+        "root": "/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpthrjgA",
+        "run": null,
+        "saved": {
+          "check_clean": true,
+          "workflow": "compiled-workflow.nika",
+          "world": {
+            "basis": "declared",
+            "credentials": [],
+            "places": [
+              {
+                "kind": "file_read",
+                "target": "./notes/brief.md",
+                "tasks": [
+                  "read_source"
+                ]
+              },
+              {
+                "kind": "file_write",
+                "target": "./out/copy.md",
+                "tasks": [
+                  "write_output"
+                ]
+              }
+            ],
+            "reach": "local"
+          }
+        },
+        "waiting": {
+          "kind": "free"
+        }
+      }
+    }
+  },
+  {
+    "command": "s-1",
+    "contract": "nika/session-host@1",
+    "event": 7,
+    "frame": "result",
+    "op": "stop",
+    "receipt": "nothing_to_stop",
+    "replayed": false,
+    "session": "ses_566f58050556a6079f39c20fe7cf0083",
+    "snapshot": {
+      "busy": null,
+      "seq": 3,
+      "snapshot": "snp_99dfea8e70750057c51ac91a0f64b5a8",
+      "work": {
+        "authoring": {
+          "calls": null,
+          "candidate": "51835c93e564b92cd838bb291ac0ef3d9d4fb51da10021f402931e6bac0fd1cd",
+          "diagnostics": [],
+          "draft": "const:\n  output_path: ./out/copy.md\n  source_path: ./notes/brief.md\nnika: compiled-workflow\noutputs:\n  write_status: ${{ tasks.write_output.status }}\npermits:\n  fs:\n    read:\n    - ./notes/brief.md\n    write:\n    - ./out/copy.md\n  tools:\n  - nika:read\n  - nika:write\ntasks:\n  read_source:\n    invoke:\n      args:\n        path: ${{ const.source_path }}\n      tool: nika:read\n  write_output:\n    after:\n      read_source: success\n    invoke:\n      args:\n        content: ${{ with.content }}\n        create_dirs: true\n        overwrite: true\n        path: ${{ const.output_path }}\n      tool: nika:write\n    with:\n      content: ${{ tasks.read_source.output }}\n",
+          "questions": [],
+          "status": "ready"
+        },
+        "candidate": null,
+        "contract": "nika/session-work@0",
+        "intelligence": {
+          "author": {
+            "kind": "deterministic",
+            "model": null,
+            "seat": null,
+            "transport": null,
+            "why": null
+          },
+          "decision": null,
+          "effort": null,
+          "selected": {
+            "kind": "local",
+            "locus": "local · private · project context stays on this machine",
+            "model": null,
+            "ready": true,
+            "refusal": null,
+            "scope": "operator_default",
+            "transport": null,
+            "via": "ollama"
+          }
+        },
+        "rail": {
+          "active": "pending",
+          "checked": "done",
+          "draft": "done",
+          "run": "pending",
+          "saved": "done"
+        },
+        "request": {
+          "decisions": [
+            "applied proposal 0bf7aa9d6449 · wrote `compiled-workflow.nika`"
+          ],
+          "goal": "Read ./notes/brief.md and write it to ./out/copy.md",
+          "unresolved": []
+        },
+        "requested": null,
+        "root": "/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpthrjgA",
+        "run": null,
+        "saved": {
+          "check_clean": true,
+          "workflow": "compiled-workflow.nika",
+          "world": {
+            "basis": "declared",
+            "credentials": [],
+            "places": [
+              {
+                "kind": "file_read",
+                "target": "./notes/brief.md",
+                "tasks": [
+                  "read_source"
+                ]
+              },
+              {
+                "kind": "file_write",
+                "target": "./out/copy.md",
+                "tasks": [
+                  "write_output"
+                ]
+              }
+            ],
+            "reach": "local"
+          }
+        },
+        "waiting": {
+          "kind": "free"
+        }
+      }
+    },
+    "target": null
+  },
+  {
+    "contract": "nika/session-host@1",
+    "event": 8,
+    "frame": "closed",
+    "session": "ses_566f58050556a6079f39c20fe7cf0083",
+    "snapshot": {
+      "busy": null,
+      "seq": 3,
+      "snapshot": "snp_99dfea8e70750057c51ac91a0f64b5a8",
+      "work": {
+        "authoring": {
+          "calls": null,
+          "candidate": "51835c93e564b92cd838bb291ac0ef3d9d4fb51da10021f402931e6bac0fd1cd",
+          "diagnostics": [],
+          "draft": "const:\n  output_path: ./out/copy.md\n  source_path: ./notes/brief.md\nnika: compiled-workflow\noutputs:\n  write_status: ${{ tasks.write_output.status }}\npermits:\n  fs:\n    read:\n    - ./notes/brief.md\n    write:\n    - ./out/copy.md\n  tools:\n  - nika:read\n  - nika:write\ntasks:\n  read_source:\n    invoke:\n      args:\n        path: ${{ const.source_path }}\n      tool: nika:read\n  write_output:\n    after:\n      read_source: success\n    invoke:\n      args:\n        content: ${{ with.content }}\n        create_dirs: true\n        overwrite: true\n        path: ${{ const.output_path }}\n      tool: nika:write\n    with:\n      content: ${{ tasks.read_source.output }}\n",
+          "questions": [],
+          "status": "ready"
+        },
+        "candidate": null,
+        "contract": "nika/session-work@0",
+        "intelligence": {
+          "author": {
+            "kind": "deterministic",
+            "model": null,
+            "seat": null,
+            "transport": null,
+            "why": null
+          },
+          "decision": null,
+          "effort": null,
+          "selected": {
+            "kind": "local",
+            "locus": "local · private · project context stays on this machine",
+            "model": null,
+            "ready": true,
+            "refusal": null,
+            "scope": "operator_default",
+            "transport": null,
+            "via": "ollama"
+          }
+        },
+        "rail": {
+          "active": "pending",
+          "checked": "done",
+          "draft": "done",
+          "run": "pending",
+          "saved": "done"
+        },
+        "request": {
+          "decisions": [
+            "applied proposal 0bf7aa9d6449 · wrote `compiled-workflow.nika`"
+          ],
+          "goal": "Read ./notes/brief.md and write it to ./out/copy.md",
+          "unresolved": []
+        },
+        "requested": null,
+        "root": "/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpthrjgA",
+        "run": null,
+        "saved": {
+          "check_clean": true,
+          "workflow": "compiled-workflow.nika",
+          "world": {
+            "basis": "declared",
+            "credentials": [],
+            "places": [
+              {
+                "kind": "file_read",
+                "target": "./notes/brief.md",
+                "tasks": [
+                  "read_source"
+                ]
+              },
+              {
+                "kind": "file_write",
+                "target": "./out/copy.md",
+                "tasks": [
+                  "write_output"
+                ]
+              }
+            ],
+            "reach": "local"
+          }
+        },
+        "waiting": {
+          "kind": "free"
+        }
+      }
+    }
+  }
+]

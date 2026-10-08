@@ -10,6 +10,7 @@ import type {
   NikaSessionAuthoringCalls,
   NikaSessionCandidateFile,
   NikaSessionIntelligence,
+  NikaSessionQuestion,
   NikaSessionRun,
   NikaSessionRunEnd,
   NikaSessionWork,
@@ -63,6 +64,10 @@ const revision = () => ({
 const observedRun = (): Record<string, any> => ({ current: true, workflow: 'digest.nika', end: { end: 'succeeded' },
   trace: '/srv/project/.nika/traces/run.ndjson', execution: null, workflow_sha256: null, chain_head: null,
   chain_len: null });
+
+/** A waiting question as `nika-session-change` serializes it (host 46817419a): no options unless a choice has some. */
+const question = (): Record<string, any> => ({ key: 'model', label: 'Which provider/model runs the language steps?',
+  type: 'text', why: 'The compiler cannot invent this authoring value.', mandatory: true });
 
 function refusal(body: Record<string, any>): NikaProtocolError {
   try {
@@ -150,6 +155,26 @@ describe('Session work members', () => {
       chain_head: 'h'.repeat(64), chain_len: 9 } });
     expect((sessionFrame(opened(named), 'http').snapshot as { work: NikaSessionWork }).work.run)
       .toMatchObject({ execution: 'exe-1', chain_len: 9 });
+  });
+
+  it('types the waiting question as the compiler asked it, a choice\'s options in its order', () => {
+    const asked = { key: 'tone', label: 'Which tone?', type: 'choice', why: 'The digest reads it.', mandatory: false,
+      options: [{ key: 'warm', label: 'Warm' }, { key: 'dry', label: 'Dry', future_option_member: 'kept' }],
+      future_question_member: 'kept' };
+    const waiting = (key: string) => ({ kind: 'question', key, id: 'q'.repeat(64) });
+    const body = work({ waiting: waiting('tone'), candidate: null, question: asked });
+    const typed = (sessionFrame(opened(body), 'http').snapshot as { work: NikaSessionWork }).work;
+    const found: NikaSessionQuestion = typed.question!;
+    expect(found).toBe(asked);
+    expect(found.options!.map((option) => option.key)).toEqual(['warm', 'dry']);
+    expect([found.future_question_member, found.options![1]!.future_option_member]).toEqual(['kept', 'kept']);
+    // A question without options, a shape the engine does not name, and no question at all.
+    for (const type of ['text', 'literal', 'other']) {
+      const plain = work({ waiting: waiting('model'), candidate: null, question: { ...question(), type } });
+      expect((sessionFrame(opened(plain), 'http').snapshot as { work: NikaSessionWork }).work.question)
+        .toEqual({ ...question(), type });
+    }
+    expect((sessionFrame(opened(work()), 'http').snapshot as { work: NikaSessionWork }).work.question).toBeUndefined();
   });
 
   it('decodes every Run the merged host recorded, unchanged', () => {
@@ -250,6 +275,18 @@ describe('Session work members', () => {
       /work\.run\.end\.end is absent/],
     ['an exit as text', (b) => { b.run = { ...observedRun(), end: { end: 'unknown', exit: 'seven' } }; },
       /work\.run\.end\.exit is not a count/],
+    // The engine leaves the question out when none waits: a written `null` is another shape.
+    ['a question as null', (b) => { b.question = null; }, /work\.question is not an object/],
+    ['a question without its label', (b) => { b.question = question(); delete b.question.label; },
+      /work\.question\.label is absent/],
+    ['a question type as a number', (b) => { b.question = { ...question(), type: 1 }; },
+      /work\.question\.type is not text/],
+    ['a mandatory flag as text', (b) => { b.question = { ...question(), mandatory: 'yes' }; },
+      /work\.question\.mandatory is not a boolean/],
+    ['options as an object', (b) => { b.question = { ...question(), type: 'choice', options: {} }; },
+      /work\.question\.options is not a list/],
+    ['an option without its label', (b) => { b.question = { ...question(), type: 'choice', options: [{ key: 'a' }] }; },
+      /work\.question\.options\[0\]\.label is absent/],
   ];
   it.each(malformed)('refuses %s as a protocol fault naming its path, never its value', (_name, mutate, message) => {
     const body = work();

@@ -476,6 +476,8 @@ export type {
   NikaSessionOpened,
   NikaSessionOptions,
   NikaSessionOutcome,
+  NikaSessionQuestion,
+  NikaSessionQuestionOption,
   NikaSessionResult,
   NikaSessionRun,
   NikaSessionRunEnd,

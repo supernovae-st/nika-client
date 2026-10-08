@@ -7,15 +7,15 @@ import type { NikaSessionEvent, NikaSessionResult } from '../src/index.js';
 import { healthResponse, jsonResponse, TOKEN_A } from './helpers/http-depth-harness.js';
 
 // The authoring Session handle over frames `nika-session-host` RECORDED from its real doors at
-// three engine commits (test/fixtures/session-host/<commit>/README.md): e849d08eaf37, the merged
-// eb89e1893, whose Work carries the current members, and 312c3d5a8, whose selection names its
-// scope. Native NDJSON driver and HTTP routes, in-process; the Session reasoner was scripted and
-// never asked; the compiler was the real deterministic one. At 312c3d5a8 one Run was also
-// recorded from a real resident through its HTTP Session door. These tests pin that the SDK
-// sends the recorded commands and decodes every recorded frame losslessly; they are not a run of
-// the shipped binaries.
+// four engine commits (test/fixtures/session-host/<commit>/README.md): e849d08eaf37, the merged
+// eb89e1893, whose Work carries the current members, 312c3d5a8, whose selection names its scope,
+// and 46817419a, whose Work names the question that waits. Native NDJSON driver and HTTP routes,
+// in-process; the Session reasoner was scripted and never asked; the compiler was the real
+// deterministic one. At 312c3d5a8 one Run was also recorded from a real resident through its HTTP
+// Session door. These tests pin that the SDK sends the recorded commands and decodes every
+// recorded frame losslessly; they are not a run of the shipped binaries.
 
-const RECORDINGS = ['e849d08eaf37', 'eb89e1893', '312c3d5a8'];
+const RECORDINGS = ['e849d08eaf37', 'eb89e1893', '312c3d5a8', '46817419a'];
 const recorded = (recording: string, name: string) => JSON.parse(readFileSync(
   new URL(`./fixtures/session-host/${recording}/${name}`, import.meta.url), 'utf8')) as Record<string, any>[];
 const REPLAY_ENGINE = fileURLToPath(new URL('./fixtures/fake-nika-session-replay.mjs', import.meta.url));
@@ -177,7 +177,7 @@ describe.each(RECORDINGS)('recorded HTTP door (%s)', (recording) => {
   });
 });
 
-describe.each(['eb89e1893', '312c3d5a8'])('recorded resident cost review over HTTP (%s)', (recording) => {
+describe.each(['eb89e1893', '312c3d5a8', '46817419a'])('recorded resident cost review over HTTP (%s)', (recording) => {
   it('reviews a Run: a stale yes refused with its line, one admission and its replay, a decline admitting nothing',
     async () => {
       const review = recorded(recording, 'http-run-review.json');
@@ -226,6 +226,28 @@ describe.each(['eb89e1893', '312c3d5a8'])('recorded resident cost review over HT
       expect(sent.filter((request) => request.body?.op !== undefined).map((request) => request.body))
         .toEqual(review.filter((entry) => entry.sent !== null).map((entry) => entry.sent));
     });
+});
+
+describe('recorded waiting question over HTTP (46817419a)', () => {
+  it('types the question the compiler asked while it waits, under the key the waiting names', async () => {
+    const decisions = recorded('46817419a', 'http-decisions.json');
+    const step = (name: string) => decisions.find((entry) => entry.step === name)!;
+    const { client } = resident((method, path, body) => (method === 'POST' && path === '/v1/sessions'
+      ? { status: 201, body: step('open').answered }
+      : { status: 200, body: step(body!.command === 'q-1' ? 'question' : 'answer').answered }));
+    const handle = await client.openSession();
+    expect(handle.opened!.snapshot.work).not.toHaveProperty('question');
+    const asked = await handle.submit(handle.opened!.snapshot, step('question').sent.line, { command: 'q-1' });
+    expect(asked).toEqual(step('question').answered);
+    const { waiting, question } = asked.snapshot.work;
+    expect(question).toEqual({ key: 'model', label: expect.any(String), type: 'text', why: expect.any(String),
+      mandatory: true });
+    expect(waiting).toMatchObject({ kind: 'question', key: question!.key });
+    // An answer the engine refuses keeps the same question, under the same identity, waiting.
+    const answered = await handle.submit(asked.snapshot, step('answer').sent.line, { command: 'q-2' });
+    expect(answered).toEqual(step('answer').answered);
+    expect([answered.snapshot.work.question, answered.snapshot.work.waiting]).toEqual([question, waiting]);
+  });
 });
 
 describe('recorded real resident Run over HTTP (312c3d5a8)', () => {

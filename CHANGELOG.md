@@ -45,7 +45,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   for byte. The observed Run is typed (`NikaSessionRun`,
   `NikaSessionRunEnd`) and checked in place: every member written, `null`
   where its observation carried none, never filled by the SDK; a Run without
-  `workflow_sha256` does not prove which bytes ran.
+  `workflow_sha256` does not prove which bytes ran. The question a Session
+  waits on (`work.question`, host `46817419a`) is typed
+  (`NikaSessionQuestion`: key, label, type, why, mandatory, and a choice's
+  options in the compiler's order) and checked in place when present; it is
+  absent when no question waits, and recorded frames at that head decode
+  unchanged.
 - Compile outcomes type the revision, reuse and intelligence evidence the
   engine records inside `provenance` (0.123 integration carrier `7d98023f9`):
   `plan.source_revision`, `plan.intent_sha256`, `plan.document_revision` and

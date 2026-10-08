@@ -1858,6 +1858,12 @@ export interface NikaSessionWork {
   intelligence?: NikaSessionIntelligence | null;
   /** What the next line answers, by the Session's own precedence. */
   waiting: NikaSessionWaiting;
+  /**
+   * The compiler's own question while `waiting` is a `question` naming the
+   * same key: what a host shows and the shape an answer takes. Absent
+   * otherwise, and on engines before it. The answer still names `waiting.id`.
+   */
+  question?: NikaSessionQuestion;
   /** The candidate under review: the exact changes a consent lands. */
   candidate: NikaSessionCandidate | null;
   /** The workflow the last consent saved. Save is never a Run. */
@@ -1868,6 +1874,32 @@ export interface NikaSessionWork {
   run: NikaSessionRun | null;
   /** The automation rail, each field at its own stage. */
   rail: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/**
+ * The question a Session waits on (`work.question`), as the compiler asked it:
+ * its own question document, field for field.
+ */
+export interface NikaSessionQuestion {
+  /** The semantic hole the answer fills: the waiting question's own key. */
+  key: string;
+  label: string;
+  /** `other` names a shape this engine does not name. */
+  type: 'text' | 'literal' | 'choice' | 'other' | (string & {});
+  /** Why the compiler asks it. */
+  why: string;
+  /** Whether the candidate cannot be ready without the answer. */
+  mandatory: boolean;
+  /** A choice's admissible answers, in the compiler's order; absent otherwise. */
+  options?: NikaSessionQuestionOption[];
+  [key: string]: unknown;
+}
+
+/** One admissible answer of a `choice` question: its key, written as the answer, and its label. */
+export interface NikaSessionQuestionOption {
+  key: string;
+  label: string;
   [key: string]: unknown;
 }
 

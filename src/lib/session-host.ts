@@ -409,6 +409,22 @@ function workMembers(work: Record<string, unknown>, fail: (what: string) => Nika
     });
     member(intelligence, 'effort', path, text(true));
   });
+  // The compiler's question while one waits: the engine leaves it out otherwise (never `null`),
+  // and writes a choice's options only when it has some.
+  member(work, 'question', 'work', (value, path) => {
+    const question = object(value, path);
+    for (const key of ['key', 'label', 'type', 'why']) member(question, key, path, text(), true);
+    member(question, 'mandatory', path, flag, true);
+    member(question, 'options', path, (options, at) => {
+      if (!Array.isArray(options)) throw fail(`${at} is not a list`);
+      options.forEach((entry, index) => {
+        const where = `${at}[${index}]`;
+        const option = object(entry, where);
+        member(option, 'key', where, text(), true);
+        member(option, 'label', where, text(), true);
+      });
+    });
+  });
   // Every member of an observed Run is written, `null` where its observation carried none.
   member(work, 'run', 'work', (value, path) => {
     if (value === null) return;

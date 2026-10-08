@@ -33,7 +33,14 @@ module.exports = async function compileEvidence(sdk, config) {
   }
   return { module_system: config.moduleSystem, rows };
 };
+module.exports.evidenceRow = evidenceRow;
 
+/**
+ * One leg's evidence. The scenario targets a revision: a leg on which the
+ * engine stated none is `exercised: false`, and the runner then withholds
+ * the qualification instead of reading the absence as a pass. A ready leg
+ * keeps its replayable plan and the plan states the revision.
+ */
 function evidenceRow(sdk, door, outcome, config, wallMs) {
   const { provenance } = outcome;
   assert.equal(outcome.compile_version, 2, `${door}: a provider round answers generation 2`);
@@ -61,13 +68,14 @@ function evidenceRow(sdk, door, outcome, config, wallMs) {
     }
   }
   if (outcome.status === 'ready') {
-    assert.notEqual(plan, undefined, `${door}: a ready round keeps its record`);
+    assert.notEqual(plan?.document_revision, undefined, `${door}: a ready revision keeps its plan and states it there`);
   }
   const revision = stated[0];
   const reuse = decision.knowledge_qualification?.reuse;
   const backend = provenance.authoring.backend;
   return {
     door,
+    exercised: stated.length > 0,
     status: outcome.status,
     held,
     plan_kept: plan !== undefined,
@@ -79,6 +87,13 @@ function evidenceRow(sdk, door, outcome, config, wallMs) {
       && config.keptLines.every((line) => outcome.candidate.includes(line)),
     questions: outcome.questions.map((question) => question.key),
     diagnostics: outcome.diagnostics.map((diagnostic) => `${diagnostic.kind}:${diagnostic.target}`),
+    // What the verifier said, in the engine's words: a held candidate is the engine's verdict.
+    judgment: {
+      diagnostics: outcome.diagnostics.filter((diagnostic) => diagnostic.target === 'semantic_verification'
+        || diagnostic.target === 'verify_held' || diagnostic.target === 'verify_resume'),
+      semantic_verification: decision.semantic_verification ?? null,
+      route: decision.route ?? null,
+    },
     strategy: provenance.strategy ?? null,
     revision: revision === undefined ? null : {
       route: revision.route ?? null,

@@ -227,9 +227,14 @@ envelope section) once per door, through a native seat and a seated resident.
 These are separate generations, never compared byte for byte. Each must satisfy
 the evidence law: every revision stated binds the exact base sent and the exact
 candidate received by sha256, a kept plan states the decision's revision, a
-ready round keeps its plan, an `operations` revision keeps the base's untouched
-lines, and the backend's model identities stay apart. The report records each
-round's status, digests, calls, tokens and backend members.
+ready round keeps its plan and states the revision there, an `operations`
+revision keeps the base's untouched lines, and the backend's model identities
+stay apart. A round that stated no revision at all did not exercise what the
+phase targets: its row says `exercised: false`, the report's `result` is
+`not_exercised` and the runner exits 1. A held round whose revision only the
+decision keeps is valid evidence. The report records each round's status,
+digests, calls, tokens, backend members and the verifier's own diagnostics and
+records.
 
 The [2026-09-19 source-build receipt](../evidence/compile-4334e58b-20260919.json)
 records 14 cases across both doors and both module systems at that producer,

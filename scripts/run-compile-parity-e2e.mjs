@@ -155,7 +155,11 @@ try {
   assert.deepEqual(snapshot(stateRoot), stateBefore, 'compile must not create or mutate resident job state');
   const provider = await providerPhase();
   assert.equal(await sha256(binary), binarySha, 'frozen binary changed during parity');
-  report = { result: 'green', scope: 'compile foundation; no general authoring or execution grant',
+  // A provider phase whose rounds stated no revision did not exercise what it targets:
+  // the report keeps every row, and the result withholds the qualification.
+  const exercised = !provider.ran || provider.results.every(({ rows }) => rows.every((row) => row.exercised));
+  report = { result: exercised ? 'green' : 'not_exercised',
+    scope: 'compile foundation; no general authoring or execution grant',
     engine: { version, binary_sha256: binarySha, identity, health },
     sdk: { version: packed.version, package_sha256: await sha256(tarball) },
     openapi_pin: openapiPin, compile_openapi: openapi.paths['/v1/compile'], resident_state_unchanged: true,
@@ -237,9 +241,15 @@ try {
 }
 abort.signal.throwIfAborted();
 if (reportPath) writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
-console.log(`compile parity green after owned cleanup: ${report.results[0].rows.length} cases × 2 doors × 2 module systems`
-  + (report.provider.ran
-    ? `; provider evidence ${report.provider.results.length} module systems × 2 doors on ${report.provider.model}` : ''));
+if (report.result !== 'green') {
+  console.error('compile parity held back: a provider round stated no revision, so the revision evidence was not '
+    + 'exercised (see the report rows)');
+  process.exitCode = 1;
+} else {
+  console.log(`compile parity green after owned cleanup: ${report.results[0].rows.length} cases × 2 doors × 2 module systems`
+    + (report.provider.ran
+      ? `; provider evidence ${report.provider.results.length} module systems × 2 doors on ${report.provider.model}` : ''));
+}
 
 async function sha256(file) {
   const hash = createHash('sha256');

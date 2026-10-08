@@ -101,6 +101,10 @@ keep Serve's own error envelope (`NikaOperationError`).
 ## Status
 
 The handle follows contract `nika/session-host@1` as the engine's
-`nika-session-host` writes it at commit `e079f3e79` (not yet integrated or
-released). Its tests run against synthetic frames written from that source
-until recorded frames from both real doors replace them.
+`nika-session-host` writes it (commits `e079f3e79`, `18479cf38`, `e849d08ea`;
+not yet integrated or released). Besides tests against a synthetic host, the
+handle is driven over frames that host recorded from its real native and HTTP
+doors at `e849d08ea` (`test/fixtures/session-host/`): it sends the recorded
+commands and decodes every recorded frame unchanged. Those doors ran
+in-process; `nika session --json` and the served `/v1/sessions` routes are not
+registered in a released binary yet.

@@ -9,15 +9,21 @@ import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 type Transcript = { module_system: string; door: string; session: string | null; steps: any[]; error: any };
-const { judgeSession, sessionParity, SHARED_STEPS, MODULE_STEPS } =
+const { judgeSession, sessionParity, landedExactly, SHARED_STEPS, MODULE_STEPS } =
   require('../scripts/packed-consumers/session-scenario.cjs') as {
     judgeSession: (report: Transcript) => { verdict: string; checks: { name: string; verdict: string; why?: string }[] };
     sessionParity: (left: Transcript, right: Transcript, steps?: string[]) => { equal: boolean; differences: any[] };
+    landedExactly: (previewed: { content?: unknown } | undefined, landed: Buffer | null) => boolean | null;
     SHARED_STEPS: string[];
     MODULE_STEPS: string[];
   };
 
 const BYTES = 'b'.repeat(64);
+/** The sha256 of the saved workflow's bytes, as the walk records it. */
+const SAVED = 'a'.repeat(64);
+/** The Run a Session observed of the saved workflow, as `work.run` carries it. */
+const OBSERVED = { current: true, workflow: 'compiled-workflow.nika', end: { end: 'succeeded' },
+  trace: '.nika/traces/run.ndjson', execution: 'exe-1', workflow_sha256: SAVED, chain_head: 'h'.repeat(64), chain_len: 9 };
 const FILE = { path: 'compiled-workflow.nika', bytes: BYTES, landing: 'create', workflow: true };
 const frame = (overrides: Record<string, unknown>) => ({ frame: 'result', event: null, op: 'submit', replayed: false,
   receipt: null, outcomes: [], seq: 2, waiting: 'consent', candidate: [FILE], saved: null, requested: null, run: null,
@@ -46,12 +52,14 @@ function walk(door: 'native' | 'http', moduleSystem = 'cjs'): Transcript {
         line: null, seq: null, names_live: true },
     { step: 'consent', ...frame({ event: 6, outcomes: ['facts'], seq: 3, waiting: 'free', candidate: null,
       saved: 'compiled-workflow.nika' }), saved_is_previewed_path: true, saved_bytes_are_previewed: true,
-    saved_sha256: BYTES, run_output_before_run: false },
+    saved_sha256: SAVED, run_output_before_run: false },
     { step: 'stop_idle', ...frame({ event: 7, op: 'stop', receipt: 'nothing_to_stop', seq: 3, waiting: 'free',
       candidate: null, saved: 'compiled-workflow.nika' }) },
     { step: 'run', ...frame({ event: 12, outcomes: ['run_requested', 'facts'], seq: 4, waiting: 'free', candidate: null,
       saved: 'compiled-workflow.nika' }) },
-    { step: 'run_observed', busy: false, waiting: 'free', requested: {}, run: { end: 'succeeded' },
+    { step: 'run_observed', deadline: false, busy: false, waiting: 'free',
+      requested: { workflow: 'compiled-workflow.nika', inputs: [], world: {} }, run: OBSERVED,
+      run_is_saved_workflow: true, run_ran_saved_bytes: true, run_succeeded: true,
       output_sha256: 'c'.repeat(64), output_is_source: true },
     { step: 'stop_racing_a_turn', receipt: 'stop_requested', target: 'c-5',
       settled: frame({ event: 16, outcomes: ['cancelled'], seq: 5, waiting: 'free', candidate: null }),
@@ -115,13 +123,34 @@ describe('a real-door Session walk is judged by the host\'s laws', () => {
 
   it('fails a Run whose output is not the source it copies', () => {
     const judged = judgeSession(edit(walk('native'), 'run_observed', { output_is_source: false }));
-    expect(verdictOf(judged, /same project world/)).toBe('failed');
+    expect(verdictOf(judged, /wrote the copy/)).toBe('failed');
   });
 
-  it('withholds the Run postcondition when the Session started none or could not observe it', () => {
+  // Root review of 9649759 (P2): the file alone never proves the Run. Each mutation touches only
+  // the observed Run (or the polling outcome); the rest of the walk, the output included, is green.
+  const runOnly: [string, Record<string, unknown>, RegExp][] = [
+    ['no observed Run', { run: null }, /observed the requested Run end/],
+    ['a Run with no observed end', { run: { ...OBSERVED, end: null } }, /observed the requested Run end/],
+    ['a failed Run', { run: { ...OBSERVED, end: { end: 'failed' } } }, /succeeded and wrote/],
+    ['a paused Run', { run: { ...OBSERVED, end: { end: 'paused' } } }, /succeeded and wrote/],
+    ['a Run of another workflow', { run: { ...OBSERVED, workflow: 'other.nika' } }, /ran the saved bytes/],
+    ['a Run of other bytes', { run: { ...OBSERVED, workflow_sha256: 'd'.repeat(64) } }, /ran the saved bytes/],
+    ['a Run kept from before the Save', { run: { ...OBSERVED, current: false } }, /ran the saved bytes/],
+    ['a polling deadline reached', { deadline: true }, /observed the requested Run end/],
+    ['a Run still under way', { busy: true }, /observed the requested Run end/],
+  ];
+  it.each(runOnly)('fails %s, whatever the project world shows', (_name, change, check) => {
+    const judged = judgeSession(edit(walk('native'), 'run_observed', change));
+    expect(verdictOf(judged, check)).toBe('failed');
+    expect(judged.verdict).toBe('failed');
+  });
+
+  it('withholds every Run check when the Session started none or could not observe it', () => {
     for (const said of ['run_not_started', 'run_unobserved']) {
       const judged = judgeSession(edit(walk('http'), 'run', { outcomes: ['run_requested', said] }));
-      expect(verdictOf(judged, /same project world/)).toBe('not_exercised');
+      for (const check of [/observed the requested Run end/, /ran the saved bytes/, /wrote the copy/]) {
+        expect(verdictOf(judged, check)).toBe('not_exercised');
+      }
       expect(judged.verdict).toBe('not_exercised');
     }
   });
@@ -151,6 +180,29 @@ describe('a real-door Session walk is judged by the host\'s laws', () => {
       error: { name: 'NikaSessionWaitError', message: 'stopped waiting', code: null, at: 'preview' } };
     expect(judgeSession(partial)).toEqual({ verdict: 'failed', checks: [{ name: 'the walk completed',
       verdict: 'failed', observed: partial.error }] });
+  });
+});
+
+describe('the saved bytes are compared with the previewed content, byte for byte', () => {
+  // Root review of 9649759 (P1): `bytes` is a BLAKE3 witness; the exact bytes are `content`.
+  const CONTENT = '# Copie\r\nnika: copy\r\n# « Relevé — semaine » ✓ 🦋\ttab\nfin sans retour';
+
+  it('accepts exactly the previewed bytes, CRLF and multibyte text included', () => {
+    expect(landedExactly({ content: CONTENT }, Buffer.from(CONTENT, 'utf8'))).toBe(true);
+  });
+
+  it('refuses one changed byte, a lost CR and a missing file', () => {
+    const changed = Buffer.from(CONTENT, 'utf8');
+    changed[changed.length - 1] ^= 0x01;
+    expect(landedExactly({ content: CONTENT }, changed)).toBe(false);
+    expect(landedExactly({ content: CONTENT }, Buffer.from(CONTENT.replaceAll('\r\n', '\n'), 'utf8'))).toBe(false);
+    expect(landedExactly({ content: CONTENT }, null)).toBe(false);
+  });
+
+  it('leaves the bytes unverified when the engine projects no content, never a pass', () => {
+    expect(landedExactly({}, Buffer.from(CONTENT, 'utf8'))).toBeNull();
+    expect(landedExactly(undefined, Buffer.from(CONTENT, 'utf8'))).toBeNull();
+    expect(landedExactly({ content: 42 }, Buffer.from('42'))).toBeNull();
   });
 });
 

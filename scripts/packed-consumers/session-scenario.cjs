@@ -112,13 +112,11 @@ async function walk(sdk, config, steps, open) {
   const saved = consent.snapshot.work.saved;
   const landed = saved?.workflow === undefined ? null : read(saved.workflow);
   const previewed = files.find((file) => file.path === saved?.workflow);
+  const savedSha = landed === null ? null : sha256(landed);
   record('consent', { ...frameRow(consent),
     saved_is_previewed_path: previewed !== undefined,
-    // A previewed file's exact bytes are its `content`; its `bytes` is a BLAKE3 witness this
-    // runner does not compute. Without `content` (an engine before it) the bytes stay unverified.
-    saved_bytes_are_previewed: typeof previewed?.content !== 'string' ? null
-      : landed !== null && landed.equals(Buffer.from(previewed.content, 'utf8')),
-    saved_sha256: landed === null ? null : sha256(landed),
+    saved_bytes_are_previewed: landedExactly(previewed, landed),
+    saved_sha256: savedSha,
     run_output_before_run: existsSync(world('out/copy.md')) });
 
   const idle = await a.stop({ command: 's-1', signal: signal() });
@@ -134,18 +132,27 @@ async function walk(sdk, config, steps, open) {
     after = reviewed.snapshot;
   }
   // The Run's end is observed by the Session itself: read snapshots until no turn is under way and
-  // the Session observed the Run, or said it started none or could not observe its end.
+  // the Session observed the Run, or said it started none or could not observe its end. Reaching
+  // the deadline instead is recorded, never read as an observation.
   const said = (kinds) => steps.some((entry) => (entry.outcomes ?? []).some((kind) => kinds.includes(kind)));
+  const unsettled = () => after.busy !== null
+    || (after.work.run === null && !said(['run_not_started', 'run_unobserved']));
   const until = Date.now() + WAIT_MS;
-  while ((after.busy !== null || (after.work.run === null && !said(['run_not_started', 'run_unobserved'])))
-    && Date.now() < until) {
+  while (unsettled() && Date.now() < until) {
     await new Promise((resolve) => setTimeout(resolve, 200));
     after = await a.snapshot({ signal: signal() });
   }
   const output = read('out/copy.md');
   const source = read('notes/brief.md');
-  record('run_observed', { busy: after.busy !== null, waiting: after.work.waiting.kind, requested: after.work.requested,
-    run: after.work.run, output_sha256: output === null ? null : sha256(output),
+  const observed = after.work.run;
+  record('run_observed', { deadline: unsettled(), busy: after.busy !== null, waiting: after.work.waiting.kind,
+    requested: after.work.requested, run: observed,
+    // The Run the Session observed is the saved workflow's when it names its path and the sha256
+    // of the exact bytes it ran (the trace's `workflow_sha256`) is the saved file's.
+    run_is_saved_workflow: observed !== null && observed.current === true && observed.workflow === saved?.workflow,
+    run_ran_saved_bytes: observed !== null && savedSha !== null && observed.workflow_sha256 === savedSha,
+    run_succeeded: observed?.end?.end === 'succeeded',
+    output_sha256: output === null ? null : sha256(output),
     output_is_source: output !== null && source !== null && output.equals(source) });
 
   // A second request with a Stop right behind it: the receipt says whether the turn was still
@@ -203,6 +210,16 @@ function frameRow(frame) {
     requested: work?.requested ?? null,
     run: work?.run ?? null,
   };
+}
+
+/**
+ * Whether the saved bytes are exactly the previewed file's `content`. Its `bytes` member is a
+ * BLAKE3 witness this runner does not compute: without `content` (an engine before it) the
+ * answer is `null`, unverified, never a pass.
+ */
+function landedExactly(previewed, landed) {
+  if (typeof previewed?.content !== 'string') return null;
+  return landed !== null && landed.equals(Buffer.from(previewed.content, 'utf8'));
 }
 
 /** A candidate file: its witness, and the sha256 of its exact `content` when the engine projects it. */
@@ -336,13 +353,22 @@ function judgeSession(report) {
   const observed = step('run_observed');
   const said = [...run.outcomes, ...(review?.outcomes ?? [])];
   const unobserved = said.filter((kind) => kind === 'run_not_started' || kind === 'run_unobserved');
+  const RUN_CHECKS = ['the Session observed the requested Run end', 'the observed Run ran the saved bytes',
+    'the Run succeeded and wrote the copy in the same project world'];
+  const evidence = { run, review, observed };
   if (unobserved.length > 0) {
     // The engine's own word: no Run started, or its end was not observed. No postcondition is claimed.
-    gap('the requested Run runs in the same project world', `the Session said ${unobserved.join(', ')}`,
-      { run, review, observed });
+    for (const name of RUN_CHECKS) gap(name, `the Session said ${unobserved.join(', ')}`, evidence);
   } else {
-    check('the requested Run runs in the same project world', said.includes('run_requested')
-      && observed.busy === false && observed.output_is_source === true, { run, review, observed });
+    // A Run the Session never observed, a deadline reached, a Run still under way or one of
+    // other bytes is a failure, whatever the project world shows. Judged from the observed Run
+    // itself, never from a summary of it.
+    const ran = observed.run;
+    check(RUN_CHECKS[0], said.includes('run_requested') && observed.deadline === false && observed.busy === false
+      && ran !== null && typeof ran?.end?.end === 'string', evidence);
+    check(RUN_CHECKS[1], ran?.current === true && typeof ran.workflow === 'string' && ran.workflow === consent.saved
+      && typeof ran.workflow_sha256 === 'string' && ran.workflow_sha256 === consent.saved_sha256, evidence);
+    check(RUN_CHECKS[2], ran?.end?.end === 'succeeded' && observed.output_is_source === true, evidence);
   }
   const race = step('stop_racing_a_turn');
   if (race.receipt === 'stop_requested') {
@@ -372,6 +398,7 @@ function judgeSession(report) {
 
 module.exports.COPY = COPY;
 module.exports.frameRow = frameRow;
+module.exports.landedExactly = landedExactly;
 module.exports.judgeSession = judgeSession;
 module.exports.sessionParity = sessionParity;
 module.exports.SHARED_STEPS = SHARED_STEPS;

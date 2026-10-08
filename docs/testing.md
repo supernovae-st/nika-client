@@ -287,10 +287,15 @@ answers nothing (natively a second project's Session; a resident refuses a
 second live Session with `session_live`), consents (the saved bytes are exactly
 the previewed file's `content`, and nothing ran; an engine that projects only
 the BLAKE3 witness leaves the bytes unverified), stops with nothing under way,
-requests the Run and reads the same project world for its output, sends a
-request with a Stop right behind it, closes, compares the full event view with
-one resumed after the proposal, and after a restart answers the old snapshot
-(`unknown_snapshot`; a closed served Session cannot be attached).
+requests the Run and requires the Session's own observation of it (the saved
+workflow, run on its exact bytes by the trace's `workflow_sha256`, ended
+`succeeded`) before reading the same project world for its output: a missing,
+failed, paused or foreign Run, or a polling deadline, fails whatever the files
+show, and `run_not_started` or `run_unobserved` leave the Run unclaimed. It
+then sends a request with a Stop right behind it, closes, compares the full
+event view with one resumed after the proposal, and after a restart answers
+the old snapshot (`unknown_snapshot`; a closed served Session cannot be
+attached).
 
 The report judges every walk check by check (`passed`, `failed`, or
 `not_exercised` with the engine's reason: a door this binary does not host, a

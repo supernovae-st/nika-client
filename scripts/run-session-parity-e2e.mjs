@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { copyFileSync, createReadStream, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { copyFileSync, createReadStream, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
@@ -26,8 +26,12 @@ assert(binary && path.isAbsolute(binary), 'NIKA_BIN must identify the frozen abs
 const SERVE_SESSIONS = (process.env.NIKA_SESSION_SERVE_FLAGS ?? '--sessions').split(' ').filter(Boolean);
 const require = createRequire(import.meta.url);
 const { judgeSession, sessionParity, SHARED_STEPS, MODULE_STEPS } = require('./packed-consumers/session-scenario.cjs');
+const { judgeJourney } = require('./packed-consumers/session-journey.cjs');
 /** The project world both doors start from: one source file the requests read. */
 const BRIEF = '# Brief\n\nOctobre — « vite » ✓ 🦋\n';
+/** The journey's world: tickets at and around both thresholds, so 48 and 72 hours select apart. */
+const TICKETS = [{ id: 'fresh', age_hours: 24 }, { id: 'boundary-48', age_hours: 48 }, { id: 'stale-60', age_hours: 60 },
+  { id: 'boundary-72', age_hours: 72 }, { id: 'stale-90', age_hours: 90 }];
 const scratch = mkdtempSync(path.join(tmpdir(), 'nika-session-parity-'));
 const consumer = path.join(scratch, 'consumer');
 const token = 'session-parity-test-only-token-0123456789';
@@ -61,17 +65,24 @@ try {
   writeFileSync(path.join(consumer, 'package.json'), '{"private":true}\n');
   await run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--omit=optional', '--offline', tarball],
     consumer);
-  copyFileSync(path.join(root, 'scripts/packed-consumers/session-scenario.cjs'), path.join(consumer, 'scenario.cjs'));
+  // The walk (`session-scenario`) and the journey (`session-journey`), each named by the consumer's
+  // second argument; the journey reuses the walk's helpers.
+  for (const name of ['session-scenario.cjs', 'session-journey.cjs']) {
+    copyFileSync(path.join(root, 'scripts/packed-consumers', name), path.join(consumer, name));
+  }
   writeFileSync(path.join(consumer, 'consumer.cjs'), [
-    "const sdk = require('@supernovae-st/nika');", "const scenario = require('./scenario.cjs');",
+    "const sdk = require('@supernovae-st/nika');", "const scenario = require(`./${process.argv[3]}.cjs`);",
     "const config = JSON.parse(require('node:fs').readFileSync(process.argv[2], 'utf8'));",
     'scenario(sdk, config).then((result) => process.stdout.write(JSON.stringify(result)));',
   ].join('\n'));
   writeFileSync(path.join(consumer, 'consumer.mjs'), [
-    "import * as sdk from '@supernovae-st/nika';", "import scenario from './scenario.cjs';",
-    "import { readFileSync } from 'node:fs';",
+    "import * as sdk from '@supernovae-st/nika';", "import { readFileSync } from 'node:fs';",
+    'const { default: scenario } = await import(`./${process.argv[3]}.cjs`);',
     'process.stdout.write(JSON.stringify(await scenario(sdk, JSON.parse(readFileSync(process.argv[2], "utf8")))));',
   ].join('\n'));
+  const consume = (moduleSystem, name, config, env) => owned.run(process.execPath,
+    [path.join(consumer, `consumer.${moduleSystem === 'esm' ? 'mjs' : 'cjs'}`), config, name],
+    { cwd: consumer, env, timeoutMs: 3_600_000, maxBuffer: 16 * 1024 * 1024 });
 
   const walks = [];
   for (const moduleSystem of ['cjs', 'esm']) {
@@ -93,20 +104,26 @@ try {
     }),
   };
   const comparisons = [...parity.doors, ...parity.module_systems];
+  const journey = await journeyPhase();
+  const journeyVerdicts = journey.ran ? journey.doors.map((entry) => (entry.exercised ? entry.verdict : 'not_exercised'))
+    : [];
   const failed = exercised.some((entry) => entry.verdict === 'failed')
-    || comparisons.some((entry) => entry.equal === false);
+    || comparisons.some((entry) => entry.equal === false) || journeyVerdicts.includes('failed');
   const gaps = walks.some((entry) => !entry.exercised || entry.verdict === 'not_exercised')
-    || comparisons.some((entry) => entry.equal === null);
+    || comparisons.some((entry) => entry.equal === null) || journeyVerdicts.includes('not_exercised');
   report = {
     result: failed ? 'failed' : gaps ? 'not_exercised' : 'green',
-    scope: 'authoring Session transport parity on the deterministic compiler; no provider, no model capability claim',
+    scope: 'authoring Session transport parity on the deterministic compiler'
+      + (journey.ran ? '; plus a real intelligence journey (capability evidence, never byte parity)' : '; no model claim'),
     engine: { version, binary_sha256: binarySha, identity },
-    sdk: { version: packed.version, package_sha256: await sha256(tarball), commit, dirty, scenario_sha256: scenarioSha },
+    sdk: { version: packed.version, package_sha256: await sha256(tarball), commit, dirty, scenario_sha256: scenarioSha,
+      journey_sha256: await sha256(path.join(root, 'scripts/packed-consumers/session-journey.cjs')) },
     serve_flags: SERVE_SESSIONS,
     attempted: walks.map(({ module_system: moduleSystem, door, exercised: ran, verdict, why }) =>
       ({ module_system: moduleSystem, door, exercised: ran, verdict: verdict ?? null, why: why ?? null })),
     parity,
     walks,
+    journey,
   };
 
   /** One walk: a fresh project world, HOME and (for HTTP) resident; the packed consumer drives it. */
@@ -121,43 +138,109 @@ try {
     if (door === 'native' && !identity.supportedCapabilities.includes('sessionHost')) {
       return { ...row, exercised: false, why: 'the engine identity lists no sessionHost' };
     }
-    let server;
-    let url;
-    let health = null;
+    const served = door === 'http' ? await serve(base, project, env) : { server: undefined };
     try {
-      if (door === 'http') {
-        server = owned.start(binary, ['serve', '--bind', '127.0.0.1:0', '--workflows', project,
-          '--token-file', tokenFile, '--state-root', path.join(base, 'state'), '--plain', ...SERVE_SESSIONS],
-        { cwd: project, env, timeoutMs: 1_800_000 });
-        const deadline = Date.now() + 15000;
-        while (!url && Date.now() < deadline && server.child.exitCode === null) {
-          abort.signal.throwIfAborted();
-          url = `${server.stdout}\n${server.stderr}`.match(/nika serve[^\n]*listening (http:\/\/127\.0\.0\.1:\d+)/)?.[1];
-          if (!url) await delay(25);
-        }
-        if (!url) {
-          const lines = `${server.stderr}`.trim().split('\n');
-          const said = lines.find((line) => /error/i.test(line)) ?? lines.slice(-3).join(' | ');
-          return { ...row, exercised: false, why: `the resident did not serve with ${SERVE_SESSIONS.join(' ')}: ${said}` };
-        }
-        await waitForHealth(url, server, abort.signal, { timeoutMs: 10000 });
-        health = await (await fetch(`${url}/health`,
-          { signal: AbortSignal.any([abort.signal, AbortSignal.timeout(10000)]) })).json();
-        if (!health.supportedCapabilities.includes('sessionHost')) {
-          return { ...row, exercised: false, health, why: 'the resident lists no sessionHost' };
-        }
-      }
+      if (served.why !== undefined) return { ...row, exercised: false, health: served.health ?? null, why: served.why };
       const config = path.join(base, 'config.json');
-      writeFileSync(config, JSON.stringify({ door, bin: binary, project, other, url, token, moduleSystem }));
-      const transcript = JSON.parse(await owned.run(process.execPath,
-        [path.join(consumer, `consumer.${moduleSystem === 'esm' ? 'mjs' : 'cjs'}`), config],
-        { cwd: consumer, env, timeoutMs: 1_800_000, maxBuffer: 16 * 1024 * 1024 }));
-      return { ...row, exercised: true, health, ...judgeSession(transcript), transcript };
+      writeFileSync(config, JSON.stringify({ door, bin: binary, project, other, url: served.url, token, moduleSystem }));
+      const transcript = JSON.parse(await consume(moduleSystem, 'session-scenario', config, env));
+      return { ...row, exercised: true, health: served.health ?? null, ...judgeSession(transcript), transcript };
     } finally {
-      // A resident that refused its flags already exited: its words are the walk's `why`.
-      if (server && server.child.exitCode === null && server.child.signalCode === null) await stopResident(server);
-      else if (server) await server.done.catch(() => {});
+      await release(served.server);
     }
+  }
+
+  /**
+   * The journey phase, run only when NIKA_SESSION_JOURNEY_CHOICE names the first screen's
+   * answer (`2 deepseek/<model>`, `1 acp:claude-code/<model>`…, the Session's own words). One
+   * ESM consumer per door: a generation costs, and module parity is the walks' to prove.
+   */
+  async function journeyPhase() {
+    const choice = process.env.NIKA_SESSION_JOURNEY_CHOICE;
+    if (!choice) return { ran: false, why: 'NIKA_SESSION_JOURNEY_CHOICE unset: deterministic transport parity only' };
+    // The variables the engine processes receive, by name only (keys, and HOME when an app seat
+    // must find its sign-in); their values are never printed.
+    const keyNames = (process.env.NIKA_SESSION_JOURNEY_ENV ?? '').split(',').filter(Boolean);
+    assert(keyNames.every((name) => /^[A-Z][A-Z0-9_]*$/.test(name) && process.env[name]),
+      'NIKA_SESSION_JOURNEY_ENV must name set variables, comma-separated');
+    // The decision seat and the reasoning effort, read by the engine from its own environment.
+    const seats = Object.fromEntries(['NIKA_SESSION_DECISION_MODEL', 'NIKA_AUTHORING_REASONING']
+      .filter((name) => process.env[name]).map((name) => [name, process.env[name]]));
+    const createFile = process.env.NIKA_SESSION_JOURNEY_CREATE_FILE
+      ?? path.join(root, 'test/fixtures/compile-evidence/recorded-fcdd44292/intent-stale-filter.txt');
+    const create = readFileSync(createFile, 'utf8');
+    const edit = process.env.NIKA_SESSION_JOURNEY_EDIT ?? 'Raise the age threshold to 72 hours.';
+    const answers = process.env.NIKA_SESSION_JOURNEY_ANSWERS ? JSON.parse(process.env.NIKA_SESSION_JOURNEY_ANSWERS) : {};
+    const acceptCost = process.env.NIKA_SESSION_JOURNEY_ACCEPT_COST === '1';
+    // The tickets the words read, and the report each leg must write: strictly older than 48, then 72 hours.
+    const expected = { create: TICKETS.filter((row) => row.age_hours > 48).map((row) => row.id),
+      edit: TICKETS.filter((row) => row.age_hours > 72).map((row) => row.id) };
+    const doors = [];
+    for (const door of (process.env.NIKA_SESSION_JOURNEY_DOORS ?? 'native,http').split(',').filter(Boolean)) {
+      doors.push(await journeyWalk(door));
+    }
+    return { ran: true, choice, key_env: keyNames, seats, accept_cost: acceptCost, answers: Object.keys(answers),
+      create_source: createFile, create_sha256: createHash('sha256').update(create).digest('hex'), edit, expected,
+      law: 'each generation judged by its own evidence and the project world, never byte-compared with another',
+      doors };
+
+    async function journeyWalk(door) {
+      const base = path.join(scratch, 'journey', door);
+      const project = path.join(base, 'project');
+      mkdirSync(path.join(project, 'in'), { recursive: true });
+      writeFileSync(path.join(project, 'in', 'tickets.json'), `${JSON.stringify(TICKETS, null, 2)}\n`);
+      const home = path.join(base, 'home');
+      mkdirSync(home, { recursive: true });
+      const env = { ...baseEnv, HOME: home, NIKA_KEYCHAIN: 'off', ...seats,
+        ...Object.fromEntries(keyNames.map((name) => [name, process.env[name]])) };
+      const row = { door, home: keyNames.includes('HOME') ? 'the person\'s own HOME' : 'isolated' };
+      if (door === 'native' && !identity.supportedCapabilities.includes('sessionHost')) {
+        return { ...row, exercised: false, why: 'the engine identity lists no sessionHost' };
+      }
+      const served = door === 'http' ? await serve(base, project, env) : { server: undefined };
+      try {
+        if (served.why !== undefined) return { ...row, exercised: false, why: served.why };
+        const config = path.join(base, 'config.json');
+        writeFileSync(config, JSON.stringify({ door, bin: binary, project, url: served.url, token, moduleSystem: 'esm',
+          choice, acceptCost, answers, create, edit }));
+        const transcript = JSON.parse(await consume('esm', 'session-journey', config, env));
+        return { ...row, exercised: true, ...judgeJourney(transcript, expected), transcript };
+      } finally {
+        await release(served.server);
+      }
+    }
+  }
+
+  /** A resident serving `project`, healthy and hosting Sessions, or why not. */
+  async function serve(base, project, env) {
+    const server = owned.start(binary, ['serve', '--bind', '127.0.0.1:0', '--workflows', project,
+      '--token-file', tokenFile, '--state-root', path.join(base, 'state'), '--plain', ...SERVE_SESSIONS],
+    { cwd: project, env, timeoutMs: 3_600_000 });
+    let url;
+    const deadline = Date.now() + 15000;
+    while (!url && Date.now() < deadline && server.child.exitCode === null) {
+      abort.signal.throwIfAborted();
+      url = `${server.stdout}\n${server.stderr}`.match(/nika serve[^\n]*listening (http:\/\/127\.0\.0\.1:\d+)/)?.[1];
+      if (!url) await delay(25);
+    }
+    if (!url) {
+      const lines = `${server.stderr}`.trim().split('\n');
+      const said = lines.find((line) => /error/i.test(line)) ?? lines.slice(-3).join(' | ');
+      return { server, why: `the resident did not serve with ${SERVE_SESSIONS.join(' ')}: ${said}` };
+    }
+    await waitForHealth(url, server, abort.signal, { timeoutMs: 10000 });
+    const health = await (await fetch(`${url}/health`,
+      { signal: AbortSignal.any([abort.signal, AbortSignal.timeout(10000)]) })).json();
+    if (!health.supportedCapabilities.includes('sessionHost')) {
+      return { server, health, why: 'the resident lists no sessionHost' };
+    }
+    return { server, url, health };
+  }
+
+  /** Stop a resident; one that refused its flags already exited and its words are the `why`. */
+  async function release(server) {
+    if (server && server.child.exitCode === null && server.child.signalCode === null) await stopResident(server);
+    else if (server) await server.done.catch(() => {});
   }
 } catch (error) {
   if (reportPath) writeFileSync(reportPath, JSON.stringify({ result: 'failed', message: error.message }, null, 2) + '\n');
@@ -170,7 +253,9 @@ try {
 abort.signal.throwIfAborted();
 if (reportPath) writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
 const summary = report.attempted.map((entry) => `${entry.module_system}/${entry.door}: `
-  + (entry.exercised ? entry.verdict : `not exercised (${entry.why})`)).join('; ');
+  + (entry.exercised ? entry.verdict : `not exercised (${entry.why})`)).join('; ')
+  + (report.journey.ran ? `; journey ${report.journey.doors.map((entry) => `${entry.door}: `
+    + (entry.exercised ? entry.verdict : `not exercised (${entry.why})`)).join(', ')}` : '');
 if (report.result === 'green') {
   console.log(`session parity green after owned cleanup: ${summary}`);
 } else {

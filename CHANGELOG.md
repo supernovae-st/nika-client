@@ -58,7 +58,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   project world, Stop, event resumption and close, judged check by check and
   compared door to door and module system to module system. A door the binary
   does not host is `not_exercised`, never a pass. The compile and Session
-  reports name the SDK commit and whether its tree was dirty.
+  reports name the SDK commit and whether its tree was dirty. With
+  `NIKA_SESSION_JOURNEY_CHOICE` (the first screen's answer in the Session's own
+  words) it also runs a real intelligence's journey per door: CREATE from
+  words, Save, Run; a new Session; EDIT in words, Save, Run. A persona answers
+  only what it was told to, and each leg is judged by its own evidence (a model
+  authored it, the Save landed the proposed bytes and ran nothing, the EDIT
+  revises the created bytes, the observed Run of the saved bytes succeeded and
+  its report names exactly the tickets each threshold selects), never by byte
+  parity with another generation.
 - Compile outcomes type the record of a document the engine's 0.123
   complete-document door created: `plan.document`
   (`NikaCompileCreatedDocument`, settled on a ready outcome only: version 1,

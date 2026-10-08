@@ -304,3 +304,38 @@ Stop), compares the two doors up to the Save and the two module systems on
 each door, and names the engine binary's sha256, the SDK commit (and whether
 the tree was dirty), the package's sha256 and the scenario's own sha256. Its
 `result` is `green` only when every walk and comparison passed.
+
+A real intelligence's journey runs only when `NIKA_SESSION_JOURNEY_CHOICE`
+gives the Session's first screen its answer, in the Session's own words
+(`2 deepseek/<model>`, `1 acp:claude-code/<model>`, …).
+`NIKA_SESSION_JOURNEY_ENV` names the variables the engine processes receive
+(keys, and `HOME` when an app seat must find its sign-in: the journey then
+uses the person's own `HOME`); their values are never printed.
+`NIKA_SESSION_DECISION_MODEL` and `NIKA_AUTHORING_REASONING`, when set, seat
+the decision model and the reasoning effort through the engine's own
+environment.
+
+```sh
+NIKA_SESSION_JOURNEY_CHOICE='2 deepseek/deepseek-v4-flash' NIKA_SESSION_JOURNEY_ENV=DEEPSEEK_API_KEY \
+NIKA_BIN=… NIKA_SESSION_PARITY_REPORT=… node scripts/run-session-parity-e2e.mjs
+```
+
+On each door (`NIKA_SESSION_JOURNEY_DOORS`, both by default), one ESM
+consumer creates from words (`NIKA_SESSION_JOURNEY_CREATE_FILE`, by default
+the stale-tickets request of `test/fixtures/compile-evidence/recorded-fcdd44292`),
+saves, runs; then a new Session over the same project world revises in words
+(`NIKA_SESSION_JOURNEY_EDIT`, by default « Raise the age threshold to 72
+hours. »), saves and runs again. The project world holds tickets at and around
+both thresholds, so each Run's `out/report.json` must name exactly the tickets
+strictly older than 48, then 72 hours. The persona answers only what it was
+told: the first screen with its choice, a one-time cost choice only under
+`NIKA_SESSION_JOURNEY_ACCEPT_COST=1`, an authoring question only from
+`NIKA_SESSION_JOURNEY_ANSWERS` (a JSON object by question key), a resident's
+Run cost review, and the consent to the proposal a leg reached; anything else
+stops the leg as `not_exercised` with what the Session waits on. Each leg is
+judged by its own evidence: a model authored the proposal (the call receipt
+and the author seat, never the selection alone), the Save landed exactly the
+proposed `content` and ran nothing, the EDIT proposal revises the created
+bytes (its revision's base is their sha256 and its candidate digest the
+proposed content's), and the Session observed a successful Run of the saved
+bytes. Separate generations are never compared byte for byte.

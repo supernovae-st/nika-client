@@ -178,9 +178,13 @@ async function advance(session, snapshot, line, persona, signal, report) {
       const answer = answerFor(persona.answers, waiting, result);
       [next, said] = [answer.line, `answer ${waiting.key} (${answer.why})`];
     } else {
+      // Where no proposal waits, the compiler's own draft (shown, never offered) is kept with its
+      // digest, so a candidate a judge held stays inspectable after the scratch is gone.
+      const draft = waiting.kind === 'consent' ? null : shown.work.authoring?.draft ?? null;
       return { waiting: waiting.kind, snapshot: shown,
         summary: { waiting: waiting.kind, key: waiting.key ?? null, outcomes: frameRow(result).outcomes,
-          turns: turn + 1, evidence: evidence(shown.work) } };
+          turns: turn + 1, evidence: evidence(shown.work), draft,
+          draft_sha256: typeof draft === 'string' ? sha256(Buffer.from(draft, 'utf8')) : null } };
     }
   }
   return { waiting: 'turn_bound', snapshot: shown, summary: { waiting: 'turn_bound', turns: 24 } };

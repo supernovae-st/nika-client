@@ -351,7 +351,8 @@ told: the first screen with its choice, a one-time cost choice only under
 Run cost review, a Run's declared input only from the same answers (keyed by
 the input's name), and the consent to the proposal a leg reached; anything
 else stops the leg as `not_exercised` with what the Session waits on, without
-waiting out the polling deadline. Each leg is judged by its own evidence: a
+waiting out the polling deadline, and keeps the compiler's own draft (shown,
+never offered, such as a candidate a judge held) with its sha256. Each leg is judged by its own evidence: a
 model authored the proposal (the call receipt and the author seat, never the
 selection alone), the Save landed exactly the proposed `content` and ran
 nothing, the EDIT proposal revises the created bytes into the saved workflow

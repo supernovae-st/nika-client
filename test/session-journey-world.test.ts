@@ -190,6 +190,30 @@ describe('a journey walked over a scripted Session', () => {
     expect(judged.verdict).toBe('not_exercised');
   });
 
+  it('keeps the draft a judge held, with its digest, when no proposal is reached', async () => {
+    const { dir, project, check } = world();
+    const held = WORKFLOW(48);
+    const sdk = { Nika: class {
+      openSession = async () => {
+        const session = scriptedSession(project, null, []);
+        return { ...session, submit: async (shown: unknown, line: string) => {
+          const settled = await session.submit(shown, line);
+          // The judge held the candidate: shown as the draft, never offered.
+          settled.snapshot.work = { ...settled.snapshot.work, waiting: { kind: 'free' }, candidate: null,
+            authoring: { ...settled.snapshot.work.authoring, status: 'incomplete', draft: held } };
+          return settled;
+        } };
+      };
+    } };
+    const report = await journey(sdk, { door: 'native', bin: '/x', project, moduleSystem: 'esm', choice: null,
+      answers: {}, create: 'Create the stale report', edit: 'Raise to 72', checkBin: check,
+      snapshots: path.join(dir, 'legs'), capture: ['out'] });
+    expect(report.steps.find((entry) => entry.step === 'create_reached')).toMatchObject({ waiting: 'free',
+      draft: held, draft_sha256: sha256(held) });
+    expect(journey.judgeJourney(report, null).checks.find((entry) => /CREATE leg reached/.test(entry.name)))
+      .toMatchObject({ verdict: 'not_exercised' });
+  });
+
   it('stops at a question no rule answers, never guessing', async () => {
     const { dir, project, check } = world();
     const sent: string[] = [];

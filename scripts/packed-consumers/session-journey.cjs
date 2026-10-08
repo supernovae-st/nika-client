@@ -253,11 +253,18 @@ function judgeJourney(report, expected, requested = null) {
         save.saved_bytes_are_previewed === true && save.save_ran_nothing === true, save);
     }
     if (base !== null) {
+      // The revision binds the document the consent saved and the Run ran: its base is the created
+      // bytes, its candidate the saved workflow's exact bytes, proposed under that same path. A
+      // digest matching some other proposed file is another document, never this one.
       const created = step('edit_open')?.created_sha256 ?? null;
       const revision = reached.evidence?.revision ?? null;
-      check('the EDIT proposal revises the created bytes', revision !== null && created !== null
-        && revision.base_sha256 === created && reached.evidence.files.some((file) =>
-        file.content_sha256 === revision.candidate_sha256), { created, revision });
+      const savedPath = save.saved ?? null;
+      const proposed = (reached.evidence?.files ?? []).find((file) => file.path === savedPath);
+      check('the EDIT proposal revises the created bytes into the saved workflow', revision !== null
+        && created !== null && revision.base_sha256 === created
+        && typeof save.saved_sha256 === 'string' && revision.candidate_sha256 === save.saved_sha256
+        && proposed !== undefined && proposed.content_sha256 === revision.candidate_sha256,
+      { created, revision, saved: savedPath, saved_sha256: save.saved_sha256, proposed: proposed ?? null });
     }
     const runs = report.steps.filter((entry) => entry.step.startsWith(`${name}_run`) && entry.outcomes);
     const unobserved = runs.flatMap((entry) => entry.outcomes)

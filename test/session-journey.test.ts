@@ -21,18 +21,22 @@ const { judgeJourney, advance, requestedSeat } = require('../scripts/packed-cons
 const EXPECTED = { create: ['stale-60', 'boundary-72', 'stale-90'], edit: ['stale-90'] };
 const CREATED = 'a'.repeat(64);
 const EDITED = 'e'.repeat(64);
-const EDITED_CONTENT = 'f'.repeat(64);
-const authored = (revision: unknown = null, content = 'c'.repeat(64)) => ({
+/** The digest of some other document a proposal may also carry. */
+const OTHER = 'f'.repeat(64);
+const file = (path: string, content: string) => ({ path, landing: 'update', content_sha256: content });
+const authored = (revision: unknown = null, files = [file('stale.nika', CREATED)]) => ({
   intelligence: { selected: { kind: 'api', via: 'deepseek' }, author: { kind: 'provider', model: 'deepseek/x' },
     decision: { model: 'typesafe/jev', refusal: null }, effort: 'max' },
   calls: { requested_model: 'deepseek/x', calls: 2, input_tokens: 10, output_tokens: 20, elapsed_ms: 900, backend: {} },
-  authoring_status: 'ready', questions: [], files: [{ path: 'stale.nika', landing: 'create', content_sha256: content }],
-  revision,
+  authoring_status: 'ready', questions: [], files, revision,
 });
+/** The EDIT revision as the Session states it: the created bytes revised into `candidate`. */
+const revised = (candidate: string, base = CREATED) => ({ mode: 'operations', base_sha256: base,
+  candidate_sha256: candidate, changed: ['const.max_age_hours'], components: [] });
 const leg = (name: string, savedSha: string, ids: string[], evidence: unknown) => [
   { step: `${name}_reached`, waiting: 'consent', key: null, outcomes: ['proposal'], turns: 1, evidence },
-  { step: `${name}_save`, outcomes: ['facts'], saved_bytes_are_previewed: true, saved_sha256: savedSha,
-    save_ran_nothing: true },
+  { step: `${name}_save`, outcomes: ['facts'], saved: 'stale.nika', saved_bytes_are_previewed: true,
+    saved_sha256: savedSha, save_ran_nothing: true },
   { step: `${name}_run`, outcomes: ['run_requested', 'facts'] },
   { step: `${name}_run_observed`, deadline: false, busy: false, saved: 'stale.nika', saved_sha256: savedSha,
     run: { current: true, workflow: 'stale.nika', end: { end: 'succeeded' }, workflow_sha256: savedSha },
@@ -43,8 +47,7 @@ function journey(): Journey {
     { step: 'create_open', frame: 'opened' },
     ...leg('create', CREATED, EXPECTED.create, authored()),
     { step: 'edit_open', frame: 'opened', created_sha256: CREATED },
-    ...leg('edit', EDITED, EXPECTED.edit, authored({ mode: 'operations', base_sha256: CREATED,
-      candidate_sha256: EDITED_CONTENT, changed: ['const.max_age_hours'], components: [] }, EDITED_CONTENT)),
+    ...leg('edit', EDITED, EXPECTED.edit, authored(revised(EDITED), [file('stale.nika', EDITED)])),
   ] };
 }
 function edit(report: Journey, name: string, change: Record<string, unknown>): Journey {
@@ -78,18 +81,28 @@ describe('a real-intelligence journey is judged leg by leg', () => {
   });
 
   it('fails an EDIT proposal that does not revise the created bytes', () => {
-    const elsewhere = authored({ mode: 'replaced', base_sha256: 'b'.repeat(64), candidate_sha256: EDITED_CONTENT,
-      changed: [], components: [] }, EDITED_CONTENT);
+    const elsewhere = authored(revised(EDITED, 'b'.repeat(64)), [file('stale.nika', EDITED)]);
     const judged = judgeJourney(edit(journey(), 'edit_reached', { evidence: elsewhere }), EXPECTED);
     expect(verdictOf(judged, /revises the created bytes/)).toEqual(['failed']);
     expect(judged.verdict).toBe('failed');
   });
 
-  it('fails a revision whose digest names other bytes than the ones proposed', () => {
-    const judged = judgeJourney(edit(journey(), 'edit_reached', { evidence: authored({ mode: 'operations',
-      base_sha256: CREATED, candidate_sha256: 'd'.repeat(64), changed: [], components: [] }, EDITED_CONTENT) }),
-    EXPECTED);
+  // Root review of 5229cf6 (P2): the revision must bind the workflow the consent saved and the Run
+  // ran, never whichever proposed file happens to carry its digest.
+  const wrongDocument: [string, unknown][] = [
+    ['a revision naming another proposed file than the one saved and run',
+      authored(revised(OTHER), [file('stale.nika', EDITED), file('other.nika', OTHER)])],
+    ['a revision and its file that agree, but not with the bytes saved and run',
+      authored(revised(OTHER), [file('stale.nika', OTHER)])],
+    ['a revision whose bytes were proposed under another path than the one saved',
+      authored(revised(EDITED), [file('other.nika', EDITED)])],
+    ['a revision whose digest names bytes nobody proposed',
+      authored(revised('d'.repeat(64)), [file('stale.nika', EDITED)])],
+  ];
+  it.each(wrongDocument)('fails %s', (_name, evidence) => {
+    const judged = judgeJourney(edit(journey(), 'edit_reached', { evidence }), EXPECTED);
     expect(verdictOf(judged, /revises the created bytes/)).toEqual(['failed']);
+    expect(judged.verdict).toBe('failed');
   });
 
   it('fails a report that holds other tickets than the threshold selects', () => {

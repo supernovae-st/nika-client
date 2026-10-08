@@ -134,9 +134,10 @@ The handle follows contract `nika/session-host@1` as the engine's
 `nika-session-host` writes it (commits `e079f3e79`, `18479cf38`, `e849d08ea`,
 then `cc08ea08f` with `run_unobserved`; not yet released). Besides tests
 against a synthetic host, the handle is driven over frames that host recorded
-from its real native and HTTP doors at `e849d08ea`
-(`test/fixtures/session-host/`): it sends the recorded commands and decodes
-every recorded frame unchanged. The 0.123 integration engine registers
+from its real native and HTTP doors at `e849d08ea` and again on the merged
+`eb89e1893`, whose Work carries the current members, with a resident's Run
+cost review (`test/fixtures/session-host/`): it sends the recorded commands and
+decodes every recorded frame unchanged. The 0.123 integration engine registers
 `nika session --json` (`3688552f3`); the served `/v1/sessions` routes arrive
 with `nika serve --sessions`. `scripts/run-session-parity-e2e.mjs` qualifies
 both doors of one binary once it hosts them (see `docs/testing.md`).

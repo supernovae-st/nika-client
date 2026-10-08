@@ -1,19 +1,20 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Nika, NikaSessionRefusedError } from '../src/index.js';
 import type { NikaSessionEvent, NikaSessionResult } from '../src/index.js';
 import { healthResponse, jsonResponse, TOKEN_A } from './helpers/http-depth-harness.js';
 
 // The authoring Session handle over frames `nika-session-host` RECORDED from its real doors at
-// engine e849d08eaf37 (test/fixtures/session-host/e849d08eaf37/README.md): the native NDJSON
-// driver and the HTTP routes, in-process (the CLI and nika serve registrations were not in that
-// binary yet). The Session reasoner was scripted and never asked; the compiler was the real
+// two engine commits (test/fixtures/session-host/<commit>/README.md): e849d08eaf37 and the merged
+// eb89e1893, whose Work carries the current members. Native NDJSON driver and HTTP routes,
+// in-process; the Session reasoner was scripted and never asked; the compiler was the real
 // deterministic one. These tests pin that the SDK sends the recorded commands and decodes every
 // recorded frame losslessly; they are not a run of the shipped binaries.
 
-const DIR = new URL('./fixtures/session-host/e849d08eaf37/', import.meta.url);
-const recorded = (name: string) => JSON.parse(readFileSync(new URL(name, DIR), 'utf8')) as Record<string, any>[];
+const RECORDINGS = ['e849d08eaf37', 'eb89e1893'];
+const recorded = (recording: string, name: string) => JSON.parse(readFileSync(
+  new URL(`./fixtures/session-host/${recording}/${name}`, import.meta.url), 'utf8')) as Record<string, any>[];
 const REPLAY_ENGINE = fileURLToPath(new URL('./fixtures/fake-nika-session-replay.mjs', import.meta.url));
 // The c-1 intent of the recording (README "COPY"; the decisions script states its words).
 const COPY = 'Read ./notes/brief.md and write it to ./out/copy.md';
@@ -28,10 +29,16 @@ async function failure(promise: Promise<unknown>): Promise<Error> {
   throw new Error('expected a failure');
 }
 
-describe('recorded native door (e849d08eaf37)', () => {
+describe.each(RECORDINGS)('recorded native door (%s)', (recording) => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it('sends the recorded script and decodes every recorded frame as the host wrote it', async () => {
-    const answers = recorded('native-answers.json');
-    const log = recorded('native-log.json');
+    const answers = recorded(recording, 'native-answers.json');
+    const log = recorded(recording, 'native-log.json');
+    // The replay engine inherits this process's environment: it serves this recording.
+    vi.stubEnv('NIKA_FAKE_SESSION_RECORDING', recording);
     const session = await new Nika({ bin: REPLAY_ENGINE }).openSession();
     expect(session.opened).toEqual(answers[0]);
     const opening = session.opened!.snapshot;
@@ -60,29 +67,30 @@ describe('recorded native door (e849d08eaf37)', () => {
   });
 });
 
-describe('recorded HTTP door (e849d08eaf37)', () => {
-  type Answer = { status: number; body: Record<string, any> };
-  function resident(route: (method: string, path: string, body: Record<string, any> | null) =>
-    Answer | Response | Promise<Response>) {
-    const sent: { method: string; path: string; body: Record<string, any> | null }[] = [];
-    const fetch = vi.fn(async (url: string | URL, init: RequestInit = {}) => {
-      const { pathname } = new URL(String(url));
-      if (pathname === '/health') return healthResponse({ engineVersion: '0.122.0', supportedCapabilities: SERVER });
-      const method = init.method ?? 'GET';
-      const body = typeof init.body === 'string' ? JSON.parse(init.body) as Record<string, any> : null;
-      sent.push({ method, path: pathname, body });
-      const answer = await route(method, pathname, body);
-      return answer instanceof Response ? answer : jsonResponse(answer.body, answer.status);
-    });
-    return { client: new Nika({ url: 'https://nika.example', token: TOKEN_A, bin: '/there-is-no-local-engine', fetch }),
-      sent };
-  }
-  const status = (frame: Record<string, any>) => (frame.frame === 'opened' ? 201
-    : frame.frame !== 'refused' ? 200 : frame.error === 'malformed' ? 400 : frame.error === 'session_not_found' ? 404 : 409);
+type Answer = { status: number; body: Record<string, any> };
+/** A resident whose Session routes answer as `route` says; every request is kept as sent. */
+function resident(route: (method: string, path: string, body: Record<string, any> | null) =>
+  Answer | Response | Promise<Response>) {
+  const sent: { method: string; path: string; body: Record<string, any> | null }[] = [];
+  const fetch = vi.fn(async (url: string | URL, init: RequestInit = {}) => {
+    const { pathname } = new URL(String(url));
+    if (pathname === '/health') return healthResponse({ engineVersion: '0.122.0', supportedCapabilities: SERVER });
+    const method = init.method ?? 'GET';
+    const body = typeof init.body === 'string' ? JSON.parse(init.body) as Record<string, any> : null;
+    sent.push({ method, path: pathname, body });
+    const answer = await route(method, pathname, body);
+    return answer instanceof Response ? answer : jsonResponse(answer.body, answer.status);
+  });
+  return { client: new Nika({ url: 'https://nika.example', token: TOKEN_A, bin: '/there-is-no-local-engine', fetch }),
+    sent };
+}
+const status = (frame: Record<string, any>) => (frame.frame === 'opened' ? 201
+  : frame.frame !== 'refused' ? 200 : frame.error === 'malformed' ? 400 : frame.error === 'session_not_found' ? 404 : 409);
 
+describe.each(RECORDINGS)('recorded HTTP door (%s)', (recording) => {
   it('replays the recorded script: exact answers decoded, the log streamed with its cursors', async () => {
-    const answers = recorded('http-answers.json');
-    const sseLog = recorded('http-sse-log.json');
+    const answers = recorded(recording, 'http-answers.json');
+    const sseLog = recorded(recording, 'http-sse-log.json');
     const session = answers[0].session as string;
     let next = 0;
     const { client, sent } = resident((method, path) => {
@@ -117,7 +125,7 @@ describe('recorded HTTP door (e849d08eaf37)', () => {
   });
 
   it('sends the recorded decision commands byte for byte and decodes busy, conflict, Stop and the question', async () => {
-    const decisions = recorded('http-decisions.json');
+    const decisions = recorded(recording, 'http-decisions.json');
     const step = (name: string) => decisions.find((entry) => entry.step === name)!;
     const session = step('open').answered.session as string;
     let stopped = false;
@@ -164,4 +172,55 @@ describe('recorded HTTP door (e849d08eaf37)', () => {
       .map((name) => step(name).sent);
     expect(commands).toEqual(expected);
   });
+});
+
+describe('recorded resident cost review over HTTP (eb89e1893)', () => {
+  it('reviews a Run: a stale yes refused with its line, one admission and its replay, a decline admitting nothing',
+    async () => {
+      const review = recorded('eb89e1893', 'http-run-review.json');
+      const step = (name: string) => review.find((entry) => entry.step === name)!;
+      // The resident answers in the recorded order; what the SDK sent is compared afterwards.
+      let next = 0;
+      const { client, sent } = resident(() => {
+        const answered = review[next++]!.answered as Record<string, any>;
+        return { status: status(answered), body: answered };
+      });
+      const handle = await client.openSession();
+      expect(handle.opened).toEqual(step('open').answered);
+      const proposed = await handle.submit(handle.opened!.snapshot, COPY, { command: 'c-1' });
+      expect(proposed).toEqual(step('propose').answered);
+      const saved = await handle.submit(proposed.snapshot, 'yes', { command: 'c-2' });
+      expect(saved).toEqual(step('save').answered);
+      const reviewing = await handle.submit(saved.snapshot, 'run it', { command: 'c-3' });
+      expect(reviewing).toEqual(step('run').answered);
+      expect(reviewing.outcomes!.map((outcome) => outcome.kind)).toEqual(['run_requested', 'run_review']);
+      expect(reviewing.snapshot.work.waiting).toMatchObject({ kind: 'run_review' });
+      // A yes typed before the review was shown is refused; the line comes back, nothing ran.
+      const stale = await failure(handle.submit(saved.snapshot, 'yes', { command: 'c-4' }));
+      expect(stale).toBeInstanceOf(NikaSessionRefusedError);
+      expect(stale).toMatchObject({ code: 'stale_snapshot', status: 409, line: 'yes', command: 'c-4' });
+      expect((stale as NikaSessionRefusedError).snapshot).toEqual(reviewing.snapshot);
+      const approved = await handle.submit(reviewing.snapshot, 'yes', { command: 'c-5' });
+      expect(approved).toEqual(step('approve').answered);
+      expect(approved.outcomes![0]).toMatchObject({ kind: 'run_reviewed', approve: true });
+      expect(approved.snapshot.work.run).toMatchObject({ current: true, end: { end: 'succeeded' } });
+      // The same command again is the same recorded result, never a second admission.
+      const replayed = await handle.submit(reviewing.snapshot, 'yes', { command: 'c-5' });
+      expect(replayed).toEqual(step('approve_replayed').answered);
+      expect(replayed).toMatchObject({ replayed: true, event: approved.event });
+      const again = await handle.submit(approved.snapshot, 'run it', { command: 'c-6' });
+      expect(again).toEqual(step('run_again').answered);
+      expect(again.snapshot.work.waiting).toMatchObject({ kind: 'run_review' });
+      expect((again.snapshot.work.waiting as { review: string }).review)
+        .not.toBe((reviewing.snapshot.work.waiting as { review: string }).review);
+      const declined = await handle.submit(again.snapshot, 'no', { command: 'c-7' });
+      expect(declined).toEqual(step('decline').answered);
+      expect(declined.outcomes).toEqual([expect.objectContaining({ kind: 'run_reviewed', approve: false })]);
+      expect(await handle.close()).toEqual(step('close').answered);
+      // Every command left with the bytes the host recorded receiving, in its order.
+      expect(sent.map(({ method, path }) => `${method} ${path.replace(step('open').answered.session, '{s}')}`))
+        .toEqual(['POST /v1/sessions', ...Array(8).fill('POST /v1/sessions/{s}/commands'), 'DELETE /v1/sessions/{s}']);
+      expect(sent.filter((request) => request.body?.op !== undefined).map((request) => request.body))
+        .toEqual(review.filter((entry) => entry.sent !== null).map((entry) => entry.sent));
+    });
 });

@@ -24,7 +24,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `snapshot()`, `details()`, `events({ after })` and `close()` complete the
   handle; `attachSession(id)` reaches the live Session a resident holds. The
   work snapshot is the engine's own, carried verbatim. No released engine
-  hosts the contract yet; see `docs/session.md`.
+  hosts the contract yet; see `docs/session.md`. The handle is pinned against
+  frames the engine's host recorded from both doors at `e849d08ea` and on the
+  merged `eb89e1893` (the current Work members, and a resident's Run cost
+  review: a stale yes refused with its line, one admission and its replay, a
+  decline that admits nothing).
 - Compile outcomes type the revision, reuse and intelligence evidence the
   engine records inside `provenance` (0.123 integration carrier `7d98023f9`):
   `plan.source_revision`, `plan.intent_sha256`, `plan.document_revision` and

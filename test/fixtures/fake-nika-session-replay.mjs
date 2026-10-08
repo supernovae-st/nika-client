@@ -3,16 +3,18 @@ import { readFileSync } from 'node:fs';
 import { createInterface } from 'node:readline';
 
 /**
- * Replays, over a real stdio pipe, the native frames `nika-session-host` RECORDED at engine
- * e849d08eaf37 (`session-host/e849d08eaf37/`, README beside them): the log lines in event order
- * and the direct replies (refusal, replayed result, details) where the host wrote them. Each
- * command the SDK sends is checked against the recorded script (op, identity, snapshot handle,
- * and the line where the recording names it); a departure is refused `malformed` and the
- * process exits 3. The frames are the host's bytes; only this pipe and the ordering rule are
- * the fixture's.
+ * Replays, over a real stdio pipe, the native frames `nika-session-host` RECORDED at one engine
+ * commit (`session-host/<commit>/`, README beside them; NIKA_FAKE_SESSION_RECORDING names it,
+ * e849d08eaf37 by default): the log lines in event order and the direct replies (refusal,
+ * replayed result, details) where the host wrote them. Each command the SDK sends is checked
+ * against the recorded script (op, identity, snapshot handle, and the line where the recording
+ * names it); a departure is refused `malformed` and the process exits 3. The frames are the
+ * host's bytes; only this pipe and the ordering rule are the fixture's.
  */
 
-const dir = new URL('./session-host/e849d08eaf37/', import.meta.url);
+const recording = process.env.NIKA_FAKE_SESSION_RECORDING ?? 'e849d08eaf37';
+if (!/^[0-9a-f]{9,40}$/.test(recording)) process.exit(3);
+const dir = new URL(`./session-host/${recording}/`, import.meta.url);
 const read = (name) => JSON.parse(readFileSync(new URL(name, dir), 'utf8'));
 const answers = read('native-answers.json');
 const log = read('native-log.json');

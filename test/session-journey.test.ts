@@ -427,6 +427,9 @@ describe('each leg is summarized for a requalification table', () => {
       ran_exact: true, reused: ['block:stale-filter-report'], present_in_run: ['block:stale-filter-report'] });
     expect(legs.edit.reuse.components[0]).toMatchObject({ witness: 'expanded', bindings: [{ path: 'const.max_age_hours',
       value: 72 }] });
+    // A succeeded Run of those bytes may still have skipped the component's branch: structural
+    // presence is witnessed, its nodes' execution is never claimed.
+    expect(Object.keys(legs.edit.reuse).filter((key) => /execut/.test(key))).toEqual([]);
   });
 
   it('names reuse by expansion in the saved bytes, the Run a separate fact', () => {
@@ -549,6 +552,11 @@ describe('each leg is summarized for a requalification table', () => {
     expect(unended.legs.create).toMatchObject({ outcome: 'not_exercised', calls: { invoked: 1, complete: false } });
     const orphan = judgeJourney(stopped(harnessed([{ status: 'failed' }])), EXPECTED);
     expect(orphan.legs.create.outcome).toBe('not_exercised');
+    // Two ends for one invocation: the second closes nothing.
+    const doubled = judgeJourney(stopped(harnessed([...receipt('failed'), { status: 'failed' }])), EXPECTED);
+    expect(doubled.legs.create).toMatchObject({ outcome: 'not_exercised', calls: { invoked: 1, failed: 1,
+      complete: false } });
+    expect(doubled.legs.create.why).toContain('failed record with no invocation before it');
   });
 
   it('counts each leg only where its words were sent', () => {

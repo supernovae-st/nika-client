@@ -210,6 +210,7 @@ try {
       const base = path.join(scratch, 'journey', door);
       const project = path.join(base, 'project');
       mkdirSync(project, { recursive: true });
+      projectFile(project);
       const home = path.join(base, 'home');
       mkdirSync(home, { recursive: true });
       // The world this door walks: a module's (its services already listening), or the tickets.
@@ -272,8 +273,10 @@ try {
       if (!url) await delay(25);
     }
     if (!url) {
-      const lines = `${server.stderr}`.trim().split('\n');
-      const said = lines.find((line) => /error/i.test(line)) ?? lines.slice(-3).join(' | ');
+      // In the resident's own words, wherever it wrote them (a refused flag on stderr, a project
+      // it cannot arm on stdout).
+      const lines = `${server.stderr}\n${server.stdout}`.split('\n').map((line) => line.trim()).filter(Boolean);
+      const said = lines.find((line) => /error/i.test(line)) ?? lines.slice(0, 3).join(' | ');
       return { server, why: `the resident did not serve with ${SERVE_SESSIONS.join(' ')}: ${said}` };
     }
     await waitForHealth(url, server, abort.signal, { timeoutMs: 10000 });
@@ -311,11 +314,20 @@ if (report.result === 'green') {
   process.exitCode = 1;
 }
 
-/** A project world: the one source file, nothing else. */
+/** A project world: the project file a resident arms by and the one source file, nothing else. */
 function world(directory) {
   mkdirSync(path.join(directory, 'notes'), { recursive: true });
+  projectFile(directory);
   writeFileSync(path.join(directory, 'notes', 'brief.md'), BRIEF);
   return directory;
+}
+
+/**
+ * The project file, on both doors alike: a resident arms nothing without one ("nothing armed —
+ * this project has no `nika.yaml`") and never listens, so each door walks the same world.
+ */
+function projectFile(directory) {
+  writeFileSync(path.join(directory, 'nika.yaml'), 'nika: session-parity\n');
 }
 
 async function sha256(file) {

@@ -269,9 +269,11 @@ real doors of one frozen binary, from the packed package's CommonJS and ESM
 faces: `nika session --json` in a project, and a served project's
 `/v1/sessions` (the resident started with `NIKA_SESSION_SERVE_FLAGS`,
 `--sessions` by default). No Cargo, no provider: each walk gets a fresh
-project world (one `notes/brief.md`), its own `HOME` and a minimal environment,
-so the engine's deterministic compiler answers and every walk must say the
-same thing.
+project world (its `nika.yaml`, which a resident needs before it arms and
+listens, and one `notes/brief.md`, alike on both doors), its own `HOME` and a
+minimal environment, so the engine's deterministic compiler answers and every
+walk must say the same thing. A resident that does not listen is reported in
+its own words, from its error or its output.
 
 ```sh
 NIKA_BIN=/absolute/path/to/nika NIKA_SESSION_PARITY_REPORT=… node scripts/run-session-parity-e2e.mjs

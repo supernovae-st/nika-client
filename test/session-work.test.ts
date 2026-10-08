@@ -66,13 +66,15 @@ const observedRun = (): Record<string, any> => ({ current: true, workflow: 'dige
   trace: '/srv/project/.nika/traces/run.ndjson', execution: null, workflow_sha256: null, chain_head: null,
   chain_len: null });
 
-// The carrier's wire example of `work.authoring.calls` at engine `ca5845b85`
-// (`nika-session-change` `AuthoringCalls` with `per_call`, projected by engine
-// code from the synthetic receipt of its allowlist test, not a live call;
-// keys sorted), byte for byte: one answered call, and one failed call whose
-// malformed digest, unrecorded references and unsafe effort the engine wrote
-// as `null`.
-const CALLS_WIRE = fileURLToPath(new URL('./fixtures/session-host/work-authoring-calls-ca5845b85.json',
+// The carrier's wire example of `work.authoring.calls` at engine `2db30c6e2`
+// (`nika-session-change` `AuthoringCalls` with `per_call`, introduced at
+// `ca5845b85`, its hyphenated roles kept since `2db30c6e2`), projected by
+// engine code from the synthetic receipt of its allowlist test, not a live
+// call; keys sorted; byte for byte: an answered `document` call; a failed
+// `document-repair` call whose malformed digest, unrecorded references and
+// unsafe effort the engine wrote as `null`; and a `revision` call cut at its
+// output limit, its usage unreported.
+const CALLS_WIRE = fileURLToPath(new URL('./fixtures/session-host/work-authoring-calls-2db30c6e2.json',
   import.meta.url));
 const wire = (): Record<string, any> => JSON.parse(readFileSync(CALLS_WIRE, 'utf8'));
 
@@ -127,28 +129,37 @@ describe('Session work members', () => {
     expect(sessionFrame(frame, transport)).toBe(frame);
     expect(JSON.stringify(frame)).toBe(raw);
     const calls: NikaSessionAuthoringCalls = (frame.snapshot.work as NikaSessionWork).authoring!.calls!;
-    const [answered, failed]: NikaSessionAuthoringCall[] = calls.per_call!;
+    const [answered, failed, cut]: NikaSessionAuthoringCall[] = calls.per_call!;
+    expect(calls.per_call).toHaveLength(3);
     expect(answered).toEqual({ call: 'document', instruction_sha256: 'a'.repeat(64),
       schema_sha256: '0123456789abcdef'.repeat(4), message_bytes: 4096, references: 2, max_output_tokens: 16384,
       timeout_ms: 600000, elapsed_ms: 700, stop_reason: 'EndTurn', failure_kind: null, usage_reported: true,
       input_tokens: 1000, output_tokens: 250, reasoning_effort: 'high', reasoning_tokens: null,
       future_call_member: 'kept' });
-    // A failed call names the engine's kind; what the receipt held unsafely or not at all stays null.
-    expect(failed).toMatchObject({ call: 'repair', instruction_sha256: null, references: null, stop_reason: null,
-      failure_kind: 'timeout', usage_reported: null, input_tokens: null, output_tokens: null, reasoning_effort: null });
-    // The totals stay the receipt's own: unknown output stays null though one call reported 250.
+    // A failed repair names the engine's kind; what the receipt held unsafely or not at all stays null.
+    expect(failed).toMatchObject({ call: 'document-repair', instruction_sha256: null, references: null,
+      stop_reason: null, failure_kind: 'timeout', usage_reported: null, input_tokens: null, output_tokens: null,
+      reasoning_effort: null });
+    // A call cut at its output limit: usage unreported is `false` with unknown tokens, never `0`.
+    expect(cut).toEqual({ call: 'revision', instruction_sha256: null, schema_sha256: null, message_bytes: 128,
+      references: null, max_output_tokens: null, timeout_ms: null, elapsed_ms: null, stop_reason: 'MaxTokens',
+      failure_kind: null, usage_reported: false, input_tokens: null, output_tokens: null, reasoning_effort: null,
+      reasoning_tokens: null });
+    // The totals stay the receipt's own, never reconciled with the rows: unknown output stays null.
     expect([calls.calls, calls.elapsed_ms, calls.input_tokens, calls.output_tokens]).toEqual([2, 900, 1000, null]);
   });
 
-  it('reads the roles the engine actually names, hyphenated repairs included', () => {
+  it('keeps the engine\'s words as it writes them, never a closed vocabulary', () => {
     const body = work();
     body.authoring.calls = wire();
-    const roles = ['document-repair', 'revision-repair'];
-    body.authoring.calls.per_call.forEach((entry: Record<string, unknown>, index: number) => {
-      entry.call = roles[index];
-    });
+    // Actual repair roles, and words this SDK has not met: carried, not re-judged.
+    body.authoring.calls.per_call[2].call = 'revision-repair';
+    body.authoring.calls.per_call[2].stop_reason = 'max_turn_requests';
+    body.authoring.calls.per_call[0].reasoning_effort = 'xhigh';
     const typed = (sessionFrame(opened(body), 'http').snapshot as { work: NikaSessionWork }).work;
-    expect(typed.authoring!.calls!.per_call!.map((entry) => entry.call)).toEqual(roles);
+    const rows = typed.authoring!.calls!.per_call!;
+    expect(rows.map((entry) => entry.call)).toEqual(['document', 'document-repair', 'revision-repair']);
+    expect([rows[2]!.stop_reason, rows[0]!.reasoning_effort]).toEqual(['max_turn_requests', 'xhigh']);
   });
 
   it('reads a receipt without calls, and an engine that does not project them', () => {

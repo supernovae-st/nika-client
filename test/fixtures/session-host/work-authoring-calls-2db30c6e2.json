@@ -23,7 +23,7 @@
             "usage_reported": true
         },
         {
-            "call": "repair",
+            "call": "document-repair",
             "elapsed_ms": 200,
             "failure_kind": "timeout",
             "input_tokens": null,
@@ -38,6 +38,23 @@
             "stop_reason": null,
             "timeout_ms": 600000,
             "usage_reported": null
+        },
+        {
+            "call": "revision",
+            "elapsed_ms": null,
+            "failure_kind": null,
+            "input_tokens": null,
+            "instruction_sha256": null,
+            "max_output_tokens": null,
+            "message_bytes": 128,
+            "output_tokens": null,
+            "reasoning_effort": null,
+            "reasoning_tokens": null,
+            "references": null,
+            "schema_sha256": null,
+            "stop_reason": "MaxTokens",
+            "timeout_ms": null,
+            "usage_reported": false
         }
     ],
     "requested_model": "acme/author-model"

@@ -499,7 +499,7 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
 
   it('keeps each call the receipt recorded beside the totals, never summed into them', async () => {
     const wire = JSON.parse(readFileSync(path.join(import.meta.dirname, 'fixtures', 'session-host',
-      'work-authoring-calls-ca5845b85.json'), 'utf8')) as { per_call: unknown[] };
+      'work-authoring-calls-2db30c6e2.json'), 'utf8')) as { per_call: unknown[] };
     const backend = { kind: 'harness_infer', transport: 'acp', observed: call('max', 'max', 'max') };
     const reachedCalls = (report: { steps: { step: string; evidence?: any }[] }) =>
       report.steps.find((step) => step.step === 'create_reached')!.evidence.calls;

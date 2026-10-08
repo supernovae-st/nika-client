@@ -38,10 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   read nor written, and `selected.scope` (`conversation`,
   `operator_default`) is typed and checked in place. The Session runner's
   journey opens with it under `NIKA_SESSION_JOURNEY_INTELLIGENCE`, and then
-  requires the requested selection held for the conversation in every frame
-  of both legs' Sessions (opened, each turn, the frame each leg reached; a
-  frame showing none is never a pass) and the operator's kept choice
-  unchanged byte for byte. The observed Run is typed (`NikaSessionRun`,
+  requires, of both legs' Sessions, the requested selection held for the
+  conversation at the opened frame and the frame each leg reached (either
+  showing none leaves the leg `not_exercised`, never passed) and in every
+  turn that shows a selection, and the operator's kept choice unchanged byte
+  for byte. The observed Run is typed (`NikaSessionRun`,
   `NikaSessionRunEnd`) and checked in place: every member written, `null`
   where its observation carried none, never filled by the SDK; a Run without
   `workflow_sha256` does not prove which bytes ran.

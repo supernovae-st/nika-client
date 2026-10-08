@@ -385,10 +385,11 @@ function isRequestedSeat(selected, requested) {
  * no model authored, or a Run the Session did not start or observe is `not_exercised` with the
  * engine's own words; a wrong digest, base, bytes or report is `failed`. When `requested`
  * names the seat (the opener's words, or the first-screen answer), each leg counts for it only
- * if its Session's own selection is that seat in every frame it shows from the open (or from the
- * journey's answer) to the frame the leg reached, held for the conversation alone when an opener
- * named it: a frame showing no selection proves nothing, and a choice kept from elsewhere is
- * never relabelled as the one requested.
+ * if its Session's own selection is that seat at the frame the leg reached (with an opener, at
+ * the opened frame too, held for the conversation alone) and in every turn from the open (or
+ * from the journey's answer) that shows a selection: a required frame showing none proves
+ * nothing, a turn showing none is not read, and a choice kept from elsewhere is never
+ * relabelled as the one requested.
  */
 function judgeJourney(report, expected, requested = null, worldChecks = null) {
   if (report.error !== null) {
@@ -402,8 +403,9 @@ function judgeJourney(report, expected, requested = null, worldChecks = null) {
     && ['provider', 'harness'].includes(evidence?.intelligence?.author?.kind);
   if (requested !== null) {
     const seat = requestedSeat(requested);
-    // Opened with the conversation's own intelligence, every frame of each leg's Session must show
-    // it; answered on the first screen, every frame from the journey's own answer on.
+    // Opened with the conversation's own intelligence, each leg's Session must show it at its
+    // opened and reached frames and in every turn that shows a selection; answered on the first
+    // screen, at its reached frame and in every turn from the journey's own answer on.
     const byOpener = step('create_open')?.opened_with === 'intelligence';
     let answeredEarlier = false;
     for (const name of ['create', 'edit']) {
@@ -432,13 +434,15 @@ function judgeJourney(report, expected, requested = null, worldChecks = null) {
         gap(seatName, 'the Session opened on a choice kept before this journey, never asked the first screen',
           { requested: seat, other });
       } else if (unseen.length > 0) {
-        // A frame that shows no selection proves no seat: never a pass.
+        // A required frame (reached; opened, with an opener) showing no selection proves no seat:
+        // never a pass.
         gap(seatName, `no selection was observed at ${unseen.join(', ')}`, { requested: seat, frames: shown });
       } else {
         check(seatName, true, { requested: seat, frames: shown });
       }
       if (byOpener) {
-        // The engine holds the opener's words for this conversation alone, in every frame.
+        // The engine holds the opener's words for this conversation alone: at the opened and
+        // reached frames, and in every turn that shows a scope.
         const scopes = frames.map(({ at, selected }) => ({ at, scope: selected?.scope ?? null }));
         const elsewhere = scopes.filter((frame) => typeof frame.scope === 'string' && frame.scope !== 'conversation');
         const unscoped = frames.filter((frame) => frame.required && typeof frame.selected?.scope !== 'string')

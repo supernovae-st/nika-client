@@ -144,7 +144,14 @@ function evidenceRow(sdk, door, outcome, config, wallMs) {
  */
 function creationRow(sdk, door, outcome, config, wallMs) {
   const { provenance } = outcome;
-  assert.equal(outcome.compile_version, 2, `${door}: a provider creation answers generation 2`);
+  if (outcome.compile_version !== 2) {
+    // No provider call: the engine settled the words without its author (a reading it composes
+    // whole goes to Check), so the document door, and its record, were never reached.
+    assert.equal(provenance.plan?.document, undefined, `${door}: only the document door settles a creation`);
+    return { door, leg: 'create', exercised: false, why: 'no provider round: the document door was not reached',
+      status: outcome.status, compile_version: outcome.compile_version, wall_ms: wallMs,
+      strategy: provenance.strategy ?? null, route: provenance.decision?.route ?? null };
+  }
   const plan = provenance.plan;
   const decision = provenance.decision ?? {};
   const settled = plan?.document;

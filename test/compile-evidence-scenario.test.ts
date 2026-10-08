@@ -89,6 +89,15 @@ describe('provider creation law', () => {
       component_literal: null, bound: 48 }]);
   });
 
+  it('marks a creation the engine settled without its author as not exercised', () => {
+    const settledWhole = { ...outcome('ready', { decision: { route: ['check: the reading composed whole'] } }),
+      compile_version: 1 };
+    delete (settledWhole.provenance as Record<string, unknown>).authoring;
+    expect(creationRow(sdk, 'native', settledWhole, created, 1)).toMatchObject({ leg: 'create', exercised: false,
+      compile_version: 1, why: 'no provider round: the document door was not reached',
+      route: ['check: the reading composed whole'] });
+  });
+
   it('holds back a ready creation that settled no record', () => {
     expect(() => creationRow(sdk, 'http', outcome('ready', { plan: { document_create: section } }), created, 1))
       .toThrow(/a ready creation settles plan\.document/);

@@ -240,8 +240,8 @@ there, an `operations` revision keeps the base's untouched lines, a ready
 creation settles `plan.document` (version 1, no program base) on the exact
 candidate received, and the backend's model identities stay apart. A revision
 round that stated no revision, or a creation that settled no record (a
-mandatory question still open, a held or refused round), did not exercise what
-the phase targets: its row says `exercised: false`, the report's `result` is
+mandatory question still open, a held or refused round, or words the engine
+settled without its author), did not exercise what the phase targets: its row says `exercised: false`, the report's `result` is
 `not_exercised` and the runner exits 1. A held round whose revision only the
 decision keeps is valid EDIT evidence. The report records each round's status,
 digests, calls, tokens, component receipts, backend members and the verifier's

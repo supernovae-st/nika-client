@@ -73,13 +73,14 @@ const REVISION_CHANGE = 'Keep three days of history instead of two.';
 /** Lines the change does not touch: an operations revision keeps them byte for byte. */
 const REVISION_KEPT = ['# Stock watch: keeps a rolling window of the stock pages.',
   '# Libellés en français : « Relevé — semaine » ✓ 🦋', '  label: "Relevé — semaine"', '    default: eu-west'];
-// The CREATE leg's words: a new document from words alone, no file or network effect. A
+// The CREATE leg's words: a new document from words alone, with a part only an author writes (a
+// summary), so the document door is reached; a schedule's bindings stay optional questions. A
 // language owner's pinned intent replaces it through NIKA_COMPILE_CREATE_INTENT_FILE.
 const CREATE_INTENT = process.env.NIKA_COMPILE_CREATE_INTENT_FILE
   ? readFileSync(process.env.NIKA_COMPILE_CREATE_INTENT_FILE, 'utf8').trim()
-  : 'Create a new workflow named weekly-digest. Declare team as a required string input. Declare the constants '
-    + 'window_days as 7 and label as « Relevé — semaine ✓ ». A nika:jq task named report returns team, window_days '
-    + 'and label as one object. Expose the report output as the named output digest.';
+  : 'Create a new workflow named weekly-digest. Every Monday, read ./notes/brief.md, write a three-line summary '
+    + 'of it in French under the title « Relevé — semaine ✓ », and save it to ./out/digest.md. Keep the number of '
+    + 'lines as a constant.';
 // Which provider legs run (`edit`, `create`): both by default, each a separate generation per door.
 const PROVIDER_LEGS = (process.env.NIKA_COMPILE_PROVIDER_LEGS ?? 'edit,create').split(',').filter(Boolean);
 const env = { ...Object.fromEntries(['PATH', 'TMPDIR', 'TMP', 'TEMP', 'LANG', 'LC_ALL']

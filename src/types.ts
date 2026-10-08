@@ -1864,6 +1864,12 @@ export interface NikaSessionWork {
    * otherwise, and on engines before it. The answer still names `waiting.id`.
    */
   question?: NikaSessionQuestion;
+  /**
+   * What the Session did with the last line typed for an authoring question,
+   * recorded at the act itself. Absent when that line was no answer, in a
+   * restored Session, and on engines before it.
+   */
+  answered?: NikaSessionAnswered;
   /** The candidate under review: the exact changes a consent lands. */
   candidate: NikaSessionCandidate | null;
   /** The workflow the last consent saved. Save is never a Run. */
@@ -1900,6 +1906,42 @@ export interface NikaSessionQuestion {
 export interface NikaSessionQuestionOption {
   key: string;
   label: string;
+  [key: string]: unknown;
+}
+
+/**
+ * What the Session did with the last line typed for an authoring question
+ * (`work.answered`): a value bound, the round dropped, the request restated in
+ * words, the question still waiting and why, or the line refused before
+ * anything committed. Recorded at the act itself, never derived from the
+ * turn's outcome: a value bound stays bound when the compile that follows
+ * fails. Every line clears it first; reading the snapshot again returns the
+ * same record. `question` names the question within this Session only: it
+ * grants nothing and is no identity across Sessions.
+ */
+export interface NikaSessionAnswered {
+  /** The question the line was typed for: its witness, the string a question's `waiting.id` carries. */
+  question: string;
+  /** What the Session did with the line; the vocabulary stays open. */
+  act: 'bound' | 'dropped' | 'restated' | 'waits' | 'refused' | (string & {});
+  /** The question's key: the hole a `bound` value filled, or the one `dropped`, `restated` or that `waits`. */
+  key?: string;
+  /** The value bound, exactly (`bound`). */
+  value?: string;
+  /**
+   * How the line gave the bound value (`bound`): the whole line `as_typed`, an
+   * `offered_key` named alone, or a verbatim part a bounded reading call chose
+   * (`model_read`); the vocabulary stays open.
+   */
+  reading?: 'as_typed' | 'offered_key' | 'model_read' | (string & {});
+  /** Why nothing was bound (`waits`): the reason the turn's outcome also shows. */
+  why?: string;
+  /**
+   * The refusal's stable class word (`refused`): `stale_revision`,
+   * `already_consumed`, `wrong_state`, `empty_answer`, `not_allowed`, …; the
+   * vocabulary stays open.
+   */
+  class?: string;
   [key: string]: unknown;
 }
 

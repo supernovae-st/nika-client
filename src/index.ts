@@ -459,6 +459,7 @@ export type {
   NikaCompileStrategy,
   NikaCompileTrigger,
   NikaNextCompileOptions,
+  NikaSessionAnswered,
   NikaSessionAuthor,
   NikaSessionAuthoring,
   NikaSessionAuthoringCall,

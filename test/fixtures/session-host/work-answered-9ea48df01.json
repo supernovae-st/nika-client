@@ -1,0 +1,44 @@
+{
+    "bound_as_typed": {
+        "act": "bound",
+        "key": "const.destination_path",
+        "question": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+        "reading": "as_typed",
+        "value": "sortie.txt"
+    },
+    "bound_model_read": {
+        "act": "bound",
+        "key": "const.destination_path",
+        "question": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+        "reading": "model_read",
+        "value": "sortie.txt"
+    },
+    "bound_offered_key": {
+        "act": "bound",
+        "key": "const.format",
+        "question": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+        "reading": "offered_key",
+        "value": "csv"
+    },
+    "dropped": {
+        "act": "dropped",
+        "key": "const.destination_path",
+        "question": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+    },
+    "refused": {
+        "act": "refused",
+        "class": "stale_revision",
+        "question": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+    },
+    "restated": {
+        "act": "restated",
+        "key": "const.destination_path",
+        "question": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
+    },
+    "waits": {
+        "act": "waits",
+        "key": "const.destination_path",
+        "question": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+        "why": "the reply names no value"
+    }
+}

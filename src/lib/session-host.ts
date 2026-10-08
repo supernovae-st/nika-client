@@ -279,11 +279,21 @@ function snapshotBody(value: unknown, transport: NikaTransportKind): NikaSession
 /** A BLAKE3 or sha256 witness: 32 bytes as lowercase hex. */
 const WITNESS = /^[0-9a-f]{64}$/;
 
+/** The members each answer act the engine names carries (`nika-session-change` `AnswerAct`). */
+const ANSWER_ACTS: Record<string, string[]> = {
+  bound: ['key', 'value', 'reading'],
+  dropped: ['key'],
+  restated: ['key'],
+  waits: ['key', 'why'],
+  refused: ['class'],
+};
+
 /**
  * The work members the SDK names (engine `nika-session-change` `work.rs`;
  * candidate `content`, `authoring.draft`/`calls` and `intelligence` from the
  * 0.123 integration `1b47f34c0`, `authoring.calls.per_call` from
- * `ca5845b85`), judged where they are. A member present with another shape
+ * `ca5845b85`, `answered` as `Answered`/`AnswerAct` serialize), judged where
+ * they are. A member present with another shape
  * is a protocol fault naming its path, never its value; an absent one,
  * `null` where the engine writes it and every unknown member ride through.
  * Nothing is copied or rebuilt.
@@ -446,6 +456,17 @@ function workMembers(work: Record<string, unknown>, fail: (what: string) => Nika
         member(option, 'label', where, text(), true);
       });
     });
+  });
+  // What the last line typed for a question did: left out when it answered nothing (never `null`),
+  // each known act with its own members; an act this SDK has not met rides through.
+  member(work, 'answered', 'work', (value, path) => {
+    const answered = object(value, path);
+    member(answered, 'question', path, text(), true);
+    member(answered, 'act', path, text(), true);
+    const act = String(answered.act);
+    for (const key of Object.hasOwn(ANSWER_ACTS, act) ? ANSWER_ACTS[act]! : []) {
+      member(answered, key, path, text(), true);
+    }
   });
   // Every member of an observed Run is written, `null` where its observation carried none.
   member(work, 'run', 'work', (value, path) => {

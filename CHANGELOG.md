@@ -61,7 +61,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `null` when unrecorded, digests as 64 lowercase hex, the engine's words
   (hyphenated repair roles included) as it spells them, never summed into the
   totals; snapshots without it decode unchanged, and journey evidence keeps it
-  beside the totals.
+  beside the totals. What the Session did with the last line typed for an
+  authoring question (`work.answered`) is typed (`NikaSessionAnswered`: the
+  question's witness and the act, `bound` with its key, exact value and
+  reading, `dropped`, `restated`, `waits` with its reason, or `refused` with
+  its class) and checked in place when present: each known act with its own
+  members, unknown acts, readings and classes carried as written; it is
+  absent when the last line answered nothing, and names the question within
+  its Session only.
 - Compile outcomes type the revision, reuse and intelligence evidence the
   engine records inside `provenance` (0.123 integration carrier `7d98023f9`):
   `plan.source_revision`, `plan.intent_sha256`, `plan.document_revision` and

@@ -14,6 +14,7 @@ import type {
 import { machineObject } from './machine.js';
 import {
   SESSION_FRAME_MAX_BYTES,
+  SESSION_HOST_CONTRACT,
   sessionFrame,
   sessionId,
   sessionRefusal,
@@ -52,7 +53,9 @@ export interface HttpSessionPort {
 
 export async function openHttpSession(port: HttpSessionPort, signal?: AbortSignal): Promise<SessionChannel> {
   const path = '/v1/sessions';
-  const frame = await exchange(port, path, { method: 'POST', signal }, [201], false);
+  // The host opens on no body or on the contract it speaks; the contract is stated, as JSON.
+  const frame = await exchange(port, path, { method: 'POST', signal, body: JSON.stringify({ contract: SESSION_HOST_CONTRACT }),
+    headers: { 'Content-Type': 'application/json' } }, [201], false);
   if (frame.frame !== 'opened') throw new NikaProtocolError(transport, 'POST /v1/sessions did not answer opened');
   return new HttpSessionChannel(port, sessionId(frame.session, transport), frame as unknown as NikaSessionOpened);
 }

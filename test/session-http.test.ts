@@ -87,6 +87,8 @@ describe('HTTP authoring Session', () => {
     expect(session.id).toBe(SESSION);
     expect(session.transport).toBe('http');
     expect(calls[1]!.headers.get('Authorization')).toBe(`Bearer ${TOKEN_A}`);
+    expect(calls[1]!.headers.get('Content-Type')).toBe('application/json');
+    expect(JSON.parse(calls[1]!.body!)).toEqual({ contract: CONTRACT });
     const read = await session.snapshot();
     // Over HTTP the work names the server's project world, verbatim.
     expect(read.work.root).toBe('/srv/project');

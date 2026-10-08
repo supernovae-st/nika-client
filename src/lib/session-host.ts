@@ -279,9 +279,6 @@ function snapshotBody(value: unknown, transport: NikaTransportKind): NikaSession
 /** A BLAKE3 or sha256 witness: 32 bytes as lowercase hex. */
 const WITNESS = /^[0-9a-f]{64}$/;
 
-/** An engine-written identifier (a call's role, a stop reason, a failure kind, an effort). */
-const WORD = /^[A-Za-z_]{1,40}$/;
-
 /**
  * The work members the SDK names (engine `nika-session-change` `work.rs`;
  * candidate `content`, `authoring.draft`/`calls` and `intelligence` from the
@@ -319,11 +316,6 @@ function workMembers(work: Record<string, unknown>, fail: (what: string) => Nika
   const witness = (nullable = false) => (value: unknown, path: string) => {
     if (!(nullable && value === null) && !(typeof value === 'string' && WITNESS.test(value))) {
       throw fail(`${path} is ${nullable ? 'neither a witness nor null' : 'not a witness'}`);
-    }
-  };
-  const word = (value: unknown, path: string) => {
-    if (value !== null && !(typeof value === 'string' && WORD.test(value))) {
-      throw fail(`${path} is neither a word nor null`);
     }
   };
 
@@ -396,8 +388,9 @@ function workMembers(work: Record<string, unknown>, fail: (what: string) => Nika
         list.forEach((entry, index) => {
           const where = `${at}[${index}]`;
           const call = object(entry, where);
+          // The engine's own words: their spelling is its allowlist's, never re-judged here.
           for (const key of ['call', 'stop_reason', 'failure_kind', 'reasoning_effort']) {
-            member(call, key, where, word, true);
+            member(call, key, where, text(true), true);
           }
           for (const key of ['instruction_sha256', 'schema_sha256']) member(call, key, where, witness(true), true);
           for (const key of ['message_bytes', 'references', 'max_output_tokens', 'timeout_ms', 'elapsed_ms',

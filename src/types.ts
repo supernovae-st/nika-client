@@ -1955,22 +1955,30 @@ export interface NikaSessionAuthoringCalls {
  * One authoring call as the compile's receipt recorded it, through the
  * engine's allowlist of safe facts (`work.authoring.calls.per_call`). A fact
  * the receipt does not hold, or holds in another shape, is `null`, never
- * guessed: unreported usage stays unknown, never `0`. Words are ASCII
- * letters and underscores, digests 64 lowercase hex. No prompt, answer,
- * proposed object, served model name or error text rides here.
+ * guessed: unreported usage stays unknown, never `0`. Digests are 64
+ * lowercase hex; the engine's words are spelled as its allowlist admits
+ * them. No prompt, answer, proposed object, served model name or error text
+ * rides here.
  */
 export interface NikaSessionAuthoringCall {
-  /** The call's role in the compile (`document`, `plan`, `repair`, …). */
+  /**
+   * The call's role in the compile as the engine names it (`document`,
+   * `document-repair`, `revision`, `revision-repair`, `plan`, `repair`, …).
+   */
   call: string | null;
   /** The sha256 of the call's instruction (its system message). */
   instruction_sha256: string | null;
   /** The sha256 of the answer schema the call asked. */
   schema_sha256: string | null;
-  /** The bytes of the call's messages. */
+  /**
+   * The summed byte length of the text content of the call's messages, as
+   * the engine counts it: not the serialized request, its schema overhead or
+   * tokens.
+   */
   message_bytes: number | null;
   /** How many knowledge references rode with the call. */
   references: number | null;
-  /** The output limit the call asked. */
+  /** The output limit the call asked; asked, not proof the transport enforced it. */
   max_output_tokens: number | null;
   /** The time the call was allowed. */
   timeout_ms: number | null;
@@ -1989,7 +1997,7 @@ export interface NikaSessionAuthoringCall {
   input_tokens: number | null;
   /** Reported output tokens. */
   output_tokens: number | null;
-  /** The reasoning effort the call asked. */
+  /** The reasoning effort the call asked (configured), never the effort that served it. */
   reasoning_effort: string | null;
   /** Reported reasoning tokens. */
   reasoning_tokens: number | null;

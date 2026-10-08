@@ -56,10 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unchanged. Each authoring call of the receipt (`work.authoring.calls.per_call`,
   engine `ca5845b85`) is typed (`NikaSessionAuthoringCall`: role, instruction
   and schema digests, message bytes, reference count, bounds, wall time, stop
-  reason or failure kind, reported reasoning and usage) and checked in place
-  against the engine's allowlist: every fact written, `null` when unrecorded,
-  never summed into the totals; snapshots without it decode unchanged, and
-  journey evidence keeps it beside the totals.
+  reason or failure kind, reported reasoning and usage) and checked in place:
+  every fact written, `null` when unrecorded, digests as 64 lowercase hex, the
+  engine's words (hyphenated repair roles included) as it spells them, never
+  summed into the totals; snapshots without it decode unchanged, and journey
+  evidence keeps it beside the totals.
 - Compile outcomes type the revision, reuse and intelligence evidence the
   engine records inside `provenance` (0.123 integration carrier `7d98023f9`):
   `plan.source_revision`, `plan.intent_sha256`, `plan.document_revision` and

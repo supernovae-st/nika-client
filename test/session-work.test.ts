@@ -67,10 +67,11 @@ const observedRun = (): Record<string, any> => ({ current: true, workflow: 'dige
   chain_len: null });
 
 // The carrier's wire example of `work.authoring.calls` at engine `ca5845b85`
-// (`nika-session-change` `AuthoringCalls` with `per_call`, from the receipt of
-// its allowlist test; keys sorted), byte for byte: one answered call, and one
-// failed call whose malformed digest, unrecorded references and unsafe effort
-// the engine wrote as `null`.
+// (`nika-session-change` `AuthoringCalls` with `per_call`, projected by engine
+// code from the synthetic receipt of its allowlist test, not a live call;
+// keys sorted), byte for byte: one answered call, and one failed call whose
+// malformed digest, unrecorded references and unsafe effort the engine wrote
+// as `null`.
 const CALLS_WIRE = fileURLToPath(new URL('./fixtures/session-host/work-authoring-calls-ca5845b85.json',
   import.meta.url));
 const wire = (): Record<string, any> => JSON.parse(readFileSync(CALLS_WIRE, 'utf8'));
@@ -137,6 +138,17 @@ describe('Session work members', () => {
       failure_kind: 'timeout', usage_reported: null, input_tokens: null, output_tokens: null, reasoning_effort: null });
     // The totals stay the receipt's own: unknown output stays null though one call reported 250.
     expect([calls.calls, calls.elapsed_ms, calls.input_tokens, calls.output_tokens]).toEqual([2, 900, 1000, null]);
+  });
+
+  it('reads the roles the engine actually names, hyphenated repairs included', () => {
+    const body = work();
+    body.authoring.calls = wire();
+    const roles = ['document-repair', 'revision-repair'];
+    body.authoring.calls.per_call.forEach((entry: Record<string, unknown>, index: number) => {
+      entry.call = roles[index];
+    });
+    const typed = (sessionFrame(opened(body), 'http').snapshot as { work: NikaSessionWork }).work;
+    expect(typed.authoring!.calls!.per_call!.map((entry) => entry.call)).toEqual(roles);
   });
 
   it('reads a receipt without calls, and an engine that does not project them', () => {
@@ -274,14 +286,14 @@ describe('Session work members', () => {
     ['a call without its stop reason member', (b) => { b.authoring.calls = wire();
       delete b.authoring.calls.per_call[0].stop_reason; },
     /work\.authoring\.calls\.per_call\[0\]\.stop_reason is absent/],
-    ['a role that is not a word', (b) => { b.authoring.calls = wire(); b.authoring.calls.per_call[1].call = SECRET; },
-      /work\.authoring\.calls\.per_call\[1\]\.call is neither a word nor null/],
-    ['an effort carrying punctuation', (b) => { b.authoring.calls = wire();
-      b.authoring.calls.per_call[0].reasoning_effort = 'high; drop table'; },
-    /work\.authoring\.calls\.per_call\[0\]\.reasoning_effort is neither a word nor null/],
-    ['a stop reason over forty letters', (b) => { b.authoring.calls = wire();
-      b.authoring.calls.per_call[0].stop_reason = 'E'.repeat(41); },
-    /work\.authoring\.calls\.per_call\[0\]\.stop_reason is neither a word nor null/],
+    ['a role as a number', (b) => { b.authoring.calls = wire(); b.authoring.calls.per_call[1].call = 2; },
+      /work\.authoring\.calls\.per_call\[1\]\.call is neither text nor null/],
+    ['an effort as a list', (b) => { b.authoring.calls = wire();
+      b.authoring.calls.per_call[0].reasoning_effort = [SECRET]; },
+    /work\.authoring\.calls\.per_call\[0\]\.reasoning_effort is neither text nor null/],
+    ['a failure kind as an object', (b) => { b.authoring.calls = wire();
+      b.authoring.calls.per_call[1].failure_kind = { kind: 'timeout' }; },
+    /work\.authoring\.calls\.per_call\[1\]\.failure_kind is neither text nor null/],
     ['an instruction digest in capitals', (b) => { b.authoring.calls = wire();
       b.authoring.calls.per_call[0].instruction_sha256 = 'A'.repeat(64); },
     /work\.authoring\.calls\.per_call\[0\]\.instruction_sha256 is neither a witness nor null/],

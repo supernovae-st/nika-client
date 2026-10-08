@@ -278,7 +278,9 @@ try {
         const transcript = JSON.parse(await consume('esm', 'session-journey', config, env));
         // A world judges its own postconditions per leg; the identity checks stay the journey's.
         const worldChecks = typeof prepared.judge === 'function' ? await prepared.judge(transcript) : null;
-        return { ...row, exercised: true, ...judgeJourney(transcript, expected, requested, worldChecks), transcript };
+        return { ...row, exercised: true,
+          ...judgeJourney(transcript, expected, requested, worldChecks, seats.NIKA_AUTHORING_REASONING ?? null),
+          transcript };
       }
     }
   }

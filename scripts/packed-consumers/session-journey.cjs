@@ -386,6 +386,36 @@ function legSelections(report, name, fromTurn, openRequired) {
   return frames;
 }
 
+/**
+ * Whether the authoring calls a leg's reached frame receipts carried `effort`: each call asked it
+ * (`requested_effort`), the ACP session took it (`transmitted_effort`) and read it back
+ * (`configured_effort`), and the Session's own configured effort names it. Another value anywhere
+ * fails; no returned call, or a receipt naming no effort, proves nothing.
+ */
+function carriedEffort(evidence, effort) {
+  const observed = evidence?.calls?.backend?.observed;
+  const records = Array.isArray(observed) ? observed : [];
+  const returned = records.filter((record) => record?.status === 'returned');
+  const named = [
+    ...records.filter((record) => record?.status === 'invoking')
+      .map((record, index) => ({ at: `call ${index} requested_effort`, value: record.requested_effort })),
+    ...returned.flatMap((record, index) => [{ at: `call ${index} transmitted_effort`, value: record.transmitted_effort },
+      { at: `call ${index} configured_effort`, value: record.configured_effort }]),
+    { at: 'intelligence.effort', value: evidence?.intelligence?.effort },
+  ];
+  const other = named.filter(({ value }) => typeof value === 'string' && value !== effort);
+  const unnamed = named.filter(({ value }) => typeof value !== 'string').map(({ at }) => at);
+  if (other.length > 0) return { verdict: 'failed', observed: { requested: effort, other } };
+  if (returned.length === 0) {
+    return { verdict: 'not_exercised', why: 'no authoring call returned on this leg', observed: { requested: effort, records } };
+  }
+  if (unnamed.length > 0) {
+    return { verdict: 'not_exercised', why: `the receipts name no effort at ${unnamed.join(', ')}`,
+      observed: { requested: effort, records } };
+  }
+  return { verdict: 'passed', observed: { requested: effort, calls: returned.length } };
+}
+
 /** Whether the Session's own selection is the seat that was requested. */
 function isRequestedSeat(selected, requested) {
   return selected !== null && selected !== undefined && selected.kind === requested.kind
@@ -403,9 +433,10 @@ function isRequestedSeat(selected, requested) {
  * the opened frame too, held for the conversation alone) and in every turn from the open (or
  * from the journey's answer) that shows a selection: a required frame showing none proves
  * nothing, a turn showing none is not read, and a choice kept from elsewhere is never
- * relabelled as the one requested.
+ * relabelled as the one requested. When `effort` names the reasoning effort asked of a seat
+ * reached over ACP, each leg also requires every authoring call to have carried it.
  */
-function judgeJourney(report, expected, requested = null, worldChecks = null) {
+function judgeJourney(report, expected, requested = null, worldChecks = null, effort = null) {
   if (report.error !== null) {
     return { verdict: 'failed', checks: [{ name: 'the journey completed', verdict: 'failed', observed: report.error }] };
   }
@@ -426,6 +457,9 @@ function judgeJourney(report, expected, requested = null, worldChecks = null) {
       const LEG = name.toUpperCase();
       const seatName = `the ${LEG} Session prepared with the requested intelligence`;
       const scopeName = `the ${LEG} Session holds the requested intelligence for this conversation alone`;
+      const effortName = `the ${LEG} Session carried the requested effort on every authoring call`;
+      // An ACP seat applies a named effort through its advertised option and reads it back.
+      const asksEffort = effort !== null && seat.transport === 'acp';
       const answeredAt = report.steps.filter((entry) => entry.step === `${name}_turn`)
         .findIndex((entry) => entry.said === 'intelligence_choice');
       const answered = byOpener || answeredAt >= 0 || answeredEarlier;
@@ -433,6 +467,7 @@ function judgeJourney(report, expected, requested = null, worldChecks = null) {
       if (step(`${name}_open`) === undefined) {
         gap(seatName, 'an earlier leg stopped first', null);
         if (byOpener) gap(scopeName, 'an earlier leg stopped first', null);
+        if (asksEffort) gap(effortName, 'an earlier leg stopped first', null);
         continue;
       }
       // Before this leg's own first-screen answer the Session had no choice to show.
@@ -468,6 +503,11 @@ function judgeJourney(report, expected, requested = null, worldChecks = null) {
         } else {
           check(scopeName, true, { scopes });
         }
+      }
+      if (asksEffort) {
+        const carried = carriedEffort(step(`${name}_reached`)?.evidence, effort);
+        if (carried.verdict === 'not_exercised') gap(effortName, carried.why, carried.observed);
+        else check(effortName, carried.verdict === 'passed', carried.observed);
       }
     }
     if (byOpener) {

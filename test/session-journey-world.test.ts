@@ -15,8 +15,8 @@ const require = createRequire(import.meta.url);
 type Journey = { module_system: string; door: string; steps: any[]; error: any };
 const journey = require('../scripts/packed-consumers/session-journey.cjs') as ((sdk: unknown, config: unknown) =>
   Promise<Journey>) & { judgeJourney: (report: Journey, expected: unknown, requested?: string | null,
-    worldChecks?: Record<string, unknown[]> | null) => { verdict: string; checks: { name: string; verdict: string;
-      why?: string }[] } };
+    worldChecks?: Record<string, unknown[]> | null, effort?: string | null) => { verdict: string;
+      checks: { name: string; verdict: string; why?: string; observed?: any }[] } };
 const sha256 = (text: string | Buffer) => createHash('sha256').update(text).digest('hex');
 const SINK = 'http://127.0.0.1:1/notifications/hook';
 const WORKFLOW = (threshold: number) => `nika: stale\nconst:\n  max_age_hours: ${threshold}\ntasks: {}\n`;
@@ -409,6 +409,74 @@ describe('a journey opened with the conversation\'s own intelligence', () => {
     expect(named(unseenOpen, 'the EDIT Session holds the requested intelligence for this conversation alone'))
       .toMatchObject({ verdict: 'not_exercised', why: 'no selection scope was observed at edit_open' });
     expect([unseenReached.verdict, unseenOpen.verdict]).toEqual(['not_exercised', 'not_exercised']);
+  });
+});
+
+describe('a journey asking an explicit effort of a seat reached over ACP', () => {
+  const WORDS = '1 acp:claude-code/opus[1m]';
+  const CLAUDE = { kind: 'harness', via: 'claude-code', model: 'claude-code/opus[1m]', transport: 'acp', ready: true,
+    scope: 'conversation' };
+  const TICKETS = { create: ['stale-60', 'boundary-72', 'stale-90'], edit: ['stale-90'] };
+  /** One ACP authoring call's receipts as the harness seat writes them: asked, taken, read back. */
+  const call = (requested: unknown, transmitted: unknown, configured: unknown) => [
+    { status: 'invoking', requested_model: 'claude-code/opus[1m]', requested_effort: requested },
+    { status: 'returned', effort_option: 'effort', transmitted_effort: transmitted, configured_effort: configured }];
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+  /** A scripted Claude ACP Session whose authoring receipts and configured effort are as given. */
+  async function walked(observed: unknown[], configured: unknown = 'max') {
+    const { dir, project, check } = world();
+    // The kept choice is read under the journey's HOME: this test's own, holding none.
+    vi.stubEnv('HOME', path.join(dir, 'home'));
+    const sdk = { Nika: class {
+      openSession = async () => {
+        const session = scriptedSession(project, null, [], null, { opened: CLAUDE, prepared: CLAUDE });
+        return { ...session, submit: async (shown: unknown, line: string) => {
+          const settled = await session.submit(shown, line);
+          const work = settled.snapshot.work;
+          if (work.authoring?.calls) work.authoring.calls.backend = { kind: 'harness_infer', transport: 'acp', observed };
+          work.intelligence = { ...work.intelligence, effort: configured };
+          return settled;
+        } };
+      };
+    } };
+    return journey(sdk, { door: 'native', bin: '/x', project, moduleSystem: 'esm', choice: null, intelligence: WORDS,
+      answers: {}, create: 'Create the stale report', edit: 'Raise to 72', checkBin: check,
+      snapshots: path.join(dir, 'legs'), capture: ['out'] });
+  }
+  const effortChecks = (judged: { checks: { name: string; verdict: string; why?: string }[] }) =>
+    judged.checks.filter((entry) => /carried the requested effort/.test(entry.name));
+
+  it('passes when every authoring call asked, took and read back the requested effort', async () => {
+    const judged = journey.judgeJourney(await walked([...call('max', 'max', 'max'), ...call('max', 'max', 'max')]),
+      TICKETS, WORDS, null, 'max');
+    expect(effortChecks(judged).map((entry) => [entry.name, entry.verdict])).toEqual([
+      ['the CREATE Session carried the requested effort on every authoring call', 'passed'],
+      ['the EDIT Session carried the requested effort on every authoring call', 'passed']]);
+    expect(judged.verdict).toBe('passed');
+  });
+
+  it('fails a call whose session read back another effort, or a Session configured with another', async () => {
+    const readBack = journey.judgeJourney(await walked(call('max', 'max', 'xhigh')), TICKETS, WORDS, null, 'max');
+    expect(effortChecks(readBack).map((entry) => entry.verdict)).toEqual(['failed', 'failed']);
+    const configured = journey.judgeJourney(await walked(call('max', 'max', 'max'), 'high'), TICKETS, WORDS, null,
+      'max');
+    expect(effortChecks(configured).map((entry) => entry.verdict)).toEqual(['failed', 'failed']);
+  });
+
+  it('never passes receipts that name no effort, nor a leg with no returned call', async () => {
+    const unnamed = journey.judgeJourney(await walked(call('max', null, null)), TICKETS, WORDS, null, 'max');
+    expect(effortChecks(unnamed)[0]).toMatchObject({ verdict: 'not_exercised',
+      why: 'the receipts name no effort at call 0 transmitted_effort, call 0 configured_effort' });
+    const none = journey.judgeJourney(await walked([]), TICKETS, WORDS, null, 'max');
+    expect(effortChecks(none)[0]).toMatchObject({ verdict: 'not_exercised', why: 'no authoring call returned on this leg' });
+  });
+
+  it('asks nothing of the effort when none was requested, or of a seat not reached over ACP', async () => {
+    const report = await walked(call('max', 'max', 'max'));
+    expect(effortChecks(journey.judgeJourney(report, TICKETS, WORDS))).toEqual([]);
+    expect(effortChecks(journey.judgeJourney(report, TICKETS, '2 deepseek/deepseek-v4-pro', null, 'max'))).toEqual([]);
   });
 });
 

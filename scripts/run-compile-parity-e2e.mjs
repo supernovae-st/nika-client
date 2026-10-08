@@ -4,6 +4,7 @@ import { copyFileSync, createReadStream, existsSync, lstatSync, mkdirSync, mkdte
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
+import { isDeepStrictEqual } from 'node:util';
 import { OwnedProcesses } from './one-door/process.mjs';
 import { stopResident, waitForHealth } from './one-door/resident.mjs';
 
@@ -25,7 +26,9 @@ const consumer = path.join(scratch, 'consumer');
 const isolatedHome = path.join(scratch, 'home');
 const token = 'compile-parity-test-only-token-0123456789';
 // The provider phase's base: comments, Unicode, every envelope section and an
-// input the change does not touch (it checks clean on the 0.122 carrier).
+// input the change does not touch. It checks clean and runs on the 0.122 carrier:
+// `nika:read` returns the file's text, so the jq step decodes it (`fromjson`)
+// before reading `.items`, as FIXTURE_RUNS witnesses before any generation.
 const REVISION_BASE = [
   '# Stock watch: keeps a rolling window of the stock pages.',
   '# Libellés en français : « Relevé — semaine » ✓ 🦋',
@@ -60,7 +63,7 @@ const REVISION_BASE = [
   '      tool: nika:jq',
   '      args:',
   '        input: ${{ with.pages }}',
-  '        expression: "[.items[] | select(.age_hours <= ${{ const.window_hours }})] | length"',
+  '        expression: "fromjson | [.items[] | select(.age_hours <= ${{ const.window_hours }})] | length"',
   'outputs:',
   '  kept: ${{ tasks.window.output }}',
   '  label: ${{ const.label }}',
@@ -73,6 +76,21 @@ const REVISION_CHANGE = 'Keep three days of history instead of two.';
 /** Lines the change does not touch: an operations revision keeps them byte for byte. */
 const REVISION_KEPT = ['# Stock watch: keeps a rolling window of the stock pages.',
   '# Libellés en français : « Relevé — semaine » ✓ 🦋', '  label: "Relevé — semaine"', '    default: eu-west'];
+// The base's behavior on the binary, witnessed before any generation (no model, no priced call):
+// over pages below, at and above both windows the base keeps 1, the requested change (two days
+// to three) keeps 2, and the undecoded base this fixture replaced still fails, so the witness
+// discriminates. A base that does not run as its request describes is never sent to an author.
+const FIXTURE_PAGES = { items: [{ id: 'young', age_hours: 24 }, { id: 'edge', age_hours: 72 },
+  { id: 'old', age_hours: 73 }] };
+const FIXTURE_OUTPUTS = (kept) => ({ kept, label: 'Relevé — semaine', region: 'eu-west' });
+const FIXTURE_RUNS = [
+  { name: 'base', source: REVISION_BASE, expect: { status: 'succeeded', outputs: FIXTURE_OUTPUTS(1) } },
+  { name: 'requested change', source: REVISION_BASE.replace('window_hours: 48 #', 'window_hours: 72 #'),
+    expect: { status: 'succeeded', outputs: FIXTURE_OUTPUTS(2) } },
+  { name: 'undecoded base', source: REVISION_BASE.replace('fromjson | ', ''),
+    expect: { status: 'failed', error: 'NIKA-BUILTIN-JQ-001' } },
+];
+assert(FIXTURE_RUNS.slice(1).every((run) => run.source !== REVISION_BASE), 'each fixture control differs from the base');
 // The CREATE leg's words: a new document from words alone, with a part only an author writes (a
 // summary), so the document door is reached; a schedule's bindings stay optional questions. A
 // language owner's pinned intent replaces it through NIKA_COMPILE_CREATE_INTENT_FILE.
@@ -192,6 +210,9 @@ try {
     assert(PROVIDER_LEGS.length > 0 && PROVIDER_LEGS.every((leg) => leg === 'edit' || leg === 'create'),
       'NIKA_COMPILE_PROVIDER_LEGS names edit and/or create, comma-separated');
     assert(CREATE_INTENT.length > 0, 'the CREATE leg needs words');
+    // Before anything is seated or asked: the EDIT base runs on this binary as its request says.
+    const witness = await fixtureWitness();
+    assert(witness.passed, `the EDIT base does not run as its request describes on this binary: ${JSON.stringify(witness.runs)}`);
     // The seats each door is given (Serve seats a direct provider only; a native seat may be an
     // ACP harness such as `claude-code/…` or `codex/…`), and the decision seat both doors judge
     // with (a local revision takes `--decision-model` from engine ae6845939 on).
@@ -288,12 +309,41 @@ try {
     return { ran: true, model, seats, key_env: keyNames, legs: PROVIDER_LEGS,
       serve_flags: serveFlags.length > 0 ? serveFlags : 'the resident\'s defaults',
       observation_ms: providerWaitMs,
-      base_sha256: createHash('sha256').update(REVISION_BASE).digest('hex'),
+      base_sha256: createHash('sha256').update(REVISION_BASE).digest('hex'), fixture_witness: witness,
       change: REVISION_CHANGE, original_intent: REVISION_INTENT,
       create_intent: CREATE_INTENT, create_intent_sha256: createHash('sha256').update(CREATE_INTENT).digest('hex'),
       create_intent_source: process.env.NIKA_COMPILE_CREATE_INTENT_FILE ?? 'scripts/run-compile-parity-e2e.mjs',
       seated_capabilities: seatedHealth.supportedCapabilities, results: rows,
       law: 'separate generations: each door judged by the evidence law, never compared byte for byte' };
+  }
+
+  /**
+   * FIXTURE_RUNS on this binary, in a project of their own holding FIXTURE_PAGES: each run's end
+   * as the engine settled it (status, outputs, error code). No model, no priced call.
+   */
+  async function fixtureWitness() {
+    const dir = path.join(scratch, 'fixture-witness');
+    mkdirSync(path.join(dir, 'data'), { recursive: true });
+    writeFileSync(path.join(dir, 'nika.yaml'), 'nika: fixture-witness\n');
+    writeFileSync(path.join(dir, 'data', 'stock.json'), `${JSON.stringify(FIXTURE_PAGES)}\n`);
+    const runs = [];
+    for (const [index, run] of FIXTURE_RUNS.entries()) {
+      const file = `witness-${index}.nika`;
+      writeFileSync(path.join(dir, file), run.source);
+      const ended = await owned.start(binary, ['run', file, '--json', '--no-gc', '--no-trace-file'],
+        { cwd: dir, env, timeoutMs: 60_000 }).done;
+      const settled = `${ended.stdout}`.split('\n').map((line) => {
+        try { return JSON.parse(line); } catch { return null; }
+      }).find((event) => event?.kind === 'run_settled') ?? null;
+      const observed = { status: settled?.status ?? null, outputs: settled?.outputs ?? null,
+        error: settled?.error?.code ?? null };
+      const passed = observed.status === run.expect.status
+        && (run.expect.outputs === undefined || isDeepStrictEqual(observed.outputs, run.expect.outputs))
+        && (run.expect.error === undefined || observed.error === run.expect.error);
+      runs.push({ name: run.name, workflow_sha256: createHash('sha256').update(run.source).digest('hex'),
+        exit: ended.code, ...observed, expected: run.expect, passed });
+    }
+    return { pages: FIXTURE_PAGES, runs, passed: runs.every((run) => run.passed) };
   }
 } catch (error) {
   if (reportPath) writeFileSync(reportPath, JSON.stringify({ result: 'failed', message: error.message }, null, 2) + '\n');

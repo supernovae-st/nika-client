@@ -249,6 +249,13 @@ lands; when the window passes, the legs that landed are reported with the bound
 (`not_exercised`, never failed) and no further generation is asked. The
 deterministic resident is stopped before the provider phase starts.
 
+Before anything is seated, the EDIT base runs on the binary over pages below,
+at and above both windows, with no model: it must keep 1, the requested change
+(two days to three) must keep 2, and the undecoded base it replaced must still
+fail with `NIKA-BUILTIN-JQ-001`, so the witness discriminates. A base that does
+not run as its request says stops the phase before any generation; the report
+keeps the witness (`provider.fixture_witness`).
+
 Each packed module system then runs two separate legs once per door, through a
 native seat and a seated resident. The EDIT leg revises one rich base
 (comments, Unicode, every envelope section); the CREATE leg writes a new

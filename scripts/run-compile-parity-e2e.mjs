@@ -200,6 +200,11 @@ try {
     assert(keyNames.length > 0 && keyNames.every((name) => /^[A-Z][A-Z0-9_]*$/.test(name) && process.env[name]),
       'NIKA_COMPILE_PROVIDER_ENV must name the set variables the seats need, comma-separated');
     const seatedEnv = { ...env, ...Object.fromEntries(keyNames.map((name) => [name, process.env[name]])) };
+    // The operator's grants for the seated resident (its call ceiling per authoring round, repairs,
+    // deadlines), in its own flag words; absent, the resident's defaults. Recorded in the report.
+    const serveFlags = (process.env.NIKA_COMPILE_SERVE_FLAGS ?? '').split(/\s+/).filter(Boolean);
+    assert(serveFlags.every((flag) => /^(--[a-z][a-z0-9-]*|[A-Za-z0-9._/:-]+)$/.test(flag)),
+      'NIKA_COMPILE_SERVE_FLAGS holds the resident\'s own flags and values, space-separated');
     // Its own project: a native provider round records its plan under .nika/compile/ there.
     const seatedProject = path.join(scratch, 'seated-project');
     mkdirSync(seatedProject);
@@ -217,7 +222,7 @@ try {
     ].join('\n'));
     seated = owned.start(binary, ['serve', '--bind', '127.0.0.1:0', '--workflows', seatedProject,
       '--token-file', path.join(scratch, 'token'), '--state-root', path.join(scratch, 'seated-state'), '--plain',
-      '--authoring-model', seats.serve, ...(seats.decision ? ['--decision-model', seats.decision] : [])],
+      '--authoring-model', seats.serve, ...(seats.decision ? ['--decision-model', seats.decision] : []), ...serveFlags],
     { cwd: seatedProject, env: seatedEnv, timeoutMs: 3_600_000 });
     let seatedUrl;
     const until = Date.now() + 15000;
@@ -253,6 +258,7 @@ try {
     await stopResident(seated);
     seated = undefined;
     return { ran: true, model, seats, key_env: keyNames, legs: PROVIDER_LEGS,
+      serve_flags: serveFlags.length > 0 ? serveFlags : 'the resident\'s defaults',
       base_sha256: createHash('sha256').update(REVISION_BASE).digest('hex'),
       change: REVISION_CHANGE, original_intent: REVISION_INTENT,
       create_intent: CREATE_INTENT, create_intent_sha256: createHash('sha256').update(CREATE_INTENT).digest('hex'),

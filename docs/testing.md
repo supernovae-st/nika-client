@@ -228,6 +228,11 @@ own seat (a native seat may be an ACP harness such as `claude-code/…` or
 a decision model beside both doors' authors (a local revision takes it from
 engine `ae6845939` on), and `NIKA_COMPILE_PROVIDER_ENV` takes several variable names,
 comma-separated (`HOME` included when a harness must find its own login).
+`NIKA_COMPILE_SERVE_FLAGS` gives the seated resident the operator's grants in
+its own flag words (`--authoring-max-calls`, `--authoring-repairs`,
+`--authoring-deadline`, `--authoring-timeout`, space-separated); absent, it
+runs with its defaults (one call per authoring round). The report names
+which.
 
 Each packed module system then runs two separate legs once per door, through a
 native seat and a seated resident. The EDIT leg revises one rich base

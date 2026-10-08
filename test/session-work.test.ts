@@ -10,6 +10,8 @@ import type {
   NikaSessionAuthoringCalls,
   NikaSessionCandidateFile,
   NikaSessionIntelligence,
+  NikaSessionRun,
+  NikaSessionRunEnd,
   NikaSessionWork,
 } from '../src/index.js';
 import { sessionFrame } from '../src/lib/session-host.js';
@@ -56,6 +58,11 @@ const revision = () => ({
       value: './in/tickets.json' }], witness: 'expanded', future_use_member: 'kept' }],
   future_revision_member: { additive: true },
 });
+
+/** An observed Run as `nika-session-change` `work.rs` serializes it: every member, `null` where unobserved. */
+const observedRun = (): Record<string, any> => ({ current: true, workflow: 'digest.nika', end: { end: 'succeeded' },
+  trace: '/srv/project/.nika/traces/run.ndjson', execution: null, workflow_sha256: null, chain_head: null,
+  chain_len: null });
 
 function refusal(body: Record<string, any>): NikaProtocolError {
   try {
@@ -126,6 +133,36 @@ describe('Session work members', () => {
     expect('intelligence' in old).toBe(false);
     expect('calls' in old.authoring!).toBe(false);
     expect('content' in old.candidate!.files[0]!).toBe(false);
+  });
+
+  it('types the observed Run, an unnamed identity kept null and never filled', () => {
+    const body = work({ waiting: { kind: 'free' }, candidate: null,
+      run: { ...observedRun(), end: { end: 'unknown', exit: 7 }, future_run_member: 'kept' } });
+    const typed = (sessionFrame(opened(body), 'http').snapshot as { work: NikaSessionWork }).work;
+    const run: NikaSessionRun = typed.run!;
+    expect(run).toBe(body.run);
+    expect(run.workflow_sha256).toBeNull();
+    expect(run.chain_len).toBeNull();
+    const end: NikaSessionRunEnd = run.end!;
+    expect(end).toEqual({ end: 'unknown', exit: 7 });
+    expect(run.future_run_member).toBe('kept');
+    const named = work({ run: { ...observedRun(), execution: 'exe-1', workflow_sha256: 'a'.repeat(64),
+      chain_head: 'h'.repeat(64), chain_len: 9 } });
+    expect((sessionFrame(opened(named), 'http').snapshot as { work: NikaSessionWork }).work.run)
+      .toMatchObject({ execution: 'exe-1', chain_len: 9 });
+  });
+
+  it('decodes every Run the merged host recorded, unchanged', () => {
+    const review = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/session-host/eb89e1893/http-run-review.json',
+      import.meta.url)), 'utf8')) as { answered: Record<string, any> }[];
+    const runs = review.map((entry) => entry.answered).filter((frame) => frame.snapshot?.work?.run);
+    expect(runs.length).toBeGreaterThan(0);
+    for (const frame of runs) {
+      const raw = JSON.stringify(frame);
+      expect(sessionFrame(frame, 'http')).toBe(frame);
+      expect(JSON.stringify(frame)).toBe(raw);
+      expect(frame.snapshot.work.run).toMatchObject({ current: true, end: { end: 'succeeded' }, workflow_sha256: null });
+    }
   });
 
   it('decodes every frame the host recorded before these members, unchanged', () => {
@@ -200,6 +237,19 @@ describe('Session work members', () => {
     ['a component file digest that is not hex', (b) => { b.candidate.revision = revision();
       b.candidate.revision.components[0].file_sha256 = 'file'; },
     /work\.candidate\.revision\.components\[0\]\.file_sha256 is neither a witness nor null/],
+    ['a Run as text', (b) => { b.run = 'succeeded'; }, /work\.run is neither an object nor null/],
+    ['a Run whose currency is text', (b) => { b.run = { ...observedRun(), current: 'true' }; },
+      /work\.run\.current is not a boolean/],
+    ['a Run without its source hash member', (b) => { b.run = observedRun(); delete b.run.workflow_sha256; },
+      /work\.run\.workflow_sha256 is absent/],
+    ['a source hash as a number', (b) => { b.run = { ...observedRun(), workflow_sha256: 7 }; },
+      /work\.run\.workflow_sha256 is neither text nor null/],
+    ['a journal length as text', (b) => { b.run = { ...observedRun(), chain_len: '9' }; },
+      /work\.run\.chain_len is neither a count nor null/],
+    ['an end without its word', (b) => { b.run = { ...observedRun(), end: { exit: 7 } }; },
+      /work\.run\.end\.end is absent/],
+    ['an exit as text', (b) => { b.run = { ...observedRun(), end: { end: 'unknown', exit: 'seven' } }; },
+      /work\.run\.end\.exit is not a count/],
   ];
   it.each(malformed)('refuses %s as a protocol fault naming its path, never its value', (_name, mutate, message) => {
     const body = work();

@@ -1853,8 +1853,8 @@ export interface NikaSessionWork {
   saved: Record<string, unknown> | null;
   /** The Run this Session requested last: a request, never an observation. */
   requested: Record<string, unknown> | null;
-  /** The last observed Run. */
-  run: Record<string, unknown> | null;
+  /** The last observed Run, with only the identities its observation carried. */
+  run: NikaSessionRun | null;
   /** The automation rail, each field at its own stage. */
   rail: Record<string, unknown>;
   [key: string]: unknown;
@@ -1997,6 +1997,57 @@ export interface NikaSessionComponentUse {
   bindings: { path: string; value: unknown; [key: string]: unknown }[];
   /** What the bytes show of it now: `expanded`, `revised`, `absent` or `unwitnessed`. */
   witness: string;
+  [key: string]: unknown;
+}
+
+/**
+ * The last Run a Session observed (`work.run`), with only the identities its
+ * observation carried and nothing re-derived. A `null` member is unknown, never
+ * guessed: a Run whose `workflow_sha256` is `null` ran bytes the snapshot does
+ * not name (both session-host doors of the 0.123 integration observe a Run
+ * without that identity), so it does not prove the saved bytes ran.
+ */
+export interface NikaSessionRun {
+  /**
+   * The Run of the workflow this Session saved last. `false` for a Run kept
+   * from an earlier session or observed before a later Save: evidence, never
+   * the result of the bytes saved now.
+   */
+  current: boolean;
+  /** The workflow the Run was asked of, relative to `work.root`. */
+  workflow: string | null;
+  /** How it ended, when its exit was observed. */
+  end: NikaSessionRunEnd | null;
+  /** The trace its settlement named, as the engine names it. */
+  trace: string | null;
+  /** The execution its frames and settlement carried. */
+  execution: string | null;
+  /** The source hash its start named: the exact bytes it ran. */
+  workflow_sha256: string | null;
+  /** The journal head its receipt named. */
+  chain_head: string | null;
+  /** The journal length its receipt named. */
+  chain_len: number | null;
+  [key: string]: unknown;
+}
+
+/**
+ * How an observed Run ended, from the exit the host observed (`end`:
+ * `succeeded`, `failed`, `refused_findings`, `refused_environment`, `paused`,
+ * `interrupted`, or `unknown` with its `exit` code); the vocabulary stays open.
+ */
+export interface NikaSessionRunEnd {
+  end:
+    | 'succeeded'
+    | 'failed'
+    | 'refused_findings'
+    | 'refused_environment'
+    | 'paused'
+    | 'interrupted'
+    | 'unknown'
+    | (string & {});
+  /** The exit code, beside `unknown`. */
+  exit?: number;
   [key: string]: unknown;
 }
 

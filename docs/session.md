@@ -62,6 +62,7 @@ interface needs to show and verify without reading anything else:
 | `authoring.draft` | `string \| null` | the compiler's candidate bytes, proposed or not: what to show while a question waits; showing it consents to nothing |
 | `authoring.calls` | `NikaSessionAuthoringCalls \| null` | the compiler's receipt of its authoring calls: the model they asked for (`requested_model`, never what served them), how many, the reported usage (`null` when unknown, never `0`) and the `backend` as its transport named it; `null` when the compile made no call |
 | `intelligence` | `NikaSessionIntelligence` | configured facts: the person's `selected` intelligence as the engine's machine resolved it, the `author` seat, the `decision` seat selected and the `effort`; a selection is never the model that served a call |
+| `run` | `NikaSessionRun \| null` | the last observed Run with only the identities its observation carried: `current` (the Run of the workflow saved last), `workflow`, `end` (`{ end }`, plus `exit` for `unknown`), `trace`, `execution`, `workflow_sha256` (the source hash its start named), `chain_head`, `chain_len`; every member written, `null` where unobserved. Both session-host doors of the 0.123 integration observe a Run without `workflow_sha256`, `execution` or the chain: such a Run does not prove which bytes ran |
 
 The SDK checks these members where they are, as it checks a compile's
 evidence: a present member of another shape fails with `NikaProtocolError`

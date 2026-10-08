@@ -28,7 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   frames the engine's host recorded from both doors at `e849d08ea` and on the
   merged `eb89e1893` (the current Work members, and a resident's Run cost
   review: a stale yes refused with its line, one admission and its replay, a
-  decline that admits nothing).
+  decline that admits nothing). The observed Run is typed (`NikaSessionRun`,
+  `NikaSessionRunEnd`) and checked in place: every member written, `null`
+  where its observation carried none, never filled by the SDK; a Run without
+  `workflow_sha256` does not prove which bytes ran.
 - Compile outcomes type the revision, reuse and intelligence evidence the
   engine records inside `provenance` (0.123 integration carrier `7d98023f9`):
   `plan.source_revision`, `plan.intent_sha256`, `plan.document_revision` and

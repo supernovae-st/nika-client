@@ -390,6 +390,22 @@ function workMembers(work: Record<string, unknown>, fail: (what: string) => Nika
     });
     member(intelligence, 'effort', path, text(true));
   });
+  // Every member of an observed Run is written, `null` where its observation carried none.
+  member(work, 'run', 'work', (value, path) => {
+    if (value === null) return;
+    const run = object(value, path);
+    member(run, 'current', path, flag, true);
+    for (const key of ['workflow', 'trace', 'execution', 'workflow_sha256', 'chain_head']) {
+      member(run, key, path, text(true), true);
+    }
+    member(run, 'chain_len', path, count(true), true);
+    member(run, 'end', path, (end, at) => {
+      if (end === null) return;
+      const ended = object(end, at);
+      member(ended, 'end', at, text(), true);
+      member(ended, 'exit', at, count());
+    }, true);
+  });
 }
 
 /** A refusal frame as the typed error its owner receives, the refused line kept. */

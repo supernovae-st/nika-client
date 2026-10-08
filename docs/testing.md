@@ -229,19 +229,28 @@ a decision model beside both doors' authors (a local revision takes it from
 engine `ae6845939` on), and `NIKA_COMPILE_PROVIDER_ENV` takes several variable names,
 comma-separated (`HOME` included when a harness must find its own login).
 
-Each packed module system then revises one rich base (comments, Unicode, every
-envelope section) once per door, through a native seat and a seated resident.
-These are separate generations, never compared byte for byte. Each must satisfy
-the evidence law: every revision stated binds the exact base sent and the exact
-candidate received by sha256, a kept plan states the decision's revision, a
-ready round keeps its plan and states the revision there, an `operations`
-revision keeps the base's untouched lines, and the backend's model identities
-stay apart. A round that stated no revision at all did not exercise what the
-phase targets: its row says `exercised: false`, the report's `result` is
+Each packed module system then runs two separate legs once per door, through a
+native seat and a seated resident. The EDIT leg revises one rich base
+(comments, Unicode, every envelope section); the CREATE leg writes a new
+document from words alone. These are separate generations, never compared byte
+for byte. Each must satisfy the evidence law: every revision stated binds the
+exact base sent and the exact candidate received by sha256, a kept plan states
+the decision's revision, a ready round keeps its plan and states the revision
+there, an `operations` revision keeps the base's untouched lines, a ready
+creation settles `plan.document` (version 1, no program base) on the exact
+candidate received, and the backend's model identities stay apart. A revision
+round that stated no revision, or a creation that settled no record (a
+mandatory question still open, a held or refused round), did not exercise what
+the phase targets: its row says `exercised: false`, the report's `result` is
 `not_exercised` and the runner exits 1. A held round whose revision only the
-decision keeps is valid evidence. The report records each round's status,
-digests, calls, tokens, backend members and the verifier's own diagnostics and
-records.
+decision keeps is valid EDIT evidence. The report records each round's status,
+digests, calls, tokens, component receipts, backend members and the verifier's
+own diagnostics and records.
+
+`NIKA_COMPILE_PROVIDER_LEGS` picks the legs (`edit`, `create`; both by default)
+and `NIKA_COMPILE_CREATE_INTENT_FILE` replaces the CREATE leg's words with a
+file's, such as a language owner's pinned intent; the report names the words'
+source and sha256.
 
 The [2026-09-19 source-build receipt](../evidence/compile-4334e58b-20260919.json)
 records 14 cases across both doors and both module systems at that producer,

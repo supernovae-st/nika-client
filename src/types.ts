@@ -1252,6 +1252,17 @@ export interface NikaCompilePlanRecord {
   intent_sha256?: string;
   /** How the source was revised over its complete document. */
   document_revision?: NikaCompileDocumentRevision;
+  /**
+   * A created document's settled record: the final bytes it binds, the
+   * request they answer and the receipts of what it composed. A ready round
+   * of the complete-document door writes it once no mandatory question is
+   * left; a continuation still waiting on one carries none. A later change
+   * to these bytes is new work over them, never an answer round of the
+   * creation.
+   */
+  document?: NikaCompileCreatedDocument;
+  /** How the complete-document door made a created document, as its answer rounds replay it. */
+  document_create?: NikaCompileDocumentCreateSection;
   [key: string]: unknown;
 }
 
@@ -1269,6 +1280,13 @@ export interface NikaCompileDecisionRecord {
    * an accepted result.
    */
   document_revision?: NikaCompileDocumentRevision;
+  /**
+   * How the complete-document door made a created document. It stays on
+   * every outcome of that door, so it may describe a held candidate or a
+   * withdrawn one (`candidate_sha256` is then `null`): evidence of the
+   * attempt, never an accepted result.
+   */
+  document_create?: NikaCompileDocumentCreate;
   /** How recalled knowledge was qualified, and what of it the candidate's bytes hold. */
   knowledge_qualification?: NikaCompileKnowledgeQualification;
   [key: string]: unknown;
@@ -1313,6 +1331,103 @@ export interface NikaCompileDocumentRevision {
   preservation?: string;
   /** The receipts of the components the revised bytes hold: new, rebound or carried. */
   components: NikaCompileComponentReceipt[];
+  [key: string]: unknown;
+}
+
+/**
+ * How a created document was made: `written` (the author wrote the whole
+ * document) or `composed` (operations applied over the author's own
+ * document). The vocabulary stays open.
+ */
+export type NikaCompileDocumentCreateMode = 'written' | 'composed' | (string & {});
+
+/**
+ * The settled record of a created document (`provenance.plan.document`,
+ * engine `nika-compile-cognition` `document_create.rs::bind`), written on a
+ * ready outcome only, optional questions left or not. It binds the final
+ * bytes, once answers, defaults and the model seating changed them:
+ * `candidate_sha256` is their sha256, and the engine reads the record as the
+ * program history of exactly those bytes. This SDK knows version `1`; a
+ * record of another version is carried as written, its other members
+ * unjudged, so read them only when `version` is `1`.
+ */
+export interface NikaCompileCreatedDocument {
+  version: number;
+  /** sha256 (lowercase hex) of the final candidate's UTF-8 bytes. */
+  candidate_sha256: string;
+  /**
+   * The effective request the door read (a clarification's words when one
+   * replaced the request); answers are never written into it.
+   */
+  request: string;
+  /** `null`: a creation revises no program. */
+  base_sha256: string | null;
+  mode: NikaCompileDocumentCreateMode;
+  /**
+   * The receipts of the components the document holds. A receipt's own
+   * `candidate_sha256` names the bytes right after its expansion, which may
+   * precede later edits or answers; what the final bytes hold of it is
+   * `decision.document_create.reuse`.
+   */
+  components: NikaCompileComponentReceipt[];
+  [key: string]: unknown;
+}
+
+/**
+ * The complete-document door's section on the native record its answer
+ * rounds replay (`provenance.plan.document_create`): what the door made and
+ * of what. It is there whenever the door's judge accepted a document, ready
+ * or not.
+ */
+export interface NikaCompileDocumentCreateSection {
+  /** The route that made it. */
+  route?: string;
+  mode: NikaCompileDocumentCreateMode;
+  /** The request the door answered. */
+  resolved?: string;
+  /** The node paths and components the operations changed, in their order; empty when written. */
+  changed: string[];
+  /** The preservation claimed, in words. */
+  preservation?: string;
+  /** The receipts of the components the document holds. */
+  components: NikaCompileComponentReceipt[];
+  [key: string]: unknown;
+}
+
+/**
+ * How the complete-document door made a created document
+ * (`provenance.decision.document_create`), with each component's receipt
+ * and what the candidate holds of them. It is there whenever the door's
+ * judge accepted a document: a ready outcome, a continuation waiting on a
+ * mandatory question, a withdrawal. It states what the door did and claims,
+ * never that the document is what the request meant.
+ */
+export interface NikaCompileDocumentCreate {
+  /** The route that made it. */
+  route?: string;
+  mode: NikaCompileDocumentCreateMode;
+  /**
+   * sha256 (lowercase hex) of the document a `composed` answer's operations
+   * applied to inside this creation (the author's own, or the door's last
+   * one); `null` when the author wrote the whole document. It is never a
+   * program base.
+   */
+  base_sha256: string | null;
+  /** How many operations the answer stated. */
+  operations: number;
+  /** The node paths and components the operations changed, in their order. */
+  changed: string[];
+  /** The preservation claimed, in words. */
+  preservation?: string;
+  /** The receipts of the components the document holds: new, rebound or carried. */
+  components: NikaCompileComponentReceipt[];
+  /** What the candidate holds of each receipt, witnessed on its bytes. */
+  reuse?: NikaCompileReuse;
+  /**
+   * sha256 (lowercase hex) of the outcome's candidate: on a ready outcome the
+   * final bytes `plan.document` binds. `null` when the outcome holds none.
+   */
+  candidate_sha256: string | null;
   [key: string]: unknown;
 }
 

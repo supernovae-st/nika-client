@@ -185,6 +185,7 @@ try {
     compile: path.join(root, 'test/fixtures/fake-nika-compile.mjs'),
     old: path.join(root, 'test/fixtures/fake-nika.mjs'),
     evidence: path.join(root, 'test/fixtures/compile-evidence/document-revision.json'),
+    created: path.join(root, 'test/fixtures/compile-evidence/document-create.json'),
   });
   await copyFile(
     path.join(root, 'scripts/packed-consumers', COMPILE_SCENARIO),
@@ -239,6 +240,7 @@ try {
     `import { isNikaCompileHeld, nextCompileRequest } from '${packageName}';`,
     `import type { NikaCompileOutcome, NikaCompileRequest, NikaCompileRefusalCode } from '${packageName}';`,
     `import type { NikaCompileAuthoringBackend, NikaCompileDocumentRevision, NikaCompileReuse } from '${packageName}';`,
+    `import type { NikaCompileCreatedDocument, NikaCompileDocumentCreate } from '${packageName}';`,
     `import type { NikaAuthoringSession, NikaSessionResult, NikaSessionSnapshot } from '${packageName}';`,
     `import type { NikaEvent, NikaJournalEvidence, NikaRun, NikaRunEvent, NikaRunEventKind } from '${packageName}';`,
     `import type { NikaEventBufferOverflowError } from '${packageName}';`,
@@ -344,6 +346,15 @@ try {
     '// @ts-expect-error the count of responses that named no model is a number',
     'const evidenceUnreported: string | undefined = evidenceBackend?.unreported_models;',
     'void evidenceDigest; void evidenceUnreported;',
+    '// NIK-17: a creation settles a typed, optional record; its base is null, never a program.',
+    'const createdDocument: NikaCompileCreatedDocument | undefined = compileOutcome.provenance.plan?.document;',
+    'const createdBase: string | null | undefined = createdDocument?.base_sha256;',
+    'const createdMade: NikaCompileDocumentCreate | undefined = compileOutcome.provenance.decision?.document_create;',
+    'const createdCandidate: string | null | undefined = createdMade?.candidate_sha256;',
+    'void createdBase; void createdCandidate;',
+    '// @ts-expect-error a settled record\'s version is a number',
+    'const createdVersion: string | undefined = createdDocument?.version;',
+    'void createdVersion;',
     '// NIK-17: the authoring Session handle; every line names the snapshot it answers.',
     'const sessionOpening: Promise<NikaAuthoringSession> = client.openSession();',
     'declare const authoring: NikaAuthoringSession;',
@@ -647,6 +658,32 @@ function assertCompile(report, moduleSystem) {
     assert.deepEqual(error, { name: 'NikaProtocolError', transport, ...typed('protocol') },
       say(`${door}: malformed known evidence is a protocol fault`));
     assert.match(message, /document_revision\.base_sha256 is not a sha256 digest/, say(`${door}: the fault names its path`));
+  }
+
+  // NIK-17: a complete-document creation's evidence (synthetic values, the engine's shapes).
+  const created = JSON.parse(readFileSync(path.join(root, 'test/fixtures/compile-evidence/document-create.json'), 'utf8'));
+  const { malformedNative: createdNative, malformedHttp: createdHttp, ...creations } = report.created;
+  assert.deepEqual(creations, {
+    ready: { status: 'ready', candidateExact: true,
+      settled: { version: 1, candidate: digest(created.ready.document.candidate), request: created.ready.intent,
+        base: null, mode: 'composed', components: [{ id: 'block:stale-filter',
+          bindings: [['const.threshold_hours', 24, 48], ['const.input_path', './in/rows.json', './in/tickets.json']] }] },
+      made: { mode: 'composed', base: digest(created.ready.authored), candidate: digest(created.ready.document.candidate),
+        operations: 3, reuse: [['block:stale-filter', 'expanded']] } },
+    written: { status: 'ready', candidateExact: true,
+      settled: { version: 1, candidate: digest(created.written.document.candidate), request: created.written.intent,
+        base: null, mode: 'written', components: [] },
+      made: { mode: 'written', base: null, candidate: digest(created.written.document.candidate), operations: 0,
+        reuse: [] } },
+    continuation: { status: 'incomplete', candidateExact: true, settled: null,
+      made: { mode: 'written', base: null, candidate: null, operations: 0, reuse: [] } },
+  }, say('a creation settles only when ready, and both doors decode its evidence identically'));
+  for (const [door, refused, transport] of [['native', createdNative, 'native-process'], ['HTTP', createdHttp, 'http']]) {
+    const { message, ...error } = refused;
+    assert.deepEqual(error, { name: 'NikaProtocolError', transport, ...typed('protocol') },
+      say(`${door}: a malformed settled creation record is a protocol fault`));
+    assert.match(message, /plan\.document\.candidate_sha256 is not a sha256 digest/,
+      say(`${door}: the creation fault names its path`));
   }
 }
 

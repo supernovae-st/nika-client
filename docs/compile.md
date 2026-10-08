@@ -192,25 +192,29 @@ Not exposed: `--authoring-samples`, `--authoring-strategy`,
 Showing or hiding any of these is your application's choice; the SDK imposes
 no display or masking.
 
-## Revision, reuse and intelligence evidence
+## Revision, creation, reuse and intelligence evidence
 
-A provider round can record how it revised a workflow, what of the recalled
-knowledge the candidate's bytes really hold, and which intelligence answered.
-The engine writes these records inside `provenance`; the SDK types them, checks
-their known members and hands you the engine's own objects. It adds, removes,
-copies, recomputes and corrects nothing.
+A provider round can record how it revised or created a workflow, what of the
+recalled knowledge the candidate's bytes really hold, and which intelligence
+answered. The engine writes these records inside `provenance`; the SDK types
+them, checks their known members and hands you the engine's own objects. It
+adds, removes, copies, recomputes and corrects nothing.
 
 | Where | Type | What it states |
 |---|---|---|
 | `provenance.plan.source_revision` | `NikaCompileSourceRevision` | `base_sha256` (the bytes revised), `candidate_sha256` (the bytes written), `resolved` (the words they now answer) |
 | `provenance.plan.intent_sha256` | `string` | the digest of the words the record answers |
 | `provenance.plan.document_revision`, `provenance.decision.document_revision` | `NikaCompileDocumentRevision` | `mode` (`operations` or `replaced`), both digests, `changed` in order, the `preservation` claimed, the `components` receipts |
-| `…document_revision.components[]` | `NikaCompileComponentReceipt` | the component's identity in its release, each hole bound (`component_literal`, `bound`), node digests, the candidate digest, and for an invoked component its calling task and child program apart |
+| `provenance.plan.document` | `NikaCompileCreatedDocument` | a created document's settled record: `version` (`1`), `candidate_sha256` (the final bytes), `request` (the words they answer), `base_sha256` (`null`: a creation revises no program), `mode` (`written` or `composed`), the `components` receipts |
+| `provenance.plan.document_create` | `NikaCompileDocumentCreateSection` | what the complete-document door made, as its answer rounds replay it: `mode`, `resolved`, `changed`, `preservation`, `components` |
+| `provenance.decision.document_create` | `NikaCompileDocumentCreate` | how the door made the document: `mode`, `base_sha256` (the author's own document a `composed` answer's operations applied to, `null` when written), `operations`, `changed`, `preservation`, `components`, their `reuse` witnessed on the outcome's candidate, and `candidate_sha256` (`null` when the outcome holds none) |
+| `…components[]` | `NikaCompileComponentReceipt` | the component's identity in its release, each hole bound (`component_literal`, `bound`), node digests, the candidate digest, and for an invoked component its calling task and child program apart |
 | `provenance.decision.knowledge_qualification.reuse` | `NikaCompileReuse` | per reference: `consulted`, `expanded`, `invoked`, `revised`, `absent` or `unreadable`, each component witnessed on the candidate's own bytes |
 | `provenance.authoring.backend` | `NikaCompileAuthoringBackend` | the seated backend and its model identities, kept apart: requested (`requested_model`), transmitted (`forwarded_model`), configured (`decision_model`, `host`, `endpoint_basis`), reported (`observed_models`, `unreported_models`, a harness's `observed` rows) and attested (`served_model`, `null` when unknown) |
 
-Every record is optional: an older engine, a creation or a deterministic
-round carries none, and its outcome reads exactly as before. A present record
+Every record is optional: an older engine, a deterministic round or a door
+that made no such record carries none, and its outcome reads exactly as before.
+A present record
 must have its producer's shape: a digest that is not 64 lowercase hex
 characters, a count that is not a non-negative integer, `null` where the
 engine never writes `null`, or a missing digest, id, binding or count fails the
@@ -227,6 +231,15 @@ Read the evidence for what it says:
   withdrawn candidate whose digest names bytes you never received.
 - `base_sha256` identifies the source parent: it is not a session sequence and
   does not prove that earlier revisions are kept.
+- A creation settles only when it is ready. `plan.document` binds the final
+  bytes, after answers, defaults and the model seating changed them; a round
+  still waiting on a mandatory question carries `document_create` and no
+  `document`. The engine reads `plan.document` as the program history of those
+  bytes: a later change to them is a revision over them, never an answer round
+  of the creation. Read `plan.document`'s other members only when its
+  `version` is `1`: a record of another version rides through unjudged.
+- `decision.document_create.base_sha256` names the author's own earlier
+  document inside the creation, never a program you sent.
 - A digest is the engine's sha256 of the UTF-8 bytes. Comparing it with your
   own `sha256(candidate)` or `sha256(base)` is your check to make; the SDK
   never makes it for you.

@@ -383,6 +383,20 @@ async function compile() {
     return;
   }
 
+  if (intent !== undefined && flags.authoringModel !== undefined) {
+    // A complete-document creation with its full evidence (fixture `compile-evidence/document-create.json`:
+    // SYNTHETIC values in the engine's shapes). The request must arrive byte for byte.
+    const created = JSON.parse(readFileSync(new URL('./compile-evidence/document-create.json', import.meta.url), 'utf8'));
+    const leg = intent === 'create-evidence-malformed' ? created.ready
+      : [created.ready, created.written, created.continuation].find((each) => each.intent === intent);
+    if (leg !== undefined) {
+      const document = structuredClone(leg.document);
+      if (intent === 'create-evidence-malformed') document.provenance.plan.document.candidate_sha256 = 'x';
+      outcome({ ...document, written: null }, document.status === 'ready' ? 0 : 2);
+      return;
+    }
+  }
+
   if (intent === 'refuse-me') {
     outcome({
       status: 'refused',

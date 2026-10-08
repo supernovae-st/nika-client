@@ -292,6 +292,41 @@ module.exports = async function compileScenario(sdk, engines) {
         authoringModel: 'deepseek/deepseek-flash' })),
       malformedHttp: await refusal(sdk, () => remoteRevision(malformedRevision)),
     };
+
+    // NIK-17: a complete-document creation's evidence (the fixture's VALUES are synthetic,
+    // its shapes the engine's): settled on the ready leg, nothing settled while a
+    // mandatory question is open, the same objects on both doors.
+    const created = JSON.parse(readFileSync(engines.created, 'utf8'));
+    const remoteCreation = (document, intent) => new sdk.Nika({ url: 'https://nika.example', token: TOKEN,
+      bin: '/missing-packed-create-engine', fetch: evidenceResident(document) })
+      .compile({ intent, cognition: 'explicitProvider' });
+    report.created = {};
+    for (const leg of ['ready', 'written', 'continuation']) {
+      const { intent, document } = created[leg];
+      const local = await native.compile({ intent, authoringModel: 'claude-code/opus' });
+      const { replay_token: _created, judged_answer_round_available: _judgedCreated, ...remote } =
+        await remoteCreation(document, intent);
+      assert.deepStrictEqual(remote, local, `${leg}: both doors decode the same creation evidence`);
+      assert.deepStrictEqual(JSON.parse(JSON.stringify(local.provenance)), document.provenance,
+        `${leg}: every provenance member survives, additive ones included`);
+      const settled = local.provenance.plan.document;
+      const made = local.provenance.decision.document_create;
+      report.created[leg] = {
+        status: local.status,
+        candidateExact: local.candidate === document.candidate && remote.candidate === document.candidate,
+        settled: settled === undefined ? null : { version: settled.version, candidate: settled.candidate_sha256,
+          request: settled.request, base: settled.base_sha256, mode: settled.mode,
+          components: settled.components.map((receipt) => ({ id: receipt.component.id,
+            bindings: receipt.bindings.map((binding) => [binding.path, binding.component_literal, binding.bound]) })) },
+        made: { mode: made.mode, base: made.base_sha256, candidate: made.candidate_sha256, operations: made.operations,
+          reuse: made.reuse.references.map((reference) => [reference.id, reference.use]) },
+      };
+    }
+    const malformedCreation = structuredClone(created.ready.document);
+    malformedCreation.provenance.plan.document.candidate_sha256 = 'x';
+    report.created.malformedNative = await refusal(sdk, () => native.compile({ intent: 'create-evidence-malformed',
+      authoringModel: 'claude-code/opus' }));
+    report.created.malformedHttp = await refusal(sdk, () => remoteCreation(malformedCreation, created.ready.intent));
     return report;
   } finally {
     delete process.env.NIKA_FAKE_ARGV_LOG;

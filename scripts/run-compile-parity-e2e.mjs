@@ -73,6 +73,15 @@ const REVISION_CHANGE = 'Keep three days of history instead of two.';
 /** Lines the change does not touch: an operations revision keeps them byte for byte. */
 const REVISION_KEPT = ['# Stock watch: keeps a rolling window of the stock pages.',
   '# Libellés en français : « Relevé — semaine » ✓ 🦋', '  label: "Relevé — semaine"', '    default: eu-west'];
+// The CREATE leg's words: a new document from words alone, no file or network effect. A
+// language owner's pinned intent replaces it through NIKA_COMPILE_CREATE_INTENT_FILE.
+const CREATE_INTENT = process.env.NIKA_COMPILE_CREATE_INTENT_FILE
+  ? readFileSync(process.env.NIKA_COMPILE_CREATE_INTENT_FILE, 'utf8').trim()
+  : 'Create a new workflow named weekly-digest. Declare team as a required string input. Declare the constants '
+    + 'window_days as 7 and label as « Relevé — semaine ✓ ». A nika:jq task named report returns team, window_days '
+    + 'and label as one object. Expose the report output as the named output digest.';
+// Which provider legs run (`edit`, `create`): both by default, each a separate generation per door.
+const PROVIDER_LEGS = (process.env.NIKA_COMPILE_PROVIDER_LEGS ?? 'edit,create').split(',').filter(Boolean);
 const env = { ...Object.fromEntries(['PATH', 'TMPDIR', 'TMP', 'TEMP', 'LANG', 'LC_ALL']
   .filter((key) => process.env[key] !== undefined).map((key) => [key, process.env[key]])),
 HOME: isolatedHome, NIKA_KEYCHAIN: 'off' };
@@ -155,9 +164,11 @@ try {
   assert.deepEqual(snapshot(stateRoot), stateBefore, 'compile must not create or mutate resident job state');
   const provider = await providerPhase();
   assert.equal(await sha256(binary), binarySha, 'frozen binary changed during parity');
-  // A provider phase whose rounds stated no revision did not exercise what it targets:
-  // the report keeps every row, and the result withholds the qualification.
-  const exercised = !provider.ran || provider.results.every(({ rows }) => rows.every((row) => row.exercised));
+  // A provider phase whose rounds stated no revision, or whose creations settled no record,
+  // did not exercise what it targets: the report keeps every row, and the result withholds
+  // the qualification.
+  const exercised = !provider.ran || provider.results.every(({ rows, created }) =>
+    [...rows, ...created].every((row) => row.exercised));
   report = { result: exercised ? 'green' : 'not_exercised',
     scope: 'compile foundation; no general authoring or execution grant',
     engine: { version, binary_sha256: binarySha, identity, health },
@@ -168,6 +179,9 @@ try {
   async function providerPhase() {
     const model = process.env.NIKA_COMPILE_PROVIDER_MODEL;
     if (!model) return { ran: false, why: 'NIKA_COMPILE_PROVIDER_MODEL unset: deterministic phase only' };
+    assert(PROVIDER_LEGS.length > 0 && PROVIDER_LEGS.every((leg) => leg === 'edit' || leg === 'create'),
+      'NIKA_COMPILE_PROVIDER_LEGS names edit and/or create, comma-separated');
+    assert(CREATE_INTENT.length > 0, 'the CREATE leg needs words');
     // The seats each door is given (Serve seats a direct provider only; a native seat may be an
     // ACP harness such as `claude-code/…` or `codex/…`), and the decision seat both doors judge
     // with (a local revision takes `--decision-model` from engine ae6845939 on).
@@ -219,7 +233,7 @@ try {
       const config = path.join(consumer, 'evidence.json');
       writeFileSync(config, JSON.stringify({ bin: binary, project: seatedProject, url: seatedUrl, token, moduleSystem,
         model: seats.native, decisionModel: seats.decision, base: REVISION_BASE, change: REVISION_CHANGE,
-        originalIntent: REVISION_INTENT, keptLines: REVISION_KEPT }));
+        originalIntent: REVISION_INTENT, keptLines: REVISION_KEPT, createIntent: CREATE_INTENT, legs: PROVIDER_LEGS }));
       const result = JSON.parse(await owned.run(process.execPath,
         [path.join(consumer, `evidence-consumer.${moduleSystem === 'esm' ? 'mjs' : 'cjs'}`), config],
         { cwd: consumer, env: seatedEnv, timeoutMs: 1_800_000, maxBuffer: 16 * 1024 * 1024 }));
@@ -234,9 +248,11 @@ try {
     }
     await stopResident(seated);
     seated = undefined;
-    return { ran: true, model, seats, key_env: keyNames,
+    return { ran: true, model, seats, key_env: keyNames, legs: PROVIDER_LEGS,
       base_sha256: createHash('sha256').update(REVISION_BASE).digest('hex'),
       change: REVISION_CHANGE, original_intent: REVISION_INTENT,
+      create_intent: CREATE_INTENT, create_intent_sha256: createHash('sha256').update(CREATE_INTENT).digest('hex'),
+      create_intent_source: process.env.NIKA_COMPILE_CREATE_INTENT_FILE ?? 'scripts/run-compile-parity-e2e.mjs',
       seated_capabilities: seatedHealth.supportedCapabilities, results: rows,
       law: 'separate generations: each door judged by the evidence law, never compared byte for byte' };
   }
@@ -254,13 +270,14 @@ try {
 abort.signal.throwIfAborted();
 if (reportPath) writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
 if (report.result !== 'green') {
-  console.error('compile parity held back: a provider round stated no revision, so the revision evidence was not '
-    + 'exercised (see the report rows)');
+  console.error('compile parity held back: a provider round stated no revision, or a creation settled no record, so '
+    + 'the evidence it targets was not exercised (see the report rows)');
   process.exitCode = 1;
 } else {
   console.log(`compile parity green after owned cleanup: ${report.results[0].rows.length} cases × 2 doors × 2 module systems`
     + (report.provider.ran
-      ? `; provider evidence ${report.provider.results.length} module systems × 2 doors on ${report.provider.model}` : ''));
+      ? `; provider evidence (${report.provider.legs.join(', ')}) ${report.provider.results.length} module systems `
+        + `× 2 doors on ${report.provider.model}` : ''));
 }
 
 async function sha256(file) {

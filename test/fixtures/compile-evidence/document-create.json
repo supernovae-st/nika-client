@@ -1,0 +1,852 @@
+{
+  "note": "SYNTHETIC values in the shapes of the 0.123 complete-document creation (nika-compile-cognition document_create.rs::record and ::bind, read over engine carrier 09234bce8, presence and nullability as its owner states them). Decoder evidence only: no engine produced these bytes.",
+  "ready": {
+    "intent": "Create a new workflow named stale-tickets. Read ./in/tickets.json, keep the tickets older than 48 hours in their input order, and write their count and ids to ./out/report.json, labelled « Relevé — semaine ». Use an admitted Foundry component when the catalogue has one.",
+    "authored": "# Stale tickets (SDK fixture, synthetic): keeps the tickets older than two days\nnika: stale-tickets\npermits:\n  fs:\n    read: [./in/tickets.json]\n    write: [./out/report.json]\n  tools: [\"nika:read\", \"nika:jq\", \"nika:write\"]\ntasks: {}\n",
+    "expanded": "# Stale tickets (SDK fixture, synthetic): keeps the tickets older than two days\n# Libellé conservé tel quel : « Relevé — semaine » ✓ 🦋\t(tab kept)\r\nnika: stale-tickets\nconst:\n  threshold_hours: 48\n  input_path: ./in/tickets.json\npermits:\n  fs:\n    read: [./in/tickets.json]\n    write: [./out/report.json]\n  tools: [\"nika:read\", \"nika:jq\", \"nika:write\"]\ntasks:\n  read_rows:\n    invoke:\n      tool: nika:read\n      args: {path: \"${{ const.input_path }}\"}\n  stale:\n    with: {rows: \"${{ tasks.read_rows.output }}\"}\n    invoke:\n      tool: nika:jq\n      args: {input: \"${{ with.rows }}\", expression: \"[.[] | select(.age_hours > ${{ const.threshold_hours }})]\"}\n",
+    "document": {
+      "compile_version": 2,
+      "status": "ready",
+      "candidate": "# Stale tickets (SDK fixture, synthetic): keeps the tickets older than two days\n# Libellé conservé tel quel : « Relevé — semaine » ✓ 🦋\t(tab kept)\r\nnika: stale-tickets\nconst:\n  threshold_hours: 48\n  input_path: ./in/tickets.json\n  label: \"Relevé — semaine\"\npermits:\n  fs:\n    read: [./in/tickets.json]\n    write: [./out/report.json]\n  tools: [\"nika:read\", \"nika:jq\", \"nika:write\"]\ntasks:\n  read_rows:\n    invoke:\n      tool: nika:read\n      args: {path: \"${{ const.input_path }}\"}\n  stale:\n    with: {rows: \"${{ tasks.read_rows.output }}\"}\n    invoke:\n      tool: nika:jq\n      args: {input: \"${{ with.rows }}\", expression: \"[.[] | select(.age_hours > ${{ const.threshold_hours }})]\"}\n  report:\n    with: {stale: \"${{ tasks.stale.output }}\"}\n    invoke:\n      tool: nika:write\n      args: {path: ./out/report.json, content: \"${{ with.stale }}\"}\noutputs:\n  stale: ${{ tasks.stale.output }}\n",
+      "questions": [],
+      "diagnostics": [
+        {
+          "kind": "applied",
+          "target": "document",
+          "message": "The author composed the complete document."
+        }
+      ],
+      "requested_boundary": {
+        "declared": {
+          "tools": [
+            "nika:read",
+            "nika:jq",
+            "nika:write"
+          ]
+        },
+        "needed": {
+          "tools": [
+            "nika:read",
+            "nika:jq",
+            "nika:write"
+          ]
+        }
+      },
+      "requested_trigger": null,
+      "check_preview": {
+        "scope": "sourceOnly",
+        "report": {
+          "report_version": 1,
+          "findings": []
+        }
+      },
+      "provenance": {
+        "compiler_version": "0.123.0",
+        "spec_pin": "a88d3c6e400d9f79fcbbbc4604a03ab22e2d46f0",
+        "skeleton": null,
+        "cognition": "explicitProvider",
+        "suggested_file": "stale-tickets.nika",
+        "strategy": "native",
+        "plan": {
+          "strategy": "native",
+          "intent_sha256": "8f410aaa2eb8adff20658e01568e8212c04256e3d7ed86d4247542ecd44eba0f",
+          "document_create": {
+            "route": "native: document",
+            "mode": "composed",
+            "resolved": "Create a new workflow named stale-tickets. Read ./in/tickets.json, keep the tickets older than 48 hours in their input order, and write their count and ids to ./out/report.json, labelled « Relevé — semaine ». Use an admitted Foundry component when the catalogue has one.",
+            "changed": [
+              "component block:stale-filter",
+              "const.label",
+              "tasks.report"
+            ],
+            "preservation": "edits verified byte by byte; each component's entries inserted by construction",
+            "components": [
+              {
+                "law": "expanded: an admitted component's exact bytes, bound at its holes by literal edits the parser proved, merged into the document; its permits, model and name are not inherited",
+                "component": {
+                  "id": "block:stale-filter",
+                  "release": {
+                    "version": "foundry-2026.10.08",
+                    "snapshot_sha256": "e9f7359e3fad0ccdab66e940bc938312b0393330c5467fb52c6c3859c6f01879",
+                    "profile": "nika-release@2"
+                  },
+                  "row_sha256": "41788786ac5ec862a889f44e3a529cdb6b60a241d9004ec692081a54afe1fb3a",
+                  "file": "blocks/stale-filter.nika",
+                  "file_sha256": "d50e29e46f644af9d1ed6354d91dd2b8c516371e3153000e1476f4477dfb8991",
+                  "status": "QUALIFIED",
+                  "proof_level": "CHECKED"
+                },
+                "bindings": [
+                  {
+                    "path": "const.threshold_hours",
+                    "hole": "const.threshold_hours",
+                    "owner": "human",
+                    "component_literal": 24,
+                    "bound": 48
+                  },
+                  {
+                    "path": "const.input_path",
+                    "hole": "const.input_path",
+                    "owner": "human",
+                    "component_literal": "./in/rows.json",
+                    "bound": "./in/tickets.json"
+                  }
+                ],
+                "open": [],
+                "not_inherited": {
+                  "nika": "stale-filter",
+                  "model": null,
+                  "permits": {
+                    "fs": {
+                      "read": [
+                        "./in/rows.json"
+                      ]
+                    }
+                  }
+                },
+                "authority": {
+                  "inherited": false,
+                  "component_declares": {
+                    "effects": [
+                      "fs.read"
+                    ],
+                    "authority": [
+                      "permits.fs",
+                      "permits.tools"
+                    ],
+                    "callables": [
+                      "nika:read",
+                      "nika:jq"
+                    ]
+                  },
+                  "document_needs": {
+                    "fs": {
+                      "read": [
+                        "./in/tickets.json"
+                      ]
+                    },
+                    "tools": [
+                      "nika:read",
+                      "nika:jq"
+                    ]
+                  }
+                },
+                "nodes": {
+                  "const": {
+                    "threshold_hours": "207f9f7364fe4f16042fa550c7f16ff0cb1d55b2c40a8d77d1162d1131aeb15a",
+                    "input_path": "248af30a0c7b7140248033fbc34effc5ac5b2dab3dfd6d2b3f21e8ab5614f8ff"
+                  },
+                  "tasks": {
+                    "read_rows": "bacfe7916fc343fd6751e5038e1b140ac7870c70e3619effc4f616e1611eff53",
+                    "stale": "11fd28a1b54308df7ab172ec8463ea0db9bc2df455d8af77dbfb670e4c46a829"
+                  }
+                },
+                "candidate_sha256": "bbf4163d725866dec51a62ebb6c6f77c524959eb2f272a578ad1545c946fb0de",
+                "check": {
+                  "ready": true,
+                  "findings": [],
+                  "diagnostics": []
+                },
+                "future_receipt_member": {
+                  "additive": true
+                }
+              }
+            ]
+          },
+          "document": {
+            "version": 1,
+            "candidate_sha256": "dc40f9f74bf72ad9a8c73577e607d7179eb6602f970c7b4dc285c13406510f34",
+            "request": "Create a new workflow named stale-tickets. Read ./in/tickets.json, keep the tickets older than 48 hours in their input order, and write their count and ids to ./out/report.json, labelled « Relevé — semaine ». Use an admitted Foundry component when the catalogue has one.",
+            "base_sha256": null,
+            "mode": "composed",
+            "components": [
+              {
+                "law": "expanded: an admitted component's exact bytes, bound at its holes by literal edits the parser proved, merged into the document; its permits, model and name are not inherited",
+                "component": {
+                  "id": "block:stale-filter",
+                  "release": {
+                    "version": "foundry-2026.10.08",
+                    "snapshot_sha256": "e9f7359e3fad0ccdab66e940bc938312b0393330c5467fb52c6c3859c6f01879",
+                    "profile": "nika-release@2"
+                  },
+                  "row_sha256": "41788786ac5ec862a889f44e3a529cdb6b60a241d9004ec692081a54afe1fb3a",
+                  "file": "blocks/stale-filter.nika",
+                  "file_sha256": "d50e29e46f644af9d1ed6354d91dd2b8c516371e3153000e1476f4477dfb8991",
+                  "status": "QUALIFIED",
+                  "proof_level": "CHECKED"
+                },
+                "bindings": [
+                  {
+                    "path": "const.threshold_hours",
+                    "hole": "const.threshold_hours",
+                    "owner": "human",
+                    "component_literal": 24,
+                    "bound": 48
+                  },
+                  {
+                    "path": "const.input_path",
+                    "hole": "const.input_path",
+                    "owner": "human",
+                    "component_literal": "./in/rows.json",
+                    "bound": "./in/tickets.json"
+                  }
+                ],
+                "open": [],
+                "not_inherited": {
+                  "nika": "stale-filter",
+                  "model": null,
+                  "permits": {
+                    "fs": {
+                      "read": [
+                        "./in/rows.json"
+                      ]
+                    }
+                  }
+                },
+                "authority": {
+                  "inherited": false,
+                  "component_declares": {
+                    "effects": [
+                      "fs.read"
+                    ],
+                    "authority": [
+                      "permits.fs",
+                      "permits.tools"
+                    ],
+                    "callables": [
+                      "nika:read",
+                      "nika:jq"
+                    ]
+                  },
+                  "document_needs": {
+                    "fs": {
+                      "read": [
+                        "./in/tickets.json"
+                      ]
+                    },
+                    "tools": [
+                      "nika:read",
+                      "nika:jq"
+                    ]
+                  }
+                },
+                "nodes": {
+                  "const": {
+                    "threshold_hours": "207f9f7364fe4f16042fa550c7f16ff0cb1d55b2c40a8d77d1162d1131aeb15a",
+                    "input_path": "248af30a0c7b7140248033fbc34effc5ac5b2dab3dfd6d2b3f21e8ab5614f8ff"
+                  },
+                  "tasks": {
+                    "read_rows": "bacfe7916fc343fd6751e5038e1b140ac7870c70e3619effc4f616e1611eff53",
+                    "stale": "11fd28a1b54308df7ab172ec8463ea0db9bc2df455d8af77dbfb670e4c46a829"
+                  }
+                },
+                "candidate_sha256": "bbf4163d725866dec51a62ebb6c6f77c524959eb2f272a578ad1545c946fb0de",
+                "check": {
+                  "ready": true,
+                  "findings": [],
+                  "diagnostics": []
+                },
+                "future_receipt_member": {
+                  "additive": true
+                }
+              }
+            ],
+            "future_document_member": "kept"
+          }
+        },
+        "decision": {
+          "document_create": {
+            "route": "native: document",
+            "mode": "composed",
+            "base_sha256": "38a6e6ac0f29167c5aa24dadd113396d2509ea6bdc7d013107c521bea92981e9",
+            "operations": 3,
+            "changed": [
+              "component block:stale-filter",
+              "const.label",
+              "tasks.report"
+            ],
+            "preservation": "edits verified byte by byte; each component's entries inserted by construction",
+            "components": [
+              {
+                "law": "expanded: an admitted component's exact bytes, bound at its holes by literal edits the parser proved, merged into the document; its permits, model and name are not inherited",
+                "component": {
+                  "id": "block:stale-filter",
+                  "release": {
+                    "version": "foundry-2026.10.08",
+                    "snapshot_sha256": "e9f7359e3fad0ccdab66e940bc938312b0393330c5467fb52c6c3859c6f01879",
+                    "profile": "nika-release@2"
+                  },
+                  "row_sha256": "41788786ac5ec862a889f44e3a529cdb6b60a241d9004ec692081a54afe1fb3a",
+                  "file": "blocks/stale-filter.nika",
+                  "file_sha256": "d50e29e46f644af9d1ed6354d91dd2b8c516371e3153000e1476f4477dfb8991",
+                  "status": "QUALIFIED",
+                  "proof_level": "CHECKED"
+                },
+                "bindings": [
+                  {
+                    "path": "const.threshold_hours",
+                    "hole": "const.threshold_hours",
+                    "owner": "human",
+                    "component_literal": 24,
+                    "bound": 48
+                  },
+                  {
+                    "path": "const.input_path",
+                    "hole": "const.input_path",
+                    "owner": "human",
+                    "component_literal": "./in/rows.json",
+                    "bound": "./in/tickets.json"
+                  }
+                ],
+                "open": [],
+                "not_inherited": {
+                  "nika": "stale-filter",
+                  "model": null,
+                  "permits": {
+                    "fs": {
+                      "read": [
+                        "./in/rows.json"
+                      ]
+                    }
+                  }
+                },
+                "authority": {
+                  "inherited": false,
+                  "component_declares": {
+                    "effects": [
+                      "fs.read"
+                    ],
+                    "authority": [
+                      "permits.fs",
+                      "permits.tools"
+                    ],
+                    "callables": [
+                      "nika:read",
+                      "nika:jq"
+                    ]
+                  },
+                  "document_needs": {
+                    "fs": {
+                      "read": [
+                        "./in/tickets.json"
+                      ]
+                    },
+                    "tools": [
+                      "nika:read",
+                      "nika:jq"
+                    ]
+                  }
+                },
+                "nodes": {
+                  "const": {
+                    "threshold_hours": "207f9f7364fe4f16042fa550c7f16ff0cb1d55b2c40a8d77d1162d1131aeb15a",
+                    "input_path": "248af30a0c7b7140248033fbc34effc5ac5b2dab3dfd6d2b3f21e8ab5614f8ff"
+                  },
+                  "tasks": {
+                    "read_rows": "bacfe7916fc343fd6751e5038e1b140ac7870c70e3619effc4f616e1611eff53",
+                    "stale": "11fd28a1b54308df7ab172ec8463ea0db9bc2df455d8af77dbfb670e4c46a829"
+                  }
+                },
+                "candidate_sha256": "bbf4163d725866dec51a62ebb6c6f77c524959eb2f272a578ad1545c946fb0de",
+                "check": {
+                  "ready": true,
+                  "findings": [],
+                  "diagnostics": []
+                },
+                "future_receipt_member": {
+                  "additive": true
+                }
+              }
+            ],
+            "reuse": {
+              "law": "reuse: a component is expanded (or invoked) when every node its receipt names is re-derived, digest for digest, from the candidate's own bytes, and every bound literal holds; a shown reference no receipt names is consulted; lexical overlap never decides",
+              "expanded": 1,
+              "invoked": 0,
+              "revised": 0,
+              "absent": 0,
+              "consulted": 0,
+              "references": [
+                {
+                  "id": "block:stale-filter",
+                  "kind": "block",
+                  "use": "expanded",
+                  "witness": {
+                    "component": "block:stale-filter",
+                    "release": {
+                      "version": "foundry-2026.10.08",
+                      "snapshot_sha256": "e9f7359e3fad0ccdab66e940bc938312b0393330c5467fb52c6c3859c6f01879",
+                      "profile": "nika-release@2"
+                    },
+                    "verdict": "expanded",
+                    "workflow": null,
+                    "candidate_sha256": "dc40f9f74bf72ad9a8c73577e607d7179eb6602f970c7b4dc285c13406510f34",
+                    "receipt_candidate_sha256": "bbf4163d725866dec51a62ebb6c6f77c524959eb2f272a578ad1545c946fb0de",
+                    "nodes": {
+                      "kept": [
+                        "const.input_path",
+                        "const.threshold_hours",
+                        "tasks.read_rows",
+                        "tasks.stale"
+                      ],
+                      "changed": [],
+                      "missing": []
+                    },
+                    "bindings_not_held": []
+                  }
+                }
+              ]
+            },
+            "candidate_sha256": "dc40f9f74bf72ad9a8c73577e607d7179eb6602f970c7b4dc285c13406510f34",
+            "future_create_member": 1
+          },
+          "knowledge_qualification": {
+            "by": "typesafe/jev",
+            "reuse": {
+              "law": "reuse: a component is expanded (or invoked) when every node its receipt names is re-derived, digest for digest, from the candidate's own bytes, and every bound literal holds; a shown reference no receipt names is consulted; lexical overlap never decides",
+              "expanded": 1,
+              "invoked": 0,
+              "revised": 0,
+              "absent": 0,
+              "consulted": 1,
+              "references": [
+                {
+                  "id": "pattern:paginated-read",
+                  "kind": "pattern",
+                  "use": "consulted"
+                },
+                {
+                  "id": "block:stale-filter",
+                  "kind": "block",
+                  "use": "expanded",
+                  "witness": {
+                    "component": "block:stale-filter",
+                    "release": {
+                      "version": "foundry-2026.10.08",
+                      "snapshot_sha256": "e9f7359e3fad0ccdab66e940bc938312b0393330c5467fb52c6c3859c6f01879",
+                      "profile": "nika-release@2"
+                    },
+                    "verdict": "expanded",
+                    "workflow": null,
+                    "candidate_sha256": "dc40f9f74bf72ad9a8c73577e607d7179eb6602f970c7b4dc285c13406510f34",
+                    "receipt_candidate_sha256": "bbf4163d725866dec51a62ebb6c6f77c524959eb2f272a578ad1545c946fb0de",
+                    "nodes": {
+                      "kept": [
+                        "const.input_path",
+                        "const.threshold_hours",
+                        "tasks.read_rows",
+                        "tasks.stale"
+                      ],
+                      "changed": [],
+                      "missing": []
+                    },
+                    "bindings_not_held": []
+                  }
+                }
+              ]
+            },
+            "lexical_overlap": {
+              "references": []
+            }
+          },
+          "native": {
+            "accepted": true,
+            "rounds": [
+              {
+                "round": 0,
+                "phase": "document",
+                "operations": 3,
+                "mode": "composed",
+                "candidate_sha256": "dc40f9f74bf72ad9a8c73577e607d7179eb6602f970c7b4dc285c13406510f34",
+                "changed": [
+                  "component block:stale-filter",
+                  "const.label",
+                  "tasks.report"
+                ],
+                "components": [
+                  "block:stale-filter"
+                ]
+              }
+            ]
+          },
+          "route": [
+            "native: document"
+          ]
+        },
+        "authoring": {
+          "model": "claude-code/opus",
+          "calls": 2,
+          "input_tokens": null,
+          "output_tokens": null,
+          "elapsed_ms": 61234,
+          "sampling": {
+            "temperature": null,
+            "seed": null,
+            "effective": "providerDefaultUnknown"
+          },
+          "context": [
+            {
+              "role": "document",
+              "instruction_sha256": "0c73d91b64052d043367052432d38fb1bd42bc61a7f8098fea6b913241d2e24c",
+              "message_bytes": 48211,
+              "result": {
+                "usage_reported": false
+              }
+            },
+            {
+              "role": "judge_request",
+              "instruction_sha256": "f6d488c100af9a22f205c042a62718e4322f50b2153ede81b2f59b7b9c502486",
+              "message_bytes": 9120,
+              "result": {
+                "usage_reported": false,
+                "failure_kind": null
+              }
+            }
+          ],
+          "backend": {
+            "kind": "acp_harness",
+            "provider": "claude-code",
+            "requested_model": "claude-code/opus",
+            "forwarded_model": "opus",
+            "decision_model": "typesafe/jev",
+            "observed": [
+              {
+                "call": 1,
+                "model": "claude-opus",
+                "usage_reported": false
+              }
+            ],
+            "observed_models": [
+              "claude-opus"
+            ],
+            "unreported_models": 1,
+            "served_model": null,
+            "usage_complete": false,
+            "numeric_usage_reported": false,
+            "cost_basis": "subscription-backed/unknown",
+            "authority": {
+              "max_calls": null,
+              "source": "default: no request bound",
+              "invocations": {
+                "sent": 2,
+                "refused": 0
+              },
+              "http_requests": {
+                "sent": null,
+                "refused": null,
+                "unknown": "the harness makes its own requests"
+              },
+              "configured": {},
+              "decision_seat": "outside this authority: its own single-attempt client"
+            },
+            "selection": {
+              "role": "author",
+              "scope": "round",
+              "future": "access-owner additive evidence"
+            }
+          }
+        },
+        "future_provenance_member": "kept"
+      }
+    }
+  },
+  "written": {
+    "intent": "Create a new workflow named page-count. Every Monday at 8, count the pages of ./docs/guide.md and return the count as « pages ».",
+    "document": {
+      "compile_version": 2,
+      "status": "ready",
+      "candidate": "nika: page-count\npermits:\n  fs:\n    read: [./docs/guide.md]\n  tools: [\"nika:read\", \"nika:jq\"]\ntasks:\n  read_guide:\n    invoke:\n      tool: nika:read\n      args: {path: ./docs/guide.md}\n  count:\n    with: {guide: \"${{ tasks.read_guide.output }}\"}\n    invoke:\n      tool: nika:jq\n      args: {input: \"${{ with.guide }}\", expression: \".pages | length\"}\noutputs:\n  pages: ${{ tasks.count.output }}\n",
+      "questions": [
+        {
+          "key": "schedule.timezone",
+          "label": "Which timezone keeps Monday 8:00?",
+          "type": "text",
+          "why": "A schedule binding outside the program.",
+          "mandatory": false
+        }
+      ],
+      "diagnostics": [],
+      "requested_boundary": {
+        "declared": {
+          "tools": [
+            "nika:read",
+            "nika:jq"
+          ]
+        },
+        "needed": {
+          "tools": [
+            "nika:read",
+            "nika:jq"
+          ]
+        }
+      },
+      "requested_trigger": {
+        "kind": "schedule",
+        "status": "requested",
+        "cadence": "every Monday at 8"
+      },
+      "check_preview": {
+        "scope": "sourceOnly",
+        "report": {
+          "report_version": 1,
+          "findings": []
+        }
+      },
+      "provenance": {
+        "compiler_version": "0.123.0",
+        "spec_pin": "a88d3c6e400d9f79fcbbbc4604a03ab22e2d46f0",
+        "skeleton": null,
+        "cognition": "explicitProvider",
+        "suggested_file": "page-count.nika",
+        "strategy": "native",
+        "plan": {
+          "strategy": "native",
+          "intent_sha256": "82b64e722366c1f77f381f29c5d257f9aa38beabad9f5a961c8e960789885c94",
+          "document_create": {
+            "route": "native: document",
+            "mode": "written",
+            "resolved": "Create a new workflow named page-count. Every Monday at 8, count the pages of ./docs/guide.md and return the count as « pages ».",
+            "changed": [],
+            "preservation": "none claimed: the author wrote the whole document",
+            "components": []
+          },
+          "document": {
+            "version": 1,
+            "candidate_sha256": "2d6b13dc13b9896248919208a132445d7a128a1bd713a8c7653ee6b39655da75",
+            "request": "Create a new workflow named page-count. Every Monday at 8, count the pages of ./docs/guide.md and return the count as « pages ».",
+            "base_sha256": null,
+            "mode": "written",
+            "components": []
+          }
+        },
+        "decision": {
+          "document_create": {
+            "route": "native: document",
+            "mode": "written",
+            "base_sha256": null,
+            "operations": 0,
+            "changed": [],
+            "preservation": "none claimed: the author wrote the whole document",
+            "components": [],
+            "reuse": {
+              "law": "reuse: a component is expanded (or invoked) when every node its receipt names is re-derived, digest for digest, from the candidate's own bytes, and every bound literal holds; a shown reference no receipt names is consulted; lexical overlap never decides",
+              "expanded": 0,
+              "invoked": 0,
+              "revised": 0,
+              "absent": 0,
+              "consulted": 0,
+              "references": []
+            },
+            "candidate_sha256": "2d6b13dc13b9896248919208a132445d7a128a1bd713a8c7653ee6b39655da75"
+          },
+          "route": [
+            "native: document"
+          ]
+        },
+        "authoring": {
+          "model": "claude-code/opus",
+          "calls": 2,
+          "input_tokens": null,
+          "output_tokens": null,
+          "elapsed_ms": 61234,
+          "sampling": {
+            "temperature": null,
+            "seed": null,
+            "effective": "providerDefaultUnknown"
+          },
+          "context": [
+            {
+              "role": "document",
+              "instruction_sha256": "0c73d91b64052d043367052432d38fb1bd42bc61a7f8098fea6b913241d2e24c",
+              "message_bytes": 48211,
+              "result": {
+                "usage_reported": false
+              }
+            },
+            {
+              "role": "judge_request",
+              "instruction_sha256": "f6d488c100af9a22f205c042a62718e4322f50b2153ede81b2f59b7b9c502486",
+              "message_bytes": 9120,
+              "result": {
+                "usage_reported": false,
+                "failure_kind": null
+              }
+            }
+          ],
+          "backend": {
+            "kind": "acp_harness",
+            "provider": "claude-code",
+            "requested_model": "claude-code/opus",
+            "forwarded_model": "opus",
+            "decision_model": "typesafe/jev",
+            "observed": [
+              {
+                "call": 1,
+                "model": "claude-opus",
+                "usage_reported": false
+              }
+            ],
+            "observed_models": [
+              "claude-opus"
+            ],
+            "unreported_models": 1,
+            "served_model": null,
+            "usage_complete": false,
+            "numeric_usage_reported": false,
+            "cost_basis": "subscription-backed/unknown",
+            "authority": {
+              "max_calls": null,
+              "source": "default: no request bound",
+              "invocations": {
+                "sent": 2,
+                "refused": 0
+              },
+              "http_requests": {
+                "sent": null,
+                "refused": null,
+                "unknown": "the harness makes its own requests"
+              },
+              "configured": {},
+              "decision_seat": "outside this authority: its own single-attempt client"
+            },
+            "selection": {
+              "role": "author",
+              "scope": "round",
+              "future": "access-owner additive evidence"
+            }
+          }
+        },
+        "future_provenance_member": "kept"
+      }
+    }
+  },
+  "continuation": {
+    "intent": "Create a new workflow named digest-sender that sends the weekly digest « Relevé » as a JSON POST to our team webhook; its address is not known yet.",
+    "document": {
+      "compile_version": 2,
+      "status": "incomplete",
+      "candidate": null,
+      "questions": [
+        {
+          "key": "const.webhook_url",
+          "label": "Which webhook receives the digest?",
+          "type": "text",
+          "why": "The request leaves the address open.",
+          "mandatory": true
+        }
+      ],
+      "diagnostics": [],
+      "requested_boundary": null,
+      "requested_trigger": null,
+      "check_preview": null,
+      "provenance": {
+        "compiler_version": "0.123.0",
+        "spec_pin": "a88d3c6e400d9f79fcbbbc4604a03ab22e2d46f0",
+        "skeleton": null,
+        "cognition": "explicitProvider",
+        "suggested_file": "digest-sender.nika",
+        "strategy": "native",
+        "plan": {
+          "strategy": "native",
+          "intent_sha256": "4fe622e9926a9062b2380f7602f46c284e85de8d0b106a578b7fd9ffcc53f770",
+          "document_create": {
+            "route": "native: document",
+            "mode": "written",
+            "resolved": "Create a new workflow named digest-sender that sends the weekly digest « Relevé » as a JSON POST to our team webhook; its address is not known yet.",
+            "changed": [],
+            "preservation": "none claimed: the author wrote the whole document",
+            "components": []
+          }
+        },
+        "decision": {
+          "document_create": {
+            "route": "native: document",
+            "mode": "written",
+            "base_sha256": null,
+            "operations": 0,
+            "changed": [],
+            "preservation": "none claimed: the author wrote the whole document",
+            "components": [],
+            "reuse": {
+              "law": "reuse: a component is expanded (or invoked) when every node its receipt names is re-derived, digest for digest, from the candidate's own bytes, and every bound literal holds; a shown reference no receipt names is consulted; lexical overlap never decides",
+              "expanded": 0,
+              "invoked": 0,
+              "revised": 0,
+              "absent": 0,
+              "consulted": 0,
+              "references": []
+            },
+            "candidate_sha256": null
+          },
+          "route": [
+            "native: document"
+          ]
+        },
+        "authoring": {
+          "model": "claude-code/opus",
+          "calls": 1,
+          "input_tokens": null,
+          "output_tokens": null,
+          "elapsed_ms": 61234,
+          "sampling": {
+            "temperature": null,
+            "seed": null,
+            "effective": "providerDefaultUnknown"
+          },
+          "context": [
+            {
+              "role": "document",
+              "instruction_sha256": "0c73d91b64052d043367052432d38fb1bd42bc61a7f8098fea6b913241d2e24c",
+              "message_bytes": 48211,
+              "result": {
+                "usage_reported": false
+              }
+            }
+          ],
+          "backend": {
+            "kind": "acp_harness",
+            "provider": "claude-code",
+            "requested_model": "claude-code/opus",
+            "forwarded_model": "opus",
+            "decision_model": "typesafe/jev",
+            "observed": [
+              {
+                "call": 1,
+                "model": "claude-opus",
+                "usage_reported": false
+              }
+            ],
+            "observed_models": [
+              "claude-opus"
+            ],
+            "unreported_models": 1,
+            "served_model": null,
+            "usage_complete": false,
+            "numeric_usage_reported": false,
+            "cost_basis": "subscription-backed/unknown",
+            "authority": {
+              "max_calls": null,
+              "source": "default: no request bound",
+              "invocations": {
+                "sent": 2,
+                "refused": 0
+              },
+              "http_requests": {
+                "sent": null,
+                "refused": null,
+                "unknown": "the harness makes its own requests"
+              },
+              "configured": {},
+              "decision_seat": "outside this authority: its own single-attempt client"
+            },
+            "selection": {
+              "role": "author",
+              "scope": "round",
+              "future": "access-owner additive evidence"
+            }
+          }
+        },
+        "future_provenance_member": "kept"
+      }
+    }
+  }
+}

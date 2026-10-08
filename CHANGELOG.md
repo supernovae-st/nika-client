@@ -38,12 +38,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refuse a malformed one with `NikaProtocolError` naming its path; absent
   records, unknown members, new vocabulary words and explicit `null` ride
   through untouched, and the outcome still holds the engine's own objects.
+- Compile outcomes type the record of a document the engine's 0.123
+  complete-document door created: `plan.document`
+  (`NikaCompileCreatedDocument`, settled on a ready outcome only: version 1,
+  the final bytes' digest, the request they answer, no program base, `written`
+  or `composed`, the component receipts), `plan.document_create`
+  (`NikaCompileDocumentCreateSection`) and `decision.document_create`
+  (`NikaCompileDocumentCreate`, with the reuse witnessed on the candidate).
+  A round still waiting on a mandatory question carries no `plan.document`; a
+  settled record of another version rides through unjudged. Both doors check
+  the known members as they do a revision's, and the packed CommonJS and ESM
+  consumers decode the same objects on both doors.
 - `scripts/run-compile-parity-e2e.mjs` gains an opt-in real-provider phase
   (`NIKA_COMPILE_PROVIDER_MODEL`, `NIKA_COMPILE_PROVIDER_ENV`): each packed
-  module system revises one rich base through a native seat and a seated
-  resident, and each round is judged by its evidence (exact base and candidate
-  digests, one revision in plan and decision, kept lines), never compared byte
-  for byte with another generation. `NIKA_COMPILE_PARITY_OPENAPI` compares a
+  module system revises one rich base (EDIT) and creates one document from
+  words (CREATE) through a native seat and a seated resident, and each round
+  is judged by its evidence (exact base and candidate digests, one revision in
+  plan and decision, kept lines; a ready creation's settled record on the exact
+  bytes received), never compared byte for byte with another generation; a
+  round that stated no revision or settled no creation record is
+  `not_exercised`. `NIKA_COMPILE_PROVIDER_LEGS` picks the legs and
+  `NIKA_COMPILE_CREATE_INTENT_FILE` the CREATE words. `NIKA_COMPILE_PARITY_OPENAPI` compares a
   candidate engine ahead of the package pin with its own exported OpenAPI, and
   the report names the document that held.
 - Over HTTP, a generation-2 compile request carries what the local engine

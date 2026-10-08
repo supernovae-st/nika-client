@@ -2,11 +2,12 @@ import type { NikaProtocolError } from '../errors.js';
 import { machineObject } from './machine.js';
 
 /**
- * The revision, reuse and intelligence evidence a compile outcome's
- * provenance may carry, judged where it is: `provenance.plan`
- * (`source_revision`, `intent_sha256`, `document_revision`),
- * `provenance.decision` (`document_revision`,
- * `knowledge_qualification.reuse`) and `provenance.authoring.backend`.
+ * The revision, creation, reuse and intelligence evidence a compile
+ * outcome's provenance may carry, judged where it is: `provenance.plan`
+ * (`source_revision`, `intent_sha256`, `document_revision`, `document`,
+ * `document_create`), `provenance.decision` (`document_revision`,
+ * `document_create`, `knowledge_qualification.reuse`) and
+ * `provenance.authoring.backend`.
  *
  * Producers (engine carrier 7d98023f9): `nika-compile-seats`
  * `foundry/document.rs::record`, `foundry/instance.rs` (expansion receipt),
@@ -14,10 +15,13 @@ import { machineObject } from './machine.js';
  * reuse, rebinding) and `foundry.rs::reused`; the backend of `nika-providers`
  * `authoring.rs::authoring_backend`, `nika-cli-host` `compile/authoring.rs`,
  * `nika-serve` `compile/author.rs` (documented in its `openapi-native.json`)
- * and the `nika-harness` descriptors.
+ * and the `nika-harness` descriptors. The 0.123 complete-document creation:
+ * `nika-compile-cognition` `document_create.rs::record` and `::bind`, whose
+ * `plan.document` the engine reads as program history from `09234bce8` on.
  *
  * Every record is optional: an outcome without it (an older engine, a
- * creation, a deterministic round) is judged exactly as before. Within a
+ * deterministic round, a door that made none) is judged exactly as before.
+ * Within a
  * present record, the members its producer always writes that identify or
  * bind the evidence (digests, ids, mode, ordered changes, bindings, counts)
  * are required, and every other known member is checked when present. `null`
@@ -45,11 +49,14 @@ export function validateCompileEvidence(provenance: Record<string, unknown>, pro
     judge.optional(plan, 'source_revision', at, (value, path) => judge.sourceRevision(value, path));
     judge.optional(plan, 'intent_sha256', at, (value, path) => judge.digest(value, path));
     judge.optional(plan, 'document_revision', at, (value, path) => judge.documentRevision(value, path));
+    judge.optional(plan, 'document', at, (value, path) => judge.createdDocument(value, path));
+    judge.optional(plan, 'document_create', at, (value, path) => judge.createSection(value, path));
   }
   const decision = machineObject(provenance.decision);
   if (decision) {
     const at = 'provenance.decision';
     judge.optional(decision, 'document_revision', at, (value, path) => judge.documentRevision(value, path));
+    judge.optional(decision, 'document_create', at, (value, path) => judge.documentCreate(value, path));
     judge.optional(decision, 'knowledge_qualification', at, (value, path) => {
       const qualification = judge.record(value, path);
       judge.optional(qualification, 'reuse', path, (reuse, at) => judge.reuse(reuse, at));
@@ -148,10 +155,54 @@ class Judge {
     this.required(revision, 'base_sha256', path, (digest, at) => this.digest(digest, at));
     this.required(revision, 'candidate_sha256', path, (digest, at) => this.digest(digest, at));
     this.required(revision, 'changed', path, (changed, at) => this.texts(changed, at));
-    this.required(revision, 'components', path, (components, at) =>
-      this.list(components, at, (receipt, entry) => this.receipt(receipt, entry)));
+    this.required(revision, 'components', path, (components, at) => this.receipts(components, at));
     this.optional(revision, 'route', path, (route, at) => this.text(route, at));
     this.optional(revision, 'preservation', path, (words, at) => this.text(words, at));
+  }
+
+  /**
+   * `plan.document`: a created document's settled record
+   * (`document_create.rs::bind`). Version 1's members are the ones known
+   * here; a record of another version rides through as written.
+   */
+  createdDocument(value: unknown, path: string): void {
+    const document = this.record(value, path);
+    this.required(document, 'version', path, (version, at) => this.count(version, at));
+    if (document.version !== 1) return;
+    this.required(document, 'candidate_sha256', path, (digest, at) => this.digest(digest, at));
+    this.required(document, 'request', path, (request, at) => this.text(request, at));
+    this.required(document, 'base_sha256', path, (digest, at) => this.digest(digest, at, true));
+    this.required(document, 'mode', path, (mode, at) => this.text(mode, at));
+    this.required(document, 'components', path, (components, at) => this.receipts(components, at));
+  }
+
+  /** `plan.document_create`: the section a creation's answer rounds replay (`document_create.rs::record`). */
+  createSection(value: unknown, path: string): void {
+    const section = this.record(value, path);
+    this.required(section, 'mode', path, (mode, at) => this.text(mode, at));
+    this.required(section, 'changed', path, (changed, at) => this.texts(changed, at));
+    this.required(section, 'components', path, (components, at) => this.receipts(components, at));
+    for (const key of ['route', 'resolved', 'preservation']) {
+      this.optional(section, key, path, (member, at) => this.text(member, at));
+    }
+  }
+
+  /** `decision.document_create`: how the door made the document (`document_create.rs::record`). */
+  documentCreate(value: unknown, path: string): void {
+    const made = this.record(value, path);
+    this.required(made, 'mode', path, (mode, at) => this.text(mode, at));
+    this.required(made, 'base_sha256', path, (digest, at) => this.digest(digest, at, true));
+    this.required(made, 'candidate_sha256', path, (digest, at) => this.digest(digest, at, true));
+    this.required(made, 'operations', path, (count, at) => this.count(count, at));
+    this.required(made, 'changed', path, (changed, at) => this.texts(changed, at));
+    this.required(made, 'components', path, (components, at) => this.receipts(components, at));
+    this.optional(made, 'route', path, (route, at) => this.text(route, at));
+    this.optional(made, 'preservation', path, (words, at) => this.text(words, at));
+    this.optional(made, 'reuse', path, (reuse, at) => this.reuse(reuse, at));
+  }
+
+  receipts(value: unknown, path: string): void {
+    this.list(value, path, (receipt, entry) => this.receipt(receipt, entry));
   }
 
   /** An expansion or invocation receipt (`foundry/instance.rs`, `foundry/invoke.rs`). */

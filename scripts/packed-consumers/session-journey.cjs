@@ -1,7 +1,7 @@
 'use strict';
 const { spawnSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
-const { cpSync, existsSync, mkdirSync, readFileSync } = require('node:fs');
+const { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } = require('node:fs');
 const path = require('node:path');
 const { frameRow, landedExactly } = require('./session-scenario.cjs');
 
@@ -64,10 +64,12 @@ async function journey(sdk, config, steps, open) {
   const opening = async () => {
     // With the conversation's own intelligence the engine opens on it and keeps nothing for the
     // operator; without, the persona may answer the first screen (`choice`).
+    const started = performance.now();
     const handle = await client.openSession({ signal: signal(),
       ...(config.intelligence ? { intelligence: config.intelligence } : {}) });
     open.push(handle);
-    return handle;
+    // The open alone (a process spawned, or a Session posted), timed apart from any authoring.
+    return { handle, openMs: Math.round(performance.now() - started) };
   };
   const closing = async (handle) => {
     open.splice(open.indexOf(handle), 1);
@@ -105,8 +107,14 @@ async function journey(sdk, config, steps, open) {
 
   /** One leg: words to a proposal, the consent, the requested Run and the report it wrote. */
   async function walk(name, session, words) {
+    const started = performance.now();
     const reached = await advance((snapshot, line, command) => send(session, snapshot, line, command),
       session.opened.snapshot, words, persona, (turn) => record(`${name}_turn`, turn));
+    // The whole preparation as the person waits for it, every turn between the words and the
+    // frame the leg settled on (a proposal, or a held candidate), on a monotonic clock; the
+    // engine's `calls.elapsed_ms` sums its authoring calls only, a lower bound of it.
+    reached.summary.timing = { submit_to_settled_ms: Math.round(performance.now() - started),
+      author_ms: reached.summary.evidence?.calls?.elapsed_ms ?? null };
     if (reached.waiting !== 'consent') {
       // What the Session itself says of how it got here (its details card), beside the raw work.
       reached.summary.details = await Promise.resolve().then(() => session.details({ signal: signal() }))
@@ -202,16 +210,16 @@ async function journey(sdk, config, steps, open) {
   const opened = config.intelligence ? 'intelligence' : 'first_screen';
 
   // CREATE: a new Session, words alone.
-  const first = await opening();
+  const { handle: first, openMs: firstOpenMs } = await opening();
   record('create_open', { ...frameRow(first.opened), intelligence: first.opened.snapshot.work.intelligence ?? null,
-    opened_with: opened });
+    opened_with: opened, open_ms: firstOpenMs });
   const created = await leg('create', first, config.create);
   await closing(first);
   if (created !== null) {
     // EDIT: a new Session over the same project world; the change in words.
-    const second = await opening();
+    const { handle: second, openMs: secondOpenMs } = await opening();
     record('edit_open', { ...frameRow(second.opened), intelligence: second.opened.snapshot.work.intelligence ?? null,
-      created_sha256: created.savedSha, opened_with: opened });
+      created_sha256: created.savedSha, opened_with: opened, open_ms: secondOpenMs });
     await leg('edit', second, config.edit);
     await closing(second);
   }
@@ -236,10 +244,13 @@ async function advance(send, snapshot, line, persona, report) {
   let next = line;
   let said = 'words';
   for (let turn = 0; turn < PERSONA_TURNS; turn += 1) {
+    const sent = performance.now();
     const result = await send(shown, next, `${said}-${turn}`);
+    // This line alone, sent to settled, on a monotonic clock.
+    const ms = Math.round(performance.now() - sent);
     shown = result.snapshot;
     const waiting = shown.work.waiting;
-    report({ turn, said, ...journeyRow(result), evidence: evidence(shown.work) });
+    report({ turn, said, ms, ...journeyRow(result), evidence: evidence(shown.work) });
     if (waiting.kind === 'intelligence_choice' && persona.choice) {
       [next, said] = [persona.choice, 'intelligence_choice'];
     } else if (waiting.kind === 'cost_choice' && persona.acceptCost) {
@@ -704,6 +715,39 @@ module.exports.advance = advance;
 module.exports.requestedSeat = requestedSeat;
 module.exports.journeyDoors = journeyDoors;
 module.exports.sessionResult = sessionResult;
+module.exports.keepDoor = keepDoor;
+
+/**
+ * One door's own files, copied out of its scratch (`base`) into `keep/<door>` before the scratch
+ * goes, so a held or failed leg stays inspectable: the project's `.nika/` (the Session's record,
+ * consents, compile plans and run traces), a resident's state root, each leg's captured world,
+ * and each draft a leg settled on without a proposal, as a file. Nothing under HOME is read.
+ * Returns what was kept, named relative to `keep`; a copy that fails is named with its reason.
+ */
+function keepDoor({ keep, door, base, project, transcript }) {
+  const into = path.join(keep, door);
+  mkdirSync(into, { recursive: true });
+  const kept = [];
+  const copy = (from, to) => {
+    if (!existsSync(from)) return;
+    try {
+      cpSync(from, path.join(into, to), { recursive: true });
+      kept.push(`${door}/${to}`);
+    } catch (error) {
+      kept.push(`${door}/${to}: not kept (${error?.code ?? 'error'})`);
+    }
+  };
+  copy(path.join(project, '.nika'), 'project-nika');
+  copy(path.join(base, 'state'), 'resident-state');
+  copy(path.join(base, 'legs'), 'legs');
+  for (const step of transcript?.steps ?? []) {
+    if (!/_reached$/.test(step.step) || typeof step.draft !== 'string') continue;
+    const file = `${step.step.replace(/_reached$/, '')}-draft.nika`;
+    writeFileSync(path.join(into, file), step.draft);
+    kept.push(`${door}/${file}`);
+  }
+  return kept;
+}
 
 /**
  * The runner's result: `failed` when a walk, a comparison or a journey door failed;

@@ -27,7 +27,7 @@ assert(binary && path.isAbsolute(binary), 'NIKA_BIN must identify the frozen abs
 const SERVE_SESSIONS = (process.env.NIKA_SESSION_SERVE_FLAGS ?? '--sessions').split(' ').filter(Boolean);
 const require = createRequire(import.meta.url);
 const { judgeSession, sessionParity, SHARED_STEPS, MODULE_STEPS } = require('./packed-consumers/session-scenario.cjs');
-const { judgeJourney, journeyDoors, sessionResult } = require('./packed-consumers/session-journey.cjs');
+const { judgeJourney, journeyDoors, keepDoor, sessionResult } = require('./packed-consumers/session-journey.cjs');
 // A requested journey's doors are checked before anything is built or run: an empty or unknown
 // selection is refused, never reported as a journey that walked nothing.
 let JOURNEY_DOORS;
@@ -194,6 +194,11 @@ try {
       : Number(process.env.NIKA_SESSION_JOURNEY_WAIT_MS);
     assert(waitMs === null || (Number.isSafeInteger(waitMs) && waitMs > 0 && waitMs <= 0x7fffffff),
       'NIKA_SESSION_JOURNEY_WAIT_MS is a positive number of milliseconds');
+    // Where each door's own files are kept before the scratch goes (an absolute directory, never
+    // named in the report): the project's `.nika/`, a resident's state, each leg's captured world
+    // and each held draft. Nothing under HOME is read.
+    const keep = process.env.NIKA_SESSION_JOURNEY_KEEP ?? null;
+    assert(keep === null || path.isAbsolute(keep), 'NIKA_SESSION_JOURNEY_KEEP names an absolute directory');
     // The tickets the words read, and the report each leg must write: strictly older than 48, then 72 hours.
     const expected = { create: TICKETS.filter((row) => row.age_hours > 48).map((row) => row.id),
       edit: TICKETS.filter((row) => row.age_hours > 72).map((row) => row.id) };
@@ -214,6 +219,7 @@ try {
     }
     return { ran: true, choice, intelligence, key_env: keyNames, seats, accept_cost: acceptCost,
       observation_ms: waitMs ?? 'the journey default (1800000)',
+      kept: keep === null ? 'not kept' : 'kept outside the scratch (NIKA_SESSION_JOURNEY_KEEP)',
       world: world === null ? 'built-in tickets' : { module: path.basename(worldFile), sha256: await sha256(worldFile) },
       ...(world === null ? {
         answers: Object.keys(answers),
@@ -261,6 +267,10 @@ try {
         // The world's own observations (its services' records), kept beside the door's verdict.
         const observations = typeof prepared.close === 'function' ? await prepared.close() : undefined;
         if (outcome !== undefined && observations !== undefined) outcome.observations = observations;
+        // The door's own files, once its resident has stopped writing, before the scratch goes.
+        if (outcome !== undefined && keep !== null) {
+          outcome.kept = keepDoor({ keep, door, base, project, transcript: outcome.transcript });
+        }
       }
       return outcome;
 

@@ -251,6 +251,37 @@ describe('a journey walked over a scripted Session', () => {
     }
   });
 
+  // Root review: `calls.elapsed_ms` sums the authoring calls only, a lower bound of the wait.
+  it('times each open, each line and each leg\'s whole preparation apart from the author\'s own sum', async () => {
+    const { dir, project, check } = world();
+    const HELD_MS = 60;
+    const sdk = { Nika: class {
+      openSession = async () => {
+        const session = scriptedSession(project, 'webhook', []);
+        return { ...session, submit: async (shown: unknown, line: string) => {
+          // The first CREATE line waits as a Session preparing would, beyond any authoring call.
+          if (line.startsWith('Create')) await new Promise((resolve) => setTimeout(resolve, HELD_MS));
+          return session.submit(shown, line);
+        } };
+      };
+    } };
+    const report = await journey(sdk, { door: 'native', bin: '/x', project, moduleSystem: 'esm', choice: null,
+      answers: { webhook: SINK }, create: 'Create the stale report', edit: 'Raise to 72', checkBin: check,
+      snapshots: path.join(dir, 'legs'), capture: ['out'] });
+    const steps = (name: string) => report.steps.filter((entry) => entry.step === name);
+    const whole = (value: unknown) => Number.isSafeInteger(value) && (value as number) >= 0;
+    expect([...steps('create_open'), ...steps('edit_open')].every((entry) => whole(entry.open_ms))).toBe(true);
+    const turns = steps('create_turn');
+    expect(turns.map((entry) => entry.said)).toEqual(['words', 'answer webhook (the answer table)']);
+    expect(turns.every((entry) => whole(entry.ms))).toBe(true);
+    expect(turns[0]!.ms).toBeGreaterThanOrEqual(HELD_MS);
+    const { timing } = steps('create_reached')[0]!;
+    // The whole preparation spans every turn; the author's own sum is the engine's receipt (3 ms here).
+    expect(timing.submit_to_settled_ms).toBeGreaterThanOrEqual(turns[0]!.ms + turns[1]!.ms);
+    expect(timing.author_ms).toBe(3);
+    expect(timing.submit_to_settled_ms).toBeGreaterThan(timing.author_ms);
+  });
+
   it('ends a leg on a cut wait as the harness bound it is, keeping the Session as it was then', async () => {
     const { dir, project, check } = world();
     const sdk = { Nika: class {
@@ -564,6 +595,45 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
     const report = await walked(call('max', 'max', 'max'));
     expect(effortChecks(journey.judgeJourney(report, TICKETS, WORDS))).toEqual([]);
     expect(effortChecks(journey.judgeJourney(report, TICKETS, '2 deepseek/deepseek-v4-pro', null, 'max'))).toEqual([]);
+  });
+});
+
+// Root review: a held leg's own files must outlive the scratch, never anything from HOME.
+describe('a door\'s own files kept before its scratch goes', () => {
+  const { keepDoor } = journey as unknown as { keepDoor: (input: { keep: string; door: string; base: string;
+    project: string; transcript: unknown }) => string[] };
+
+  it('copies the project record, the resident state, the captured legs and each held draft', () => {
+    const { dir, project } = world();
+    const base = path.dirname(project);
+    mkdirSync(path.join(project, '.nika', 'traces'), { recursive: true });
+    writeFileSync(path.join(project, '.nika', 'session-state.json'), '{"goal":"g"}\n');
+    writeFileSync(path.join(project, '.nika', 'traces', 'run.ndjson'), '{"kind":"run_settled"}\n');
+    mkdirSync(path.join(base, 'state'), { recursive: true });
+    writeFileSync(path.join(base, 'state', 'jobs.json'), '[]\n');
+    mkdirSync(path.join(base, 'legs', 'create', 'out'), { recursive: true });
+    writeFileSync(path.join(base, 'legs', 'create', 'out', 'report.json'), '{"count":3}\n');
+    const held = 'nika: held\ntasks: {}\n';
+    const transcript = { steps: [{ step: 'create_reached', waiting: 'free', draft: held },
+      { step: 'edit_reached', waiting: 'consent', draft: null }, { step: 'create_turn', draft: 'not a reached frame' }] };
+    const keep = path.join(dir, 'kept');
+    expect(keepDoor({ keep, door: 'http', base, project, transcript })).toEqual(['http/project-nika',
+      'http/resident-state', 'http/legs', 'http/create-draft.nika']);
+    expect(readFileSync(path.join(keep, 'http', 'project-nika', 'traces', 'run.ndjson'), 'utf8'))
+      .toBe('{"kind":"run_settled"}\n');
+    expect(readFileSync(path.join(keep, 'http', 'resident-state', 'jobs.json'), 'utf8')).toBe('[]\n');
+    expect(readFileSync(path.join(keep, 'http', 'legs', 'create', 'out', 'report.json'), 'utf8')).toBe('{"count":3}\n');
+    expect(readFileSync(path.join(keep, 'http', 'create-draft.nika'), 'utf8')).toBe(held);
+    expect(existsSync(path.join(keep, 'http', 'edit-draft.nika'))).toBe(false);
+  });
+
+  it('keeps only what the door has: a native door without a resident or captures, no transcript', () => {
+    const { dir, project } = world();
+    const base = path.dirname(project);
+    mkdirSync(path.join(project, '.nika'), { recursive: true });
+    writeFileSync(path.join(project, '.nika', 'consents.ndjson'), '');
+    expect(keepDoor({ keep: path.join(dir, 'kept'), door: 'native', base, project, transcript: undefined }))
+      .toEqual(['native/project-nika']);
   });
 });
 

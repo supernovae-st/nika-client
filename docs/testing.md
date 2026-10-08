@@ -400,7 +400,16 @@ waiting out the polling deadline, and keeps the compiler's own draft (shown,
 never offered, such as a candidate a judge held) with its sha256, the raw
 work snapshot as the Session showed it and the Session's own details card.
 Every turn, Save and Run it keeps carries the Session's outcomes verbatim
-(`raw.outcomes`: a refusal's reason, a fact's text) beside their kinds. The
+(`raw.outcomes`: a refusal's reason, a fact's text) beside their kinds. Time
+is kept on a monotonic clock: each Session's `open_ms` (the open alone), each
+turn's `ms`, and each leg's `timing.submit_to_settled_ms`, from its first line
+to the frame it settled on (a proposal, or a held candidate), beside
+`timing.author_ms`, the engine's own sum of its authoring calls, a lower bound
+of that wait. `NIKA_SESSION_JOURNEY_KEEP` (an absolute directory) keeps each
+door's own files before its scratch goes: the project's `.nika/` (the
+Session's record, consents, compile plans, run traces), a resident's state,
+each leg's captured world and each held draft as a file; nothing under HOME
+is read, and the report never names the directory. The
 journey's own bounds are bounds of its observation, never product limits,
 and never a verdict: it answers at most 24 lines per leg, waits for one turn
 and watches one Run within `NIKA_SESSION_JOURNEY_WAIT_MS` (30 minutes unless

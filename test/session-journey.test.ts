@@ -162,7 +162,9 @@ describe('a real-intelligence journey is judged leg by leg', () => {
       message: 'malformed frame' } }, EXPECTED);
     expect(judged).toEqual({ verdict: 'failed', checks: [{ name: 'the journey completed', verdict: 'failed',
       observed: { name: 'NikaProtocolError', message: 'malformed frame' } }] });
-    expect([legs.create.outcome, legs.edit.why]).toEqual(['failed', 'the journey completed']);
+    // The fault stopped the EDIT leg: the CREATE leg keeps the verdicts of its own evidence.
+    expect([legs.create.outcome, legs.edit.outcome, legs.edit.why]).toEqual(['passed', 'failed',
+      'the journey completed']);
   });
 
   it('reports a Run the harness stopped watching as its observation bound, never a failed Run', () => {
@@ -476,7 +478,7 @@ describe('each leg is summarized for a requalification table', () => {
     const refused = judgeJourney(stopped(rows({ failure_kind: 'provider_error' }, { failure_kind: 'timeout' })),
       EXPECTED);
     expect(refused.legs.create).toMatchObject({ outcome: 'provider_failure',
-      calls: { invoked: 2, failed: 1, timed_out: 1, known: true } });
+      calls: { invoked: 2, failed: 1, timed_out: 1, complete: true, incomplete: [] } });
     expect(refused.legs.create.per_call).toEqual([
       { call: 'document', elapsed_ms: 10, stop_reason: null, failure_kind: 'provider_error' },
       { call: 'document-repair', elapsed_ms: 10, stop_reason: null, failure_kind: 'timeout' }]);
@@ -485,10 +487,11 @@ describe('each leg is summarized for a requalification table', () => {
   });
 
   it('claims no class the evidence does not show', () => {
-    // No receipt says how any call ended: neither a hold nor a provider failure.
+    // Calls counted with no receipt of how they ended: neither a hold nor a provider failure.
     const unknown = judgeJourney(stopped(authored()), EXPECTED);
-    expect(unknown.legs.create).toMatchObject({ outcome: 'not_exercised', why: 'the Session waits on free',
-      calls: { known: false } });
+    expect(unknown.legs.create).toMatchObject({ outcome: 'not_exercised', calls: { complete: false } });
+    expect(unknown.legs.create.why).toBe('the receipts are incomplete: create_turn 0 counts 2 authoring call(s) '
+      + 'but its receipt holds 0; create_reached counts 2 authoring call(s) but its receipt holds 0');
     // A question the persona was not told to answer is no hold either.
     const asked = judgeJourney(stopped(harnessed(receipt('returned')), 'question'), EXPECTED);
     expect(asked.legs.create.outcome).toBe('not_exercised');
@@ -501,9 +504,51 @@ describe('each leg is summarized for a requalification table', () => {
       EXPECTED);
     expect(wrong.legs.create).toMatchObject({ outcome: 'failed',
       why: 'the CREATE report holds exactly the expected tickets' });
-    // A journey that did not complete fails the leg it was in.
-    const broken = judgeJourney({ ...journey(), error: { message: 'boom' } }, EXPECTED);
-    expect([broken.legs.create.outcome, broken.legs.edit.outcome]).toEqual(['failed', 'failed']);
+  });
+
+  it('fails only the leg a fault stopped, never a CREATE its own evidence passed', () => {
+    const afterCreate = judgeJourney({ ...journey(), error: { message: 'the EDIT frame was malformed' } }, EXPECTED);
+    expect([afterCreate.verdict, afterCreate.legs.create.outcome, afterCreate.legs.edit.outcome])
+      .toEqual(['failed', 'passed', 'failed']);
+    // A fault inside CREATE fails it; its EDIT was never attempted.
+    const inCreate = { ...journey(), error: { message: 'the save frame was malformed' } };
+    inCreate.steps = inCreate.steps.filter((entry) => entry.step.startsWith('create_'));
+    const failed = judgeJourney(inCreate, EXPECTED);
+    expect([failed.legs.create.outcome, failed.legs.create.why, failed.legs.edit.outcome])
+      .toEqual(['failed', 'the journey completed', 'not_attempted']);
+  });
+
+  it('counts a first submit the Session accepted though the harness stopped waiting', () => {
+    const cut = (busy: unknown) => ({ ...journey(), steps: [{ step: 'create_open', open_ms: 5 },
+      { step: 'create_harness_bound', bound: 'turn_wait', limit_ms: 1000, command: 'words-0', busy, waiting: null,
+        evidence: null, why: 'the harness stopped waiting for words-0 after 1000 ms: an observation bound of this '
+          + 'harness, never a product limit' }] });
+    const accepted = judgeJourney(cut({ command: 'words-0', phase: 'preparing', stop_requested: false }), EXPECTED);
+    expect(accepted.legs.create).toMatchObject({ attempted: true, outcome: 'not_exercised',
+      why: 'the harness stopped waiting for words-0 after 1000 ms: an observation bound of this harness, never a '
+        + 'product limit' });
+    expect(accepted.legs.edit).toMatchObject({ attempted: false, outcome: 'not_attempted' });
+    expect(journeyDenominators([{ door: 'native', exercised: true, ...accepted }])).toMatchObject({
+      create: { attempted: 1, not_exercised: 1 }, edit: { attempted: 0 }, full_routes: { passed: 0, of: 1 } });
+    // Busy on nothing, or on another command: no submit of these words is shown accepted.
+    for (const busy of [null, { command: 'words-1', phase: 'preparing', stop_requested: false }]) {
+      expect(judgeJourney(cut(busy), EXPECTED).legs.create.attempted).toBe(false);
+    }
+  });
+
+  it('draws no cause from incomplete call receipts, keeping their partial counts', () => {
+    // Three calls declared, one receipt pair: the two other ends are unknown.
+    const partial = { ...harnessed(receipt('failed')), calls: { ...harnessed(receipt('failed')).calls, calls: 3 } };
+    const judged = judgeJourney(stopped(partial), EXPECTED);
+    expect(judged.legs.create).toMatchObject({ attempted: true, outcome: 'not_exercised',
+      calls: { invoked: 1, returned: 0, failed: 1, complete: false } });
+    expect(judged.legs.create.why).toBe('the receipts are incomplete: create_turn 0 counts 3 authoring call(s) '
+      + 'but its receipt holds 1; create_reached counts 3 authoring call(s) but its receipt holds 1');
+    // An invocation with no end, or an end with no invocation, proves no cause either.
+    const unended = judgeJourney(stopped(harnessed([{ status: 'invoking', requested_effort: 'max' }])), EXPECTED);
+    expect(unended.legs.create).toMatchObject({ outcome: 'not_exercised', calls: { invoked: 1, complete: false } });
+    const orphan = judgeJourney(stopped(harnessed([{ status: 'failed' }])), EXPECTED);
+    expect(orphan.legs.create.outcome).toBe('not_exercised');
   });
 
   it('counts each leg only where its words were sent', () => {

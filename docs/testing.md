@@ -427,12 +427,17 @@ generations are never compared byte for byte.
 
 Each door's report also summarizes its legs (`legs.create`, `legs.edit`) for a
 requalification table, from the leg's own checks and receipts: `attempted`
-(its words were sent) and one outcome, `passed`, `failed` (a check of the leg
-failed), `provider_failure` (no proposal, every authoring call invoked ended
-without an answer), `semantic_hold` (no proposal, the Session free, though a
-call answered), `not_exercised` (anything else unproven; a leg whose requested
-seat went unproven is never attributed that seat's hold), or `not_attempted`
-(an earlier leg stopped first). Beside it ride the calls' ends, the timing and
+(a submit of its words was accepted: a turn settled on it, or the harness
+stopped waiting while the Session showed itself busy on that very command) and
+one outcome, `passed`, `failed` (a check of the leg failed, or a fault stopped
+it; a leg settled before the fault keeps its own verdicts), `provider_failure`
+(no proposal, and complete receipts show every authoring call invoked ended
+without an answer), `semantic_hold` (no proposal, the Session free, and complete
+receipts show a call answered), `not_exercised` (anything else unproven:
+incomplete receipts, a declared call count other than the receipt held or a
+call with no documented end, prove no cause; a leg whose requested seat went
+unproven is never attributed that seat's hold), or `not_attempted` (an earlier
+leg stopped first). Beside it ride the calls' ends, the timing and
 the reuse its proposal witnesses: each component of the revision the Session
 states for the bytes, with the engine's witness (`expanded`, `revised`,
 `absent`, `unwitnessed`), `reused`, the components expanded in the very bytes

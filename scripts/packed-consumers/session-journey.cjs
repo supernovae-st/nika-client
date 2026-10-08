@@ -491,35 +491,60 @@ function carriedEffort(frames, effort) {
 
 /**
  * How a leg's authoring calls ended, each compile's receipt read once: the harness seat's own
- * records (`invoking`, then `returned`, `failed`, `cancelled` or `timed_out`), else the engine's
- * per-call rows (a `failure_kind` is a failed call, `timeout` a timed-out one; a `stop_reason` an
- * answer). `known` is false when no receipt says how any call ended.
+ * records (`invoking`, then `returned`, `failed`, `cancelled` or `timed_out`, paired by position
+ * as the effort judge pairs them), else the engine's per-call rows (a `failure_kind` is a failed
+ * call, `timeout` a timed-out one; a `stop_reason` an answer). The counts keep what is known;
+ * `complete` holds only when some receipt was read and every frame's declared call count is the
+ * receipt it holds, each invocation closed by one documented end and each row naming its end.
+ * Otherwise `incomplete` says what is missing, and no cause is drawn from the counts.
  */
 function callEnds(frames) {
-  const ends = { invoked: 0, returned: 0, failed: 0, cancelled: 0, timed_out: 0, known: false };
+  const ends = { invoked: 0, returned: 0, failed: 0, cancelled: 0, timed_out: 0, complete: false,
+    incomplete: [] };
   const seen = new Set();
-  for (const { evidence } of frames) {
+  for (const { at, evidence } of frames) {
     const calls = evidence?.calls;
-    const observed = Array.isArray(calls?.backend?.observed) ? calls.backend.observed : [];
-    const rows = Array.isArray(calls?.per_call) ? calls.per_call : [];
+    if (calls === null || calls === undefined) continue;
+    const counted = typeof calls.calls === 'number' ? calls.calls : null;
+    const observed = Array.isArray(calls.backend?.observed) ? calls.backend.observed : [];
+    const rows = Array.isArray(calls.per_call) ? calls.per_call : [];
+    const held = observed.length > 0 ? observed.filter((record) => record?.status === 'invoking').length : rows.length;
+    if (counted !== held) {
+      ends.incomplete.push(`${at} counts ${counted ?? 'no'} authoring call(s) but its receipt holds ${held}`);
+    }
     const receipt = JSON.stringify({ observed, rows });
     if ((observed.length === 0 && rows.length === 0) || seen.has(receipt)) continue;
     seen.add(receipt);
-    ends.known = true;
     if (observed.length > 0) {
+      let call = -1;
+      let open = false;
       for (const record of observed) {
-        if (record?.status === 'invoking') ends.invoked += 1;
-        else if (CALL_ENDS.has(record?.status)) ends[record.status] += 1;
+        const status = typeof record?.status === 'string' ? record.status : 'unnamed';
+        if (status === 'invoking') {
+          if (open) ends.incomplete.push(`${at} call ${call} has no end before the next invocation`);
+          [call, open] = [call + 1, true];
+          ends.invoked += 1;
+        } else if (!CALL_ENDS.has(status)) {
+          ends.incomplete.push(`${at} ${status} record is neither an invocation nor a call end`);
+        } else if (!open) {
+          ends.incomplete.push(`${at} ${status} record with no invocation before it`);
+        } else {
+          open = false;
+          ends[status] += 1;
+        }
       }
+      if (open) ends.incomplete.push(`${at} call ${call} has no end`);
       continue;
     }
-    for (const row of rows) {
+    rows.forEach((row, index) => {
       ends.invoked += 1;
       if (row?.failure_kind === 'timeout') ends.timed_out += 1;
       else if (typeof row?.failure_kind === 'string') ends.failed += 1;
       else if (typeof row?.stop_reason === 'string') ends.returned += 1;
-    }
+      else ends.incomplete.push(`${at} call ${index} names neither a stop reason nor a failure kind`);
+    });
   }
+  ends.complete = seen.size > 0 && ends.incomplete.length === 0;
   return ends;
 }
 
@@ -556,18 +581,26 @@ function reuseOf(report, name) {
 
 /**
  * One leg as a requalification table counts it, from its own checks and receipts, never
- * relabelled: `not_attempted` (its words were never sent: an earlier leg stopped first; it counts
- * in no denominator), `passed` (every check of the leg passed), `failed` (a check of the leg
- * failed: seat, effort, bytes, Run or postcondition), `provider_failure` (no proposal, and every
- * authoring call invoked ended without an answer), `semantic_hold` (no proposal, the Session free,
- * though an authoring call answered: the verifier held it) or `not_exercised` (anything else left
- * unproven, with the first reason; a leg whose requested seat went unproven is never attributed a
- * hold or a failure of that seat). Its calls' ends, monotonic timing and reuse witnesses ride along.
+ * relabelled: `not_attempted` (no submit of its words was accepted: an earlier leg stopped first;
+ * it counts in no denominator), `passed` (every check of the leg passed), `failed` (a check of the
+ * leg failed: seat, effort, bytes, Run, postcondition, or a fault that stopped it),
+ * `provider_failure` (no proposal, and complete receipts show every authoring call ended without
+ * an answer), `semantic_hold` (no proposal, the Session free, and complete receipts show an
+ * authoring call answered: the verifier held it) or `not_exercised` (anything else left unproven,
+ * with the first reason: incomplete receipts prove no cause; a leg whose requested seat went
+ * unproven is never attributed a hold or a failure of that seat). Its calls' ends, monotonic
+ * timing and reuse witnesses ride along.
  */
 function legSummary(report, name, legChecks) {
   const step = (at) => report.steps.find((entry) => entry.step === at);
   const reached = step(`${name}_reached`);
-  const attempted = reached !== undefined || report.steps.some((entry) => entry.step === `${name}_turn`);
+  // A submit was accepted when a turn settled on it, or when the harness stopped waiting while
+  // the Session showed itself busy on that very command.
+  const bound = step(`${name}_harness_bound`);
+  const acceptedUnsettled = bound?.bound === 'turn_wait' && typeof bound.command === 'string'
+    && bound.busy?.command === bound.command;
+  const attempted = reached !== undefined || acceptedUnsettled
+    || report.steps.some((entry) => entry.step === `${name}_turn`);
   const calls = callEnds(effortFrames(report, name));
   const timing = { open_ms: step(`${name}_open`)?.open_ms ?? null,
     submit_to_settled_ms: reached?.timing?.submit_to_settled_ms ?? null, author_ms: reached?.timing?.author_ms ?? null };
@@ -586,13 +619,17 @@ function legSummary(report, name, legChecks) {
   if (unseated !== undefined) return summary('not_exercised', unseated.why);
   // The leg's own state, as the Session said it, is why it reached no proposal.
   const own = legChecks.find((entry) => entry.name === `the ${name.toUpperCase()} leg reached a proposal`);
-  if (reached !== undefined && reached.waiting !== 'consent' && calls.known) {
+  const unsettled = reached !== undefined && reached.waiting !== 'consent';
+  if (unsettled && calls.complete) {
     const answered = calls.returned;
     const unanswered = calls.failed + calls.cancelled + calls.timed_out;
     if (calls.invoked > 0 && answered === 0 && unanswered === calls.invoked) {
       return summary('provider_failure', own?.why ?? null);
     }
     if (answered > 0 && reached.waiting === 'free') return summary('semantic_hold', own?.why ?? null);
+  }
+  if (unsettled && calls.incomplete.length > 0) {
+    return summary('not_exercised', `the receipts are incomplete: ${calls.incomplete.join('; ')}`);
   }
   return summary('not_exercised', unproven?.why ?? 'the leg judged nothing');
 }
@@ -640,9 +677,21 @@ function judgeJourney(report, expected, requested = null, worldChecks = null, ef
   const legsOf = (byLeg) => ({ create: legSummary(report, 'create', byLeg.create),
     edit: legSummary(report, 'edit', byLeg.edit) });
   if (report.error !== null) {
+    // A fault fails the journey and the leg it stopped; a leg settled before it keeps the verdicts
+    // of its own evidence.
     const completed = { name: 'the journey completed', verdict: 'failed', observed: report.error };
-    return { verdict: 'failed', checks: [completed], legs: legsOf({ create: [completed], edit: [completed] }) };
+    const { byLeg } = judgeLegs({ ...report, error: null }, expected, requested, worldChecks, effort);
+    byLeg[report.steps.some((entry) => entry.step.startsWith('edit_')) ? 'edit' : 'create'].push(completed);
+    return { verdict: 'failed', checks: [completed], legs: legsOf(byLeg) };
   }
+  const { checks, byLeg } = judgeLegs(report, expected, requested, worldChecks, effort);
+  const verdict = checks.some((entry) => entry.verdict === 'failed') ? 'failed'
+    : checks.some((entry) => entry.verdict === 'not_exercised') ? 'not_exercised' : 'passed';
+  return { verdict, checks, legs: legsOf(byLeg) };
+}
+
+/** Each check of a transcript as `judgeJourney` states it, with the leg each one judges. */
+function judgeLegs(report, expected, requested, worldChecks, effort) {
   const step = (name) => report.steps.find((entry) => entry.step === name);
   const checks = [];
   // Each check is also the leg's it judges, for that leg's summary.
@@ -848,9 +897,7 @@ function judgeJourney(report, expected, requested = null, worldChecks = null, ef
     { report: observed.report, expected: ids });
   }
   leg = null;
-  const verdict = checks.some((entry) => entry.verdict === 'failed') ? 'failed'
-    : checks.some((entry) => entry.verdict === 'not_exercised') ? 'not_exercised' : 'passed';
-  return { verdict, checks, legs: legsOf(byLeg) };
+  return { checks, byLeg };
 }
 
 module.exports.judgeJourney = judgeJourney;

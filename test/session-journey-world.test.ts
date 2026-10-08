@@ -21,17 +21,22 @@ const sha256 = (text: string | Buffer) => createHash('sha256').update(text).dige
 const SINK = 'http://127.0.0.1:1/notifications/hook';
 const WORKFLOW = (threshold: number) => `nika: stale\nconst:\n  max_age_hours: ${threshold}\ntasks: {}\n`;
 
+type Seat = Record<string, unknown> | null;
+
 /**
  * One scripted Session over `project`: words propose, `yes` saves, `run it` writes the report,
- * first asking the declared input `runInput` when one is named.
+ * first asking the declared input `runInput` when one is named. `seat` names the selection its
+ * opened frame shows and the one every later frame shows.
  */
-function scriptedSession(project: string, asked: string | null, sent: string[], runInput: string | null = null) {
+function scriptedSession(project: string, asked: string | null, sent: string[], runInput: string | null = null,
+  seat: { opened: Seat; prepared: Seat } | null = null) {
   let seq = 1;
   let created: string | null = null;
   const files = () => (existsSync(path.join(project, 'stale.nika'))
     ? readFileSync(path.join(project, 'stale.nika'), 'utf8') : null);
   let work: Record<string, any> = { contract: 'nika/session-work@0', root: project, request: {}, authoring: null,
-    intelligence: { selected: { kind: 'api', via: 'deepseek' }, author: { kind: 'provider', model: 'deepseek/x' } },
+    intelligence: { selected: seat === null ? { kind: 'api', via: 'deepseek' } : seat.prepared,
+      author: { kind: 'provider', model: 'deepseek/x' } },
     waiting: { kind: 'free' }, candidate: null, saved: null, requested: null, run: null, rail: {} };
   let pending: string | null = null;
   const snapshot = () => ({ snapshot: `snp-${seq}`, seq, busy: null, work: structuredClone(work) });
@@ -47,8 +52,10 @@ function scriptedSession(project: string, asked: string | null, sent: string[], 
     candidate: { files: [{ path: 'stale.nika', bytes: 'b'.repeat(64), content, landing: 'create' }], revision } };
     return result([{ kind: 'proposal' }]);
   };
+  const opened = { frame: 'opened', event: 1, snapshot: snapshot() };
+  if (seat !== null) opened.snapshot.work.intelligence.selected = seat.opened;
   return {
-    opened: { frame: 'opened', event: 1, snapshot: snapshot() },
+    opened,
     async submit(_shown: unknown, line: string) {
       sent.push(line);
       if (line === 'yes' && pending !== null) {
@@ -268,15 +275,23 @@ describe('a journey opened with the conversation\'s own intelligence', () => {
   const WORDS = '2 deepseek/deepseek-v4-pro';
   const selected = (extra: Record<string, unknown> = {}) => ({ kind: 'api', via: 'deepseek',
     model: 'deepseek/deepseek-v4-pro', transport: null, ready: true, scope: 'conversation', ...extra });
-  /** A scripted SDK whose opened work names `chosen`, recording what openSession was asked; `onOpen` runs at each open. */
-  function chosenSdk(project: string, chosen: Record<string, unknown>, asked: unknown[], onOpen = () => {}) {
+  const FLASH = selected({ model: 'deepseek/deepseek-flash' });
+  /** One selection in every frame of a Session. */
+  const throughout = (seat: Seat) => ({ opened: seat, prepared: seat });
+  /**
+   * A scripted SDK whose n-th Session shows `seats[n]` (the last one past the list): one selection
+   * in its opened frame, one in every frame after it. What openSession was asked is recorded;
+   * `onOpen` runs at each open.
+   */
+  function chosenSdk(project: string, seats: { opened: Seat; prepared: Seat }[], asked: unknown[], onOpen = () => {}) {
+    let opens = 0;
     return { Nika: class {
       openSession = async (options: unknown) => {
         asked.push(options);
         onOpen();
-        const session = scriptedSession(project, null, []);
-        session.opened.snapshot.work.intelligence = { ...session.opened.snapshot.work.intelligence, selected: chosen };
-        return session;
+        const seat = seats[Math.min(opens, seats.length - 1)]!;
+        opens += 1;
+        return scriptedSession(project, null, [], null, seat);
       };
     } };
   }
@@ -296,33 +311,82 @@ describe('a journey opened with the conversation\'s own intelligence', () => {
     edit: 'Raise to 72', checkBin: check, snapshots: path.join(dir, 'legs'), capture: ['out'] });
   const verdict = (judged: { checks: { name: string; verdict: string }[] }, name: RegExp) =>
     judged.checks.filter((entry) => name.test(entry.name)).map((entry) => entry.verdict);
+  const TICKETS = { create: ['stale-60', 'boundary-72', 'stale-90'], edit: ['stale-90'] };
+  const SEAT_AND_SCOPE = /Session prepared with the requested intelligence|conversation alone/;
+  const named = (judged: { checks: { name: string; verdict: string; observed?: any }[] }, name: string) =>
+    judged.checks.find((entry) => entry.name === name)!;
+  /** One journey over a fresh project and HOME, judged for WORDS: only the seat can fail it. */
+  async function judgedFor(seats: { opened: Seat; prepared: Seat }[]) {
+    const { dir, project, check } = homeWithKeptChoice();
+    return journey.judgeJourney(await journey(chosenSdk(project, seats, []), config(dir, project, check)), TICKETS,
+      WORDS);
+  }
 
   it('opens each Session with the words, holds them for the conversation and keeps nothing for the operator', async () => {
     const { dir, project, check } = homeWithKeptChoice();
     const asked: unknown[] = [];
-    const report = await journey(chosenSdk(project, selected(), asked), config(dir, project, check));
+    // Every frame of both Sessions shows the requested seat, held for this conversation.
+    const report = await journey(chosenSdk(project, [throughout(selected())], asked), config(dir, project, check));
     expect(asked).toEqual([expect.objectContaining({ intelligence: WORDS }), expect.objectContaining({ intelligence: WORDS })]);
-    const judged = journey.judgeJourney(report, { create: ['stale-60', 'boundary-72', 'stale-90'], edit: ['stale-90'] },
-      WORDS);
-    expect(verdict(judged, /requested intelligence|conversation alone|kept choice/)).toEqual(['passed', 'passed', 'passed']);
+    const judged = journey.judgeJourney(report, TICKETS, WORDS);
+    expect(judged.checks.filter((entry) => /requested intelligence|kept choice/.test(entry.name))
+      .map((entry) => [entry.name, entry.verdict])).toEqual([
+      ['the CREATE Session prepared with the requested intelligence', 'passed'],
+      ['the CREATE Session holds the requested intelligence for this conversation alone', 'passed'],
+      ['the EDIT Session prepared with the requested intelligence', 'passed'],
+      ['the EDIT Session holds the requested intelligence for this conversation alone', 'passed'],
+      ['the operator\'s kept choice is byte-identical across the journey', 'passed'],
+    ]);
+    // Each leg is read in every frame its Session showed, the EDIT one included.
+    expect(named(judged, 'the EDIT Session prepared with the requested intelligence').observed.frames
+      .map((frame: { at: string }) => frame.at)).toEqual(['edit_open', 'edit_turn 0', 'edit_reached']);
     expect(judged.verdict).toBe('passed');
   });
 
   it('fails another seat, an operator-scoped selection, or a kept choice the journey rewrote', async () => {
-    const other = homeWithKeptChoice();
-    const wrongSeat = await journey(chosenSdk(other.project, selected({ model: 'deepseek/deepseek-flash' }), []),
-      config(other.dir, other.project, other.check));
-    expect(verdict(journey.judgeJourney(wrongSeat, null, WORDS), /prepared with the requested intelligence/))
-      .toEqual(['failed']);
-    const operator = homeWithKeptChoice();
-    const operatorScoped = await journey(chosenSdk(operator.project, selected({ scope: 'operator_default' }), []),
-      config(operator.dir, operator.project, operator.check));
-    expect(verdict(journey.judgeJourney(operatorScoped, null, WORDS), /conversation alone/)).toEqual(['failed']);
+    expect(verdict(await judgedFor([throughout(FLASH)]), /prepared with the requested intelligence/))
+      .toEqual(['failed', 'failed']);
+    expect(verdict(await judgedFor([throughout(selected({ scope: 'operator_default' }))]), /conversation alone/))
+      .toEqual(['failed', 'failed']);
     const rewritten = homeWithKeptChoice();
-    const rewrote = await journey(chosenSdk(rewritten.project, selected(), [], () => writeFileSync(
+    const rewrote = await journey(chosenSdk(rewritten.project, [throughout(selected())], [], () => writeFileSync(
       path.join(rewritten.home, '.nika', 'session-intelligence.json'), '{"kind":"harness"}\n')),
     config(rewritten.dir, rewritten.project, rewritten.check));
     expect(verdict(journey.judgeJourney(rewrote, null, WORDS), /kept choice/)).toEqual(['failed']);
+  });
+
+  // Independent review of 006bc2c: the judge read the selection at the CREATE open only, so a
+  // Session that opened on the requested seat and then prepared with another passed.
+  it('fails a Session that opens on the requested seat and prepares CREATE and EDIT with another', async () => {
+    const operatorFlash = { ...FLASH, scope: 'operator_default' };
+    const judged = await judgedFor([{ opened: selected(), prepared: operatorFlash }, throughout(operatorFlash)]);
+    expect(verdict(judged, SEAT_AND_SCOPE)).toEqual(['failed', 'failed', 'failed', 'failed']);
+    expect(named(judged, 'the CREATE Session prepared with the requested intelligence').observed.other
+      .map((frame: { at: string }) => frame.at)).toEqual(['create_turn 0', 'create_reached']);
+    expect(judged.verdict).toBe('failed');
+  });
+
+  it.each([
+    ['opens and prepares EDIT with another seat', throughout(FLASH), ['edit_open', 'edit_turn 0', 'edit_reached']],
+    ['opens EDIT on the requested seat and prepares it with another', { opened: selected(), prepared: FLASH },
+      ['edit_turn 0', 'edit_reached']],
+  ])('fails a journey whose CREATE holds the requested seat and whose EDIT %s', async (_name, edit, frames) => {
+    const judged = await judgedFor([throughout(selected()), edit]);
+    expect(verdict(judged, SEAT_AND_SCOPE)).toEqual(['passed', 'passed', 'failed', 'passed']);
+    expect(named(judged, 'the EDIT Session prepared with the requested intelligence').observed.other
+      .map((frame: { at: string }) => frame.at)).toEqual(frames);
+    expect(judged.verdict).toBe('failed');
+  });
+
+  it('never passes a leg whose opened or reached frame shows no selection', async () => {
+    const unseenReached = await judgedFor([{ opened: selected(), prepared: null }]);
+    expect(verdict(unseenReached, SEAT_AND_SCOPE)).toEqual(Array(4).fill('not_exercised'));
+    expect(named(unseenReached, 'the CREATE Session prepared with the requested intelligence'))
+      .toMatchObject({ why: 'no selection was observed at create_reached' });
+    const unseenOpen = await judgedFor([{ opened: null, prepared: selected() }]);
+    expect(named(unseenOpen, 'the EDIT Session holds the requested intelligence for this conversation alone'))
+      .toMatchObject({ verdict: 'not_exercised', why: 'no selection scope was observed at edit_open' });
+    expect([unseenReached.verdict, unseenOpen.verdict]).toEqual(['not_exercised', 'not_exercised']);
   });
 });
 

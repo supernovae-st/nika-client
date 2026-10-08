@@ -240,42 +240,79 @@ describe('a journey counts for the seat the Session actually selected', () => {
     expect(requestedSeat('4')).toEqual({ kind: 'none', via: null, model: null, transport: null });
   });
 
-  const seatCheck = (judged: Judged) => judged.checks.find((check) => /requested intelligence/.test(check.name));
-  const selecting = (selected: Record<string, unknown>) => edit(journey(), 'create_reached', {
-    evidence: { ...authored(), intelligence: { ...authored().intelligence, selected } } });
+  // Each leg's Session is judged on its own: CREATE first, then EDIT.
+  const seatChecks = (judged: Judged) => judged.checks.filter((check) => /prepared with the requested/.test(check.name));
+  const selectedIn = (selected: unknown) => ({ ...authored(), intelligence: { ...authored().intelligence, selected } });
+  /** Both legs reach their proposal with `selected`, as one kept choice shows it in each Session. */
+  const selecting = (selected: Record<string, unknown>) => edit(edit(journey(), 'create_reached',
+    { evidence: selectedIn(selected) }), 'edit_reached', { evidence: selectedIn(selected) });
   const answeredFirstScreen = (report: Journey): Journey => ({ ...report,
     steps: [{ step: 'create_turn', turn: 0, said: 'intelligence_choice' }, ...report.steps] });
+  const verdicts = (judged: Judged) => seatChecks(judged).map((check) => check.verdict);
 
-  it('credits the requested seat when the Session selected it', () => {
-    expect(seatCheck(judgeJourney(journey(), EXPECTED, '2 deepseek'))).toMatchObject({ verdict: 'passed' });
+  it('credits the requested seat when each leg\'s Session selected it', () => {
+    expect(seatChecks(judgeJourney(journey(), EXPECTED, '2 deepseek')).map((check) => [check.name, check.verdict]))
+      .toEqual([['the CREATE Session prepared with the requested intelligence', 'passed'],
+        ['the EDIT Session prepared with the requested intelligence', 'passed']]);
   });
 
   it('credits an explicitly named model exactly as the engine projects it', () => {
     const api = selecting({ kind: 'api', via: 'deepseek', transport: null, model: 'deepseek/deepseek-v4-flash',
       locus: 'DeepSeek API', ready: true, refusal: null });
-    expect(seatCheck(judgeJourney(answeredFirstScreen(api), EXPECTED, '2 deepseek/deepseek-v4-flash')))
-      .toMatchObject({ verdict: 'passed' });
+    expect(verdicts(judgeJourney(answeredFirstScreen(api), EXPECTED, '2 deepseek/deepseek-v4-flash')))
+      .toEqual(['passed', 'passed']);
     const claude = { kind: 'harness', via: 'claude-code', transport: 'acp', model: 'claude-code/claude-opus-5-5[1m]',
       locus: 'Claude app', ready: true, refusal: null };
     const requested = '1 acp:claude-code/claude-opus-5-5[1m]';
-    expect(seatCheck(judgeJourney(answeredFirstScreen(selecting(claude)), EXPECTED, requested)))
-      .toMatchObject({ verdict: 'passed' });
+    expect(verdicts(judgeJourney(answeredFirstScreen(selecting(claude)), EXPECTED, requested)))
+      .toEqual(['passed', 'passed']);
     // The same app reached natively is not the ACP seat requested.
-    expect(seatCheck(judgeJourney(answeredFirstScreen(selecting({ ...claude, transport: 'native' })), EXPECTED,
-      requested))).toMatchObject({ verdict: 'failed' });
+    expect(verdicts(judgeJourney(answeredFirstScreen(selecting({ ...claude, transport: 'native' })), EXPECTED,
+      requested))).toEqual(['failed', 'failed']);
   });
 
   it('never relabels a choice kept before the journey as the requested one', () => {
     const judged = judgeJourney(journey(), EXPECTED, '1 acp:claude-code/opus');
-    expect(seatCheck(judged)).toMatchObject({ verdict: 'not_exercised',
-      why: 'the Session opened on a choice kept before this journey, never asked the first screen' });
+    expect(seatChecks(judged)).toEqual(['CREATE', 'EDIT'].map((leg) => expect.objectContaining({
+      name: `the ${leg} Session prepared with the requested intelligence`, verdict: 'not_exercised',
+      why: 'the Session opened on a choice kept before this journey, never asked the first screen' })));
     expect(judged.verdict).toBe('not_exercised');
   });
 
   it('fails a first-screen answer the Session did not honor', () => {
-    const answered = { ...journey(), steps: [{ step: 'create_turn', turn: 0, said: 'intelligence_choice' },
-      ...journey().steps] };
-    expect(seatCheck(judgeJourney(answered, EXPECTED, '1 acp:claude-code/opus'))).toMatchObject({ verdict: 'failed' });
+    expect(verdicts(judgeJourney(answeredFirstScreen(journey()), EXPECTED, '1 acp:claude-code/opus')))
+      .toEqual(['failed', 'failed']);
+  });
+
+  it('fails an EDIT Session that prepared with another seat than the journey\'s first-screen answer', () => {
+    const seat = { kind: 'api', via: 'deepseek', transport: null, model: 'deepseek/deepseek-v4-pro' };
+    const flash = edit(answeredFirstScreen(selecting(seat)), 'edit_reached',
+      { evidence: selectedIn({ ...seat, model: 'deepseek/deepseek-flash' }) });
+    const judged = judgeJourney(flash, EXPECTED, '2 deepseek/deepseek-v4-pro');
+    expect(verdicts(judged)).toEqual(['passed', 'failed']);
+    expect(judged.verdict).toBe('failed');
+  });
+
+  it('reads a leg that asked the first screen again from its own answer on', () => {
+    const seat = { kind: 'api', via: 'deepseek', transport: null, model: 'deepseek/deepseek-v4-pro' };
+    const report = answeredFirstScreen(selecting(seat));
+    // The EDIT Session opened with no choice and asked again; before its answer it showed none.
+    const reasked = { ...report, steps: report.steps.flatMap((entry) => (entry.step !== 'edit_open' ? [entry] : [
+      { ...entry, intelligence: { selected: { kind: 'none', ready: false } } },
+      { step: 'edit_turn', turn: 0, said: 'words', evidence: selectedIn({ kind: 'none', ready: false }) },
+      { step: 'edit_turn', turn: 1, said: 'intelligence_choice', evidence: selectedIn(seat) }])) };
+    expect(verdicts(judgeJourney(reasked, EXPECTED, '2 deepseek/deepseek-v4-pro'))).toEqual(['passed', 'passed']);
+  });
+
+  it('withholds the EDIT Session\'s seat and scope when it never opened', () => {
+    const opened = { step: 'create_open', opened_with: 'intelligence', intelligence: { selected: { kind: 'api',
+      via: 'deepseek', model: 'deepseek/deepseek-v4-pro', scope: 'conversation' } } };
+    const stuck = { ...journey(), steps: [opened, { step: 'create_reached', waiting: 'question', key: 'k',
+      outcomes: ['question'], evidence: selectedIn(opened.intelligence.selected) }] };
+    const judged = judgeJourney(stuck, EXPECTED, '2 deepseek/deepseek-v4-pro');
+    expect(judged.checks.filter((check) => /EDIT Session/.test(check.name)).map((check) => [check.verdict, check.why]))
+      .toEqual([['not_exercised', 'an earlier leg stopped first'], ['not_exercised', 'an earlier leg stopped first']]);
+    expect(judged.verdict).toBe('not_exercised');
   });
 });
 

@@ -339,15 +339,19 @@ uses the person's own `HOME`); their values are never printed. The Session
 keeps a first-screen answer in `~/.nika/session-intelligence.json`, so with
 the person's own `HOME` the persona never answers that screen: the Session
 opens on the choice the person already keeps, and a journey counts for the
-requested seat only when the Session's own selection is that seat (a choice
-kept from elsewhere is reported as such, never relabelled).
+requested seat only when each leg's Session shows that seat as its own
+selection, from the journey's first-screen answer on (a choice kept from
+elsewhere is reported as such, never relabelled).
 `NIKA_SESSION_JOURNEY_INTELLIGENCE` (instead of the choice; naming both is
 refused) opens each Session with the conversation's own intelligence
 (`openSession({ intelligence })`, an engine with `sessionIntelligence`):
 the first screen is never asked, nothing is kept for the operator, and the
 person's own `HOME` is then safe for an app seat's sign-in. The journey then
-also requires the opened selection to be the requested one with
-`scope: conversation`, and the operator's kept choice to read the same
+requires of each leg's Session, CREATE and EDIT, the requested seat with
+`scope: conversation` in every frame it shows (the opened frame, each turn's
+snapshot, the frame the leg reached): a frame showing another seat or scope
+fails the leg, and an opened or reached frame showing none leaves it
+`not_exercised`, never passed. The operator's kept choice must read the same
 (presence and sha256, never its content) before and after the journey.
 `NIKA_SESSION_DECISION_MODEL` and `NIKA_AUTHORING_REASONING`, when set, seat
 the decision model and the reasoning effort through the engine's own

@@ -345,6 +345,33 @@ function requestedSeat(choice) {
   return { kind, via: named ? bare.slice(0, slash) : bare, model: named ? bare : null, transport };
 }
 
+/**
+ * Every frame of one leg's Session that shows a selection, in order: the opened frame, each turn's
+ * snapshot, the frame the leg reached and the one the harness saw when it stopped waiting. A turn
+ * index `fromTurn` drops the opened frame and the turns before it. A selection must be observed
+ * at the frame the leg reached, and at the opened frame when `openRequired`.
+ */
+function legSelections(report, name, fromTurn, openRequired) {
+  const step = (at) => report.steps.find((entry) => entry.step === at);
+  const selection = (evidence) => evidence?.intelligence?.selected ?? null;
+  const frames = [];
+  if (fromTurn === null) {
+    frames.push({ at: `${name}_open`, selected: step(`${name}_open`)?.intelligence?.selected ?? null,
+      required: openRequired });
+  }
+  report.steps.filter((entry) => entry.step === `${name}_turn`).forEach((entry, index) => {
+    if (fromTurn === null || index >= fromTurn) {
+      frames.push({ at: `${name}_turn ${entry.turn ?? index}`, selected: selection(entry.evidence), required: false });
+    }
+  });
+  frames.push({ at: `${name}_reached`, selected: selection(step(`${name}_reached`)?.evidence), required: true });
+  const bound = step(`${name}_harness_bound`);
+  if (bound !== undefined) {
+    frames.push({ at: `${name}_harness_bound`, selected: selection(bound.evidence), required: false });
+  }
+  return frames;
+}
+
 /** Whether the Session's own selection is the seat that was requested. */
 function isRequestedSeat(selected, requested) {
   return selected !== null && selected !== undefined && selected.kind === requested.kind
@@ -357,8 +384,11 @@ function isRequestedSeat(selected, requested) {
  * What one door's journey must show, per leg. A leg that never reached a proposal, a proposal
  * no model authored, or a Run the Session did not start or observe is `not_exercised` with the
  * engine's own words; a wrong digest, base, bytes or report is `failed`. When `requested`
- * names the first-screen answer, the journey counts for that seat only if the Session's own
- * selection is it: a choice kept from elsewhere is never relabelled as the one requested.
+ * names the seat (the opener's words, or the first-screen answer), each leg counts for it only
+ * if its Session's own selection is that seat in every frame it shows from the open (or from the
+ * journey's answer) to the frame the leg reached, held for the conversation alone when an opener
+ * named it: a frame showing no selection proves nothing, and a choice kept from elsewhere is
+ * never relabelled as the one requested.
  */
 function judgeJourney(report, expected, requested = null, worldChecks = null) {
   if (report.error !== null) {
@@ -372,30 +402,59 @@ function judgeJourney(report, expected, requested = null, worldChecks = null) {
     && ['provider', 'harness'].includes(evidence?.intelligence?.author?.kind);
   if (requested !== null) {
     const seat = requestedSeat(requested);
-    // Opened with the conversation's own intelligence, the selection is the opened frame's own.
+    // Opened with the conversation's own intelligence, every frame of each leg's Session must show
+    // it; answered on the first screen, every frame from the journey's own answer on.
     const byOpener = step('create_open')?.opened_with === 'intelligence';
-    const reached = step('create_reached');
-    const selected = (byOpener ? step('create_open')?.intelligence?.selected
-      : reached?.evidence?.intelligence?.selected) ?? null;
-    const answered = report.steps.some((entry) => entry.step === 'create_turn' && entry.said === 'intelligence_choice');
-    if (selected === null) {
-      gap('the Session prepared with the requested intelligence', 'no selection was observed', reached ?? null);
-    } else if (isRequestedSeat(selected, seat)) {
-      check('the Session prepared with the requested intelligence', true, { requested: seat, selected });
-    } else if (answered || byOpener) {
-      // The persona gave the first screen this answer, or the opener named it, and the Session
-      // selected another seat.
-      check('the Session prepared with the requested intelligence', false, { requested: seat, selected });
-    } else {
-      gap('the Session prepared with the requested intelligence',
-        'the Session opened on a choice kept before this journey, never asked the first screen', { requested: seat,
-          selected });
+    let answeredEarlier = false;
+    for (const name of ['create', 'edit']) {
+      const LEG = name.toUpperCase();
+      const seatName = `the ${LEG} Session prepared with the requested intelligence`;
+      const scopeName = `the ${LEG} Session holds the requested intelligence for this conversation alone`;
+      const answeredAt = report.steps.filter((entry) => entry.step === `${name}_turn`)
+        .findIndex((entry) => entry.said === 'intelligence_choice');
+      const answered = byOpener || answeredAt >= 0 || answeredEarlier;
+      answeredEarlier = answeredEarlier || answeredAt >= 0;
+      if (step(`${name}_open`) === undefined) {
+        gap(seatName, 'an earlier leg stopped first', null);
+        if (byOpener) gap(scopeName, 'an earlier leg stopped first', null);
+        continue;
+      }
+      // Before this leg's own first-screen answer the Session had no choice to show.
+      const frames = legSelections(report, name, answeredAt >= 0 && !byOpener ? answeredAt : null, byOpener);
+      const shown = frames.map(({ at, selected }) => ({ at, selected }));
+      const other = shown.filter((frame) => frame.selected !== null && !isRequestedSeat(frame.selected, seat));
+      const unseen = frames.filter((frame) => frame.required && frame.selected === null).map((frame) => frame.at);
+      if (other.length > 0 && answered) {
+        // The opener named it, or the persona gave the first screen this answer, and the Session
+        // showed another seat in at least one frame.
+        check(seatName, false, { requested: seat, other });
+      } else if (other.length > 0) {
+        gap(seatName, 'the Session opened on a choice kept before this journey, never asked the first screen',
+          { requested: seat, other });
+      } else if (unseen.length > 0) {
+        // A frame that shows no selection proves no seat: never a pass.
+        gap(seatName, `no selection was observed at ${unseen.join(', ')}`, { requested: seat, frames: shown });
+      } else {
+        check(seatName, true, { requested: seat, frames: shown });
+      }
+      if (byOpener) {
+        // The engine holds the opener's words for this conversation alone, in every frame.
+        const scopes = frames.map(({ at, selected }) => ({ at, scope: selected?.scope ?? null }));
+        const elsewhere = scopes.filter((frame) => typeof frame.scope === 'string' && frame.scope !== 'conversation');
+        const unscoped = frames.filter((frame) => frame.required && typeof frame.selected?.scope !== 'string')
+          .map((frame) => frame.at);
+        if (elsewhere.length > 0) {
+          check(scopeName, false, { scopes: elsewhere });
+        } else if (unscoped.length > 0) {
+          gap(scopeName, `no selection scope was observed at ${unscoped.join(', ')}`, { scopes });
+        } else {
+          check(scopeName, true, { scopes });
+        }
+      }
     }
     if (byOpener) {
-      // The engine holds the opener's words for this conversation alone and keeps nothing for the
-      // operator: the kept choice reads the same at both ends of the journey.
-      check('the Session holds the requested intelligence for this conversation alone',
-        selected?.scope === 'conversation', { scope: selected?.scope ?? null });
+      // The engine keeps nothing for the operator: the kept choice reads the same at both ends of
+      // the journey.
       const [before, after] = ['before', 'after'].map((when) =>
         report.steps.find((entry) => entry.step === 'operator_choice' && entry.when === when));
       const kept = 'the operator\'s kept choice is byte-identical across the journey';

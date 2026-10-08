@@ -168,10 +168,20 @@ try {
   async function providerPhase() {
     const model = process.env.NIKA_COMPILE_PROVIDER_MODEL;
     if (!model) return { ran: false, why: 'NIKA_COMPILE_PROVIDER_MODEL unset: deterministic phase only' };
-    const keyName = process.env.NIKA_COMPILE_PROVIDER_ENV;
-    assert(keyName && /^[A-Z][A-Z0-9_]*$/.test(keyName) && process.env[keyName],
-      'NIKA_COMPILE_PROVIDER_ENV must name the set variable that holds the seat\'s key');
-    const seatedEnv = { ...env, [keyName]: process.env[keyName] };
+    // The seats each door is given (Serve seats a direct provider only; a native seat may be an
+    // ACP harness such as `claude-code/…` or `codex/…`). The decision seat judges Serve's rounds;
+    // the local engine seats one for a creation only (its `--decision-model` refuses `--base`).
+    const seats = {
+      native: process.env.NIKA_COMPILE_NATIVE_MODEL ?? model,
+      serve: process.env.NIKA_COMPILE_SERVE_MODEL ?? model,
+      decision: process.env.NIKA_COMPILE_DECISION_MODEL ?? null,
+    };
+    // The variables the engine processes receive, by name only (keys, and HOME when a harness
+    // must find its own login); their values are never printed.
+    const keyNames = (process.env.NIKA_COMPILE_PROVIDER_ENV ?? '').split(',').filter(Boolean);
+    assert(keyNames.length > 0 && keyNames.every((name) => /^[A-Z][A-Z0-9_]*$/.test(name) && process.env[name]),
+      'NIKA_COMPILE_PROVIDER_ENV must name the set variables the seats need, comma-separated');
+    const seatedEnv = { ...env, ...Object.fromEntries(keyNames.map((name) => [name, process.env[name]])) };
     // Its own project: a native provider round records its plan under .nika/compile/ there.
     const seatedProject = path.join(scratch, 'seated-project');
     mkdirSync(seatedProject);
@@ -189,7 +199,8 @@ try {
     ].join('\n'));
     seated = owned.start(binary, ['serve', '--bind', '127.0.0.1:0', '--workflows', seatedProject,
       '--token-file', path.join(scratch, 'token'), '--state-root', path.join(scratch, 'seated-state'), '--plain',
-      '--authoring-model', model], { cwd: seatedProject, env: seatedEnv, timeoutMs: 3_600_000 });
+      '--authoring-model', seats.serve, ...(seats.decision ? ['--decision-model', seats.decision] : [])],
+    { cwd: seatedProject, env: seatedEnv, timeoutMs: 3_600_000 });
     let seatedUrl;
     const until = Date.now() + 15000;
     while (!seatedUrl && Date.now() < until) {
@@ -207,7 +218,8 @@ try {
     for (const moduleSystem of ['cjs', 'esm']) {
       const config = path.join(consumer, 'evidence.json');
       writeFileSync(config, JSON.stringify({ bin: binary, project: seatedProject, url: seatedUrl, token, moduleSystem,
-        model, base: REVISION_BASE, change: REVISION_CHANGE, originalIntent: REVISION_INTENT, keptLines: REVISION_KEPT }));
+        model: seats.native, base: REVISION_BASE, change: REVISION_CHANGE,
+        originalIntent: REVISION_INTENT, keptLines: REVISION_KEPT }));
       const result = JSON.parse(await owned.run(process.execPath,
         [path.join(consumer, `evidence-consumer.${moduleSystem === 'esm' ? 'mjs' : 'cjs'}`), config],
         { cwd: consumer, env: seatedEnv, timeoutMs: 1_800_000, maxBuffer: 16 * 1024 * 1024 }));
@@ -222,7 +234,7 @@ try {
     }
     await stopResident(seated);
     seated = undefined;
-    return { ran: true, model, key_env: keyName,
+    return { ran: true, model, seats, key_env: keyNames,
       base_sha256: createHash('sha256').update(REVISION_BASE).digest('hex'),
       change: REVISION_CHANGE, original_intent: REVISION_INTENT,
       seated_capabilities: seatedHealth.supportedCapabilities, results: rows,

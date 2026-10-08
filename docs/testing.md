@@ -222,6 +222,13 @@ NIKA_COMPILE_PROVIDER_ENV=DEEPSEEK_API_KEY \
 NIKA_BIN=… NIKA_COMPILE_PARITY_REPORT=… node scripts/run-compile-parity-e2e.mjs
 ```
 
+`NIKA_COMPILE_NATIVE_MODEL` and `NIKA_COMPILE_SERVE_MODEL` give each door its
+own seat (a native seat may be an ACP harness such as `claude-code/…` or
+`codex/…`; Serve seats a direct provider), `NIKA_COMPILE_DECISION_MODEL` seats
+a decision model beside the resident's author (the local engine seats one for
+a creation only), and `NIKA_COMPILE_PROVIDER_ENV` takes several variable names,
+comma-separated (`HOME` included when a harness must find its own login).
+
 Each packed module system then revises one rich base (comments, Unicode, every
 envelope section) once per door, through a native seat and a seated resident.
 These are separate generations, never compared byte for byte. Each must satisfy

@@ -80,7 +80,7 @@ interface needs to show and verify without reading anything else:
 | `authoring.draft` | `string \| null` | the compiler's candidate bytes, proposed or not: what to show while a question waits; showing it consents to nothing |
 | `authoring.calls` | `NikaSessionAuthoringCalls \| null` | the compiler's receipt of its authoring calls: the model they asked for (`requested_model`, never what served them), how many, the reported usage (`null` when unknown, never `0`) and the `backend` as its transport named it; `null` when the compile made no call |
 | `intelligence` | `NikaSessionIntelligence` | configured facts: the person's `selected` intelligence as the engine's machine resolved it, the `author` seat, the `decision` seat selected and the `effort`; a selection is never the model that served a call |
-| `run` | `NikaSessionRun \| null` | the last observed Run with only the identities its observation carried: `current` (the Run of the workflow saved last), `workflow`, `end` (`{ end }`, plus `exit` for `unknown`), `trace`, `execution`, `workflow_sha256` (the source hash its start named), `chain_head`, `chain_len`; every member written, `null` where unobserved. Both session-host doors of the 0.123 integration observe a Run without `workflow_sha256`, `execution` or the chain: such a Run does not prove which bytes ran |
+| `run` | `NikaSessionRun \| null` | the last observed Run with only the identities its observation carried: `current` (the Run of the workflow saved last), `workflow`, `end` (`{ end }`, plus `exit` for `unknown`), `trace`, `execution`, `workflow_sha256` (the source hash its start named), `chain_head`, `chain_len`; every member written, `null` where unobserved. A Run without `workflow_sha256` does not prove which bytes ran: both session-host doors observed none up to host `4271f09ef`; from host `b5d844d84` a run names what it observed of itself (recorded here from a real resident over HTTP at `312c3d5a8`: the sha256 of the bytes it ran, the job's execution uuid and opaque trace, the receipt head) |
 
 The SDK checks these members where they are, as it checks a compile's
 evidence: a present member of another shape fails with `NikaProtocolError`
@@ -153,10 +153,12 @@ The handle follows contract `nika/session-host@1` as the engine's
 `nika-session-host` writes it (commits `e079f3e79`, `18479cf38`, `e849d08ea`,
 then `cc08ea08f` with `run_unobserved`; not yet released). Besides tests
 against a synthetic host, the handle is driven over frames that host recorded
-from its real native and HTTP doors at `e849d08ea` and again on the merged
+from its real native and HTTP doors at `e849d08ea`, again on the merged
 `eb89e1893`, whose Work carries the current members, with a resident's Run
-cost review (`test/fixtures/session-host/`): it sends the recorded commands and
-decodes every recorded frame unchanged. The 0.123 integration engine registers
+cost review, and at `312c3d5a8`, whose selection names its scope, with one Run
+of a real resident through its HTTP Session door
+(`test/fixtures/session-host/`): it sends the recorded commands and decodes
+every recorded frame unchanged. The 0.123 integration engine registers
 `nika session --json` (`3688552f3`); the served `/v1/sessions` routes arrive
 with `nika serve --sessions`. `scripts/run-session-parity-e2e.mjs` qualifies
 both doors of one binary once it hosts them (see `docs/testing.md`).

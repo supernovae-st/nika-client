@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
@@ -152,6 +154,20 @@ describe('a real-door Session walk is judged by the host\'s laws', () => {
     const other = judgeSession(edit(walk('http'), 'run_observed', { run: { ...OBSERVED, workflow: 'other.nika',
       workflow_sha256: null } }));
     expect(verdictOf(other, /ran the saved bytes/)).toBe('failed');
+  });
+
+  it('proves the saved bytes ran from the Run identity a real resident named (host 312c3d5a8)', () => {
+    // The recorded Run's own source hash, against the sha256 the walk computes of the saved file.
+    const recorded = JSON.parse(readFileSync(new URL('./fixtures/session-host/312c3d5a8/http-resident-run.json',
+      import.meta.url), 'utf8')) as { workflow: string; ran: { snapshot: { work: { run: unknown } } } };
+    const savedAs = (bytes: string) => edit(edit(walk('http'), 'consent', { saved: 'root.nika',
+      saved_sha256: createHash('sha256').update(bytes).digest('hex') }), 'run_observed',
+    { run: recorded.ran.snapshot.work.run });
+    const same = judgeSession(savedAs(recorded.workflow));
+    expect(verdictOf(same, /ran the saved bytes/)).toBe('passed');
+    expect(verdictOf(same, /observed the requested Run end/)).toBe('passed');
+    // One more byte in the saved file and the same Run no longer proves it ran them.
+    expect(verdictOf(judgeSession(savedAs(`${recorded.workflow}\n`)), /ran the saved bytes/)).toBe('failed');
   });
 
   it('reads `./` and a bare relative path as the same saved workflow', () => {

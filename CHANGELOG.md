@@ -25,10 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   handle; `attachSession(id)` reaches the live Session a resident holds. The
   work snapshot is the engine's own, carried verbatim. No released engine
   hosts the contract yet; see `docs/session.md`. The handle is pinned against
-  frames the engine's host recorded from both doors at `e849d08ea` and on the
+  frames the engine's host recorded from both doors at `e849d08ea`, on the
   merged `eb89e1893` (the current Work members, and a resident's Run cost
   review: a stale yes refused with its line, one admission and its replay, a
-  decline that admits nothing). `openSession({ intelligence })` opens the
+  decline that admits nothing) and at `312c3d5a8` (the selection's `scope`, and
+  one real resident Run over HTTP whose `work.run` names the sha256 of the
+  bytes it ran, which the Session judge reads as the proof it is). `openSession({ intelligence })` opens the
   Session with an intelligence held for this conversation alone, in the
   engine's own first-screen words (natively `--intelligence`, over HTTP the
   `intelligence` member of the open body), gated on `sessionIntelligence`

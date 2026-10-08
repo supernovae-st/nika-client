@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -6,13 +7,15 @@ import type { NikaSessionEvent, NikaSessionResult } from '../src/index.js';
 import { healthResponse, jsonResponse, TOKEN_A } from './helpers/http-depth-harness.js';
 
 // The authoring Session handle over frames `nika-session-host` RECORDED from its real doors at
-// two engine commits (test/fixtures/session-host/<commit>/README.md): e849d08eaf37 and the merged
-// eb89e1893, whose Work carries the current members. Native NDJSON driver and HTTP routes,
-// in-process; the Session reasoner was scripted and never asked; the compiler was the real
-// deterministic one. These tests pin that the SDK sends the recorded commands and decodes every
-// recorded frame losslessly; they are not a run of the shipped binaries.
+// three engine commits (test/fixtures/session-host/<commit>/README.md): e849d08eaf37, the merged
+// eb89e1893, whose Work carries the current members, and 312c3d5a8, whose selection names its
+// scope. Native NDJSON driver and HTTP routes, in-process; the Session reasoner was scripted and
+// never asked; the compiler was the real deterministic one. At 312c3d5a8 one Run was also
+// recorded from a real resident through its HTTP Session door. These tests pin that the SDK
+// sends the recorded commands and decodes every recorded frame losslessly; they are not a run of
+// the shipped binaries.
 
-const RECORDINGS = ['e849d08eaf37', 'eb89e1893'];
+const RECORDINGS = ['e849d08eaf37', 'eb89e1893', '312c3d5a8'];
 const recorded = (recording: string, name: string) => JSON.parse(readFileSync(
   new URL(`./fixtures/session-host/${recording}/${name}`, import.meta.url), 'utf8')) as Record<string, any>[];
 const REPLAY_ENGINE = fileURLToPath(new URL('./fixtures/fake-nika-session-replay.mjs', import.meta.url));
@@ -174,10 +177,10 @@ describe.each(RECORDINGS)('recorded HTTP door (%s)', (recording) => {
   });
 });
 
-describe('recorded resident cost review over HTTP (eb89e1893)', () => {
+describe.each(['eb89e1893', '312c3d5a8'])('recorded resident cost review over HTTP (%s)', (recording) => {
   it('reviews a Run: a stale yes refused with its line, one admission and its replay, a decline admitting nothing',
     async () => {
-      const review = recorded('eb89e1893', 'http-run-review.json');
+      const review = recorded(recording, 'http-run-review.json');
       const step = (name: string) => review.find((entry) => entry.step === name)!;
       // The resident answers in the recorded order; what the SDK sent is compared afterwards.
       let next = 0;
@@ -223,4 +226,35 @@ describe('recorded resident cost review over HTTP (eb89e1893)', () => {
       expect(sent.filter((request) => request.body?.op !== undefined).map((request) => request.body))
         .toEqual(review.filter((entry) => entry.sent !== null).map((entry) => entry.sent));
     });
+});
+
+describe('recorded real resident Run over HTTP (312c3d5a8)', () => {
+  it('decodes the open and the Run reply unchanged; the Run names the sha256 of the bytes it ran', async () => {
+    // {workflow, workflow_sha256, opened, ran}: the project held `root.nika`, "run root.nika" was
+    // typed as c-3 against the opening snapshot, and the resident's own backend ran it (README).
+    const file = JSON.parse(readFileSync(new URL('./fixtures/session-host/312c3d5a8/http-resident-run.json',
+      import.meta.url), 'utf8')) as Record<string, any>;
+    const { client, sent } = resident((_method, path) => (path === '/v1/sessions'
+      ? { status: 201, body: file.opened } : { status: 200, body: file.ran }));
+    const handle = await client.openSession();
+    expect(handle.opened).toEqual(file.opened);
+    expect(handle.opened!.snapshot.work.intelligence?.selected).toMatchObject({ scope: 'operator_default' });
+    const ran = await handle.submit(handle.opened!.snapshot, 'run root.nika', { command: 'c-3' });
+    expect(ran).toEqual(file.ran);
+    // The command left with the bytes the recorder sent.
+    expect(sent.at(-1)).toEqual({ method: 'POST', path: `/v1/sessions/${file.opened.session}/commands`,
+      body: { contract: 'nika/session-host@1', op: 'submit', command: 'c-3',
+        snapshot: file.opened.snapshot.snapshot, line: 'run root.nika' } });
+    const run = ran.snapshot.work.run!;
+    expect(run).toMatchObject({ current: true, workflow: 'root.nika', end: { end: 'succeeded' } });
+    // The source hash is the sha256 of exactly the bytes the project held, as the runners compute it.
+    const bytes = createHash('sha256').update(file.workflow as string).digest('hex');
+    expect(file.workflow_sha256).toBe(bytes);
+    expect(run.workflow_sha256).toBe(bytes);
+    // The other identities are the job's: an execution uuid, an opaque trace (never a path), the
+    // receipt head. The SDK carries them as written; none is filled or read by it.
+    expect(run.execution).toMatch(/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
+    expect(typeof run.trace === 'string' && !run.trace.includes('/')).toBe(true);
+    expect(run.chain_head).toMatch(/^[0-9a-f]{64}$/);
+  });
 });

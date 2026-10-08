@@ -361,9 +361,10 @@ the last) to have carried it, by the engine's own receipts: each call's
 `invoking` record paired by position with its end, the call asked it
 (`requested_effort`), a returned call had it taken by the ACP session
 (`transmitted_effort`) and read back (`configured_effort`), and the Session's
-configured `intelligence.effort` names it. Another value fails the leg; an end
-with no invocation before it, receipts naming none, or a leg with no returned
-call leave it `not_exercised`.
+configured `intelligence.effort` names it. Another value fails the leg; an
+incomplete receipt (a call with no end, an end with no invocation before it,
+calls counted that the receipt does not hold), receipts naming no effort, or
+a leg with no returned call leave it `not_exercised`.
 
 ```sh
 NIKA_SESSION_JOURNEY_CHOICE='2 deepseek/deepseek-v4-flash' NIKA_SESSION_JOURNEY_ENV=DEEPSEEK_API_KEY \

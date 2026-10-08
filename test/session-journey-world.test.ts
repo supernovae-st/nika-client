@@ -427,12 +427,14 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
   afterEach(() => {
     vi.unstubAllEnvs();
   });
+  type Receipts = unknown[] | { calls: number; backend: unknown };
   /**
    * A scripted Claude ACP Session: each line's result carries one compile's receipts (`receipts`,
-   * or `receipts(n)` for its n-th line) and the configured effort; with `asked`, the CREATE words
-   * first ask that question, which the persona answers.
+   * or `receipts(n)` for its n-th line: the harness's records, counted as the harness counts its
+   * invocations, or a whole `{ calls, backend }`) and the configured effort; with `asked`, the
+   * CREATE words first ask that question, which the persona answers.
    */
-  async function walked(receipts: unknown[] | ((line: number) => unknown[]), configured: unknown = 'max',
+  async function walked(receipts: Receipts | ((line: number) => Receipts), configured: unknown = 'max',
     asked: string | null = null) {
     const { dir, project, check } = world();
     // The kept choice is read under the journey's HOME: this test's own, holding none.
@@ -443,11 +445,14 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
         let line = 0;
         return { ...session, submit: async (shown: unknown, words: string) => {
           const settled = await session.submit(shown, words);
-          const observed = typeof receipts === 'function' ? receipts(line++) : receipts;
+          const given = typeof receipts === 'function' ? receipts(line++) : receipts;
+          const counted = Array.isArray(given)
+            ? { calls: given.filter((record) => (record as { status?: string })?.status === 'invoking').length,
+              backend: { kind: 'harness_infer', transport: 'acp', observed: given } }
+            : given;
           const work = settled.snapshot.work;
-          work.authoring = { ...(work.authoring ?? {}), calls: { requested_model: 'claude-code/opus[1m]', calls: 1,
-            input_tokens: null, output_tokens: null, elapsed_ms: 1,
-            backend: { kind: 'harness_infer', transport: 'acp', observed } } };
+          work.authoring = { ...(work.authoring ?? {}), calls: { requested_model: 'claude-code/opus[1m]',
+            input_tokens: null, output_tokens: null, elapsed_ms: 1, ...counted } };
           work.intelligence = { ...work.intelligence, effort: configured };
           return settled;
         } };
@@ -492,10 +497,32 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
   it('never pairs a returned call with an invocation it does not have', async () => {
     const alone = journey.judgeJourney(await walked([returnedAlone]), TICKETS, WORDS, null, 'max');
     expect(effortChecks(alone)[0]).toMatchObject({ verdict: 'not_exercised',
-      why: 'a call ended without its invoking receipt: create_turn 0 returned record with no invocation before it' });
+      why: 'the receipts are incomplete: create_turn 0 returned record with no invocation before it' });
     const second = journey.judgeJourney(await walked([...call('max', 'max', 'max'), returnedAlone]), TICKETS, WORDS,
       null, 'max');
     expect(effortChecks(second).map((entry) => entry.verdict)).toEqual(['not_exercised', 'not_exercised']);
+  }, WALKS);
+
+  // Independent review of 0fe9f75: a call left open was overwritten or never checked at the end.
+  it('never passes a call whose receipt has no end, at the end or before the next invocation', async () => {
+    const [invoking, end] = call('max', 'max', 'max');
+    const trailing = journey.judgeJourney(await walked([invoking, end, invoking]), TICKETS, WORDS, null, 'max');
+    expect(effortChecks(trailing)[0]).toMatchObject({ verdict: 'not_exercised',
+      why: 'the receipts are incomplete: create_turn 0 call 1 has no end' });
+    const overwritten = journey.judgeJourney(await walked([invoking, invoking, end]), TICKETS, WORDS, null, 'max');
+    expect(effortChecks(overwritten)[0]).toMatchObject({ verdict: 'not_exercised',
+      why: 'the receipts are incomplete: create_turn 0 call 0 has no end before the next invocation' });
+  }, WALKS);
+
+  it('never passes a turn whose counted calls carry no receipt, nor a count its receipt does not hold', async () => {
+    // CREATE asks a question first: that compile counts one call but names no backend receipt.
+    const unreceipted = journey.judgeJourney(await walked((line) => (line === 0 ? { calls: 1, backend: null }
+      : call('max', 'max', 'max')), 'max', 'webhook'), TICKETS, WORDS, null, 'max');
+    expect(effortChecks(unreceipted)[0]).toMatchObject({ verdict: 'not_exercised',
+      why: 'the receipts are incomplete: create_turn 0 counts 1 authoring call(s) but its receipt holds 0 invocation(s)' });
+    const miscounted = journey.judgeJourney(await walked({ calls: 2, backend: { kind: 'harness_infer', transport: 'acp',
+      observed: call('max', 'max', 'max') } }), TICKETS, WORDS, null, 'max');
+    expect(effortChecks(miscounted)[0]!.why).toMatch(/counts 2 authoring call\(s\) but its receipt holds 1 invocation/);
   }, WALKS);
 
   it('reads a call that ended without returning by what it asked, and counts only returned calls', async () => {

@@ -407,13 +407,15 @@ function effortFrames(report, name) {
  * Every call must have asked the effort (`requested_effort`), every returned call must have had
  * it taken (`transmitted_effort`) and read back (`configured_effort`), and the Session's
  * configured `intelligence.effort` must name it where it is named (always at the reached frame).
- * Another value anywhere fails; an end with no invocation before it, a receipt naming no effort,
- * or no returned call proves nothing. A compile's receipt seen on several frames is read once.
+ * Another value anywhere fails. An incomplete receipt proves nothing: a frame counting calls its
+ * receipt does not hold, a call with no end (or another invocation before it), an end with no
+ * invocation before it; nor does a receipt naming no effort, or no returned call. A compile's
+ * receipt seen on several frames is read once.
  */
 function carriedEffort(frames, effort) {
   const other = [];
   const unnamed = [];
-  const orphans = [];
+  const incomplete = [];
   const seen = new Set();
   let returned = 0;
   const name = (at, value) => {
@@ -424,16 +426,24 @@ function carriedEffort(frames, effort) {
     const configured = evidence?.intelligence?.effort;
     if (required || typeof configured === 'string') name(`${at} intelligence.effort`, configured);
     const observed = evidence?.calls?.backend?.observed;
-    if (!Array.isArray(observed) || observed.length === 0 || seen.has(JSON.stringify(observed))) continue;
-    seen.add(JSON.stringify(observed));
+    const records = Array.isArray(observed) ? observed : [];
+    // An ACP harness counts its invocations: each counted call must have its receipt.
+    const counted = typeof evidence?.calls?.calls === 'number' ? evidence.calls.calls : 0;
+    const invocations = records.filter((record) => record?.status === 'invoking').length;
+    if (counted !== invocations) {
+      incomplete.push(`${at} counts ${counted} authoring call(s) but its receipt holds ${invocations} invocation(s)`);
+    }
+    if (records.length === 0 || seen.has(JSON.stringify(records))) continue;
+    seen.add(JSON.stringify(records));
     let call = -1;
     let open = false;
-    for (const record of observed) {
+    for (const record of records) {
       if (record?.status === 'invoking') {
+        if (open) incomplete.push(`${at} call ${call} has no end before the next invocation`);
         [call, open] = [call + 1, true];
         name(`${at} call ${call} requested_effort`, record.requested_effort);
       } else if (!open) {
-        orphans.push(`${at} ${record?.status ?? 'unnamed'} record with no invocation before it`);
+        incomplete.push(`${at} ${record?.status ?? 'unnamed'} record with no invocation before it`);
       } else {
         open = false;
         if (record.status !== 'returned') continue;
@@ -442,10 +452,11 @@ function carriedEffort(frames, effort) {
         name(`${at} call ${call} configured_effort`, record.configured_effort);
       }
     }
+    if (open) incomplete.push(`${at} call ${call} has no end`);
   }
   if (other.length > 0) return { verdict: 'failed', observed: { requested: effort, other } };
-  if (orphans.length > 0) {
-    return { verdict: 'not_exercised', why: `a call ended without its invoking receipt: ${orphans.join('; ')}`,
+  if (incomplete.length > 0) {
+    return { verdict: 'not_exercised', why: `the receipts are incomplete: ${incomplete.join('; ')}`,
       observed: { requested: effort } };
   }
   if (returned === 0) {

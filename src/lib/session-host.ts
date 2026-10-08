@@ -315,6 +315,39 @@ function workMembers(work: Record<string, unknown>, fail: (what: string) => Nika
         member(file, 'workflow', at, flag);
       });
     }, true);
+    member(candidate, 'revision', 'work.candidate', (value, path) => {
+      if (value === null) return;
+      const revision = object(value, path);
+      member(revision, 'mode', path, text(), true);
+      member(revision, 'base_sha256', path, witness(true), true);
+      member(revision, 'candidate_sha256', path, witness(), true);
+      member(revision, 'changed', path, (changed, at) => {
+        if (!Array.isArray(changed) || !changed.every((entry) => typeof entry === 'string')) {
+          throw fail(`${at} is not a list of text`);
+        }
+      }, true);
+      member(revision, 'preservation', path, text());
+      member(revision, 'components', path, (components, at) => {
+        if (!Array.isArray(components)) throw fail(`${at} is not a list`);
+        components.forEach((entry, index) => {
+          const where = `${at}[${index}]`;
+          const use = object(entry, where);
+          member(use, 'id', where, text(), true);
+          member(use, 'version', where, text(true));
+          member(use, 'release', where, text(true));
+          member(use, 'file_sha256', where, witness(true));
+          member(use, 'witness', where, text(), true);
+          member(use, 'bindings', where, (bindings, list) => {
+            if (!Array.isArray(bindings)) throw fail(`${list} is not a list`);
+            bindings.forEach((binding, position) => {
+              const hole = object(binding, `${list}[${position}]`);
+              member(hole, 'path', `${list}[${position}]`, text(), true);
+              member(hole, 'value', `${list}[${position}]`, () => {}, true);
+            });
+          }, true);
+        });
+      }, true);
+    });
   }
   const authoring = machineObject(work.authoring);
   if (authoring) {

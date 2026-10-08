@@ -47,6 +47,15 @@ function work(extra: Record<string, unknown> = {}): Record<string, any> {
 }
 const opened = (body: Record<string, any>) => ({ contract: CONTRACT, session: SESSION, frame: 'opened', event: 1,
   snapshot: { snapshot: `snp_${'0'.repeat(32)}`, seq: 1, busy: null, work: body }, notices: [] });
+/** A revised candidate's compact revision, in the shape `nika-session-change` `work.rs` serializes. */
+const revision = () => ({
+  mode: 'operations', base_sha256: 'c'.repeat(64), candidate_sha256: 'd'.repeat(64), changed: ['const.max_age_hours'],
+  preservation: 'by construction: each component\'s entries inserted or rebound in place; not re-verified byte by byte',
+  components: [{ id: 'block:stale-filter-report', version: 'fixture-document-r1', release: '2'.repeat(64),
+    file_sha256: null, bindings: [{ path: 'const.max_age_hours', value: 72 }, { path: 'const.records_path',
+      value: './in/tickets.json' }], witness: 'expanded', future_use_member: 'kept' }],
+  future_revision_member: { additive: true },
+});
 
 function refusal(body: Record<string, any>): NikaProtocolError {
   try {
@@ -84,6 +93,20 @@ describe('Session work members', () => {
     expect(intelligence.decision).toEqual({ model: 'typesafe/jev', refusal: null });
     expect(intelligence.effort).toBe('max');
     expect(intelligence.future_intelligence_member).toEqual({ additive: true });
+  });
+
+  it('types a revised candidate\'s compact revision, bound to its bytes', () => {
+    const body = work();
+    body.candidate.revision = revision();
+    const typed = (sessionFrame(opened(body), 'http').snapshot as { work: NikaSessionWork }).work;
+    const revised = typed.candidate!.revision!;
+    expect(revised).toMatchObject({ mode: 'operations', base_sha256: 'c'.repeat(64), changed: ['const.max_age_hours'] });
+    const [use] = revised.components;
+    expect(use!.bindings[0]).toEqual({ path: 'const.max_age_hours', value: 72 });
+    expect(use!.witness).toBe('expanded');
+    expect(use!.future_use_member).toBe('kept');
+    expect(revised.future_revision_member).toEqual({ additive: true });
+    expect(work().candidate.revision).toBeNull();
   });
 
   it('keeps explicit null apart from absence', () => {
@@ -154,6 +177,29 @@ describe('Session work members', () => {
     ['a decision seat without its model', (b) => { delete b.intelligence.decision.model; },
       /work\.intelligence\.decision\.model is absent/],
     ['an effort as a number', (b) => { b.intelligence.effort = 3; }, /work\.intelligence\.effort is neither text nor null/],
+    ['a revision as text', (b) => { b.candidate.revision = 'operations'; },
+      /work\.candidate\.revision is not an object/],
+    ['a revision without its candidate digest', (b) => { b.candidate.revision = revision();
+      delete b.candidate.revision.candidate_sha256; }, /work\.candidate\.revision\.candidate_sha256 is absent/],
+    ['a revision base that is not hex', (b) => { b.candidate.revision = { ...revision(), base_sha256: SECRET }; },
+      /work\.candidate\.revision\.base_sha256 is neither a witness nor null/],
+    ['a revision without its base member', (b) => { b.candidate.revision = revision();
+      delete b.candidate.revision.base_sha256; }, /work\.candidate\.revision\.base_sha256 is absent/],
+    ['changes with a number', (b) => { b.candidate.revision = { ...revision(), changed: ['const.x', 2] }; },
+      /work\.candidate\.revision\.changed is not a list of text/],
+    ['components as an object', (b) => { b.candidate.revision = { ...revision(), components: {} }; },
+      /work\.candidate\.revision\.components is not a list/],
+    ['a component without its id', (b) => { b.candidate.revision = revision();
+      delete b.candidate.revision.components[0].id; }, /work\.candidate\.revision\.components\[0\]\.id is absent/],
+    ['a component witness as a number', (b) => { b.candidate.revision = revision();
+      b.candidate.revision.components[0].witness = 1; },
+    /work\.candidate\.revision\.components\[0\]\.witness is not text/],
+    ['a binding without its value', (b) => { b.candidate.revision = revision();
+      delete b.candidate.revision.components[0].bindings[0].value; },
+    /work\.candidate\.revision\.components\[0\]\.bindings\[0\]\.value is absent/],
+    ['a component file digest that is not hex', (b) => { b.candidate.revision = revision();
+      b.candidate.revision.components[0].file_sha256 = 'file'; },
+    /work\.candidate\.revision\.components\[0\]\.file_sha256 is neither a witness nor null/],
   ];
   it.each(malformed)('refuses %s as a protocol fault naming its path, never its value', (_name, mutate, message) => {
     const body = work();

@@ -58,6 +58,7 @@ interface needs to show and verify without reading anything else:
 | Member | Type | What it states |
 |---|---|---|
 | `candidate.files[].content` | `string` | the exact bytes a consent lands; `bytes` stays their BLAKE3 witness (not a sha256) |
+| `candidate.revision` | `NikaSessionDocumentRevision \| null` | how the candidate revised its complete document, bound to its bytes: `mode`, `base_sha256` and `candidate_sha256` (sha256), `changed` in order, `preservation`, and each component's identity, bindings and `witness`; a compact projection of the compile's record |
 | `authoring.draft` | `string \| null` | the compiler's candidate bytes, proposed or not: what to show while a question waits; showing it consents to nothing |
 | `authoring.calls` | `NikaSessionAuthoringCalls \| null` | the compiler's receipt of its authoring calls: the model they asked for (`requested_model`, never what served them), how many, the reported usage (`null` when unknown, never `0`) and the `backend` as its transport named it; `null` when the compile made no call |
 | `intelligence` | `NikaSessionIntelligence` | configured facts: the person's `selected` intelligence as the engine's machine resolved it, the `author` seat, the `decision` seat selected and the `effort`; a selection is never the model that served a call |

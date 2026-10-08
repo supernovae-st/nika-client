@@ -44,9 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`NikaSessionAuthoringCalls`: requested model, calls, reported usage with
   unknown kept `null`, the backend as reported) and the configured
   `intelligence` (`NikaSessionIntelligence`: selection, author seat, decision
-  seat, effort). Both doors check these members where they are; a malformed
-  one is a `NikaProtocolError` naming its path, and absent members, explicit
-  `null` and unknown members ride through.
+  seat, effort), as well as the candidate's compact `revision`
+  (`NikaSessionDocumentRevision`: digests, ordered changes, components with
+  their bindings and witness). Both doors check these members where they are;
+  a malformed one is a `NikaProtocolError` naming its path, and absent members,
+  explicit `null` and unknown members ride through.
 - `scripts/run-session-parity-e2e.mjs` walks the authoring Session through
   both real doors of one frozen binary (`nika session --json` and a served
   project's `/v1/sessions`) from the packed CommonJS and ESM faces, keyless on

@@ -1957,6 +1957,46 @@ export interface NikaSessionAuthor {
 /** The candidate under review (`work.candidate`): the exact changes a consent lands. */
 export interface NikaSessionCandidate {
   files: NikaSessionCandidateFile[];
+  /**
+   * How the workflow it lands was revised over its complete document, bound
+   * to these exact bytes (never an earlier candidate's); `null` when it was
+   * not a revision. A compact projection: the compile's own record is fuller.
+   */
+  revision?: NikaSessionDocumentRevision | null;
+  [key: string]: unknown;
+}
+
+/** The revision a Session candidate carries (`work.candidate.revision`). */
+export interface NikaSessionDocumentRevision {
+  /** `operations` (literal edits and component merges) or `replaced` (the whole source). */
+  mode: 'operations' | 'replaced' | (string & {});
+  /** sha256 (lowercase hex) of the bytes revised; `null` when none was named. */
+  base_sha256: string | null;
+  /** sha256 (lowercase hex) of the candidate's bytes, the ones the record binds. */
+  candidate_sha256: string;
+  /** The node paths and components the operations changed, in order. */
+  changed: string[];
+  /** The preservation claimed, in words. */
+  preservation?: string;
+  /** The admitted components the bytes hold. */
+  components: NikaSessionComponentUse[];
+  [key: string]: unknown;
+}
+
+/** One admitted component a revised candidate holds. */
+export interface NikaSessionComponentUse {
+  /** `block:<name>`. */
+  id: string;
+  /** The release version it resolved in. */
+  version?: string | null;
+  /** The release snapshot it resolved in. */
+  release?: string | null;
+  /** sha256 of the admitted bytes it was expanded from. */
+  file_sha256?: string | null;
+  /** Each hole bound, with its literal (any JSON value). */
+  bindings: { path: string; value: unknown; [key: string]: unknown }[];
+  /** What the bytes show of it now: `expanded`, `revised`, `absent` or `unwitnessed`. */
+  witness: string;
   [key: string]: unknown;
 }
 

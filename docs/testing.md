@@ -228,11 +228,21 @@ own seat (a native seat may be an ACP harness such as `claude-code/…` or
 a decision model beside both doors' authors (a local revision takes it from
 engine `ae6845939` on), and `NIKA_COMPILE_PROVIDER_ENV` takes several variable names,
 comma-separated (`HOME` included when a harness must find its own login).
-`NIKA_COMPILE_SERVE_FLAGS` gives the seated resident the operator's grants in
-its own flag words (`--authoring-max-calls`, `--authoring-repairs`,
-`--authoring-deadline`, `--authoring-timeout`, space-separated); absent, it
-runs with its defaults (one call per authoring round). The report names
-which.
+`NIKA_COMPILE_SERVE_FLAGS` gives the seated resident operator flags in its own
+words (`--authoring-max-calls`, `--authoring-repairs`, `--authoring-deadline`,
+`--authoring-timeout`, space-separated); absent, the resident's own defaults
+hold, and the report names which. Read those defaults in the engine's code,
+not its help: at engine `563ab54e9` an unset grant imposes no request, repair
+or round limit (only the route's transport capacities), although the help
+names defaults of one call, three repairs and 300 seconds; an explicit flag
+sets a limit the engine would not otherwise impose.
+
+The provider phase is watched within `NIKA_COMPILE_PROVIDER_WAIT_MS` per module
+system (six hours unless set): a bound of the harness's observation, recorded
+in the report, never a limit on the authoring. Each finished leg is kept as it
+lands; when the window passes, the legs that landed are reported with the bound
+(`not_exercised`, never failed) and no further generation is asked. The
+deterministic resident is stopped before the provider phase starts.
 
 Each packed module system then runs two separate legs once per door, through a
 native seat and a seated resident. The EDIT leg revises one rich base
@@ -352,7 +362,13 @@ Run cost review, a Run's declared input only from the same answers (keyed by
 the input's name), and the consent to the proposal a leg reached; anything
 else stops the leg as `not_exercised` with what the Session waits on, without
 waiting out the polling deadline, and keeps the compiler's own draft (shown,
-never offered, such as a candidate a judge held) with its sha256. Each leg is judged by its own evidence: a
+never offered, such as a candidate a judge held) with its sha256. The
+journey's own bounds are bounds of its observation, never product limits,
+and never a verdict: it answers at most 24 lines per leg, waits for one turn
+and watches one Run within `NIKA_SESSION_JOURNEY_WAIT_MS` (30 minutes unless
+set). Past one, the leg ends `not_exercised` with that bound named and what
+the Session showed then (a cut wait never stops the turn); a genuine fault
+still fails the journey. Each leg is judged by its own evidence: a
 model authored the proposal (the call receipt and the author seat, never the
 selection alone), the Save landed exactly the proposed `content` and ran
 nothing, the EDIT proposal revises the created bytes into the saved workflow

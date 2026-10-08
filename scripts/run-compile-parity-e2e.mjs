@@ -166,13 +166,19 @@ try {
       [path.join(consumer, `consumer.${moduleSystem === 'esm' ? 'mjs' : 'cjs'}`), config], consumer)));
   }
   assert.deepEqual(snapshot(stateRoot), stateBefore, 'compile must not create or mutate resident job state');
+  // The deterministic resident's part is done: it never outlives its phase into the provider's.
+  await stopResident(server);
+  server = undefined;
   const provider = await providerPhase();
   assert.equal(await sha256(binary), binarySha, 'frozen binary changed during parity');
   // A provider phase whose rounds stated no revision, or whose creations settled no record,
   // did not exercise what it targets: the report keeps every row, and the result withholds
   // the qualification.
-  const exercised = !provider.ran || provider.results.every(({ rows, created }) =>
-    [...rows, ...created].every((row) => row.exercised));
+  // A module system the harness stopped watching, or one never reached after it, exercised less
+  // than the phase targets: never green.
+  const exercised = !provider.ran || (provider.results.length === 2 && provider.results.every(
+    ({ rows, created, harness_bound: bound }) => bound === undefined
+      && [...rows, ...created].every((row) => row.exercised)));
   report = { result: exercised ? 'green' : 'not_exercised',
     scope: 'compile foundation; no general authoring or execution grant',
     engine: { version, binary_sha256: binarySha, identity, health },
@@ -203,6 +209,11 @@ try {
     // The operator's grants for the seated resident (its call ceiling per authoring round, repairs,
     // deadlines), in its own flag words; absent, the resident's defaults. Recorded in the report.
     const serveFlags = (process.env.NIKA_COMPILE_SERVE_FLAGS ?? '').split(/\s+/).filter(Boolean);
+    // How long the harness watches one module system's rounds (six hours unless set): a bound of
+    // its own observation, recorded in the report, never a limit on the authoring itself.
+    const providerWaitMs = Number(process.env.NIKA_COMPILE_PROVIDER_WAIT_MS ?? 21_600_000);
+    assert(Number.isSafeInteger(providerWaitMs) && providerWaitMs > 0 && providerWaitMs <= 0x7fffffff,
+      'NIKA_COMPILE_PROVIDER_WAIT_MS is a positive number of milliseconds');
     assert(serveFlags.every((flag) => /^(--[a-z][a-z0-9-]*|[A-Za-z0-9._/:-]+)$/.test(flag)),
       'NIKA_COMPILE_SERVE_FLAGS holds the resident\'s own flags and values, space-separated');
     // Its own project: a native provider round records its plan under .nika/compile/ there.
@@ -240,12 +251,29 @@ try {
     const rows = [];
     for (const moduleSystem of ['cjs', 'esm']) {
       const config = path.join(consumer, 'evidence.json');
+      const progress = path.join(consumer, `evidence-${moduleSystem}.jsonl`);
+      writeFileSync(progress, '');
       writeFileSync(config, JSON.stringify({ bin: binary, project: seatedProject, url: seatedUrl, token, moduleSystem,
         model: seats.native, decisionModel: seats.decision, base: REVISION_BASE, change: REVISION_CHANGE,
-        originalIntent: REVISION_INTENT, keptLines: REVISION_KEPT, createIntent: CREATE_INTENT, legs: PROVIDER_LEGS }));
-      const result = JSON.parse(await owned.run(process.execPath,
-        [path.join(consumer, `evidence-consumer.${moduleSystem === 'esm' ? 'mjs' : 'cjs'}`), config],
-        { cwd: consumer, env: seatedEnv, timeoutMs: 1_800_000, maxBuffer: 16 * 1024 * 1024 }));
+        originalIntent: REVISION_INTENT, keptLines: REVISION_KEPT, createIntent: CREATE_INTENT, legs: PROVIDER_LEGS,
+        progress }));
+      let result;
+      try {
+        result = JSON.parse(await owned.run(process.execPath,
+          [path.join(consumer, `evidence-consumer.${moduleSystem === 'esm' ? 'mjs' : 'cjs'}`), config],
+          { cwd: consumer, env: seatedEnv, timeoutMs: providerWaitMs, maxBuffer: 16 * 1024 * 1024 }));
+      } catch (error) {
+        if (!/timed out after \d+ms$/.test(String(error?.message))) throw error;
+        // The harness stopped watching (its window, never a product limit): the legs that landed
+        // are kept, the rest is withheld, and no further generation is asked.
+        const landed = readFileSync(progress, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line));
+        rows.push({ module_system: moduleSystem, rows: landed.filter((entry) => entry.leg === 'edit')
+          .map((entry) => entry.row), created: landed.filter((entry) => entry.leg === 'create').map((entry) => entry.row),
+        harness_bound: { bound: 'provider_wait', limit_ms: providerWaitMs,
+          why: `the harness stopped watching ${moduleSystem} after ${providerWaitMs} ms: an observation bound of this `
+            + 'harness, never a product limit' } });
+        break;
+      }
       for (const row of result.rows) {
         // Operations claim every byte outside their spans: the base's comments and Unicode survive.
         if (row.revision?.mode === 'operations') {
@@ -259,6 +287,7 @@ try {
     seated = undefined;
     return { ran: true, model, seats, key_env: keyNames, legs: PROVIDER_LEGS,
       serve_flags: serveFlags.length > 0 ? serveFlags : 'the resident\'s defaults',
+      observation_ms: providerWaitMs,
       base_sha256: createHash('sha256').update(REVISION_BASE).digest('hex'),
       change: REVISION_CHANGE, original_intent: REVISION_INTENT,
       create_intent: CREATE_INTENT, create_intent_sha256: createHash('sha256').update(CREATE_INTENT).digest('hex'),
@@ -272,7 +301,7 @@ try {
 } finally {
   try {
     if (seated) await stopResident(seated);
-    await stopResident(server);
+    if (server) await stopResident(server);
   } finally { await owned.close(); }
   rmSync(scratch, { recursive: true, force: true });
   for (const [signal, handler] of handlers) process.off(signal, handler);
@@ -280,7 +309,9 @@ try {
 abort.signal.throwIfAborted();
 if (reportPath) writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
 if (report.result !== 'green') {
-  console.error('compile parity held back: a provider round stated no revision, or a creation settled no record, so '
+  const bounded = report.provider?.results?.find((entry) => entry.harness_bound)?.harness_bound;
+  console.error(bounded ? `compile parity held back: ${bounded.why} (the legs that landed are in the report)`
+    : 'compile parity held back: a provider round stated no revision, or a creation settled no record, so '
     + 'the evidence it targets was not exercised (see the report rows)');
   process.exitCode = 1;
 } else {

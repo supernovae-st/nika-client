@@ -15,8 +15,22 @@ const { frameRow, landedExactly } = require('./session-scenario.cjs');
 // judged by its own evidence and the project world's postconditions, never
 // compared byte for byte with another door's or another run's.
 
+// The harness's own observation window, never a product limit: how long it waits for one turn
+// and watches one Run before it reports what it last saw (`config.waitMs` sets another).
 const WAIT_MS = 1_800_000;
+// The persona's own bound on the lines it answers in one leg, never the Session's.
+const PERSONA_TURNS = 24;
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
+const OBSERVATION = 'an observation bound of this harness, never a product limit';
+
+/** A harness observation bound reached: what the Session showed then is kept, nothing is claimed. */
+class HarnessBound extends Error {
+  constructor(record) {
+    super(record.why);
+    this.name = 'HarnessBound';
+    this.record = record;
+  }
+}
 
 module.exports = async function sessionJourney(sdk, config) {
   const steps = [];
@@ -34,7 +48,8 @@ module.exports = async function sessionJourney(sdk, config) {
 };
 
 async function journey(sdk, config, steps, open) {
-  const signal = () => AbortSignal.timeout(WAIT_MS);
+  const waitMs = Number.isSafeInteger(config.waitMs) && config.waitMs > 0 ? config.waitMs : WAIT_MS;
+  const signal = () => AbortSignal.timeout(waitMs);
   const client = config.door === 'native'
     ? new sdk.Nika({ bin: config.bin, cwd: config.project })
     : new sdk.Nika({ url: config.url, token: config.token, allowInsecureHttp: true,
@@ -55,11 +70,39 @@ async function journey(sdk, config, steps, open) {
     open.splice(open.indexOf(handle), 1);
     return handle.close({ signal: signal() });
   };
+  /**
+   * One line, waited for within the harness's window. A cut wait never stops the turn: the leg
+   * ends on that observation bound, keeping what the Session shows now.
+   */
+  const send = async (session, snapshot, line, command) => {
+    try {
+      return await session.submit(snapshot, line, { command, signal: signal() });
+    } catch (error) {
+      if (error?.name !== 'NikaSessionWaitError') throw error;
+      const now = await session.snapshot({ signal: AbortSignal.timeout(60_000) }).catch(() => null);
+      const draft = now?.work?.authoring?.draft ?? null;
+      throw new HarnessBound({ bound: 'turn_wait', limit_ms: waitMs, command,
+        why: `the harness stopped waiting for ${command} after ${waitMs} ms: ${OBSERVATION}`,
+        busy: now?.busy ?? null, waiting: now?.work?.waiting ?? null, evidence: now ? evidence(now.work) : null,
+        draft, draft_sha256: typeof draft === 'string' ? sha256(Buffer.from(draft, 'utf8')) : null });
+    }
+  };
+
+  /** One leg, or the observation bound it ended on (kept as `<leg>_harness_bound`). */
+  async function leg(name, session, words) {
+    try {
+      return await walk(name, session, words);
+    } catch (error) {
+      if (!(error instanceof HarnessBound)) throw error;
+      record(`${name}_harness_bound`, error.record);
+      return null;
+    }
+  }
 
   /** One leg: words to a proposal, the consent, the requested Run and the report it wrote. */
-  async function leg(name, session, words) {
-    const reached = await advance(session, session.opened.snapshot, words, persona, signal, (turn) =>
-      record(`${name}_turn`, turn));
+  async function walk(name, session, words) {
+    const reached = await advance((snapshot, line, command) => send(session, snapshot, line, command),
+      session.opened.snapshot, words, persona, (turn) => record(`${name}_turn`, turn));
     record(`${name}_reached`, reached.summary);
     if (reached.waiting !== 'consent') return null;
     const shown = reached.snapshot;
@@ -70,7 +113,7 @@ async function journey(sdk, config, steps, open) {
       return bytes === null ? null : sha256(bytes);
     };
     const reportBefore = reportSha();
-    const consent = await session.submit(shown, 'yes', { command: `${name}-save`, signal: signal() });
+    const consent = await send(session, shown, 'yes', `${name}-save`);
     const saved = consent.snapshot.work.saved;
     const landed = saved?.workflow === undefined ? null : read(saved.workflow);
     const previewed = files.find((file) => file.path === saved?.workflow);
@@ -83,7 +126,7 @@ async function journey(sdk, config, steps, open) {
       saved_sha256: savedSha, saved_base64: landed === null ? null : landed.toString('base64'),
       save_ran_nothing: ranNothing, check });
     const runStartedAt = Date.now();
-    let run = await session.submit(consent.snapshot, 'run it', { command: `${name}-run`, signal: signal() });
+    let run = await send(session, consent.snapshot, 'run it', `${name}-run`);
     record(`${name}_run`, frameRow(run));
     // What the Run asks before it starts: the resident's cost review, which the persona accepts
     // (the Run is the authorized step), and a declared input's value, answered only by a persona
@@ -91,13 +134,13 @@ async function journey(sdk, config, steps, open) {
     for (let asked = 0; asked < 8; asked += 1) {
       const waiting = run.snapshot.work.waiting;
       if (waiting.kind === 'run_review') {
-        run = await session.submit(run.snapshot, 'yes', { command: `${name}-run-review-${asked}`, signal: signal() });
+        run = await send(session, run.snapshot, 'yes', `${name}-run-review-${asked}`);
         record(`${name}_run_review`, frameRow(run));
         continue;
       }
       const answer = waiting.kind === 'input' ? answerFor(persona.answers, { key: waiting.name }, run, 'input') : null;
       if (answer === null) break;
-      run = await session.submit(run.snapshot, answer.line, { command: `${name}-run-input-${asked}`, signal: signal() });
+      run = await send(session, run.snapshot, answer.line, `${name}-run-input-${asked}`);
       record(`${name}_run_input`, { ...frameRow(run), input: waiting.name ?? null, said: answer.why });
     }
     let after = run.snapshot;
@@ -108,7 +151,9 @@ async function journey(sdk, config, steps, open) {
     const waitsOnPerson = () => after.busy === null && after.work.waiting.kind !== 'free';
     const unsettled = () => !waitsOnPerson() && (after.busy !== null
       || (after.work.run === null && !said(['run_not_started', 'run_unobserved'])));
-    const until = Date.now() + WAIT_MS;
+    // Watched within the harness's window: past it the leg says what it last saw, a bound of the
+    // observation, never a verdict on the Run.
+    const until = Date.now() + waitMs;
     while (unsettled() && Date.now() < until) {
       await new Promise((resolve) => setTimeout(resolve, 500));
       after = await session.snapshot({ signal: signal() });
@@ -122,7 +167,8 @@ async function journey(sdk, config, steps, open) {
       parsed = { unparsable: true };
     }
     const { kind, name: input = null, key = null } = after.work.waiting;
-    record(`${name}_run_observed`, { deadline: unsettled(), busy: after.busy !== null, run: after.work.run,
+    record(`${name}_run_observed`, { deadline: unsettled(), observation_ms: waitMs, busy: after.busy !== null,
+      run: after.work.run,
       waiting: { kind, name: input, key }, saved: saved?.workflow ?? null, saved_sha256: savedSha, report: parsed,
       report_sha256: report === null ? null : sha256(report), window, snapshot: capture(name) });
     return { shown, savedSha };
@@ -157,16 +203,15 @@ async function journey(sdk, config, steps, open) {
 }
 
 /**
- * Submit `line`, then answer only what the persona was told to, until the Session waits on a
+ * Send `line`, then answer only what the persona was told to, until the Session waits on a
  * consent or settles otherwise. Every turn is reported; nothing is guessed for the person.
  */
-async function advance(session, snapshot, line, persona, signal, report) {
+async function advance(send, snapshot, line, persona, report) {
   let shown = snapshot;
   let next = line;
   let said = 'words';
-  // A harness bound against a door that never settles, not a product quota.
-  for (let turn = 0; turn < 24; turn += 1) {
-    const result = await session.submit(shown, next, { command: `${said}-${turn}`, signal: signal() });
+  for (let turn = 0; turn < PERSONA_TURNS; turn += 1) {
+    const result = await send(shown, next, `${said}-${turn}`);
     shown = result.snapshot;
     const waiting = shown.work.waiting;
     report({ turn, said, ...frameRow(result), evidence: evidence(shown.work) });
@@ -187,7 +232,14 @@ async function advance(session, snapshot, line, persona, signal, report) {
           draft_sha256: typeof draft === 'string' ? sha256(Buffer.from(draft, 'utf8')) : null } };
     }
   }
-  return { waiting: 'turn_bound', snapshot: shown, summary: { waiting: 'turn_bound', turns: 24 } };
+  // The persona's own bound, never the Session's: what the Session shows now is kept.
+  const draft = shown.work.authoring?.draft ?? null;
+  return { waiting: 'harness_bound', snapshot: shown,
+    summary: { waiting: shown.work.waiting.kind, key: shown.work.waiting.key ?? null, turns: PERSONA_TURNS,
+      harness: { bound: 'persona_turns', limit: PERSONA_TURNS,
+        why: `the persona answered ${PERSONA_TURNS} lines and stopped: ${OBSERVATION}` },
+      evidence: evidence(shown.work), draft,
+      draft_sha256: typeof draft === 'string' ? sha256(Buffer.from(draft, 'utf8')) : null } };
 }
 
 /**
@@ -312,17 +364,28 @@ function judgeJourney(report, expected, requested = null, worldChecks = null) {
 
   // The tickets ids judge the built-in world only; a world module brings its own checks instead.
   for (const [name, ids, base] of [['create', expected?.create ?? [], null], ['edit', expected?.edit ?? [], 'create']]) {
+    const LEG = name.toUpperCase();
+    // A world module states its own postconditions; the built-in world's are the tickets report.
+    const worldName = `the ${LEG} world postconditions hold`;
+    const postconditions = worldChecks ? worldName : `the ${LEG} report holds exactly the expected tickets`;
+    const consentName = `the ${LEG} consent saved exactly the proposed bytes`;
+    const revisionName = 'the EDIT proposal revises the created bytes into the saved workflow';
+    const runChecks = [`the ${LEG} Run of the saved workflow succeeded`, `the ${LEG} Run ran the saved bytes`];
+    // A harness observation bound ends a leg without a verdict on what it did not see.
+    const bound = step(`${name}_harness_bound`);
+    const stopped = bound?.why ?? 'an earlier leg stopped first';
+    const withhold = (names, why, observed) => names.forEach((entry) => gap(entry, why, observed));
     const reached = step(`${name}_reached`);
     if (reached === undefined) {
-      gap(`the ${name.toUpperCase()} leg reached a proposal`, 'an earlier leg stopped first', null);
+      gap(`the ${LEG} leg reached a proposal`, stopped, bound ?? null);
       continue;
     }
     if (reached.waiting !== 'consent') {
-      gap(`the ${name.toUpperCase()} leg reached a proposal`,
-        `the Session waits on ${reached.waiting}${reached.key ? ` (${reached.key})` : ''}`, reached);
+      const waits = `the Session waits on ${reached.waiting}${reached.key ? ` (${reached.key})` : ''}`;
+      gap(`the ${LEG} leg reached a proposal`, reached.harness ? `${reached.harness.why}; ${waits}` : waits, reached);
       continue;
     }
-    check(`the ${name.toUpperCase()} leg reached a proposal`, true, reached);
+    check(`the ${LEG} leg reached a proposal`, true, reached);
     if (authored(reached.evidence)) {
       check(`a model authored the ${name.toUpperCase()} proposal`, true, reached.evidence);
     } else {
@@ -331,11 +394,15 @@ function judgeJourney(report, expected, requested = null, worldChecks = null) {
         reached.evidence);
     }
     const save = step(`${name}_save`);
+    if (save === undefined) {
+      withhold([consentName, ...(base !== null ? [revisionName] : []), ...runChecks, postconditions], stopped,
+        bound ?? null);
+      continue;
+    }
     if (save.saved_bytes_are_previewed === null) {
-      gap(`the ${name.toUpperCase()} consent saved exactly the proposed bytes`, 'no candidate content projected', save);
+      gap(consentName, 'no candidate content projected', save);
     } else {
-      check(`the ${name.toUpperCase()} consent saved exactly the proposed bytes`,
-        save.saved_bytes_are_previewed === true && save.save_ran_nothing === true, save);
+      check(consentName, save.saved_bytes_are_previewed === true && save.save_ran_nothing === true, save);
     }
     if (base !== null) {
       // The revision binds the document the consent saved and the Run ran: its base is the created
@@ -345,7 +412,7 @@ function judgeJourney(report, expected, requested = null, worldChecks = null) {
       const revision = reached.evidence?.revision ?? null;
       const savedPath = save.saved ?? null;
       const proposed = (reached.evidence?.files ?? []).find((file) => file.path === savedPath);
-      check('the EDIT proposal revises the created bytes into the saved workflow', revision !== null
+      check(revisionName, revision !== null
         && created !== null && revision.base_sha256 === created
         && typeof save.saved_sha256 === 'string' && revision.candidate_sha256 === save.saved_sha256
         && proposed !== undefined && proposed.content_sha256 === revision.candidate_sha256,
@@ -355,11 +422,16 @@ function judgeJourney(report, expected, requested = null, worldChecks = null) {
     const unobserved = runs.flatMap((entry) => entry.outcomes)
       .filter((kind) => kind === 'run_not_started' || kind === 'run_unobserved');
     const observed = step(`${name}_run_observed`);
-    const LEG = name.toUpperCase();
-    // A world module states its own postconditions; the built-in world's are the tickets report.
-    const worldName = `the ${LEG} world postconditions hold`;
-    const postconditions = worldChecks ? worldName : `the ${LEG} report holds exactly the expected tickets`;
-    const runChecks = [`the ${LEG} Run of the saved workflow succeeded`, `the ${LEG} Run ran the saved bytes`];
+    if (observed === undefined) {
+      withhold([...runChecks, postconditions], stopped, bound ?? null);
+      continue;
+    }
+    if (observed.deadline === true) {
+      // The harness stopped watching while the Run was still unsettled: what it last saw is kept.
+      withhold([...runChecks, postconditions], `the harness stopped watching the Run after ${observed.observation_ms
+        ?? 'its window in'} ms: ${OBSERVATION}`, observed);
+      continue;
+    }
     const waiting = observed.waiting ?? { kind: 'free' };
     if (unobserved.length > 0 || (observed.run === null && waiting.kind !== 'free')) {
       // The engine's own word (no Run started, or its end unobserved), or a Run waiting on what
@@ -372,7 +444,7 @@ function judgeJourney(report, expected, requested = null, worldChecks = null) {
       continue;
     }
     const ran = observed.run;
-    check(runChecks[0], observed.deadline === false && observed.busy === false && ran?.current === true
+    check(runChecks[0], observed.busy === false && ran?.current === true
       && path.posix.normalize(String(ran.workflow)) === path.posix.normalize(String(observed.saved))
       && ran.end?.end === 'succeeded', observed);
     // The bytes a Run ran are proven only by the source hash the Session names for it; a Session

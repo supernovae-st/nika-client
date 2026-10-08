@@ -1,5 +1,8 @@
 import { createHash } from 'node:crypto';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { isNikaCompileHeld } from '../src/index.js';
 
@@ -128,5 +131,37 @@ describe('provider creation law', () => {
     const row = creationRow(sdk, 'http', outcome('incomplete', { decision: { document_create: {
       ...made, candidate_sha256: null } } }), created, 1);
     expect(row).toMatchObject({ exercised: false, made: { candidate_sha256: null, names_the_candidate_received: false } });
+  });
+});
+
+describe('provider legs kept as they land', () => {
+  it('appends each finished leg to the progress file, in the order the doors ran', async () => {
+    const compileEvidence = require('../scripts/packed-consumers/compile-evidence.cjs') as (sdk: unknown,
+      config: Record<string, unknown>) => Promise<{ rows: unknown[]; created: unknown[] }>;
+    const dir = mkdtempSync(path.join(tmpdir(), 'nika-sdk-evidence-progress-'));
+    try {
+      const progress = path.join(dir, 'progress.jsonl');
+      writeFileSync(progress, '');
+      const asked: string[] = [];
+      const fake = { isNikaCompileHeld, Nika: class {
+        readonly door: string;
+        constructor(options: { url?: string }) { this.door = options.url ? 'http' : 'native'; }
+        async compile(input: { intent?: string }) {
+          asked.push(`${this.door} ${input.intent ? 'create' : 'edit'}`);
+          return outcome('incomplete', { decision: {} }, true);
+        }
+      } };
+      const result = await compileEvidence(fake, { ...config, bin: '/x', project: dir, url: 'http://127.0.0.1:1',
+        token: 't', moduleSystem: 'cjs', model: 'm/n', change: 'Set const.window_hours to 72',
+        originalIntent: 'i', createIntent: 'Create it', legs: ['edit', 'create'], progress });
+      const kept = readFileSync(progress, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+      expect(asked).toEqual(['native edit', 'native create', 'http edit', 'http create']);
+      expect(kept.map((entry) => [entry.leg, entry.row.door])).toEqual([['edit', 'native'], ['create', 'native'],
+        ['edit', 'http'], ['create', 'http']]);
+      expect(kept.filter((entry) => entry.leg === 'edit').map((entry) => entry.row)).toEqual(result.rows);
+      expect(kept.filter((entry) => entry.leg === 'create').map((entry) => entry.row)).toEqual(result.created);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

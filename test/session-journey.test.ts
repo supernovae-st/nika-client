@@ -155,10 +155,35 @@ describe('a real-intelligence journey is judged leg by leg', () => {
       /EDIT consent/)).toEqual(['failed']);
   });
 
-  it('fails a journey that stopped, keeping its partial transcript', () => {
-    const judged = judgeJourney({ ...journey(), error: { name: 'NikaSessionWaitError', message: 'cut' } }, EXPECTED);
+  it('fails a journey a genuine fault stopped, keeping its partial transcript', () => {
+    const judged = judgeJourney({ ...journey(), error: { name: 'NikaProtocolError', message: 'malformed frame' } },
+      EXPECTED);
     expect(judged).toEqual({ verdict: 'failed', checks: [{ name: 'the journey completed', verdict: 'failed',
-      observed: { name: 'NikaSessionWaitError', message: 'cut' } }] });
+      observed: { name: 'NikaProtocolError', message: 'malformed frame' } }] });
+  });
+
+  it('reports a Run the harness stopped watching as its observation bound, never a failed Run', () => {
+    const judged = judgeJourney(edit(journey(), 'create_run_observed', { deadline: true, observation_ms: 5000,
+      busy: true, run: null }), EXPECTED);
+    expect(verdictOf(judged, /CREATE Run|CREATE report/)).toEqual(['not_exercised', 'not_exercised', 'not_exercised']);
+    expect(judged.checks.find((entry) => entry.name === 'the CREATE Run of the saved workflow succeeded')!.why)
+      .toBe('the harness stopped watching the Run after 5000 ms: an observation bound of this harness, never a '
+        + 'product limit');
+    expect(judged.verdict).toBe('not_exercised');
+  });
+
+  it('withholds what a leg did not reach after the harness stopped waiting, never failing it', () => {
+    const steps = journey().steps.filter((entry) => !/^create_(run|save)|^edit_/.test(entry.step));
+    const why = 'the harness stopped waiting for create-save after 5000 ms: an observation bound of this harness, '
+      + 'never a product limit';
+    const judged = judgeJourney({ ...journey(), steps: [...steps, { step: 'create_harness_bound', bound: 'turn_wait',
+      limit_ms: 5000, command: 'create-save', why, busy: { command: 'create-save', phase: 'running' } }] }, EXPECTED);
+    expect(verdictOf(judged, /CREATE leg reached/)).toEqual(['passed']);
+    expect(judged.checks.filter((entry) => /CREATE (consent|Run|report)/.test(entry.name))
+      .map((entry) => [entry.verdict, entry.why])).toEqual([['not_exercised', why], ['not_exercised', why],
+      ['not_exercised', why], ['not_exercised', why]]);
+    expect(verdictOf(judged, /EDIT leg reached/)).toEqual(['not_exercised']);
+    expect(judged.verdict).toBe('not_exercised');
   });
 });
 
@@ -269,44 +294,62 @@ describe('the persona answers only what it was told to', () => {
     };
     return { session, sent };
   }
-  const signal = () => AbortSignal.timeout(1000);
+  // The leg's own sender: one line, one command identity.
+  const via = (session: { submit: (shown: unknown, line: string, options?: unknown) => Promise<unknown> }) =>
+    (shown: unknown, line: string, command: string) => session.submit(shown, line, { command });
 
   it('answers the first screen with its choice, then stops at the consent', async () => {
     const { session, sent } = scripted([['intelligence_choice'], ['consent', { proposal: 'p' }]]);
-    const reached = await advance(session, snapshot('free'), 'Create it',
-      { choice: '2 deepseek/deepseek-v4-flash', acceptCost: false, answers: {} }, signal, () => {});
+    const reached = await advance(via(session), snapshot('free'), 'Create it',
+      { choice: '2 deepseek/deepseek-v4-flash', acceptCost: false, answers: {} }, () => {});
     expect(sent).toEqual(['Create it', '2 deepseek/deepseek-v4-flash']);
     expect(reached.waiting).toBe('consent');
   });
 
   it('stops at a cost choice it was not authorized to accept, and accepts one it was', async () => {
     const refused = scripted([['cost_choice'], ['consent']]);
-    const stopped = await advance(refused.session, snapshot('free'), 'Create it',
-      { choice: '1', acceptCost: false, answers: {} }, signal, () => {});
+    const stopped = await advance(via(refused.session), snapshot('free'), 'Create it',
+      { choice: '1', acceptCost: false, answers: {} }, () => {});
     expect([refused.sent, stopped.waiting]).toEqual([['Create it'], 'cost_choice']);
     const allowed = scripted([['cost_choice'], ['consent']]);
-    const accepted = await advance(allowed.session, snapshot('free'), 'Create it',
-      { choice: '1', acceptCost: true, answers: {} }, signal, () => {});
+    const accepted = await advance(via(allowed.session), snapshot('free'), 'Create it',
+      { choice: '1', acceptCost: true, answers: {} }, () => {});
     expect([allowed.sent, accepted.waiting]).toEqual([['Create it', 'yes'], 'consent']);
   });
 
   it('answers a question only from its table, and stops on any other', async () => {
     const known = scripted([['question', { key: 'const.webhook_endpoint' }], ['consent']]);
-    await advance(known.session, snapshot('free'), 'Create it',
-      { choice: '1', acceptCost: false, answers: { 'const.webhook_endpoint': 'https://hooks.example/x' } }, signal,
-      () => {});
+    await advance(via(known.session), snapshot('free'), 'Create it',
+      { choice: '1', acceptCost: false, answers: { 'const.webhook_endpoint': 'https://hooks.example/x' } }, () => {});
     expect(known.sent).toEqual(['Create it', 'https://hooks.example/x']);
     const unknown = scripted([['question', { key: 'const.audience' }]]);
-    const stopped = await advance(unknown.session, snapshot('free'), 'Create it',
-      { choice: '1', acceptCost: false, answers: { 'const.webhook_endpoint': 'x' } }, signal, () => {});
+    const stopped = await advance(via(unknown.session), snapshot('free'), 'Create it',
+      { choice: '1', acceptCost: false, answers: { 'const.webhook_endpoint': 'x' } }, () => {});
     expect([unknown.sent, stopped.waiting, stopped.summary.key]).toEqual([['Create it'], 'question', 'const.audience']);
+  });
+
+  it('stops answering after its own turn bound, keeping what the Session shows, never claiming a result', async () => {
+    const asks = Array.from({ length: 30 }, (): [string, Record<string, unknown>] =>
+      ['question', { key: 'const.again' }]);
+    const { session, sent } = scripted(asks);
+    const reached = await advance(via(session), snapshot('free'), 'Create it',
+      { choice: '1', acceptCost: false, answers: { 'const.again': 'once more' } }, () => {});
+    expect(sent).toHaveLength(24);
+    expect(reached.waiting).toBe('harness_bound');
+    expect(reached.summary).toMatchObject({ waiting: 'question', key: 'const.again', turns: 24,
+      harness: { bound: 'persona_turns', limit: 24,
+        why: 'the persona answered 24 lines and stopped: an observation bound of this harness, never a product limit' } });
+    const judged = judgeJourney(edit(journey(), 'create_reached', reached.summary), EXPECTED);
+    expect(judged.checks.find((entry) => entry.name === 'the CREATE leg reached a proposal')).toMatchObject({
+      verdict: 'not_exercised', why: 'the persona answered 24 lines and stopped: an observation bound of this '
+        + 'harness, never a product limit; the Session waits on question (const.again)' });
   });
 
   it('never consents for the person and never answers a gate', async () => {
     for (const kind of ['gate', 'run_review', 'input', 'activation', 'free']) {
       const { session, sent } = scripted([[kind]]);
-      const reached = await advance(session, snapshot('free'), 'Create it',
-        { choice: '1', acceptCost: true, answers: {} }, signal, () => {});
+      const reached = await advance(via(session), snapshot('free'), 'Create it',
+        { choice: '1', acceptCost: true, answers: {} }, () => {});
       expect([sent, reached.waiting]).toEqual([['Create it'], kind]);
     }
   });

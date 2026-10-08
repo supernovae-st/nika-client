@@ -214,6 +214,39 @@ describe('a journey walked over a scripted Session', () => {
       .toMatchObject({ verdict: 'not_exercised' });
   });
 
+  it('ends a leg on a cut wait as the harness bound it is, keeping the Session as it was then', async () => {
+    const { dir, project, check } = world();
+    const sdk = { Nika: class {
+      openSession = async () => {
+        const session = scriptedSession(project, null, []);
+        return { ...session,
+          submit: async (shown: unknown, line: string, options: { command: string }) => {
+            if (line === 'run it') {
+              throw Object.assign(new Error('session: the wait was cut'), { name: 'NikaSessionWaitError',
+                command: options.command });
+            }
+            return session.submit(shown, line);
+          },
+          snapshot: async () => ({ ...(await session.snapshot()), busy: { command: 'create-run', phase: 'running',
+            stop_requested: false } }) };
+      };
+    } };
+    const report = await journey(sdk, { door: 'native', bin: '/x', project, moduleSystem: 'esm', choice: null,
+      answers: {}, create: 'Create the stale report', edit: 'Raise to 72', checkBin: check, waitMs: 4321,
+      snapshots: path.join(dir, 'legs'), capture: ['out'] });
+    expect(report.error).toBeNull();
+    expect(report.steps.find((entry) => entry.step === 'create_harness_bound')).toMatchObject({ bound: 'turn_wait',
+      limit_ms: 4321, command: 'create-run', busy: { command: 'create-run', phase: 'running' },
+      why: 'the harness stopped waiting for create-run after 4321 ms: an observation bound of this harness, never a '
+        + 'product limit' });
+    // The Save was observed before the bound; the Run and what follows were not.
+    const judged = journey.judgeJourney(report, { create: [], edit: [] });
+    expect(judged.checks.find((entry) => /CREATE consent/.test(entry.name))).toMatchObject({ verdict: 'passed' });
+    expect(judged.checks.filter((entry) => /CREATE (Run|report)/.test(entry.name)).map((entry) => entry.verdict))
+      .toEqual(['not_exercised', 'not_exercised', 'not_exercised']);
+    expect(judged.verdict).toBe('not_exercised');
+  });
+
   it('stops at a question no rule answers, never guessing', async () => {
     const { dir, project, check } = world();
     const sent: string[] = [];

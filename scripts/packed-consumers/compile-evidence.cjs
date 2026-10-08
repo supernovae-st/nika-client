@@ -1,6 +1,7 @@
 'use strict';
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
+const { appendFileSync } = require('node:fs');
 const path = require('node:path');
 
 const sha256 = (text) => createHash('sha256').update(text, 'utf8').digest('hex');
@@ -35,15 +36,21 @@ module.exports = async function compileEvidence(sdk, config) {
   const legs = config.legs ?? ['edit', 'create'];
   const rows = [];
   const created = [];
+  // Each finished leg is kept as it lands, so a bound of the harness's observation keeps what
+  // was already seen (the runner reads this file when it stops watching).
+  const kept = (leg, row) => {
+    if (config.progress) appendFileSync(config.progress, `${JSON.stringify({ leg, row })}\n`);
+    return row;
+  };
   for (const door of ['native', 'http']) {
     if (legs.includes('edit')) {
       const { outcome, wallMs } = await round(door,
         { workflow: config.base, change: config.change, original_intent: config.originalIntent });
-      rows.push(evidenceRow(sdk, door, outcome, config, wallMs));
+      rows.push(kept('edit', evidenceRow(sdk, door, outcome, config, wallMs)));
     }
     if (legs.includes('create')) {
       const { outcome, wallMs } = await round(door, { intent: config.createIntent });
-      created.push(creationRow(sdk, door, outcome, config, wallMs));
+      created.push(kept('create', creationRow(sdk, door, outcome, config, wallMs)));
     }
   }
   return { module_system: config.moduleSystem, rows, created };

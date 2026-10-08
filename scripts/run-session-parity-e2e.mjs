@@ -176,6 +176,12 @@ try {
     const edit = process.env.NIKA_SESSION_JOURNEY_EDIT ?? 'Raise the age threshold to 72 hours.';
     const answers = process.env.NIKA_SESSION_JOURNEY_ANSWERS ? JSON.parse(process.env.NIKA_SESSION_JOURNEY_ANSWERS) : {};
     const acceptCost = process.env.NIKA_SESSION_JOURNEY_ACCEPT_COST === '1';
+    // The harness's own window for one turn and one Run (the journey's 30 minutes unless set): a
+    // bound of its observation, reported as such, never a limit on the Session's work.
+    const waitMs = process.env.NIKA_SESSION_JOURNEY_WAIT_MS === undefined ? null
+      : Number(process.env.NIKA_SESSION_JOURNEY_WAIT_MS);
+    assert(waitMs === null || (Number.isSafeInteger(waitMs) && waitMs > 0 && waitMs <= 0x7fffffff),
+      'NIKA_SESSION_JOURNEY_WAIT_MS is a positive number of milliseconds');
     // The tickets the words read, and the report each leg must write: strictly older than 48, then 72 hours.
     const expected = { create: TICKETS.filter((row) => row.age_hours > 48).map((row) => row.id),
       edit: TICKETS.filter((row) => row.age_hours > 72).map((row) => row.id) };
@@ -195,6 +201,7 @@ try {
       doors.push(await journeyWalk(door));
     }
     return { ran: true, choice, key_env: keyNames, seats, accept_cost: acceptCost,
+      observation_ms: waitMs ?? 'the journey default (1800000)',
       world: world === null ? 'built-in tickets' : { module: path.basename(worldFile), sha256: await sha256(worldFile) },
       ...(world === null ? {
         answers: Object.keys(answers),
@@ -250,7 +257,7 @@ try {
         if (served.why !== undefined) return { ...row, exercised: false, why: served.why };
         const config = path.join(base, 'config.json');
         writeFileSync(config, JSON.stringify({ door, bin: binary, project, url: served.url, token, moduleSystem: 'esm',
-          choice: personHome ? null : choice, acceptCost, answers: prepared.answers, create: prepared.create,
+          choice: personHome ? null : choice, acceptCost, waitMs, answers: prepared.answers, create: prepared.create,
           edit: prepared.edit, checkBin: binary, snapshots: path.join(base, 'legs'), capture: prepared.capture }));
         const transcript = JSON.parse(await consume('esm', 'session-journey', config, env));
         // A world judges its own postconditions per leg; the identity checks stay the journey's.

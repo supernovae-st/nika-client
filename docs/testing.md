@@ -437,7 +437,9 @@ receipts show a call answered), `not_exercised` (anything else unproven:
 incomplete receipts, a declared call count other than the receipt held or a
 call with no documented end, prove no cause; a leg whose requested seat went
 unproven is never attributed that seat's hold), or `not_attempted` (an earlier
-leg stopped first). Beside it ride the calls' ends, the timing and
+leg stopped first, or a fault came before its words were accepted, the EDIT
+Session's opening included). A fault the journey charged to a leg rides as its
+`fault`, apart from what the leg proved. Beside it ride the calls' ends, the timing and
 the reuse its proposal witnesses: each component of the revision the Session
 states for the bytes, with the engine's witness (`expanded`, `revised`,
 `absent`, `unwitnessed`), `reused`, the components expanded in the very bytes

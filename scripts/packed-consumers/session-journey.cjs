@@ -216,7 +216,9 @@ async function journey(sdk, config, steps, open) {
   const created = await leg('create', first, config.create);
   await closing(first);
   if (created !== null) {
-    // EDIT: a new Session over the same project world; the change in words.
+    // EDIT: a new Session over the same project world; the change in words. Its opening is EDIT's
+    // own phase: a fault there stops EDIT, never the CREATE already settled.
+    record('edit_opening', {});
     const { handle: second, openMs: secondOpenMs } = await opening();
     record('edit_open', { ...frameRow(second.opened), intelligence: second.opened.snapshot.work.intelligence ?? null,
       created_sha256: created.savedSha, opened_with: opened, open_ms: secondOpenMs });
@@ -605,11 +607,19 @@ function legSummary(report, name, legChecks) {
   const timing = { open_ms: step(`${name}_open`)?.open_ms ?? null,
     submit_to_settled_ms: reached?.timing?.submit_to_settled_ms ?? null, author_ms: reached?.timing?.author_ms ?? null };
   const rows = reached?.evidence?.calls?.per_call;
+  // A fault the journey charged to this leg stays visible here, apart from what the leg proved.
+  const fault = legChecks.find((entry) => entry.name === 'the journey completed') ?? null;
   const summary = (outcome, why) => ({ attempted, outcome, why, calls, timing,
     per_call: Array.isArray(rows) ? rows.map((row) => ({ call: row?.call ?? null, elapsed_ms: row?.elapsed_ms ?? null,
       stop_reason: row?.stop_reason ?? null, failure_kind: row?.failure_kind ?? null })) : null,
-    reuse: reuseOf(report, name) });
-  if (!attempted) return summary('not_attempted', 'an earlier leg stopped first');
+    reuse: reuseOf(report, name), fault: fault?.observed ?? null });
+  if (!attempted) {
+    if (fault === null) return summary('not_attempted', 'an earlier leg stopped first');
+    const opening = step(`${name}_opening`) !== undefined && step(`${name}_open`) === undefined;
+    return summary('not_attempted', opening
+      ? `a fault stopped the journey while the ${name.toUpperCase()} Session opened, before any words were sent`
+      : 'a fault stopped the journey before a submit of this leg\'s words was accepted');
+  }
   const failed = legChecks.find((entry) => entry.verdict === 'failed');
   if (failed !== undefined) return summary('failed', failed.name);
   const unproven = legChecks.find((entry) => entry.verdict === 'not_exercised');

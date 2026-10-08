@@ -510,6 +510,41 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
     expect(reachedCalls(await walked(call('max', 'max', 'max'))).per_call).toBeNull();
   }, WALKS);
 
+  it('charges an EDIT Session that failed to open to EDIT alone, CREATE keeping its own pass', async () => {
+    const { dir, project, check } = world();
+    vi.stubEnv('HOME', path.join(dir, 'home'));
+    let opens = 0;
+    const sdk = { Nika: class {
+      openSession = async () => {
+        opens += 1;
+        if (opens === 2) throw Object.assign(new Error('the EDIT Session did not open'), { name: 'NikaTransportError' });
+        const session = scriptedSession(project, null, [], null, { opened: CLAUDE, prepared: CLAUDE });
+        return { ...session, submit: async (shown: unknown, words: string) => {
+          const settled = await session.submit(shown, words);
+          const work = settled.snapshot.work;
+          work.authoring = { ...(work.authoring ?? {}), calls: { requested_model: 'claude-code/opus[1m]',
+            input_tokens: null, output_tokens: null, elapsed_ms: 1, calls: 1,
+            backend: { kind: 'harness_infer', transport: 'acp', observed: call('max', 'max', 'max') } } };
+          work.intelligence = { ...work.intelligence, effort: 'max' };
+          return settled;
+        } };
+      };
+    } };
+    const report = await journey(sdk, { door: 'native', bin: '/x', project, moduleSystem: 'esm', choice: null,
+      intelligence: WORDS, answers: {}, create: 'Create the stale report', edit: 'Raise to 72', checkBin: check,
+      snapshots: path.join(dir, 'legs'), capture: ['out'] });
+    expect(report.error).toMatchObject({ name: 'NikaTransportError', at: 'edit_opening' });
+    const summarized = journey as unknown as { judgeJourney: (...args: unknown[]) => { verdict: string;
+      legs: Record<string, any> }; journeyDenominators: (doors: unknown[]) => Record<string, any> };
+    const judged = summarized.judgeJourney(report, TICKETS, WORDS, null, 'max');
+    expect([judged.verdict, judged.legs.create.outcome]).toEqual(['failed', 'passed']);
+    expect(judged.legs.edit).toMatchObject({ attempted: false, outcome: 'not_attempted',
+      why: 'a fault stopped the journey while the EDIT Session opened, before any words were sent',
+      fault: { name: 'NikaTransportError', message: 'the EDIT Session did not open', at: 'edit_opening' } });
+    expect(summarized.journeyDenominators([{ door: 'native', exercised: true, ...judged }])).toMatchObject({
+      create: { attempted: 1, passed: 1 }, edit: { attempted: 0 }, full_routes: { passed: 0, of: 1 } });
+  }, WALKS);
+
   it('passes when every authoring call asked, took and read back the requested effort', async () => {
     const judged = journey.judgeJourney(await walked([...call('max', 'max', 'max'), ...call('max', 'max', 'max')]),
       TICKETS, WORDS, null, 'max');

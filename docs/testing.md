@@ -356,12 +356,14 @@ fails the leg, and an opened or reached frame showing none leaves it
 `NIKA_SESSION_DECISION_MODEL` and `NIKA_AUTHORING_REASONING`, when set, seat
 the decision model and the reasoning effort through the engine's own
 environment. When an effort is asked of a seat reached over ACP, the journey
-also requires every authoring call of each leg to have carried it, by the
-engine's own receipts: asked (`requested_effort`), taken by the ACP session
-(`transmitted_effort`) and read back (`configured_effort`), with the Session's
-configured `intelligence.effort` naming it too; another value fails the leg,
-and receipts naming none, or a leg with no returned call, leave it
-`not_exercised`.
+also requires every authoring call of each leg (each turn's compile, not only
+the last) to have carried it, by the engine's own receipts: each call's
+`invoking` record paired by position with its end, the call asked it
+(`requested_effort`), a returned call had it taken by the ACP session
+(`transmitted_effort`) and read back (`configured_effort`), and the Session's
+configured `intelligence.effort` names it. Another value fails the leg; an end
+with no invocation before it, receipts naming none, or a leg with no returned
+call leave it `not_exercised`.
 
 ```sh
 NIKA_SESSION_JOURNEY_CHOICE='2 deepseek/deepseek-v4-flash' NIKA_SESSION_JOURNEY_ENV=DEEPSEEK_API_KEY \

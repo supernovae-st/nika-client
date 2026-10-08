@@ -43,7 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   showing none leaves the leg `not_exercised`, never passed) and in every
   turn that shows a selection, and the operator's kept choice unchanged byte
   for byte; an effort asked of a seat reached over ACP must be carried by
-  every authoring call, asked, taken and read back by the engine's receipts. The observed Run is typed (`NikaSessionRun`,
+  every authoring call of every turn, each invocation paired with its own
+  end, asked, taken and read back by the engine's receipts. The observed Run is typed (`NikaSessionRun`,
   `NikaSessionRunEnd`) and checked in place: every member written, `null`
   where its observation carried none, never filled by the SDK; a Run without
   `workflow_sha256` does not prove which bytes ran. The question a Session

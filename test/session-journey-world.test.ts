@@ -424,29 +424,39 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
   afterEach(() => {
     vi.unstubAllEnvs();
   });
-  /** A scripted Claude ACP Session whose authoring receipts and configured effort are as given. */
-  async function walked(observed: unknown[], configured: unknown = 'max') {
+  /**
+   * A scripted Claude ACP Session: each line's result carries one compile's receipts (`receipts`,
+   * or `receipts(n)` for its n-th line) and the configured effort; with `asked`, the CREATE words
+   * first ask that question, which the persona answers.
+   */
+  async function walked(receipts: unknown[] | ((line: number) => unknown[]), configured: unknown = 'max',
+    asked: string | null = null) {
     const { dir, project, check } = world();
     // The kept choice is read under the journey's HOME: this test's own, holding none.
     vi.stubEnv('HOME', path.join(dir, 'home'));
     const sdk = { Nika: class {
       openSession = async () => {
-        const session = scriptedSession(project, null, [], null, { opened: CLAUDE, prepared: CLAUDE });
-        return { ...session, submit: async (shown: unknown, line: string) => {
-          const settled = await session.submit(shown, line);
+        const session = scriptedSession(project, asked, [], null, { opened: CLAUDE, prepared: CLAUDE });
+        let line = 0;
+        return { ...session, submit: async (shown: unknown, words: string) => {
+          const settled = await session.submit(shown, words);
+          const observed = typeof receipts === 'function' ? receipts(line++) : receipts;
           const work = settled.snapshot.work;
-          if (work.authoring?.calls) work.authoring.calls.backend = { kind: 'harness_infer', transport: 'acp', observed };
+          work.authoring = { ...(work.authoring ?? {}), calls: { requested_model: 'claude-code/opus[1m]', calls: 1,
+            input_tokens: null, output_tokens: null, elapsed_ms: 1,
+            backend: { kind: 'harness_infer', transport: 'acp', observed } } };
           work.intelligence = { ...work.intelligence, effort: configured };
           return settled;
         } };
       };
     } };
     return journey(sdk, { door: 'native', bin: '/x', project, moduleSystem: 'esm', choice: null, intelligence: WORDS,
-      answers: {}, create: 'Create the stale report', edit: 'Raise to 72', checkBin: check,
+      answers: asked ? { [asked]: SINK } : {}, create: 'Create the stale report', edit: 'Raise to 72', checkBin: check,
       snapshots: path.join(dir, 'legs'), capture: ['out'] });
   }
-  const effortChecks = (judged: { checks: { name: string; verdict: string; why?: string }[] }) =>
+  const effortChecks = (judged: { checks: { name: string; verdict: string; why?: string; observed?: any }[] }) =>
     judged.checks.filter((entry) => /carried the requested effort/.test(entry.name));
+  const returnedAlone = { status: 'returned', effort_option: 'effort', transmitted_effort: 'max', configured_effort: 'max' };
 
   it('passes when every authoring call asked, took and read back the requested effort', async () => {
     const judged = journey.judgeJourney(await walked([...call('max', 'max', 'max'), ...call('max', 'max', 'max')]),
@@ -468,9 +478,46 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
   it('never passes receipts that name no effort, nor a leg with no returned call', async () => {
     const unnamed = journey.judgeJourney(await walked(call('max', null, null)), TICKETS, WORDS, null, 'max');
     expect(effortChecks(unnamed)[0]).toMatchObject({ verdict: 'not_exercised',
-      why: 'the receipts name no effort at call 0 transmitted_effort, call 0 configured_effort' });
+      why: 'the receipts name no effort at create_turn 0 call 0 transmitted_effort, create_turn 0 call 0 '
+        + 'configured_effort' });
     const none = journey.judgeJourney(await walked([]), TICKETS, WORDS, null, 'max');
     expect(effortChecks(none)[0]).toMatchObject({ verdict: 'not_exercised', why: 'no authoring call returned on this leg' });
+  });
+
+  // Root review of 3193d70: a returned record with no invocation before it passed, since no
+  // `invoking` record meant no missing `requested_effort`.
+  it('never pairs a returned call with an invocation it does not have', async () => {
+    const alone = journey.judgeJourney(await walked([returnedAlone]), TICKETS, WORDS, null, 'max');
+    expect(effortChecks(alone)[0]).toMatchObject({ verdict: 'not_exercised',
+      why: 'a call ended without its invoking receipt: create_turn 0 returned record with no invocation before it' });
+    const second = journey.judgeJourney(await walked([...call('max', 'max', 'max'), returnedAlone]), TICKETS, WORDS,
+      null, 'max');
+    expect(effortChecks(second).map((entry) => entry.verdict)).toEqual(['not_exercised', 'not_exercised']);
+  });
+
+  it('reads a call that ended without returning by what it asked, and counts only returned calls', async () => {
+    const failed = (asked: string) => [{ status: 'invoking', requested_effort: asked },
+      { status: 'failed', reason: 'transport ended before a complete answer' }];
+    const recovered = journey.judgeJourney(await walked([...failed('max'), ...call('max', 'max', 'max')]), TICKETS,
+      WORDS, null, 'max');
+    expect(effortChecks(recovered).map((entry) => entry.verdict)).toEqual(['passed', 'passed']);
+    const never = journey.judgeJourney(await walked(failed('max')), TICKETS, WORDS, null, 'max');
+    expect(effortChecks(never)[0]).toMatchObject({ verdict: 'not_exercised', why: 'no authoring call returned on this leg' });
+    const other = journey.judgeJourney(await walked([...failed('high'), ...call('max', 'max', 'max')]), TICKETS, WORDS,
+      null, 'max');
+    expect(effortChecks(other)[0]!.observed.other).toEqual([{ at: 'create_turn 0 call 0 requested_effort', value: 'high' }]);
+  });
+
+  // Root review of 3193d70: the reached frame holds its last compile's calls only.
+  it('reads every turn of a leg, so an earlier compile\'s effort cannot hide behind the last one', async () => {
+    // CREATE asks a question first: the compile before the answer read back xhigh, the one after it max.
+    const judged = journey.judgeJourney(await walked((line) => (line === 0 ? call('max', 'max', 'xhigh')
+      : call('max', 'max', 'max')), 'max', 'webhook'), TICKETS, WORDS, null, 'max');
+    const reached = judged.checks.find((entry) => entry.name === 'the CREATE leg reached a proposal');
+    expect(reached).toMatchObject({ verdict: 'passed' });
+    const [create] = effortChecks(judged);
+    expect(create).toMatchObject({ verdict: 'failed' });
+    expect(create!.observed.other).toEqual([{ at: 'create_turn 0 call 0 configured_effort', value: 'xhigh' }]);
   });
 
   it('asks nothing of the effort when none was requested, or of a seat not reached over ACP', async () => {

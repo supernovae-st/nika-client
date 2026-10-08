@@ -387,33 +387,75 @@ function legSelections(report, name, fromTurn, openRequired) {
 }
 
 /**
- * Whether the authoring calls a leg's reached frame receipts carried `effort`: each call asked it
- * (`requested_effort`), the ACP session took it (`transmitted_effort`) and read it back
- * (`configured_effort`), and the Session's own configured effort names it. Another value anywhere
- * fails; no returned call, or a receipt naming no effort, proves nothing.
+ * The frames of one leg that may carry an authoring receipt, in order: each turn (each may hold
+ * its own compile's calls), the frame the leg reached (required: its configured effort must be
+ * named) and the one the harness saw when it stopped waiting.
  */
-function carriedEffort(evidence, effort) {
-  const observed = evidence?.calls?.backend?.observed;
-  const records = Array.isArray(observed) ? observed : [];
-  const returned = records.filter((record) => record?.status === 'returned');
-  const named = [
-    ...records.filter((record) => record?.status === 'invoking')
-      .map((record, index) => ({ at: `call ${index} requested_effort`, value: record.requested_effort })),
-    ...returned.flatMap((record, index) => [{ at: `call ${index} transmitted_effort`, value: record.transmitted_effort },
-      { at: `call ${index} configured_effort`, value: record.configured_effort }]),
-    { at: 'intelligence.effort', value: evidence?.intelligence?.effort },
-  ];
-  const other = named.filter(({ value }) => typeof value === 'string' && value !== effort);
-  const unnamed = named.filter(({ value }) => typeof value !== 'string').map(({ at }) => at);
+function effortFrames(report, name) {
+  const step = (at) => report.steps.find((entry) => entry.step === at);
+  const turns = report.steps.filter((entry) => entry.step === `${name}_turn`)
+    .map((entry, index) => ({ at: `${name}_turn ${entry.turn ?? index}`, evidence: entry.evidence, required: false }));
+  const bound = step(`${name}_harness_bound`);
+  return [...turns, { at: `${name}_reached`, evidence: step(`${name}_reached`)?.evidence, required: true },
+    ...(bound ? [{ at: `${name}_harness_bound`, evidence: bound.evidence, required: false }] : [])];
+}
+
+/**
+ * Whether every authoring call a leg's frames receipt carried `effort`. A frame's receipt is the
+ * harness seat's own sequence for one compile: each call's `invoking` record, then its end
+ * (`returned`, `failed`, `cancelled`, `timed_out`), paired by position, never by an invented id.
+ * Every call must have asked the effort (`requested_effort`), every returned call must have had
+ * it taken (`transmitted_effort`) and read back (`configured_effort`), and the Session's
+ * configured `intelligence.effort` must name it where it is named (always at the reached frame).
+ * Another value anywhere fails; an end with no invocation before it, a receipt naming no effort,
+ * or no returned call proves nothing. A compile's receipt seen on several frames is read once.
+ */
+function carriedEffort(frames, effort) {
+  const other = [];
+  const unnamed = [];
+  const orphans = [];
+  const seen = new Set();
+  let returned = 0;
+  const name = (at, value) => {
+    if (typeof value !== 'string') unnamed.push(at);
+    else if (value !== effort) other.push({ at, value });
+  };
+  for (const { at, evidence, required } of frames) {
+    const configured = evidence?.intelligence?.effort;
+    if (required || typeof configured === 'string') name(`${at} intelligence.effort`, configured);
+    const observed = evidence?.calls?.backend?.observed;
+    if (!Array.isArray(observed) || observed.length === 0 || seen.has(JSON.stringify(observed))) continue;
+    seen.add(JSON.stringify(observed));
+    let call = -1;
+    let open = false;
+    for (const record of observed) {
+      if (record?.status === 'invoking') {
+        [call, open] = [call + 1, true];
+        name(`${at} call ${call} requested_effort`, record.requested_effort);
+      } else if (!open) {
+        orphans.push(`${at} ${record?.status ?? 'unnamed'} record with no invocation before it`);
+      } else {
+        open = false;
+        if (record.status !== 'returned') continue;
+        returned += 1;
+        name(`${at} call ${call} transmitted_effort`, record.transmitted_effort);
+        name(`${at} call ${call} configured_effort`, record.configured_effort);
+      }
+    }
+  }
   if (other.length > 0) return { verdict: 'failed', observed: { requested: effort, other } };
-  if (returned.length === 0) {
-    return { verdict: 'not_exercised', why: 'no authoring call returned on this leg', observed: { requested: effort, records } };
+  if (orphans.length > 0) {
+    return { verdict: 'not_exercised', why: `a call ended without its invoking receipt: ${orphans.join('; ')}`,
+      observed: { requested: effort } };
+  }
+  if (returned === 0) {
+    return { verdict: 'not_exercised', why: 'no authoring call returned on this leg', observed: { requested: effort } };
   }
   if (unnamed.length > 0) {
     return { verdict: 'not_exercised', why: `the receipts name no effort at ${unnamed.join(', ')}`,
-      observed: { requested: effort, records } };
+      observed: { requested: effort } };
   }
-  return { verdict: 'passed', observed: { requested: effort, calls: returned.length } };
+  return { verdict: 'passed', observed: { requested: effort, calls: returned } };
 }
 
 /** Whether the Session's own selection is the seat that was requested. */
@@ -505,7 +547,7 @@ function judgeJourney(report, expected, requested = null, worldChecks = null, ef
         }
       }
       if (asksEffort) {
-        const carried = carriedEffort(step(`${name}_reached`)?.evidence, effort);
+        const carried = carriedEffort(effortFrames(report, name), effort);
         if (carried.verdict === 'not_exercised') gap(effortName, carried.why, carried.observed);
         else check(effortName, carried.verdict === 'passed', carried.observed);
       }

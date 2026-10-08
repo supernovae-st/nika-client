@@ -191,11 +191,17 @@ class NativeSessionChannel implements SessionChannel {
   }
 
   events(after: string | undefined, signal?: AbortSignal): AsyncIterable<NikaSessionEvent> {
-    const from = this.#cursor(after);
     const retention = this.#retention;
     const channel = this;
     return {
-      [Symbol.asyncIterator]: () => {
+      [Symbol.asyncIterator]: (): AsyncIterator<NikaSessionEvent> => {
+        let from: number;
+        try {
+          from = channel.#cursor(after);
+        } catch (error) {
+          // A cursor this Session never issued fails the iteration, never the call.
+          return { next: () => Promise.reject(error) };
+        }
         const queue: NikaSessionEvent[] = channel.#events.filter((event) => (event.event ?? 0) > from);
         let ended: { error?: Error } | undefined;
         let wake: (() => void) | undefined;

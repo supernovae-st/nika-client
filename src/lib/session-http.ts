@@ -54,8 +54,9 @@ export interface HttpSessionPort {
 export async function openHttpSession(port: HttpSessionPort, signal?: AbortSignal): Promise<SessionChannel> {
   const path = '/v1/sessions';
   // The host opens on no body or on the contract it speaks; the contract is stated, as JSON.
-  const frame = await exchange(port, path, { method: 'POST', signal, body: JSON.stringify({ contract: SESSION_HOST_CONTRACT }),
-    headers: { 'Content-Type': 'application/json' } }, [201], false);
+  const body = JSON.stringify({ contract: SESSION_HOST_CONTRACT });
+  const frame = await exchange(port, path,
+    { method: 'POST', signal, body, headers: { 'Content-Type': 'application/json' } }, [201], false);
   if (frame.frame !== 'opened') throw new NikaProtocolError(transport, 'POST /v1/sessions did not answer opened');
   return new HttpSessionChannel(port, sessionId(frame.session, transport), frame as unknown as NikaSessionOpened);
 }
@@ -167,7 +168,9 @@ class HttpSessionChannel implements SessionChannel {
     if (frame.frame !== expected) {
       throw new NikaProtocolError(transport, `session: expected a ${expected} frame, got another`);
     }
-    if (frame.session !== this.session) throw new NikaProtocolError(transport, 'session: a frame named another Session');
+    if (frame.session !== this.session) {
+      throw new NikaProtocolError(transport, 'session: a frame named another Session');
+    }
   }
 }
 

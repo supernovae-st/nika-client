@@ -214,7 +214,9 @@ export class NikaSessionRefusedError extends NikaOperationError {
     // Content stays off the enumerable surface every logger and serializer reads.
     for (const key of ['line', 'snapshot'] as const) {
       if (details[key] !== undefined) {
-        Object.defineProperty(this, key, { value: details[key], enumerable: false, writable: false, configurable: false });
+        Object.defineProperty(this, key, {
+          value: details[key], enumerable: false, writable: false, configurable: false,
+        });
       }
     }
   }

@@ -618,7 +618,9 @@ export class NativeProcessTransport implements Transport {
         + 'the authoring Session needs an engine that hosts `nika session --json`. Nothing was started',
       );
     }
-    return openNativeSession({ bin: this.options.engine.bin, cwd: this.options.cwd, signal: options.signal, retention });
+    return openNativeSession({
+      bin: this.options.engine.bin, cwd: this.options.cwd, signal: options.signal, retention,
+    });
   }
 
   async attachSession(_id: string, _options: NikaSessionOptions): Promise<SessionChannel> {

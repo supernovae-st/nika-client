@@ -139,6 +139,12 @@ describe('a real-door Session walk is judged by the host\'s laws', () => {
     ['a polling deadline reached', { deadline: true }, /observed the requested Run end/],
     ['a Run still under way', { busy: true }, /observed the requested Run end/],
   ];
+  it('reads `./` and a bare relative path as the same saved workflow', () => {
+    const judged = judgeSession(edit(walk('native'), 'run_observed', { run: { ...OBSERVED,
+      workflow: './compiled-workflow.nika' } }));
+    expect(verdictOf(judged, /ran the saved bytes/)).toBe('passed');
+  });
+
   it.each(runOnly)('fails %s, whatever the project world shows', (_name, change, check) => {
     const judged = judgeSession(edit(walk('native'), 'run_observed', change));
     expect(verdictOf(judged, check)).toBe('failed');

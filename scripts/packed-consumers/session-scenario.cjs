@@ -364,9 +364,12 @@ function judgeSession(report) {
     // other bytes is a failure, whatever the project world shows. Judged from the observed Run
     // itself, never from a summary of it.
     const ran = observed.run;
+    // Both name a path relative to the project root; `./x` and `x` are one file.
+    const relative = (name) => (typeof name === 'string' ? path.posix.normalize(name) : null);
     check(RUN_CHECKS[0], said.includes('run_requested') && observed.deadline === false && observed.busy === false
       && ran !== null && typeof ran?.end?.end === 'string', evidence);
-    check(RUN_CHECKS[1], ran?.current === true && typeof ran.workflow === 'string' && ran.workflow === consent.saved
+    check(RUN_CHECKS[1], ran?.current === true && relative(ran.workflow) !== null
+      && relative(ran.workflow) === relative(consent.saved)
       && typeof ran.workflow_sha256 === 'string' && ran.workflow_sha256 === consent.saved_sha256, evidence);
     check(RUN_CHECKS[2], ran?.end?.end === 'succeeded' && observed.output_is_source === true, evidence);
   }

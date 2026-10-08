@@ -12,6 +12,7 @@ import {
   normalizeCompileOptions,
   normalizeCompileRequest,
 } from './lib/compile.js';
+import { NikaAuthoringSession } from './lib/session-host.js';
 import type {
   NikaCancelResult,
   NikaAttachRunOptions,
@@ -30,6 +31,7 @@ import type {
   NikaScheduleApplyResult,
   NikaScheduleOptions,
   NikaScheduleStatus,
+  NikaSessionOptions,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
   NikaTransportKind,
@@ -157,6 +159,26 @@ export class Nika {
       normalizeCompileRequest(request),
       normalizeCompileOptions(options),
     );
+  }
+
+  /**
+   * The engine's authoring Session: the same `SessionRuntime` the terminal
+   * uses, reached through its host door (`nika session --json` in this
+   * client's `cwd`, or the served project's `/v1/sessions`). Lines go in as
+   * typed by a human, each naming the snapshot it answers; the engine decides
+   * what a line means, proposes, saves and requests runs, and every frame
+   * comes back as it wrote it. Opening needs the engine's `sessionHost`
+   * capability; without it nothing is started or posted. Over HTTP one
+   * Session is live per served project: a second open is refused
+   * (`session_live`) with the live id to `attachSession()` to.
+   */
+  async openSession(options: NikaSessionOptions = {}): Promise<NikaAuthoringSession> {
+    return new NikaAuthoringSession(await this.transport.openSession(options, this.eventBufferSize));
+  }
+
+  /** The live Session a resident holds (HTTP), by the id `openSession()` or a refusal named. */
+  async attachSession(id: string, options: NikaSessionOptions = {}): Promise<NikaAuthoringSession> {
+    return new NikaAuthoringSession(await this.transport.attachSession(id, options));
   }
 
   /**
@@ -371,10 +393,14 @@ export {
   NikaOperationError,
   NikaProtocolError,
   NikaRunOwnershipError,
+  NikaSessionRefusedError,
+  NikaSessionWaitError,
   NikaTransportError,
 } from './errors.js';
 
 export { NikaEngineUnavailable };
+
+export { NikaAuthoringSession };
 
 export { isNikaRunSucceeded } from './results.js';
 
@@ -429,6 +455,19 @@ export type {
   NikaCompileStrategy,
   NikaCompileTrigger,
   NikaNextCompileOptions,
+  NikaSessionBusy,
+  NikaSessionClosed,
+  NikaSessionCommandOptions,
+  NikaSessionDetails,
+  NikaSessionEvent,
+  NikaSessionEventsOptions,
+  NikaSessionOpened,
+  NikaSessionOptions,
+  NikaSessionOutcome,
+  NikaSessionResult,
+  NikaSessionSnapshot,
+  NikaSessionWaiting,
+  NikaSessionWork,
   NikaConfig,
   NikaLocalConfig,
   NikaRemoteConfig,

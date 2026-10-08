@@ -28,6 +28,7 @@ import type {
   NikaScheduleOptions,
   NikaScheduleStatus,
   NikaSettlement,
+  NikaSessionOptions,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
   NikaWorkflowMetadata,
@@ -58,6 +59,8 @@ import {
 } from './compile.js';
 import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
 import { readSettlement } from './settlement.js';
+import { callerSessionId, SESSION_HOST_CAPABILITY, type SessionChannel } from './session-host.js';
+import { attachHttpSession, openHttpSession, type HttpSessionPort } from './session-http.js';
 import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
 import type { Transport, TransportRun } from './transport.js';
 import {
@@ -559,6 +562,51 @@ export class HttpTransport implements Transport {
       ...object,
       verified: POSITIVE_TRACE_VERDICTS.has(object.verdict.toUpperCase()) && traceBound,
     } as NikaTraceVerifyResult;
+  }
+
+  /**
+   * The served project's authoring Session (`POST /v1/sessions`), gated on the
+   * resident's `sessionHost` capability. The server holds the Session, its
+   * project world and its runs; the client sends lines and reads frames.
+   */
+  async openSession(options: NikaSessionOptions, _retention: number): Promise<SessionChannel> {
+    await this.requireSessionHost();
+    return openHttpSession(this.sessionPort(), options.signal);
+  }
+
+  /** The live Session a `session_live` refusal (or an earlier `openSession`) named. */
+  async attachSession(id: string, options: NikaSessionOptions): Promise<SessionChannel> {
+    const session = callerSessionId(id);
+    await this.requireSessionHost();
+    return attachHttpSession(this.sessionPort(), session, options.signal);
+  }
+
+  private async requireSessionHost(): Promise<void> {
+    const identity = await this.ensureServerIdentity();
+    if (identity.supportedCapabilities.includes(SESSION_HOST_CAPABILITY)) return;
+    throw this.gap(
+      SESSION_HOST_CAPABILITY,
+      `The connected nika serve ${identity.engineVersion} does not advertise ${SESSION_HOST_CAPABILITY} `
+      + `(advertised: ${identity.supportedCapabilities.join(', ') || 'nothing'}): it hosts no authoring `
+      + 'Session. Nothing was posted',
+    );
+  }
+
+  /** What the Session door borrows: authenticated requests, bounded bodies, Serve's refusals. */
+  private sessionPort(): HttpSessionPort {
+    return {
+      request: (path, init, unbounded) => this.fetchResponse(path, init, !unbounded, true, false, unbounded),
+      object: (response, path, signal, maxBytes, useRequestTimeout) =>
+        this.readObservationObject(response, path, signal, maxBytes, useRequestTimeout),
+      failure: async (response, path) => {
+        const refusal = await this.readRefusal(response, path);
+        if (refusal) return this.refused(path, { operation: 'session', status: response.status, refusal });
+        await discardResponse(response);
+        return new NikaTransportError(this.kind, `HTTP ${response.status} for ${path}: [REDACTED]`);
+      },
+      redact: (text) => this.redact(text),
+      sseLimits: (maxBytes) => ({ maxLineBytes: maxBytes, maxFrameBytes: maxBytes, maxBufferBytes: maxBytes }),
+    };
   }
 
   private httpRun(

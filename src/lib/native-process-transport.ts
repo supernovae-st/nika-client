@@ -23,6 +23,7 @@ import type {
   NikaScheduleApplyResult,
   NikaScheduleOptions,
   NikaScheduleStatus,
+  NikaSessionOptions,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
   NikaTransportKind,
@@ -66,6 +67,8 @@ import {
   runRefusalError,
   type RunRefusal,
 } from './run-refusal.js';
+import { SESSION_HOST_CAPABILITY, type SessionChannel } from './session-host.js';
+import { openNativeSession } from './session-native.js';
 import type { Transport, TransportRun } from './transport.js';
 
 interface Captured {
@@ -597,6 +600,34 @@ export class NativeProcessTransport implements Transport {
         resolve({ exitCode: code ?? 3, stdout, stderr });
       });
     });
+  }
+
+  /**
+   * The engine's authoring Session in this client's `cwd` (`nika session
+   * --json`): one process, one Session, opened as bare `nika` opens it there.
+   * An engine without the host is refused before any spawn.
+   */
+  async openSession(options: NikaSessionOptions, retention: number): Promise<SessionChannel> {
+    const identity = await this.ensureReady();
+    if (!identity.supportedCapabilities.includes(SESSION_HOST_CAPABILITY)) {
+      throw new NikaCompatibilityError(
+        SESSION_HOST_CAPABILITY,
+        this.kind,
+        `Engine ${identity.engineVersion} at ${this.options.engine.bin} does not advertise `
+        + `${SESSION_HOST_CAPABILITY} (advertised: ${identity.supportedCapabilities.join(', ') || 'nothing'}); `
+        + 'the authoring Session needs an engine that hosts `nika session --json`. Nothing was started',
+      );
+    }
+    return openNativeSession({ bin: this.options.engine.bin, cwd: this.options.cwd, signal: options.signal, retention });
+  }
+
+  async attachSession(_id: string, _options: NikaSessionOptions): Promise<SessionChannel> {
+    throw new NikaCompatibilityError(
+      'attachSession',
+      this.kind,
+      'A native Session is the process that opened it: keep its handle. attachSession() reaches a '
+      + 'Session a nika serve holds',
+    );
   }
 
   /** The verified engine's identity is kept: its capabilities gate what a run may ask. */

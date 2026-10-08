@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `nika.openSession()` reaches the engine's authoring Session (the
+  `SessionRuntime` the terminal opens) through its host doors, contract
+  `nika/session-host@1`: `nika session --json` in the client's `cwd`, or the
+  served project's `/v1/sessions` (gated on the `sessionHost` capability,
+  refused typed before anything starts or is posted otherwise).
+  `submit(snapshot, line)` sends a line with the handle of the snapshot it
+  answers; the engine reads it, and a line for a snapshot that is no longer
+  current is refused (`NikaSessionRefusedError`, the line kept) with nothing
+  sent to the runtime. Commands carry identities: the same identity and bytes
+  return the recorded result (`replayed: true`), other bytes are a
+  `command_conflict`. A cut wait (`NikaSessionWaitError`) never stops the turn;
+  `stop()` does, with a receipt the stopped turn's own result settles.
+  `snapshot()`, `details()`, `events({ after })` and `close()` complete the
+  handle; `attachSession(id)` reaches the live Session a resident holds. The
+  work snapshot is the engine's own, carried verbatim. No released engine
+  hosts the contract yet; see `docs/session.md`.
 - Compile outcomes type the revision, reuse and intelligence evidence the
   engine records inside `provenance` (0.123 integration carrier `7d98023f9`):
   `plan.source_revision`, `plan.intent_sha256`, `plan.document_revision` and

@@ -676,7 +676,8 @@ export type NikaOperation =
   | 'traceVerify'
   | 'schedule'
   | 'scheduleStatus'
-  | 'compile';
+  | 'compile'
+  | 'session';
 
 /** One engine-owned schedule finding. The vocabulary remains additive. */
 export interface NikaScheduleFinding {
@@ -1649,4 +1650,174 @@ export interface NikaCompileOutcome {
   plan_record_error?: NikaCompileRecordError;
   /** Local engine only: this round's rejections could not be kept under `.nika/compile/`. */
   declined_record_error?: NikaCompileRecordError;
+}
+
+/* ------------------------------------------------------------------ */
+/* Authoring Session — the engine's own `SessionRuntime` through its   */
+/* host doors (`nika session --json` natively, `/v1/sessions` over     */
+/* HTTP), contract `nika/session-host@1`. The engine reads every line  */
+/* and holds every identity: the SDK carries frames, never classifies  */
+/* a line, never rebuilds the work and never answers for the human.    */
+/* `NikaRun` stays the separate observer of an executing Run.          */
+/* ------------------------------------------------------------------ */
+
+/** Options of `openSession()` and `attachSession()`. */
+export interface NikaSessionOptions {
+  /** Stops waiting for the door to open or answer; it never closes or stops the Session. */
+  signal?: AbortSignal;
+}
+
+/** Options of one command (`submit`, `stop`, `close`). */
+export interface NikaSessionCommandOptions {
+  /**
+   * The command's identity, 1–128 characters of `[A-Za-z0-9._:-]`. Sending
+   * the same identity with the same bytes again returns the recorded result
+   * (`replayed: true`) and never runs the turn twice: that is how a caller
+   * whose wait was cut reads the result of a turn the engine kept running.
+   * The same identity with other bytes is refused (`command_conflict`).
+   * Default: a fresh random identity.
+   */
+  command?: string;
+  /**
+   * Stops this wait only. The engine keeps the accepted turn running;
+   * `stop()` is the command that stops it, `close()` the one that ends the
+   * Session.
+   */
+  signal?: AbortSignal;
+}
+
+/** Options of `events()`. */
+export interface NikaSessionEventsOptions {
+  /**
+   * Resume after this event cursor (`<session>:<event>`, a previous event's
+   * `cursor`). Over HTTP, a cursor the server cannot resume (another
+   * incarnation, beyond its log) yields one `resync` frame carrying the
+   * current snapshot, then live events. Natively the handle replays the
+   * events it still retains.
+   */
+  after?: string;
+  /** Ends the iteration; it never stops or closes the Session. */
+  signal?: AbortSignal;
+}
+
+/**
+ * The work a Session holds, exactly as the engine serializes it (contract
+ * `nika/session-work@0`): carried verbatim, never re-derived. Over HTTP
+ * `root` names the server's project world, never a path on the client;
+ * candidate file paths stay relative to it.
+ */
+export interface NikaSessionWork {
+  contract: string;
+  /** The engine's proven project root (the server's, over HTTP). */
+  root: string;
+  /** The request as the Session keeps it: goal, decisions, open questions. */
+  request: Record<string, unknown>;
+  /** The compiler's last word on the request, when the Session holds one. */
+  authoring: Record<string, unknown> | null;
+  /** What the next line answers, by the Session's own precedence. */
+  waiting: NikaSessionWaiting;
+  /** The candidate under review: the exact changes a consent lands. */
+  candidate: Record<string, unknown> | null;
+  /** The workflow the last consent saved. Save is never a Run. */
+  saved: Record<string, unknown> | null;
+  /** The Run this Session requested last: a request, never an observation. */
+  requested: Record<string, unknown> | null;
+  /** The last observed Run. */
+  run: Record<string, unknown> | null;
+  /** The automation rail, each field at its own stage. */
+  rail: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+/**
+ * What the next line answers (`kind`: `free`, `run_review`, `cost_choice`,
+ * `intelligence_choice`, `consent`, `gate`, `question`, `input`,
+ * `activation`). The identity it carries (a question's witness, a proposal)
+ * is data to show: the snapshot handle a line names is what binds an answer.
+ */
+export interface NikaSessionWaiting {
+  kind: string;
+  [key: string]: unknown;
+}
+
+/** The turn under way, when one is. */
+export interface NikaSessionBusy {
+  command: string;
+  /** `preparing`, `running` or `settling`; the vocabulary stays open. */
+  phase: string;
+  stop_requested: boolean;
+  [key: string]: unknown;
+}
+
+/** One published snapshot: the handle a line names, and the work it shows. */
+export interface NikaSessionSnapshot {
+  /** The opaque handle a submitted line names; resolvable only in its Session. */
+  snapshot: string;
+  /** The publish counter (not an event number). */
+  seq: number;
+  busy: NikaSessionBusy | null;
+  work: NikaSessionWork;
+  [key: string]: unknown;
+}
+
+/** One outcome of a settled turn, in order (`kind` names it; the vocabulary stays open). */
+export interface NikaSessionOutcome {
+  kind: string;
+  text?: string;
+  [key: string]: unknown;
+}
+
+/** Members every frame carries. */
+interface NikaSessionFrameBase {
+  contract: string;
+  session: string;
+  /** Present exactly on an event: its number in the Session. */
+  event?: number;
+  [key: string]: unknown;
+}
+
+export interface NikaSessionOpened extends NikaSessionFrameBase {
+  frame: 'opened';
+  snapshot: NikaSessionSnapshot;
+  notices?: unknown[];
+}
+
+/** A settled command: its outcomes (submit), its receipt (stop), and the snapshot it published. */
+export interface NikaSessionResult extends NikaSessionFrameBase {
+  frame: 'result';
+  command: string;
+  op: 'submit' | 'stop' | 'close' | (string & {});
+  /** `true` when the recorded result of an earlier identical command came back. */
+  replayed: boolean;
+  outcomes?: NikaSessionOutcome[];
+  /** Stop only: `stop_requested`, `nothing_to_stop` or `run_underway`. A receipt is not a settlement. */
+  receipt?: string;
+  /** Stop only: the command it targeted, or `null`. */
+  target?: string | null;
+  snapshot: NikaSessionSnapshot;
+}
+
+export interface NikaSessionClosed extends NikaSessionFrameBase {
+  frame: 'closed';
+  command?: string;
+  snapshot: NikaSessionSnapshot;
+}
+
+export interface NikaSessionDetails extends NikaSessionFrameBase {
+  frame: 'details';
+  /** The handle of the snapshot whose details these are. */
+  snapshot: string;
+  /** The Session's details text, captured when that snapshot was published. */
+  text: string;
+}
+
+/**
+ * One event of the Session (`opened`, `accepted`, `activity`, `result`,
+ * `closed`, and over HTTP `resync`), as the engine wrote it. `cursor` is the
+ * SDK's resume point for `events({ after })`.
+ */
+export interface NikaSessionEvent extends NikaSessionFrameBase {
+  frame: string;
+  /** `<session>:<event>`; absent on a `resync` frame. */
+  cursor?: string;
 }

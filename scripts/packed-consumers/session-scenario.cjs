@@ -368,9 +368,15 @@ function judgeSession(report) {
     const relative = (name) => (typeof name === 'string' ? path.posix.normalize(name) : null);
     check(RUN_CHECKS[0], said.includes('run_requested') && observed.deadline === false && observed.busy === false
       && ran !== null && typeof ran?.end?.end === 'string', evidence);
-    check(RUN_CHECKS[1], ran?.current === true && relative(ran.workflow) !== null
-      && relative(ran.workflow) === relative(consent.saved)
-      && typeof ran.workflow_sha256 === 'string' && ran.workflow_sha256 === consent.saved_sha256, evidence);
+    const savedWorkflow = ran?.current === true && relative(ran.workflow) !== null
+      && relative(ran.workflow) === relative(consent.saved);
+    if (savedWorkflow && typeof ran.workflow_sha256 !== 'string') {
+      // The bytes a Run ran are proven only by the source hash the Session names for it; a
+      // Session that names none leaves them unproven, never assumed to be the saved ones.
+      gap(RUN_CHECKS[1], 'the Session names no source hash of the bytes its Run ran', evidence);
+    } else {
+      check(RUN_CHECKS[1], savedWorkflow && ran.workflow_sha256 === consent.saved_sha256, evidence);
+    }
     check(RUN_CHECKS[2], ran?.end?.end === 'succeeded' && observed.output_is_source === true, evidence);
   }
   const race = step('stop_racing_a_turn');

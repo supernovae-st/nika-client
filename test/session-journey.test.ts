@@ -115,17 +115,37 @@ describe('a real-intelligence journey is judged leg by leg', () => {
   });
 
   it('fails a Run of other bytes, or one that did not succeed', () => {
-    for (const run of [{ current: true, workflow: 'stale.nika', end: { end: 'succeeded' }, workflow_sha256: 'x' },
-      { current: true, workflow: 'stale.nika', end: { end: 'failed' }, workflow_sha256: CREATED }, null]) {
-      const judged = judgeJourney(edit(journey(), 'create_run_observed', { run }), EXPECTED);
-      expect(verdictOf(judged, /CREATE Run of the saved bytes/)).toEqual(['failed']);
-    }
+    const runOf = (run: unknown) => judgeJourney(edit(journey(), 'create_run_observed', { run }), EXPECTED);
+    const other = runOf({ current: true, workflow: 'stale.nika', end: { end: 'succeeded' }, workflow_sha256: 'x' });
+    expect(verdictOf(other, /CREATE Run/)).toEqual(['passed', 'failed']);
+    const failed = runOf({ current: true, workflow: 'stale.nika', end: { end: 'failed' }, workflow_sha256: CREATED });
+    expect(verdictOf(failed, /CREATE Run/)).toEqual(['failed', 'passed']);
+    expect(verdictOf(runOf(null), /CREATE Run/)).toEqual(['failed', 'not_exercised']);
+  });
+
+  it('leaves the bytes a Run ran unproven when the Session names no source hash, never passed', () => {
+    // Both session-host doors observe a Run without its identity leg at 4271f09ef: the source
+    // hash is null there, so the saved bytes are neither proven nor contradicted.
+    const judged = judgeJourney(edit(journey(), 'create_run_observed', { run: { current: true,
+      workflow: 'stale.nika', end: { end: 'succeeded' }, workflow_sha256: null } }), EXPECTED);
+    expect(verdictOf(judged, /CREATE Run/)).toEqual(['passed', 'not_exercised']);
+    expect(judged.checks.find((entry) => entry.name === 'the CREATE Run ran the saved bytes')!.why)
+      .toBe('the Session names no source hash of the bytes its Run ran');
+    expect(judged.verdict).toBe('not_exercised');
   });
 
   it('withholds the Run and its report when the Session started none', () => {
     const judged = judgeJourney(edit(journey(), 'edit_run', { outcomes: ['run_requested', 'run_not_started'] }),
       EXPECTED);
-    expect(verdictOf(judged, /EDIT Run|EDIT report/)).toEqual(['not_exercised', 'not_exercised']);
+    expect(verdictOf(judged, /EDIT Run|EDIT report/)).toEqual(['not_exercised', 'not_exercised', 'not_exercised']);
+  });
+
+  it('withholds the Run and its report when the Run waits on what the persona was never told', () => {
+    const judged = judgeJourney(edit(journey(), 'edit_run_observed', { run: null, deadline: false,
+      waiting: { kind: 'input', name: 'sink_url', key: null } }), EXPECTED);
+    expect(verdictOf(judged, /EDIT Run|EDIT report/)).toEqual(['not_exercised', 'not_exercised', 'not_exercised']);
+    expect(judged.checks.find((entry) => entry.name === 'the EDIT Run ran the saved bytes')!.why)
+      .toBe('the Session waits on input sink_url, which the persona does not answer');
   });
 
   it('fails a Save that ran something or saved other bytes', () => {

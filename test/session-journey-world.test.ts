@@ -21,8 +21,11 @@ const sha256 = (text: string | Buffer) => createHash('sha256').update(text).dige
 const SINK = 'http://127.0.0.1:1/notifications/hook';
 const WORKFLOW = (threshold: number) => `nika: stale\nconst:\n  max_age_hours: ${threshold}\ntasks: {}\n`;
 
-/** One scripted Session over `project`: words propose, `yes` saves, `run it` writes the report. */
-function scriptedSession(project: string, asked: string | null, sent: string[]) {
+/**
+ * One scripted Session over `project`: words propose, `yes` saves, `run it` writes the report,
+ * first asking the declared input `runInput` when one is named.
+ */
+function scriptedSession(project: string, asked: string | null, sent: string[], runInput: string | null = null) {
   let seq = 1;
   let created: string | null = null;
   const files = () => (existsSync(path.join(project, 'stale.nika'))
@@ -54,16 +57,22 @@ function scriptedSession(project: string, asked: string | null, sent: string[]) 
         work = { ...work, waiting: { kind: 'free' }, candidate: null, saved: { workflow: 'stale.nika' } };
         return result([{ kind: 'facts' }]);
       }
-      if (line === 'run it') {
+      const runNow = (outcomes: Record<string, unknown>[]) => {
         const bytes = files()!;
         const threshold = Number(/max_age_hours: (\d+)/.exec(bytes)![1]);
         mkdirSync(path.join(project, 'out'), { recursive: true });
         const ids = threshold === 48 ? ['stale-60', 'boundary-72', 'stale-90'] : ['stale-90'];
         writeFileSync(path.join(project, 'out', 'report.json'), JSON.stringify({ count: ids.length, ids }));
-        work = { ...work, run: { current: true, workflow: 'stale.nika', end: { end: 'succeeded' },
-          workflow_sha256: sha256(bytes), trace: '.nika/traces/run.ndjson' } };
-        return result([{ kind: 'run_requested' }, { kind: 'facts' }]);
+        work = { ...work, waiting: { kind: 'free' }, run: { current: true, workflow: 'stale.nika',
+          end: { end: 'succeeded' }, workflow_sha256: sha256(bytes), trace: '.nika/traces/run.ndjson' } };
+        return result(outcomes);
+      };
+      if (line === 'run it' && runInput !== null) {
+        work = { ...work, waiting: { kind: 'input', name: runInput } };
+        return result([{ kind: 'run_requested' }, { kind: 'input', text: `The value of ${runInput}?` }]);
       }
+      if (line === 'run it') return runNow([{ kind: 'run_requested' }, { kind: 'facts' }]);
+      if (work.waiting.kind === 'input') return runNow([{ kind: 'facts' }]);
       if (asked !== null && work.waiting.kind !== 'question' && line.startsWith('Create')) {
         work = { ...work, waiting: { kind: 'question', key: asked } };
         return result([{ kind: 'question', text: 'Where should the notification be sent?' }]);
@@ -87,8 +96,8 @@ function scriptedSession(project: string, asked: string | null, sent: string[]) 
   };
 }
 
-function fakeSdk(project: string, asked: string | null, sent: string[]) {
-  return { Nika: class { openSession = async () => scriptedSession(project, asked, sent); } };
+function fakeSdk(project: string, asked: string | null, sent: string[], runInput: string | null = null) {
+  return { Nika: class { openSession = async () => scriptedSession(project, asked, sent, runInput); } };
 }
 
 const scratches: string[] = [];
@@ -146,6 +155,39 @@ describe('a journey walked over a scripted Session', () => {
     expect(sent.slice(0, 2)).toEqual(['Create the stale report', SINK]);
     expect(report.steps.find((entry) => entry.step === 'create_turn' && entry.turn === 1).said)
       .toBe('answer const.target (the observed sink address)');
+  });
+
+  it('gives a Run\'s declared input only by a persona rule on its name, then observes the Run', async () => {
+    const { dir, project, check } = world();
+    const sent: string[] = [];
+    const report = await journey(fakeSdk(project, null, sent, 'sink_url'), { door: 'native', bin: '/x', project,
+      moduleSystem: 'esm', choice: null, create: 'Create the stale report', edit: 'Raise to 72', checkBin: check,
+      snapshots: path.join(dir, 'legs'), capture: ['out'],
+      answers: [{ key: 'sink|url', line: SINK, why: 'the observed sink address' }] });
+    expect(sent).toEqual(['Create the stale report', 'yes', 'run it', SINK, 'Raise to 72', 'yes', 'run it', SINK]);
+    expect(report.steps.find((entry) => entry.step === 'create_run_input'))
+      .toMatchObject({ input: 'sink_url', said: 'the observed sink address' });
+    const judged = journey.judgeJourney(report, { create: ['stale-60', 'boundary-72', 'stale-90'],
+      edit: ['stale-90'] });
+    expect(judged.verdict).toBe('passed');
+  });
+
+  it('stops at once when a Run waits on an input no rule answers, saying what it waits on', async () => {
+    const { dir, project, check } = world();
+    const sent: string[] = [];
+    const started = Date.now();
+    const report = await journey(fakeSdk(project, null, sent, 'sink_url'), { door: 'native', bin: '/x', project,
+      moduleSystem: 'esm', choice: null, answers: {}, create: 'Create the stale report', edit: 'Raise to 72',
+      checkBin: check, snapshots: path.join(dir, 'legs'), capture: ['out'] });
+    expect(Date.now() - started).toBeLessThan(5000);
+    expect(sent.slice(0, 3)).toEqual(['Create the stale report', 'yes', 'run it']);
+    expect(report.steps.find((entry) => entry.step === 'create_run_observed')).toMatchObject({ deadline: false,
+      run: null, waiting: { kind: 'input', name: 'sink_url' } });
+    const judged = journey.judgeJourney(report, { create: ['stale-60', 'boundary-72', 'stale-90'],
+      edit: ['stale-90'] });
+    expect(judged.checks.find((entry) => entry.name === 'the CREATE Run of the saved workflow succeeded'))
+      .toMatchObject({ verdict: 'not_exercised', why: 'the Session waits on input sink_url, which the persona does not answer' });
+    expect(judged.verdict).toBe('not_exercised');
   });
 
   it('stops at a question no rule answers, never guessing', async () => {

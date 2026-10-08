@@ -74,7 +74,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   module that replaces the tickets with another case (its project, services,
   words, persona rules, captured paths and its own per-leg judgment), kept
   outside the repository when its data is private; each leg's world is copied
-  after its Run, and the saved bytes are checked by the engine itself.
+  after its Run, and the saved bytes are checked by the engine itself. A Run's
+  declared input is given only by the persona's answers, and a Session waiting
+  on what the persona was never told stops the leg at once. Both Session judges
+  prove the bytes a Run ran only by the source hash the Session names
+  (`work.run.workflow_sha256`): another hash fails, none leaves them unproven
+  (`not_exercised`), as both session-host doors report a Run today.
 - Compile outcomes type the record of a document the engine's 0.123
   complete-document door created: `plan.document`
   (`NikaCompileCreatedDocument`, settled on a ready outcome only: version 1,

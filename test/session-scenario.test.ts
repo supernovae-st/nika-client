@@ -139,6 +139,21 @@ describe('a real-door Session walk is judged by the host\'s laws', () => {
     ['a polling deadline reached', { deadline: true }, /observed the requested Run end/],
     ['a Run still under way', { busy: true }, /observed the requested Run end/],
   ];
+  it('leaves the bytes a Run ran unproven when the Session names no source hash, never passed', () => {
+    // Both session-host doors observe a Run without its identity leg at 4271f09ef.
+    for (const unnamed of [null, undefined]) {
+      const judged = judgeSession(edit(walk('http'), 'run_observed', { run: { ...OBSERVED,
+        workflow_sha256: unnamed } }));
+      expect(verdictOf(judged, /ran the saved bytes/)).toBe('not_exercised');
+      expect(verdictOf(judged, /observed the requested Run end/)).toBe('passed');
+      expect(judged.verdict).toBe('not_exercised');
+    }
+    // Named nowhere AND of another workflow is still a failure: the path alone contradicts it.
+    const other = judgeSession(edit(walk('http'), 'run_observed', { run: { ...OBSERVED, workflow: 'other.nika',
+      workflow_sha256: null } }));
+    expect(verdictOf(other, /ran the saved bytes/)).toBe('failed');
+  });
+
   it('reads `./` and a bare relative path as the same saved workflow', () => {
     const judged = judgeSession(edit(walk('native'), 'run_observed', { run: { ...OBSERVED,
       workflow: './compiled-workflow.nika' } }));

@@ -288,10 +288,13 @@ second live Session with `session_live`), consents (the saved bytes are exactly
 the previewed file's `content`, and nothing ran; an engine that projects only
 the BLAKE3 witness leaves the bytes unverified), stops with nothing under way,
 requests the Run and requires the Session's own observation of it (the saved
-workflow, run on its exact bytes by the trace's `workflow_sha256`, ended
-`succeeded`) before reading the same project world for its output: a missing,
-failed, paused or foreign Run, or a polling deadline, fails whatever the files
-show, and `run_not_started` or `run_unobserved` leave the Run unclaimed. It
+workflow, ended `succeeded`) before reading the same project world for its
+output: a missing, failed, paused or foreign Run, or a polling deadline, fails
+whatever the files show, and `run_not_started` or `run_unobserved` leave the
+Run unclaimed. That the Run ran the saved bytes is proven only by the source
+hash the Session names for it (`work.run.workflow_sha256`, equal to the saved
+file's sha256): another hash fails, and a Session that names none leaves the
+bytes unproven (`not_exercised`), never passed. It
 then sends a request with a Stop right behind it, closes, compares the full
 event view with one resumed after the proposal, and after a restart answers
 the old snapshot (`unknown_snapshot`; a closed served Session cannot be
@@ -338,15 +341,18 @@ strictly older than 48, then 72 hours. The persona answers only what it was
 told: the first screen with its choice, a one-time cost choice only under
 `NIKA_SESSION_JOURNEY_ACCEPT_COST=1`, an authoring question only from
 `NIKA_SESSION_JOURNEY_ANSWERS` (a JSON object by question key), a resident's
-Run cost review, and the consent to the proposal a leg reached; anything else
-stops the leg as `not_exercised` with what the Session waits on. Each leg is
-judged by its own evidence: a model authored the proposal (the call receipt
-and the author seat, never the selection alone), the Save landed exactly the
-proposed `content` and ran nothing, the EDIT proposal revises the created
-bytes into the saved workflow (its revision's base is their sha256, its
-candidate digest the saved bytes' sha256, proposed under the saved path), and
-the Session observed a successful Run of the saved bytes. Separate generations
-are never compared byte for byte.
+Run cost review, a Run's declared input only from the same answers (keyed by
+the input's name), and the consent to the proposal a leg reached; anything
+else stops the leg as `not_exercised` with what the Session waits on, without
+waiting out the polling deadline. Each leg is judged by its own evidence: a
+model authored the proposal (the call receipt and the author seat, never the
+selection alone), the Save landed exactly the proposed `content` and ran
+nothing, the EDIT proposal revises the created bytes into the saved workflow
+(its revision's base is their sha256, its candidate digest the saved bytes'
+sha256, proposed under the saved path), the Session observed a successful Run
+of the saved workflow, and that Run ran the saved bytes when the Session names
+their source hash (unproven, never passed, when it names none). Separate
+generations are never compared byte for byte.
 
 `NIKA_SESSION_JOURNEY_WORLD` (an absolute path to an ES module) replaces the
 built-in tickets world with another case, kept outside this repository when its
@@ -363,6 +369,6 @@ project world and each Run's time window. `judge` returns each leg's checks
 (`passed`, `failed` or `not_exercised`), which replace the tickets report
 check; the journey's own checks (a reached proposal, a model's call receipt,
 the exact Save, a revision bound to the saved workflow, an observed successful
-Run of the saved bytes) stay. A leg the world does not judge is not exercised,
-and a malformed check fails. The report names the module by its file name and
-sha256, never by its path.
+Run of the saved workflow and of its bytes) stay. A leg the world does not
+judge is not exercised, and a malformed check fails. The report names the
+module by its file name and sha256, never by its path.

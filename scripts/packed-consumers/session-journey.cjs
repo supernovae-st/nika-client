@@ -85,16 +85,29 @@ async function journey(sdk, config, steps, open) {
     const runStartedAt = Date.now();
     let run = await session.submit(consent.snapshot, 'run it', { command: `${name}-run`, signal: signal() });
     record(`${name}_run`, frameRow(run));
-    if (run.snapshot.work.waiting.kind === 'run_review') {
-      // The resident's cost review of the Run: the persona accepts it, as the run authorized.
-      run = await session.submit(run.snapshot, 'yes', { command: `${name}-run-review`, signal: signal() });
-      record(`${name}_run_review`, frameRow(run));
+    // What the Run asks before it starts: the resident's cost review, which the persona accepts
+    // (the Run is the authorized step), and a declared input's value, answered only by a persona
+    // rule over its name and asking words, never guessed. Anything else is left to the person.
+    for (let asked = 0; asked < 8; asked += 1) {
+      const waiting = run.snapshot.work.waiting;
+      if (waiting.kind === 'run_review') {
+        run = await session.submit(run.snapshot, 'yes', { command: `${name}-run-review-${asked}`, signal: signal() });
+        record(`${name}_run_review`, frameRow(run));
+        continue;
+      }
+      const answer = waiting.kind === 'input' ? answerFor(persona.answers, { key: waiting.name }, run, 'input') : null;
+      if (answer === null) break;
+      run = await session.submit(run.snapshot, answer.line, { command: `${name}-run-input-${asked}`, signal: signal() });
+      record(`${name}_run_input`, { ...frameRow(run), input: waiting.name ?? null, said: answer.why });
     }
     let after = run.snapshot;
     const said = (kinds) => steps.some((entry) => entry.step.startsWith(`${name}_run`)
       && (entry.outcomes ?? []).some((kind) => kinds.includes(kind)));
-    const unsettled = () => after.busy !== null
-      || (after.work.run === null && !said(['run_not_started', 'run_unobserved']));
+    // A Session waiting on the person (an input no rule answers, a gate) starts and ends no Run
+    // until someone answers: polling stops, and the leg says what it waits on.
+    const waitsOnPerson = () => after.busy === null && after.work.waiting.kind !== 'free';
+    const unsettled = () => !waitsOnPerson() && (after.busy !== null
+      || (after.work.run === null && !said(['run_not_started', 'run_unobserved'])));
     const until = Date.now() + WAIT_MS;
     while (unsettled() && Date.now() < until) {
       await new Promise((resolve) => setTimeout(resolve, 500));
@@ -108,8 +121,9 @@ async function journey(sdk, config, steps, open) {
     } catch {
       parsed = { unparsable: true };
     }
+    const { kind, name: input = null, key = null } = after.work.waiting;
     record(`${name}_run_observed`, { deadline: unsettled(), busy: after.busy !== null, run: after.work.run,
-      saved: saved?.workflow ?? null, saved_sha256: savedSha, report: parsed,
+      waiting: { kind, name: input, key }, saved: saved?.workflow ?? null, saved_sha256: savedSha, report: parsed,
       report_sha256: report === null ? null : sha256(report), window, snapshot: capture(name) });
     return { shown, savedSha };
   }
@@ -173,14 +187,14 @@ async function advance(session, snapshot, line, persona, signal, report) {
 }
 
 /**
- * The persona's answer to one authoring question: an exact key from an answer table
- * (`{ key: line }`), or the first rule (`[{ key, text, line, why }]`, `key` and `text` regular
- * expressions over the question's key and its asking words) that matches. `null` when nothing
- * the persona was told answers it.
+ * The persona's answer to one authoring question (or, with `asking: 'input'`, to a Run's declared
+ * input, keyed by its name): an exact key from an answer table (`{ key: line }`), or the first
+ * rule (`[{ key, text, line, why }]`, `key` and `text` regular expressions over the key and the
+ * asking words) that matches. `null` when nothing the persona was told answers it.
  */
-function answerFor(answers, waiting, result) {
+function answerFor(answers, waiting, result, asking = 'question') {
   if (Array.isArray(answers)) {
-    const asked = (result.outcomes ?? []).find((outcome) => outcome.kind === 'question')?.text ?? '';
+    const asked = (result.outcomes ?? []).find((outcome) => outcome.kind === asking)?.text ?? '';
     const rule = answers.find((each) => (each.key !== undefined && new RegExp(each.key, 'i').test(waiting.key ?? ''))
       || (each.text !== undefined && new RegExp(each.text, 'i').test(asked)));
     return rule === undefined ? null : { line: rule.line, why: rule.why ?? 'a persona rule' };
@@ -337,20 +351,35 @@ function judgeJourney(report, expected, requested = null, worldChecks = null) {
     const unobserved = runs.flatMap((entry) => entry.outcomes)
       .filter((kind) => kind === 'run_not_started' || kind === 'run_unobserved');
     const observed = step(`${name}_run_observed`);
+    const LEG = name.toUpperCase();
     // A world module states its own postconditions; the built-in world's are the tickets report.
-    const worldName = `the ${name.toUpperCase()} world postconditions hold`;
-    if (unobserved.length > 0) {
-      gap(`the ${name.toUpperCase()} Run of the saved bytes succeeded`, `the Session said ${unobserved.join(', ')}`,
-        observed);
-      gap(worldChecks ? worldName : `the ${name.toUpperCase()} report holds exactly the expected tickets`,
-        'no Run was observed', observed);
+    const worldName = `the ${LEG} world postconditions hold`;
+    const postconditions = worldChecks ? worldName : `the ${LEG} report holds exactly the expected tickets`;
+    const runChecks = [`the ${LEG} Run of the saved workflow succeeded`, `the ${LEG} Run ran the saved bytes`];
+    const waiting = observed.waiting ?? { kind: 'free' };
+    if (unobserved.length > 0 || (observed.run === null && waiting.kind !== 'free')) {
+      // The engine's own word (no Run started, or its end unobserved), or a Run waiting on what
+      // the persona was never told to answer: nothing about the Run or its world is claimed.
+      const why = unobserved.length > 0 ? `the Session said ${unobserved.join(', ')}`
+        : `the Session waits on ${waiting.kind} ${waiting.name ?? waiting.key ?? ''}`.trim()
+          + ', which the persona does not answer';
+      for (const entry of runChecks) gap(entry, why, observed);
+      gap(postconditions, 'no Run was observed', observed);
       continue;
     }
     const ran = observed.run;
-    check(`the ${name.toUpperCase()} Run of the saved bytes succeeded`, observed.deadline === false
-      && observed.busy === false && ran?.current === true && path.posix.normalize(String(ran.workflow))
-        === path.posix.normalize(String(observed.saved)) && ran.workflow_sha256 === observed.saved_sha256
+    check(runChecks[0], observed.deadline === false && observed.busy === false && ran?.current === true
+      && path.posix.normalize(String(ran.workflow)) === path.posix.normalize(String(observed.saved))
       && ran.end?.end === 'succeeded', observed);
+    // The bytes a Run ran are proven only by the source hash the Session names for it; a Session
+    // that names none leaves them unproven, never assumed to be the saved ones.
+    if (ran === null) {
+      gap(runChecks[1], 'no Run was observed', observed);
+    } else if (typeof ran.workflow_sha256 !== 'string') {
+      gap(runChecks[1], 'the Session names no source hash of the bytes its Run ran', observed);
+    } else {
+      check(runChecks[1], ran.workflow_sha256 === observed.saved_sha256, observed);
+    }
     if (worldChecks) {
       const stated = worldChecks[name];
       if (!Array.isArray(stated) || stated.length === 0) gap(worldName, 'the world judged nothing for this leg', null);

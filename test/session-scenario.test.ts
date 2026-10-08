@@ -102,9 +102,15 @@ describe('a real-door Session walk is judged by the host\'s laws', () => {
 
   it('fails a Save whose bytes are not the previewed ones, or that ran', () => {
     expect(verdictOf(judgeSession(edit(walk('native'), 'consent', { saved_bytes_are_previewed: false })),
-      /previewed bytes/)).toBe('failed');
+      /exactly the previewed/)).toBe('failed');
     expect(verdictOf(judgeSession(edit(walk('native'), 'consent', { run_output_before_run: true })),
-      /previewed bytes/)).toBe('failed');
+      /runs nothing/)).toBe('failed');
+  });
+
+  it('leaves the saved bytes unverified when the engine projects no candidate content', () => {
+    const judged = judgeSession(edit(walk('http'), 'consent', { saved_bytes_are_previewed: null }));
+    expect(verdictOf(judged, /exactly the previewed/)).toBe('not_exercised');
+    expect(verdictOf(judged, /runs nothing/)).toBe('passed');
   });
 
   it('fails a Run whose output is not the source it copies', () => {

@@ -111,9 +111,13 @@ async function walk(sdk, config, steps, open) {
   const consent = await a.submit(proposal.snapshot, 'yes', { command: 'c-3', signal: signal() });
   const saved = consent.snapshot.work.saved;
   const landed = saved?.workflow === undefined ? null : read(saved.workflow);
+  const previewed = files.find((file) => file.path === saved?.workflow);
   record('consent', { ...frameRow(consent),
-    saved_is_previewed_path: files.some((file) => file.path === saved?.workflow),
-    saved_bytes_are_previewed: landed !== null && files.some((file) => file.bytes === sha256(landed)),
+    saved_is_previewed_path: previewed !== undefined,
+    // A previewed file's exact bytes are its `content`; its `bytes` is a BLAKE3 witness this
+    // runner does not compute. Without `content` (an engine before it) the bytes stay unverified.
+    saved_bytes_are_previewed: typeof previewed?.content !== 'string' ? null
+      : landed !== null && landed.equals(Buffer.from(previewed.content, 'utf8')),
     saved_sha256: landed === null ? null : sha256(landed),
     run_output_before_run: existsSync(world('out/copy.md')) });
 
@@ -201,8 +205,10 @@ function frameRow(frame) {
   };
 }
 
+/** A candidate file: its witness, and the sha256 of its exact `content` when the engine projects it. */
 function fileRow(file) {
-  return { path: file.path, bytes: file.bytes, landing: file.landing ?? null, workflow: file.workflow ?? null };
+  return { path: file.path, bytes: file.bytes, landing: file.landing ?? null, workflow: file.workflow ?? null,
+    content_sha256: typeof file.content === 'string' ? sha256(Buffer.from(file.content, 'utf8')) : null };
 }
 
 function errorRow(error) {
@@ -315,9 +321,14 @@ function judgeSession(report) {
       && second.names_live === true, second);
   }
   const consent = step('consent');
-  check('the consent saves exactly the previewed bytes and runs nothing', consent.saved_is_previewed_path
-    && consent.saved_bytes_are_previewed && consent.run_output_before_run === false
-    && !consent.outcomes.some((kind) => kind.startsWith('run')), consent);
+  check('the consent saves the previewed file and runs nothing', consent.saved_is_previewed_path
+    && consent.run_output_before_run === false && !consent.outcomes.some((kind) => kind.startsWith('run')), consent);
+  if (consent.saved_bytes_are_previewed === null) {
+    gap('the saved bytes are exactly the previewed ones',
+      'the engine projects no candidate content, only a BLAKE3 witness this runner does not compute', consent);
+  } else {
+    check('the saved bytes are exactly the previewed ones', consent.saved_bytes_are_previewed === true, consent);
+  }
   const idle = step('stop_idle');
   check('a Stop with no turn under way has nothing to stop', idle.receipt === 'nothing_to_stop', idle);
   const run = step('run');

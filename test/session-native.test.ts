@@ -122,6 +122,33 @@ describe('native authoring Session', () => {
     expect(conflict).toMatchObject({ code: 'command_conflict', command: 'c-1', line: 'other words' });
   });
 
+  it('keeps a pending identity to its own bytes: other bytes are refused before sending, the first completes', async () => {
+    const session = await open();
+    const first = await session.snapshot();
+    const accepted = session.submit(first, 'slow draft', { command: 'same-id' });
+    const reused = await failure(session.submit(first, 'other words', { command: 'same-id' }));
+    expect(reused).toBeInstanceOf(NikaConfigurationError);
+    expect(reused.message).toMatch(/pending with other bytes/);
+    const settled = await accepted;
+    expect(settled).toMatchObject({ command: 'same-id', replayed: false, outcomes: [{ kind: 'proposal' }] });
+  });
+
+  it('lets an identical concurrent retry share the one turn and its result', async () => {
+    const session = await open();
+    const first = await session.snapshot();
+    const [one, two] = await Promise.all([
+      session.submit(first, 'slow draft', { command: 'twice' }),
+      session.submit(first, 'slow draft', { command: 'twice' }),
+    ]);
+    expect(two).toEqual(one);
+    const turns: string[] = [];
+    for await (const event of session.events({ after: `${session.id}:0` })) {
+      if (event.frame === 'accepted' && event.command === 'twice') turns.push(event.cursor!);
+      if (event.frame === 'result' && event.command === 'twice') break;
+    }
+    expect(turns).toHaveLength(1);
+  });
+
   it('answers reads during a turn, refuses a second line as busy, and settles a Stop by the turn itself', async () => {
     const session = await open();
     const first = await session.snapshot();

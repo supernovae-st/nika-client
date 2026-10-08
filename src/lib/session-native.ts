@@ -50,6 +50,8 @@ interface Read {
 
 interface Waiter {
   readonly op: string;
+  /** The exact bytes sent: every waiter of one identity waits for the same command. */
+  readonly body: string;
   readonly line?: string;
   resolve(frame: NikaSessionResult | NikaSessionClosed): void;
   reject(error: Error): void;
@@ -157,6 +159,16 @@ class NativeSessionChannel implements SessionChannel {
         return;
       }
       const waiters = this.#waiters.get(command.command) ?? [];
+      // One identity names one command. A frame names only the identity, so a pending
+      // identity reused with other bytes could not be told apart: it is refused here,
+      // before anything is written. Identical bytes wait for the same result; any other
+      // reuse is the engine's ledger to judge.
+      if (waiters.some((pending) => pending.body !== command.body)) {
+        reject(new NikaConfigurationError(
+          `session: command ${command.command} is pending with other bytes on this handle; `
+          + 'a command identity names one command'));
+        return;
+      }
       const abort = () => {
         const kept = (this.#waiters.get(command.command) ?? []).filter((entry) => entry !== waiter);
         if (kept.length === 0) this.#waiters.delete(command.command);
@@ -166,6 +178,7 @@ class NativeSessionChannel implements SessionChannel {
       };
       const waiter: Waiter = {
         op: command.op,
+        body: command.body,
         ...(command.line === undefined ? {} : { line: command.line }),
         resolve: (frame) => { signal?.removeEventListener('abort', abort); resolve(frame); },
         reject: (error) => { signal?.removeEventListener('abort', abort); reject(error); },

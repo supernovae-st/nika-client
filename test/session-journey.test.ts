@@ -420,9 +420,9 @@ describe('each leg is summarized for a requalification table', () => {
     expect([legs.create.outcome, legs.edit.outcome]).toEqual(['passed', 'passed']);
     expect([legs.create.attempted, legs.edit.attempted]).toEqual([true, true]);
     // The tickets world's CREATE states no revision: its reuse is not observable, never "none".
-    expect(legs.create.reuse).toMatchObject({ observable: false, reused: [] });
+    expect(legs.create.reuse).toMatchObject({ observable: false, reused: [], present_in_run: [] });
     expect(legs.edit.reuse).toMatchObject({ observable: true, candidate_sha256: EDITED, saved_exact: true,
-      ran_exact: true, reused: ['block:stale-filter-report'] });
+      ran_exact: true, reused: ['block:stale-filter-report'], present_in_run: ['block:stale-filter-report'] });
     expect(legs.edit.reuse.components[0]).toMatchObject({ witness: 'expanded', bindings: [{ path: 'const.max_age_hours',
       value: 72 }] });
   });
@@ -434,15 +434,20 @@ describe('each leg is summarized for a requalification table', () => {
         components: [used('expanded'), { ...used('revised'), id: 'block:other' }] }, [file('stale.nika', EDITED)]);
       return judgeJourney(report, EXPECTED).legs.edit;
     };
-    // A Run of other bytes: the saved workflow still holds the expansion, and the leg fails.
+    // A Run of other bytes: the saved workflow still holds the expansion, no Run holds it, the leg fails.
     const ranElsewhere = witnessed({ run: { current: true, workflow: 'stale.nika', end: { end: 'succeeded' },
       workflow_sha256: OTHER } }, 'edit_run_observed');
     expect(ranElsewhere.reuse).toMatchObject({ saved_exact: true, ran_exact: false,
-      reused: ['block:stale-filter-report'] });
+      reused: ['block:stale-filter-report'], present_in_run: [] });
     expect(ranElsewhere.outcome).toBe('failed');
+    // The exact bytes ran but the Run failed: present in no succeeded Run.
+    const failedRun = witnessed({ run: { current: true, workflow: 'stale.nika', end: { end: 'failed' },
+      workflow_sha256: EDITED } }, 'edit_run_observed');
+    expect(failedRun.reuse).toMatchObject({ ran_exact: true, reused: ['block:stale-filter-report'],
+      present_in_run: [] });
     // Saved bytes other than the ones the revision witnessed: nothing is reused, a revised use never.
     const savedElsewhere = witnessed({ saved_sha256: OTHER }, 'edit_save');
-    expect(savedElsewhere.reuse).toMatchObject({ saved_exact: false, reused: [] });
+    expect(savedElsewhere.reuse).toMatchObject({ saved_exact: false, reused: [], present_in_run: [] });
     expect(savedElsewhere.reuse.components.map((use: { witness: string }) => use.witness))
       .toEqual(['expanded', 'revised']);
   });

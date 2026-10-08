@@ -435,11 +435,12 @@ seat went unproven is never attributed that seat's hold), or `not_attempted`
 (an earlier leg stopped first). Beside it ride the calls' ends, the timing and
 the reuse its proposal witnesses: each component of the revision the Session
 states for the bytes, with the engine's witness (`expanded`, `revised`,
-`absent`, `unwitnessed`), and `reused`, the components expanded in the very
-bytes the consent saved; whether a Run ran those bytes (`ran_exact`) stays a
-separate fact, and neither claims that each of a component's nodes executed
-(only the Run's trace would). A proposal whose Session states no revision
-witnesses nothing (`observable: false`), never "none". The
+`absent`, `unwitnessed`), `reused`, the components expanded in the very bytes
+the consent saved, and `present_in_run`, those of them in the bytes a succeeded
+Run ran (`ran_exact`): the whole byte chain. Neither claims that each of a
+component's nodes executed (a branch or a skip may leave one unrun); with no
+task or trace witness read, that stays unknown. A proposal whose Session states
+no revision witnesses nothing (`observable: false`), never "none". The
 journey's `denominators` count CREATE and EDIT apart over the exercised doors:
 an EDIT behind a stopped CREATE was never attempted and counts in no EDIT
 denominator.

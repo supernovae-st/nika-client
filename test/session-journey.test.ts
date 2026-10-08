@@ -181,19 +181,43 @@ describe('a requested journey walks at least one door, or the run says so', () =
 });
 
 describe('a journey counts for the seat the Session actually selected', () => {
-  it('reads a first-screen answer in the Session\'s own vocabulary', () => {
-    expect(requestedSeat('1 acp:claude-code/opus')).toEqual({ kind: 'harness', via: 'claude-code', model: 'opus',
-      transport: 'acp' });
+  // Root re-review of a7b3aa2: the engine keeps a named model whole (`split_seat`), as its own
+  // test pins `1 acp:claude-code/claude-opus-5-5[1m]` → model `claude-code/claude-opus-5-5[1m]`.
+  it('projects a first-screen answer as the Session projects its selection', () => {
+    expect(requestedSeat('1 acp:claude-code/claude-opus-5-5[1m]')).toEqual({ kind: 'harness', via: 'claude-code',
+      model: 'claude-code/claude-opus-5-5[1m]', transport: 'acp' });
     expect(requestedSeat('2 deepseek/deepseek-v4-flash')).toEqual({ kind: 'api', via: 'deepseek',
-      model: 'deepseek-v4-flash', transport: null });
-    expect(requestedSeat('1 codex')).toEqual({ kind: 'harness', via: 'codex', model: null, transport: null });
+      model: 'deepseek/deepseek-v4-flash', transport: null });
+    expect(requestedSeat('1 codex')).toEqual({ kind: 'harness', via: 'codex', model: null, transport: 'native' });
+    expect(requestedSeat('1')).toEqual({ kind: 'harness', via: null, model: null, transport: 'native' });
+    // An empty side names no model: the whole name is the provider, as `split_seat` keeps it.
+    expect(requestedSeat('2 deepseek/')).toEqual({ kind: 'api', via: 'deepseek/', model: null, transport: null });
     expect(requestedSeat('4')).toEqual({ kind: 'none', via: null, model: null, transport: null });
   });
 
   const seatCheck = (judged: Judged) => judged.checks.find((check) => /requested intelligence/.test(check.name));
+  const selecting = (selected: Record<string, unknown>) => edit(journey(), 'create_reached', {
+    evidence: { ...authored(), intelligence: { ...authored().intelligence, selected } } });
+  const answeredFirstScreen = (report: Journey): Journey => ({ ...report,
+    steps: [{ step: 'create_turn', turn: 0, said: 'intelligence_choice' }, ...report.steps] });
 
   it('credits the requested seat when the Session selected it', () => {
     expect(seatCheck(judgeJourney(journey(), EXPECTED, '2 deepseek'))).toMatchObject({ verdict: 'passed' });
+  });
+
+  it('credits an explicitly named model exactly as the engine projects it', () => {
+    const api = selecting({ kind: 'api', via: 'deepseek', transport: null, model: 'deepseek/deepseek-v4-flash',
+      locus: 'DeepSeek API', ready: true, refusal: null });
+    expect(seatCheck(judgeJourney(answeredFirstScreen(api), EXPECTED, '2 deepseek/deepseek-v4-flash')))
+      .toMatchObject({ verdict: 'passed' });
+    const claude = { kind: 'harness', via: 'claude-code', transport: 'acp', model: 'claude-code/claude-opus-5-5[1m]',
+      locus: 'Claude app', ready: true, refusal: null };
+    const requested = '1 acp:claude-code/claude-opus-5-5[1m]';
+    expect(seatCheck(judgeJourney(answeredFirstScreen(selecting(claude)), EXPECTED, requested)))
+      .toMatchObject({ verdict: 'passed' });
+    // The same app reached natively is not the ACP seat requested.
+    expect(seatCheck(judgeJourney(answeredFirstScreen(selecting({ ...claude, transport: 'native' })), EXPECTED,
+      requested))).toMatchObject({ verdict: 'failed' });
   });
 
   it('never relabels a choice kept before the journey as the requested one', () => {

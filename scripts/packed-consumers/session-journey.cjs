@@ -182,18 +182,22 @@ function journeyDoors(value) {
 }
 
 /**
- * The seat a first-screen answer names, in the Session's own vocabulary: `1 <app>[/<model>]`
- * (`acp:` before the app asks for ACP), `2 <provider>[/<model>]`, `3 <local>`, `4`.
+ * The seat a first-screen answer names, projected as the Session projects its selection
+ * (`nika-session` `intelligence.rs` `choose`, `choose_app`, `split_seat`; `work.rs` `Selected`):
+ * `1 <app>[/<model>]` reaches the app natively unless `acp:` asks for ACP, `2 <provider>[/<model>]`,
+ * `3 <local>`, `4`. A `<via>/<name>` names the provider (or app) AND the model, the model kept
+ * whole; an empty side names no model. Only a harness has a transport.
  */
 function requestedSeat(choice) {
   const [pick, name] = String(choice ?? '').trim().split(/\s+/);
   const kind = { 1: 'harness', 2: 'api', 3: 'local', 4: 'none' }[pick] ?? null;
-  if (!name) return { kind, via: null, model: null, transport: null };
-  const acp = name.startsWith('acp:');
+  const acp = kind === 'harness' && name !== undefined && name.startsWith('acp:');
+  const transport = kind === 'harness' ? (acp ? 'acp' : 'native') : null;
+  if (!name) return { kind, via: null, model: null, transport };
   const bare = acp ? name.slice('acp:'.length) : name;
   const slash = bare.indexOf('/');
-  return { kind, via: slash < 0 ? bare : bare.slice(0, slash), model: slash < 0 ? null : bare.slice(slash + 1),
-    transport: acp ? 'acp' : null };
+  const named = slash > 0 && slash < bare.length - 1;
+  return { kind, via: named ? bare.slice(0, slash) : bare, model: named ? bare : null, transport };
 }
 
 /** Whether the Session's own selection is the seat that was requested. */

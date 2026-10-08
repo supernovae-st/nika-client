@@ -26,7 +26,16 @@ assert(binary && path.isAbsolute(binary), 'NIKA_BIN must identify the frozen abs
 const SERVE_SESSIONS = (process.env.NIKA_SESSION_SERVE_FLAGS ?? '--sessions').split(' ').filter(Boolean);
 const require = createRequire(import.meta.url);
 const { judgeSession, sessionParity, SHARED_STEPS, MODULE_STEPS } = require('./packed-consumers/session-scenario.cjs');
-const { judgeJourney } = require('./packed-consumers/session-journey.cjs');
+const { judgeJourney, journeyDoors, sessionResult } = require('./packed-consumers/session-journey.cjs');
+// A requested journey's doors are checked before anything is built or run: an empty or unknown
+// selection is refused, never reported as a journey that walked nothing.
+let JOURNEY_DOORS;
+try {
+  JOURNEY_DOORS = process.env.NIKA_SESSION_JOURNEY_CHOICE ? journeyDoors(process.env.NIKA_SESSION_JOURNEY_DOORS) : [];
+} catch (error) {
+  if (reportPath) writeFileSync(reportPath, JSON.stringify({ result: 'refused', message: error.message }, null, 2) + '\n');
+  throw error;
+}
 /** The project world both doors start from: one source file the requests read. */
 const BRIEF = '# Brief\n\nOctobre — « vite » ✓ 🦋\n';
 /** The journey's world: tickets at and around both thresholds, so 48 and 72 hours select apart. */
@@ -105,14 +114,8 @@ try {
   };
   const comparisons = [...parity.doors, ...parity.module_systems];
   const journey = await journeyPhase();
-  const journeyVerdicts = journey.ran ? journey.doors.map((entry) => (entry.exercised ? entry.verdict : 'not_exercised'))
-    : [];
-  const failed = exercised.some((entry) => entry.verdict === 'failed')
-    || comparisons.some((entry) => entry.equal === false) || journeyVerdicts.includes('failed');
-  const gaps = walks.some((entry) => !entry.exercised || entry.verdict === 'not_exercised')
-    || comparisons.some((entry) => entry.equal === null) || journeyVerdicts.includes('not_exercised');
   report = {
-    result: failed ? 'failed' : gaps ? 'not_exercised' : 'green',
+    result: sessionResult(walks, comparisons, journey),
     scope: 'authoring Session transport parity on the deterministic compiler'
       + (journey.ran ? '; plus a real intelligence journey (capability evidence, never byte parity)' : '; no model claim'),
     engine: { version, binary_sha256: binarySha, identity },
@@ -176,11 +179,14 @@ try {
     const expected = { create: TICKETS.filter((row) => row.age_hours > 48).map((row) => row.id),
       edit: TICKETS.filter((row) => row.age_hours > 72).map((row) => row.id) };
     const doors = [];
-    for (const door of (process.env.NIKA_SESSION_JOURNEY_DOORS ?? 'native,http').split(',').filter(Boolean)) {
+    for (const door of JOURNEY_DOORS) {
       doors.push(await journeyWalk(door));
     }
     return { ran: true, choice, key_env: keyNames, seats, accept_cost: acceptCost, answers: Object.keys(answers),
-      create_source: createFile, create_sha256: createHash('sha256').update(create).digest('hex'), edit, expected,
+      // Named relative to the repository, or by its file name alone: a report never carries a private path.
+      create_source: path.relative(root, createFile).startsWith('..') ? `<outside the repository>/${path.basename(createFile)}`
+        : path.relative(root, createFile),
+      create_sha256: createHash('sha256').update(create).digest('hex'), edit, expected,
       law: 'each generation judged by its own evidence and the project world, never byte-compared with another',
       doors };
 

@@ -168,6 +168,20 @@ function evidence(work) {
 }
 
 /**
+ * The doors a journey walks: a nonempty list of `native` and `http`, each named once; unset means
+ * both. Anything else is a configuration refusal, so an empty selection can never report a
+ * journey that walked no door.
+ */
+function journeyDoors(value) {
+  if (value === undefined) return ['native', 'http'];
+  const doors = String(value).split(',').map((door) => door.trim());
+  if (doors.some((door) => door !== 'native' && door !== 'http') || new Set(doors).size !== doors.length) {
+    throw new Error('NIKA_SESSION_JOURNEY_DOORS names native and/or http, comma-separated, each once');
+  }
+  return doors;
+}
+
+/**
  * The seat a first-screen answer names, in the Session's own vocabulary: `1 <app>[/<model>]`
  * (`acp:` before the app asks for ACP), `2 <provider>[/<model>]`, `3 <local>`, `4`.
  */
@@ -293,3 +307,21 @@ function judgeJourney(report, expected, requested = null) {
 module.exports.judgeJourney = judgeJourney;
 module.exports.advance = advance;
 module.exports.requestedSeat = requestedSeat;
+module.exports.journeyDoors = journeyDoors;
+module.exports.sessionResult = sessionResult;
+
+/**
+ * The runner's result: `failed` when a walk, a comparison or a journey door failed;
+ * `not_exercised` when any of them was not exercised, or a requested journey walked no door;
+ * `green` only when everything requested was exercised and passed.
+ */
+function sessionResult(walks, comparisons, journey) {
+  const doors = journey.ran ? journey.doors : [];
+  const journeyVerdicts = doors.map((entry) => (entry.exercised ? entry.verdict : 'not_exercised'));
+  if (walks.some((entry) => entry.exercised && entry.verdict === 'failed')
+    || comparisons.some((entry) => entry.equal === false) || journeyVerdicts.includes('failed')) return 'failed';
+  if (walks.length === 0 || walks.some((entry) => !entry.exercised || entry.verdict === 'not_exercised')
+    || comparisons.some((entry) => entry.equal === null) || journeyVerdicts.includes('not_exercised')
+    || (journey.ran && doors.length === 0)) return 'not_exercised';
+  return 'green';
+}

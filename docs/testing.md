@@ -325,8 +325,10 @@ NIKA_SESSION_JOURNEY_CHOICE='2 deepseek/deepseek-v4-flash' NIKA_SESSION_JOURNEY_
 NIKA_BIN=… NIKA_SESSION_PARITY_REPORT=… node scripts/run-session-parity-e2e.mjs
 ```
 
-On each door (`NIKA_SESSION_JOURNEY_DOORS`, both by default), one ESM
-consumer creates from words (`NIKA_SESSION_JOURNEY_CREATE_FILE`, by default
+On each door (`NIKA_SESSION_JOURNEY_DOORS`: `native` and/or `http`, each
+once, both by default; an empty or unknown selection is refused before
+anything runs, and a requested journey that walked no door is never green),
+one ESM consumer creates from words (`NIKA_SESSION_JOURNEY_CREATE_FILE`, by default
 the stale-tickets request of `test/fixtures/compile-evidence/recorded-fcdd44292`),
 saves, runs; then a new Session over the same project world revises in words
 (`NIKA_SESSION_JOURNEY_EDIT`, by default « Raise the age threshold to 72

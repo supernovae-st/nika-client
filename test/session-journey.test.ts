@@ -11,9 +11,12 @@ import { describe, expect, it } from 'vitest';
 const require = createRequire(import.meta.url);
 type Journey = { module_system: string; door: string; steps: any[]; error: any };
 type Judged = { verdict: string; checks: { name: string; verdict: string; why?: string }[] };
-const { judgeJourney, advance, requestedSeat } = require('../scripts/packed-consumers/session-journey.cjs') as {
+const { judgeJourney, advance, requestedSeat, journeyDoors, sessionResult } =
+  require('../scripts/packed-consumers/session-journey.cjs') as {
   judgeJourney: (report: Journey, expected: { create: string[]; edit: string[] }, requested?: string | null) => Judged;
   requestedSeat: (choice: string) => Record<string, string | null>;
+  journeyDoors: (value: string | undefined) => string[];
+  sessionResult: (walks: unknown[], comparisons: unknown[], journey: unknown) => string;
   advance: (session: unknown, snapshot: unknown, line: string, persona: unknown, signal: () => AbortSignal,
     report: (turn: unknown) => void) => Promise<{ waiting: string; summary: any }>;
 };
@@ -136,6 +139,44 @@ describe('a real-intelligence journey is judged leg by leg', () => {
     const judged = judgeJourney({ ...journey(), error: { name: 'NikaSessionWaitError', message: 'cut' } }, EXPECTED);
     expect(judged).toEqual({ verdict: 'failed', checks: [{ name: 'the journey completed', verdict: 'failed',
       observed: { name: 'NikaSessionWaitError', message: 'cut' } }] });
+  });
+});
+
+// Root review of 5229cf6 (second P2): an explicitly empty door selection reported a journey that
+// walked no door, and the runner could still be green.
+describe('a requested journey walks at least one door, or the run says so', () => {
+  it('reads the door selection strictly', () => {
+    expect(journeyDoors(undefined)).toEqual(['native', 'http']);
+    expect(journeyDoors('native')).toEqual(['native']);
+    expect(journeyDoors(' http , native ')).toEqual(['http', 'native']);
+    for (const refused of ['', ',', 'native,', 'smtp', 'native,native', 'NATIVE']) {
+      expect(() => journeyDoors(refused), refused).toThrow(/NIKA_SESSION_JOURNEY_DOORS names native and\/or http/);
+    }
+  });
+
+  const walk = (verdict: string, exercised = true) => ({ exercised, verdict });
+  const equal = { equal: true };
+
+  it('is green only when every walk, comparison and journey door passed', () => {
+    expect(sessionResult([walk('passed')], [equal], { ran: false })).toBe('green');
+    expect(sessionResult([walk('passed')], [equal], { ran: true, doors: [walk('passed')] })).toBe('green');
+  });
+
+  it('never reports a requested journey that walked no door as green', () => {
+    expect(sessionResult([walk('passed')], [equal], { ran: true, doors: [] })).toBe('not_exercised');
+  });
+
+  it('carries a journey door\'s failure or gap into the run', () => {
+    expect(sessionResult([walk('passed')], [equal], { ran: true, doors: [walk('failed')] })).toBe('failed');
+    expect(sessionResult([walk('passed')], [equal], { ran: true, doors: [walk('passed'), walk('x', false)] }))
+      .toBe('not_exercised');
+  });
+
+  it('never reports walks that did not happen as green', () => {
+    expect(sessionResult([], [], { ran: false })).toBe('not_exercised');
+    expect(sessionResult([walk('passed', false)], [equal], { ran: false })).toBe('not_exercised');
+    expect(sessionResult([walk('passed')], [{ equal: null }], { ran: false })).toBe('not_exercised');
+    expect(sessionResult([walk('passed')], [{ equal: false }], { ran: false })).toBe('failed');
   });
 });
 

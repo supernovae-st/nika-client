@@ -27,7 +27,8 @@ assert(binary && path.isAbsolute(binary), 'NIKA_BIN must identify the frozen abs
 const SERVE_SESSIONS = (process.env.NIKA_SESSION_SERVE_FLAGS ?? '--sessions').split(' ').filter(Boolean);
 const require = createRequire(import.meta.url);
 const { judgeSession, sessionParity, SHARED_STEPS, MODULE_STEPS } = require('./packed-consumers/session-scenario.cjs');
-const { judgeJourney, journeyDoors, keepDoor, sessionResult } = require('./packed-consumers/session-journey.cjs');
+const { judgeJourney, journeyDenominators, journeyDoors, keepDoor, sessionResult } =
+  require('./packed-consumers/session-journey.cjs');
 // A requested journey's doors are checked before anything is built or run: an empty or unknown
 // selection is refused, never reported as a journey that walked nothing.
 let JOURNEY_DOORS;
@@ -229,7 +230,7 @@ try {
         create_sha256: createHash('sha256').update(create).digest('hex'), edit, expected,
       } : {}),
       law: 'each generation judged by its own evidence and the project world, never byte-compared with another',
-      doors };
+      doors, denominators: journeyDenominators(doors) };
 
     async function journeyWalk(door) {
       const base = path.join(scratch, 'journey', door);
@@ -341,7 +342,9 @@ if (reportPath) writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n'
 const summary = report.attempted.map((entry) => `${entry.module_system}/${entry.door}: `
   + (entry.exercised ? entry.verdict : `not exercised (${entry.why})`)).join('; ')
   + (report.journey.ran ? `; journey ${report.journey.doors.map((entry) => `${entry.door}: `
-    + (entry.exercised ? entry.verdict : `not exercised (${entry.why})`)).join(', ')}` : '');
+    + (entry.exercised ? entry.verdict : `not exercised (${entry.why})`)).join(', ')}`
+    + ` (${['create', 'edit'].map((leg) => `${leg.toUpperCase()} passed ${report.journey.denominators[leg].passed}`
+      + ` of ${report.journey.denominators[leg].attempted} attempted`).join(', ')})` : '');
 if (report.result === 'green') {
   console.log(`session parity green after owned cleanup: ${summary}`);
 } else {

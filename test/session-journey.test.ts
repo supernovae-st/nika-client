@@ -10,10 +10,12 @@ import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 type Journey = { module_system: string; door: string; steps: any[]; error: any };
-type Judged = { verdict: string; checks: { name: string; verdict: string; why?: string }[] };
-const { judgeJourney, advance, requestedSeat, journeyDoors, sessionResult } =
+type Judged = { verdict: string; checks: { name: string; verdict: string; why?: string }[]; legs: Record<string, any> };
+const { judgeJourney, journeyDenominators, advance, requestedSeat, journeyDoors, sessionResult } =
   require('../scripts/packed-consumers/session-journey.cjs') as {
-  judgeJourney: (report: Journey, expected: { create: string[]; edit: string[] }, requested?: string | null) => Judged;
+  judgeJourney: (report: Journey, expected: { create: string[]; edit: string[] }, requested?: string | null,
+    worldChecks?: unknown, effort?: string | null) => Judged;
+  journeyDenominators: (doors: unknown[]) => Record<string, any>;
   requestedSeat: (choice: string) => Record<string, string | null>;
   journeyDoors: (value: string | undefined) => string[];
   sessionResult: (walks: unknown[], comparisons: unknown[], journey: unknown) => string;
@@ -156,10 +158,11 @@ describe('a real-intelligence journey is judged leg by leg', () => {
   });
 
   it('fails a journey a genuine fault stopped, keeping its partial transcript', () => {
-    const judged = judgeJourney({ ...journey(), error: { name: 'NikaProtocolError', message: 'malformed frame' } },
-      EXPECTED);
+    const { legs, ...judged } = judgeJourney({ ...journey(), error: { name: 'NikaProtocolError',
+      message: 'malformed frame' } }, EXPECTED);
     expect(judged).toEqual({ verdict: 'failed', checks: [{ name: 'the journey completed', verdict: 'failed',
       observed: { name: 'NikaProtocolError', message: 'malformed frame' } }] });
+    expect([legs.create.outcome, legs.edit.why]).toEqual(['failed', 'the journey completed']);
   });
 
   it('reports a Run the harness stopped watching as its observation bound, never a failed Run', () => {
@@ -389,5 +392,117 @@ describe('the persona answers only what it was told to', () => {
         { choice: '1', acceptCost: true, answers: {} }, () => {});
       expect([sent, reached.waiting]).toEqual([['Create it'], kind]);
     }
+  });
+});
+
+describe('each leg is summarized for a requalification table', () => {
+  /** One ACP authoring call's receipts: invoked, then its end. */
+  const receipt = (end: string) => [{ status: 'invoking', requested_effort: 'max' },
+    { status: end, transmitted_effort: end === 'returned' ? 'max' : undefined,
+      configured_effort: end === 'returned' ? 'max' : undefined }];
+  const harnessed = (records: unknown[]) => ({ ...authored(), calls: { ...authored().calls,
+    calls: records.filter((record) => (record as { status: string }).status === 'invoking').length,
+    backend: { kind: 'harness_infer', transport: 'acp', observed: records } } });
+  /** A CREATE that never reached a proposal: the Session free (or waiting) after its turn. */
+  const stopped = (evidence: unknown, waiting = 'free') => ({ ...journey(), steps: [{ step: 'create_open', open_ms: 5 },
+    { step: 'create_turn', turn: 0, evidence }, { step: 'create_reached', waiting, key: null, outcomes: ['facts'],
+      evidence, timing: { submit_to_settled_ms: 900, author_ms: 800 } }] });
+  /** A component as `nika-session-change` serializes a revision's use of it. */
+  const used = (witness: string) => ({ id: 'block:stale-filter-report', version: 'r1', release: '2'.repeat(64),
+    file_sha256: null, bindings: [{ path: 'const.max_age_hours', value: 72 }], witness });
+
+  it('passes both legs of a full route, its timing and the reuse its EDIT witnessed', () => {
+    const reused = journey();
+    const editReached = reused.steps.find((entry) => entry.step === 'edit_reached');
+    editReached.evidence = authored({ ...revised(EDITED), components: [used('expanded')] },
+      [file('stale.nika', EDITED)]);
+    const { legs } = judgeJourney(reused, EXPECTED);
+    expect([legs.create.outcome, legs.edit.outcome]).toEqual(['passed', 'passed']);
+    expect([legs.create.attempted, legs.edit.attempted]).toEqual([true, true]);
+    // The tickets world's CREATE states no revision: its reuse is not observable, never "none".
+    expect(legs.create.reuse).toMatchObject({ observable: false, executed: [] });
+    expect(legs.edit.reuse).toMatchObject({ observable: true, candidate_sha256: EDITED, saved_exact: true,
+      ran_exact: true, executed: ['block:stale-filter-report'] });
+    expect(legs.edit.reuse.components[0]).toMatchObject({ witness: 'expanded', bindings: [{ path: 'const.max_age_hours',
+      value: 72 }] });
+  });
+
+  it('never calls reuse actual unless the expanded bytes are the ones saved and run', () => {
+    const elsewhere = edit(journey(), 'edit_run_observed', { run: { current: true, workflow: 'stale.nika',
+      end: { end: 'succeeded' }, workflow_sha256: OTHER } });
+    const editReached = elsewhere.steps.find((entry) => entry.step === 'edit_reached');
+    editReached.evidence = authored({ ...revised(EDITED), components: [used('expanded'), { ...used('revised'),
+      id: 'block:other' }] }, [file('stale.nika', EDITED)]);
+    const { legs } = judgeJourney(elsewhere, EXPECTED);
+    expect(legs.edit.reuse).toMatchObject({ saved_exact: true, ran_exact: false, executed: [] });
+    expect(legs.edit.reuse.components.map((use: { witness: string }) => use.witness)).toEqual(['expanded', 'revised']);
+    expect(legs.edit.outcome).toBe('failed');
+  });
+
+  it('tells a semantic hold from a provider failure by the calls\' own ends', () => {
+    const held = judgeJourney(stopped(harnessed([...receipt('returned'), ...receipt('returned')])), EXPECTED);
+    expect(held.legs.create).toMatchObject({ attempted: true, outcome: 'semantic_hold', why: 'the Session waits on free',
+      calls: { invoked: 2, returned: 2, failed: 0 }, timing: { open_ms: 5, submit_to_settled_ms: 900, author_ms: 800 } });
+    const failed = judgeJourney(stopped(harnessed(receipt('failed'))), EXPECTED);
+    expect(failed.legs.create).toMatchObject({ outcome: 'provider_failure',
+      calls: { invoked: 1, returned: 0, failed: 1 } });
+    const timedOut = judgeJourney(stopped(harnessed([...receipt('timed_out'), ...receipt('cancelled')])), EXPECTED);
+    expect(timedOut.legs.create).toMatchObject({ outcome: 'provider_failure',
+      calls: { invoked: 2, timed_out: 1, cancelled: 1 } });
+    // One answered call among failed ones is no provider failure: the verifier held what it answered.
+    const mixed = judgeJourney(stopped(harnessed([...receipt('failed'), ...receipt('returned')])), EXPECTED);
+    expect(mixed.legs.create.outcome).toBe('semantic_hold');
+    // An EDIT behind a stopped CREATE was never attempted.
+    expect(held.legs.edit).toMatchObject({ attempted: false, outcome: 'not_attempted' });
+  });
+
+  it('reads the engine\'s per-call rows when no harness receipt names the ends', () => {
+    const rows = (...ends: Record<string, unknown>[]) => ({ ...authored(), calls: { ...authored().calls,
+      calls: ends.length, backend: { kind: 'direct_api' }, per_call: ends.map((end, index) => ({ call: index === 0
+        ? 'document' : 'document-repair', elapsed_ms: 10, stop_reason: null, failure_kind: null, ...end })) } });
+    const refused = judgeJourney(stopped(rows({ failure_kind: 'provider_error' }, { failure_kind: 'timeout' })),
+      EXPECTED);
+    expect(refused.legs.create).toMatchObject({ outcome: 'provider_failure',
+      calls: { invoked: 2, failed: 1, timed_out: 1, known: true } });
+    expect(refused.legs.create.per_call).toEqual([
+      { call: 'document', elapsed_ms: 10, stop_reason: null, failure_kind: 'provider_error' },
+      { call: 'document-repair', elapsed_ms: 10, stop_reason: null, failure_kind: 'timeout' }]);
+    const held = judgeJourney(stopped(rows({ stop_reason: 'EndTurn' })), EXPECTED);
+    expect(held.legs.create.outcome).toBe('semantic_hold');
+  });
+
+  it('claims no class the evidence does not show', () => {
+    // No receipt says how any call ended: neither a hold nor a provider failure.
+    const unknown = judgeJourney(stopped(authored()), EXPECTED);
+    expect(unknown.legs.create).toMatchObject({ outcome: 'not_exercised', why: 'the Session waits on free',
+      calls: { known: false } });
+    // A question the persona was not told to answer is no hold either.
+    const asked = judgeJourney(stopped(harnessed(receipt('returned')), 'question'), EXPECTED);
+    expect(asked.legs.create.outcome).toBe('not_exercised');
+    // A Session showing a seat other than the one requested: its hold is never that seat's.
+    const unseated = judgeJourney(stopped(harnessed(receipt('returned'))), EXPECTED, '1 acp:claude-code/opus[1m]');
+    expect(unseated.legs.create).toMatchObject({ outcome: 'not_exercised',
+      why: 'the Session opened on a choice kept before this journey, never asked the first screen' });
+    // A wrong report fails the leg, named by its check.
+    const wrong = judgeJourney(edit(journey(), 'create_run_observed', { report: { count: 1, ids: ['stale-60'] } }),
+      EXPECTED);
+    expect(wrong.legs.create).toMatchObject({ outcome: 'failed',
+      why: 'the CREATE report holds exactly the expected tickets' });
+    // A journey that did not complete fails the leg it was in.
+    const broken = judgeJourney({ ...journey(), error: { message: 'boom' } }, EXPECTED);
+    expect([broken.legs.create.outcome, broken.legs.edit.outcome]).toEqual(['failed', 'failed']);
+  });
+
+  it('counts each leg only where its words were sent', () => {
+    const door = (judged: Judged, exercised = true) => ({ door: 'native', exercised, ...judged });
+    const full = door(judgeJourney(journey(), EXPECTED));
+    const held = door(judgeJourney(stopped(harnessed(receipt('returned'))), EXPECTED));
+    const failed = door(judgeJourney(stopped(harnessed(receipt('failed'))), EXPECTED));
+    const unexercised = { door: 'http', exercised: false, why: 'the engine identity lists no sessionHost' };
+    expect(journeyDenominators([full, held, failed, unexercised])).toEqual({
+      create: { attempted: 3, passed: 1, semantic_hold: 1, provider_failure: 1, failed: 0, not_exercised: 0 },
+      edit: { attempted: 1, passed: 1, semantic_hold: 0, provider_failure: 0, failed: 0, not_exercised: 0 },
+      full_routes: { passed: 1, of: 3 },
+      law: 'an EDIT behind a stopped CREATE was never attempted and counts in no EDIT denominator' });
   });
 });

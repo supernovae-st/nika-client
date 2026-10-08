@@ -489,6 +489,129 @@ function carriedEffort(frames, effort) {
   return { verdict: 'passed', observed: { requested: effort, calls: returned } };
 }
 
+/**
+ * How a leg's authoring calls ended, each compile's receipt read once: the harness seat's own
+ * records (`invoking`, then `returned`, `failed`, `cancelled` or `timed_out`), else the engine's
+ * per-call rows (a `failure_kind` is a failed call, `timeout` a timed-out one; a `stop_reason` an
+ * answer). `known` is false when no receipt says how any call ended.
+ */
+function callEnds(frames) {
+  const ends = { invoked: 0, returned: 0, failed: 0, cancelled: 0, timed_out: 0, known: false };
+  const seen = new Set();
+  for (const { evidence } of frames) {
+    const calls = evidence?.calls;
+    const observed = Array.isArray(calls?.backend?.observed) ? calls.backend.observed : [];
+    const rows = Array.isArray(calls?.per_call) ? calls.per_call : [];
+    const receipt = JSON.stringify({ observed, rows });
+    if ((observed.length === 0 && rows.length === 0) || seen.has(receipt)) continue;
+    seen.add(receipt);
+    ends.known = true;
+    if (observed.length > 0) {
+      for (const record of observed) {
+        if (record?.status === 'invoking') ends.invoked += 1;
+        else if (CALL_ENDS.has(record?.status)) ends[record.status] += 1;
+      }
+      continue;
+    }
+    for (const row of rows) {
+      ends.invoked += 1;
+      if (row?.failure_kind === 'timeout') ends.timed_out += 1;
+      else if (typeof row?.failure_kind === 'string') ends.failed += 1;
+      else if (typeof row?.stop_reason === 'string') ends.returned += 1;
+    }
+  }
+  return ends;
+}
+
+/**
+ * The component reuse a leg's proposal witnesses, read from the revision the Session states for
+ * its bytes: each component with the engine's witness on those bytes (`expanded`, `revised`,
+ * `absent`, `unwitnessed`). Actual reuse (`executed`) is a component expanded in the very bytes
+ * the consent saved and a succeeded Run ran, never one retrieved or merely similar. A proposal
+ * whose Session states no revision witnesses nothing: not observable, never "none".
+ */
+function reuseOf(report, name) {
+  const step = (at) => report.steps.find((entry) => entry.step === at);
+  const revision = step(`${name}_reached`)?.evidence?.revision ?? null;
+  if (revision === null) {
+    return { observable: false, why: 'the Session states no document revision for this proposal', components: [],
+      executed: [] };
+  }
+  const bound = typeof revision.candidate_sha256 === 'string' ? revision.candidate_sha256 : null;
+  const saved = step(`${name}_save`)?.saved_sha256;
+  const run = step(`${name}_run_observed`)?.run ?? null;
+  const savedExact = typeof saved === 'string' && bound !== null ? saved === bound : null;
+  const ranExact = typeof run?.workflow_sha256 === 'string' && bound !== null ? run.workflow_sha256 === bound : null;
+  const components = (Array.isArray(revision.components) ? revision.components : []).map((use) => ({
+    id: use?.id ?? null, version: use?.version ?? null, release: use?.release ?? null,
+    file_sha256: use?.file_sha256 ?? null, bindings: use?.bindings ?? [], witness: use?.witness ?? null }));
+  const ran = savedExact === true && ranExact === true && run?.end?.end === 'succeeded';
+  return { observable: true, candidate_sha256: bound, saved_exact: savedExact, ran_exact: ranExact, components,
+    executed: ran ? components.filter((use) => use.witness === 'expanded').map((use) => use.id) : [] };
+}
+
+/**
+ * One leg as a requalification table counts it, from its own checks and receipts, never
+ * relabelled: `not_attempted` (its words were never sent: an earlier leg stopped first; it counts
+ * in no denominator), `passed` (every check of the leg passed), `failed` (a check of the leg
+ * failed: seat, effort, bytes, Run or postcondition), `provider_failure` (no proposal, and every
+ * authoring call invoked ended without an answer), `semantic_hold` (no proposal, the Session free,
+ * though an authoring call answered: the verifier held it) or `not_exercised` (anything else left
+ * unproven, with the first reason; a leg whose requested seat went unproven is never attributed a
+ * hold or a failure of that seat). Its calls' ends, monotonic timing and reuse witnesses ride along.
+ */
+function legSummary(report, name, legChecks) {
+  const step = (at) => report.steps.find((entry) => entry.step === at);
+  const reached = step(`${name}_reached`);
+  const attempted = reached !== undefined || report.steps.some((entry) => entry.step === `${name}_turn`);
+  const calls = callEnds(effortFrames(report, name));
+  const timing = { open_ms: step(`${name}_open`)?.open_ms ?? null,
+    submit_to_settled_ms: reached?.timing?.submit_to_settled_ms ?? null, author_ms: reached?.timing?.author_ms ?? null };
+  const rows = reached?.evidence?.calls?.per_call;
+  const summary = (outcome, why) => ({ attempted, outcome, why, calls, timing,
+    per_call: Array.isArray(rows) ? rows.map((row) => ({ call: row?.call ?? null, elapsed_ms: row?.elapsed_ms ?? null,
+      stop_reason: row?.stop_reason ?? null, failure_kind: row?.failure_kind ?? null })) : null,
+    reuse: reuseOf(report, name) });
+  if (!attempted) return summary('not_attempted', 'an earlier leg stopped first');
+  const failed = legChecks.find((entry) => entry.verdict === 'failed');
+  if (failed !== undefined) return summary('failed', failed.name);
+  const unproven = legChecks.find((entry) => entry.verdict === 'not_exercised');
+  if (unproven === undefined && legChecks.length > 0) return summary('passed', null);
+  const unseated = legChecks.find((entry) => entry.verdict === 'not_exercised'
+    && entry.name.includes('the requested intelligence'));
+  if (unseated !== undefined) return summary('not_exercised', unseated.why);
+  // The leg's own state, as the Session said it, is why it reached no proposal.
+  const own = legChecks.find((entry) => entry.name === `the ${name.toUpperCase()} leg reached a proposal`);
+  if (reached !== undefined && reached.waiting !== 'consent' && calls.known) {
+    const answered = calls.returned;
+    const unanswered = calls.failed + calls.cancelled + calls.timed_out;
+    if (calls.invoked > 0 && answered === 0 && unanswered === calls.invoked) {
+      return summary('provider_failure', own?.why ?? null);
+    }
+    if (answered > 0 && reached.waiting === 'free') return summary('semantic_hold', own?.why ?? null);
+  }
+  return summary('not_exercised', unproven?.why ?? 'the leg judged nothing');
+}
+
+/**
+ * A report's CREATE and EDIT denominators over its exercised doors: each leg counted only where
+ * its words were sent, so an EDIT behind a stopped CREATE counts in no EDIT denominator; a full
+ * route is a door whose CREATE and EDIT both passed.
+ */
+function journeyDenominators(doors) {
+  const exercised = doors.filter((door) => door?.exercised === true && door.legs);
+  const count = (name) => {
+    const legs = exercised.map((door) => door.legs[name]).filter((leg) => leg?.attempted === true);
+    const by = (outcome) => legs.filter((leg) => leg.outcome === outcome).length;
+    return { attempted: legs.length, passed: by('passed'), semantic_hold: by('semantic_hold'),
+      provider_failure: by('provider_failure'), failed: by('failed'), not_exercised: by('not_exercised') };
+  };
+  return { create: count('create'), edit: count('edit'),
+    full_routes: { passed: exercised.filter((door) => door.legs.create?.outcome === 'passed'
+      && door.legs.edit?.outcome === 'passed').length, of: exercised.length },
+    law: 'an EDIT behind a stopped CREATE was never attempted and counts in no EDIT denominator' };
+}
+
 /** Whether the Session's own selection is the seat that was requested. */
 function isRequestedSeat(selected, requested) {
   return selected !== null && selected !== undefined && selected.kind === requested.kind
@@ -510,13 +633,23 @@ function isRequestedSeat(selected, requested) {
  * reached over ACP, each leg also requires every authoring call to have carried it.
  */
 function judgeJourney(report, expected, requested = null, worldChecks = null, effort = null) {
+  const legsOf = (byLeg) => ({ create: legSummary(report, 'create', byLeg.create),
+    edit: legSummary(report, 'edit', byLeg.edit) });
   if (report.error !== null) {
-    return { verdict: 'failed', checks: [{ name: 'the journey completed', verdict: 'failed', observed: report.error }] };
+    const completed = { name: 'the journey completed', verdict: 'failed', observed: report.error };
+    return { verdict: 'failed', checks: [completed], legs: legsOf({ create: [completed], edit: [completed] }) };
   }
   const step = (name) => report.steps.find((entry) => entry.step === name);
   const checks = [];
-  const check = (name, passed, observed) => checks.push({ name, verdict: passed ? 'passed' : 'failed', observed });
-  const gap = (name, why, observed) => checks.push({ name, verdict: 'not_exercised', why, observed });
+  // Each check is also the leg's it judges, for that leg's summary.
+  const byLeg = { create: [], edit: [] };
+  let leg = null;
+  const record = (entry) => {
+    checks.push(entry);
+    if (leg !== null) byLeg[leg].push(entry);
+  };
+  const check = (name, passed, observed) => record({ name, verdict: passed ? 'passed' : 'failed', observed });
+  const gap = (name, why, observed) => record({ name, verdict: 'not_exercised', why, observed });
   const authored = (evidence) => evidence?.calls !== null && evidence?.calls?.calls >= 1
     && ['provider', 'harness'].includes(evidence?.intelligence?.author?.kind);
   if (requested !== null) {
@@ -527,6 +660,7 @@ function judgeJourney(report, expected, requested = null, worldChecks = null, ef
     const byOpener = step('create_open')?.opened_with === 'intelligence';
     let answeredEarlier = false;
     for (const name of ['create', 'edit']) {
+      leg = name;
       const LEG = name.toUpperCase();
       const seatName = `the ${LEG} Session prepared with the requested intelligence`;
       const scopeName = `the ${LEG} Session holds the requested intelligence for this conversation alone`;
@@ -583,6 +717,7 @@ function judgeJourney(report, expected, requested = null, worldChecks = null, ef
         else check(effortName, carried.verdict === 'passed', carried.observed);
       }
     }
+    leg = null;
     if (byOpener) {
       // The engine keeps nothing for the operator: the kept choice reads the same at both ends of
       // the journey.
@@ -599,6 +734,7 @@ function judgeJourney(report, expected, requested = null, worldChecks = null, ef
 
   // The tickets ids judge the built-in world only; a world module brings its own checks instead.
   for (const [name, ids, base] of [['create', expected?.create ?? [], null], ['edit', expected?.edit ?? [], 'create']]) {
+    leg = name;
     const LEG = name.toUpperCase();
     // A world module states its own postconditions; the built-in world's are the tickets report.
     const worldName = `the ${LEG} world postconditions hold`;
@@ -696,7 +832,7 @@ function judgeJourney(report, expected, requested = null, worldChecks = null, ef
       if (!Array.isArray(stated) || stated.length === 0) gap(worldName, 'the world judged nothing for this leg', null);
       for (const entry of stated ?? []) {
         if (['passed', 'failed', 'not_exercised'].includes(entry?.verdict) && typeof entry.name === 'string') {
-          checks.push(entry);
+          record(entry);
         } else {
           check(worldName, false, { malformed_world_check: entry ?? null });
         }
@@ -707,12 +843,14 @@ function judgeJourney(report, expected, requested = null, worldChecks = null, ef
       && observed.report.count === ids.length && JSON.stringify(observed.report.ids) === JSON.stringify(ids),
     { report: observed.report, expected: ids });
   }
+  leg = null;
   const verdict = checks.some((entry) => entry.verdict === 'failed') ? 'failed'
     : checks.some((entry) => entry.verdict === 'not_exercised') ? 'not_exercised' : 'passed';
-  return { verdict, checks };
+  return { verdict, checks, legs: legsOf(byLeg) };
 }
 
 module.exports.judgeJourney = judgeJourney;
+module.exports.journeyDenominators = journeyDenominators;
 module.exports.advance = advance;
 module.exports.requestedSeat = requestedSeat;
 module.exports.journeyDoors = journeyDoors;

@@ -425,6 +425,23 @@ of the saved workflow, and that Run ran the saved bytes when the Session names
 their source hash (unproven, never passed, when it names none). Separate
 generations are never compared byte for byte.
 
+Each door's report also summarizes its legs (`legs.create`, `legs.edit`) for a
+requalification table, from the leg's own checks and receipts: `attempted`
+(its words were sent) and one outcome, `passed`, `failed` (a check of the leg
+failed), `provider_failure` (no proposal, every authoring call invoked ended
+without an answer), `semantic_hold` (no proposal, the Session free, though a
+call answered), `not_exercised` (anything else unproven; a leg whose requested
+seat went unproven is never attributed that seat's hold), or `not_attempted`
+(an earlier leg stopped first). Beside it ride the calls' ends, the timing and
+the reuse its proposal witnesses: each component of the revision the Session
+states for the bytes, with the engine's witness (`expanded`, `revised`,
+`absent`, `unwitnessed`), and `executed`, the components expanded in the very
+bytes the consent saved and a succeeded Run ran. A proposal whose Session
+states no revision witnesses nothing (`observable: false`), never "none". The
+journey's `denominators` count CREATE and EDIT apart over the exercised doors:
+an EDIT behind a stopped CREATE was never attempted and counts in no EDIT
+denominator.
+
 `NIKA_SESSION_JOURNEY_WORLD` (an absolute path to an ES module) replaces the
 built-in tickets world with another case, kept outside this repository when its
 data is private. Its `prepare({ door, project, scratch, binary })` seeds the

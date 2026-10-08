@@ -420,23 +420,31 @@ describe('each leg is summarized for a requalification table', () => {
     expect([legs.create.outcome, legs.edit.outcome]).toEqual(['passed', 'passed']);
     expect([legs.create.attempted, legs.edit.attempted]).toEqual([true, true]);
     // The tickets world's CREATE states no revision: its reuse is not observable, never "none".
-    expect(legs.create.reuse).toMatchObject({ observable: false, executed: [] });
+    expect(legs.create.reuse).toMatchObject({ observable: false, reused: [] });
     expect(legs.edit.reuse).toMatchObject({ observable: true, candidate_sha256: EDITED, saved_exact: true,
-      ran_exact: true, executed: ['block:stale-filter-report'] });
+      ran_exact: true, reused: ['block:stale-filter-report'] });
     expect(legs.edit.reuse.components[0]).toMatchObject({ witness: 'expanded', bindings: [{ path: 'const.max_age_hours',
       value: 72 }] });
   });
 
-  it('never calls reuse actual unless the expanded bytes are the ones saved and run', () => {
-    const elsewhere = edit(journey(), 'edit_run_observed', { run: { current: true, workflow: 'stale.nika',
-      end: { end: 'succeeded' }, workflow_sha256: OTHER } });
-    const editReached = elsewhere.steps.find((entry) => entry.step === 'edit_reached');
-    editReached.evidence = authored({ ...revised(EDITED), components: [used('expanded'), { ...used('revised'),
-      id: 'block:other' }] }, [file('stale.nika', EDITED)]);
-    const { legs } = judgeJourney(elsewhere, EXPECTED);
-    expect(legs.edit.reuse).toMatchObject({ saved_exact: true, ran_exact: false, executed: [] });
-    expect(legs.edit.reuse.components.map((use: { witness: string }) => use.witness)).toEqual(['expanded', 'revised']);
-    expect(legs.edit.outcome).toBe('failed');
+  it('names reuse by expansion in the saved bytes, the Run a separate fact', () => {
+    const witnessed = (change: Record<string, unknown>, at: string) => {
+      const report = edit(journey(), at, change);
+      report.steps.find((entry) => entry.step === 'edit_reached').evidence = authored({ ...revised(EDITED),
+        components: [used('expanded'), { ...used('revised'), id: 'block:other' }] }, [file('stale.nika', EDITED)]);
+      return judgeJourney(report, EXPECTED).legs.edit;
+    };
+    // A Run of other bytes: the saved workflow still holds the expansion, and the leg fails.
+    const ranElsewhere = witnessed({ run: { current: true, workflow: 'stale.nika', end: { end: 'succeeded' },
+      workflow_sha256: OTHER } }, 'edit_run_observed');
+    expect(ranElsewhere.reuse).toMatchObject({ saved_exact: true, ran_exact: false,
+      reused: ['block:stale-filter-report'] });
+    expect(ranElsewhere.outcome).toBe('failed');
+    // Saved bytes other than the ones the revision witnessed: nothing is reused, a revised use never.
+    const savedElsewhere = witnessed({ saved_sha256: OTHER }, 'edit_save');
+    expect(savedElsewhere.reuse).toMatchObject({ saved_exact: false, reused: [] });
+    expect(savedElsewhere.reuse.components.map((use: { witness: string }) => use.witness))
+      .toEqual(['expanded', 'revised']);
   });
 
   it('tells a semantic hold from a provider failure by the calls\' own ends', () => {

@@ -526,16 +526,18 @@ function callEnds(frames) {
 /**
  * The component reuse a leg's proposal witnesses, read from the revision the Session states for
  * its bytes: each component with the engine's witness on those bytes (`expanded`, `revised`,
- * `absent`, `unwitnessed`). Actual reuse (`executed`) is a component expanded in the very bytes
- * the consent saved and a succeeded Run ran, never one retrieved or merely similar. A proposal
- * whose Session states no revision witnesses nothing: not observable, never "none".
+ * `absent`, `unwitnessed`). Actual reuse (`reused`) is a component expanded in the very bytes the
+ * consent saved, never one retrieved or merely similar. Whether a Run ran those bytes
+ * (`ran_exact`) is a separate fact, and neither proves that each of a component's nodes executed:
+ * only the Run's trace would. A proposal whose Session states no revision witnesses nothing: not
+ * observable, never "none".
  */
 function reuseOf(report, name) {
   const step = (at) => report.steps.find((entry) => entry.step === at);
   const revision = step(`${name}_reached`)?.evidence?.revision ?? null;
   if (revision === null) {
     return { observable: false, why: 'the Session states no document revision for this proposal', components: [],
-      executed: [] };
+      reused: [] };
   }
   const bound = typeof revision.candidate_sha256 === 'string' ? revision.candidate_sha256 : null;
   const saved = step(`${name}_save`)?.saved_sha256;
@@ -545,9 +547,8 @@ function reuseOf(report, name) {
   const components = (Array.isArray(revision.components) ? revision.components : []).map((use) => ({
     id: use?.id ?? null, version: use?.version ?? null, release: use?.release ?? null,
     file_sha256: use?.file_sha256 ?? null, bindings: use?.bindings ?? [], witness: use?.witness ?? null }));
-  const ran = savedExact === true && ranExact === true && run?.end?.end === 'succeeded';
   return { observable: true, candidate_sha256: bound, saved_exact: savedExact, ran_exact: ranExact, components,
-    executed: ran ? components.filter((use) => use.witness === 'expanded').map((use) => use.id) : [] };
+    reused: savedExact === true ? components.filter((use) => use.witness === 'expanded').map((use) => use.id) : [] };
 }
 
 /**

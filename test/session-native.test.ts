@@ -118,7 +118,15 @@ describe('native authoring Session', () => {
     const again = await session.submit(first, 'hello', { command: 'c-1' });
     expect(original.replayed).toBe(false);
     expect(again).toMatchObject({ replayed: true, command: 'c-1', outcomes: original.outcomes });
-    expect(again.event).toBeUndefined();
+    // The recorded result again, with its original event number, never logged a second time.
+    expect(again.event).toBe(original.event);
+    const later = await session.submit(again.snapshot, 'later', { command: 'c-later' });
+    const results: number[] = [];
+    for await (const event of session.events({ after: `${session.id}:0` })) {
+      if (event.frame === 'result') results.push(event.event!);
+      if (event.event === later.event) break;
+    }
+    expect(results).toEqual([original.event, later.event]);
     // The handle binds an identity to its bytes as the host's ledger does: refused before sending.
     const conflict = await failure(session.submit(first, 'other words', { command: 'c-1' }));
     expect(conflict).toBeInstanceOf(NikaConfigurationError);

@@ -106,6 +106,8 @@ class NativeSessionChannel implements SessionChannel {
   readonly #subscribers = new Set<Subscriber>();
   readonly #exited: Promise<number | null>;
   #pending = Buffer.alloc(0);
+  /** The last event number the log delivered. */
+  #lastEvent = 0;
   #stderr = '';
   #ended: Error | 'closed' | undefined;
   #opening?: { resolve(frame: NikaSessionOpened): void; reject(error: Error): void };
@@ -373,7 +375,9 @@ class NativeSessionChannel implements SessionChannel {
       this.#protocol('a frame named another Session');
       return;
     }
-    if (typeof frame.event === 'number') {
+    // The log's events arrive in order. A result re-sent to a repeated command keeps its
+    // original event number and is a direct reply: it settles its command, never logged twice.
+    if (typeof frame.event === 'number' && frame.event > this.#lastEvent) {
       this.#event(frame);
       if (frame.frame === 'result') this.#settle(frame.command as string, frame as unknown as NikaSessionResult);
       if (frame.frame === 'closed') this.#closed(frame as unknown as NikaSessionClosed);
@@ -416,6 +420,7 @@ class NativeSessionChannel implements SessionChannel {
   }
 
   #event(frame: Record<string, unknown>): void {
+    this.#lastEvent = frame.event as number;
     const event = { ...frame, cursor: `${this.session}:${frame.event as number}` } as NikaSessionEvent;
     this.#events.push(event);
     if (this.#events.length > this.#retention) this.#events.shift();

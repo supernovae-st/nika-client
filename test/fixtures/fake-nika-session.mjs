@@ -139,7 +139,8 @@ input.on('line', (line) => {
       emit({ frame: 'refused', command: command.command, error: 'command_conflict', message: 'other bytes',
         line: command.line, snapshot: current });
     } else if (known.result) {
-      emit({ ...known.result, replayed: true, event: undefined });
+      // v3: the recorded log frame again, with its original event number, as a direct reply.
+      process.stdout.write(`${JSON.stringify({ ...known.result, replayed: true })}\n`);
     }
     // In flight with the same bytes: the native door writes nothing; the result event answers both.
     return;

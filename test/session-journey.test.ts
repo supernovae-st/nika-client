@@ -569,6 +569,7 @@ describe('each leg is summarized for a requalification table', () => {
       create: { attempted: 3, passed: 1, semantic_hold: 1, provider_failure: 1, failed: 0, not_exercised: 0 },
       edit: { attempted: 1, passed: 1, semantic_hold: 0, provider_failure: 0, failed: 0, not_exercised: 0 },
       full_routes: { passed: 1, of: 3 },
-      law: 'an EDIT behind a stopped CREATE was never attempted and counts in no EDIT denominator' });
+      law: 'an EDIT behind a stopped CREATE was never attempted and counts in no EDIT denominator; '
+        + 'a full route also closed both Sessions without a fault' });
   });
 });

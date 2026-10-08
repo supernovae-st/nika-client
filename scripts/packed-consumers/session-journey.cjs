@@ -214,6 +214,8 @@ async function journey(sdk, config, steps, open) {
   record('create_open', { ...frameRow(first.opened), intelligence: first.opened.snapshot.work.intelligence ?? null,
     opened_with: opened, open_ms: firstOpenMs });
   const created = await leg('create', first, config.create);
+  // Closing a Session comes after its leg settled: a fault there is the journey's, never the leg's.
+  record('create_closing', {});
   await closing(first);
   if (created !== null) {
     // EDIT: a new Session over the same project world; the change in words. Its opening is EDIT's
@@ -223,6 +225,7 @@ async function journey(sdk, config, steps, open) {
     record('edit_open', { ...frameRow(second.opened), intelligence: second.opened.snapshot.work.intelligence ?? null,
       created_sha256: created.savedSha, opened_with: opened, open_ms: secondOpenMs });
     await leg('edit', second, config.edit);
+    record('edit_closing', {});
     await closing(second);
   }
   record('operator_choice', { when: 'after', ...keptChoice() });
@@ -591,9 +594,10 @@ function reuseOf(report, name) {
  * authoring call answered: the verifier held it) or `not_exercised` (anything else left unproven,
  * with the first reason: incomplete receipts prove no cause; a leg whose requested seat went
  * unproven is never attributed a hold or a failure of that seat). Its calls' ends, monotonic
- * timing and reuse witnesses ride along.
+ * timing and reuse witnesses ride along, with a fault charged to it (`fault`) and one that came
+ * while its Session closed after it settled (`lifecycle_fault`), which never changes its outcome.
  */
-function legSummary(report, name, legChecks) {
+function legSummary(report, name, legChecks, closing = null) {
   const step = (at) => report.steps.find((entry) => entry.step === at);
   const reached = step(`${name}_reached`);
   // A submit was accepted when a turn settled on it, or when the harness stopped waiting while
@@ -612,7 +616,7 @@ function legSummary(report, name, legChecks) {
   const summary = (outcome, why) => ({ attempted, outcome, why, calls, timing,
     per_call: Array.isArray(rows) ? rows.map((row) => ({ call: row?.call ?? null, elapsed_ms: row?.elapsed_ms ?? null,
       stop_reason: row?.stop_reason ?? null, failure_kind: row?.failure_kind ?? null })) : null,
-    reuse: reuseOf(report, name), fault: fault?.observed ?? null });
+    reuse: reuseOf(report, name), fault: fault?.observed ?? null, lifecycle_fault: closing ?? null });
   if (!attempted) {
     if (fault === null) return summary('not_attempted', 'an earlier leg stopped first');
     const opening = step(`${name}_opening`) !== undefined && step(`${name}_open`) === undefined;
@@ -646,8 +650,9 @@ function legSummary(report, name, legChecks) {
 
 /**
  * A report's CREATE and EDIT denominators over its exercised doors: each leg counted only where
- * its words were sent, so an EDIT behind a stopped CREATE counts in no EDIT denominator; a full
- * route is a door whose CREATE and EDIT both passed.
+ * its words were sent, so an EDIT behind a stopped CREATE counts in no EDIT denominator. A leg's
+ * business verdict stays distinct from the route's completion: a full route is a door whose CREATE
+ * and EDIT both passed and whose Sessions both closed without a fault.
  */
 function journeyDenominators(doors) {
   const exercised = doors.filter((door) => door?.exercised === true && door.legs);
@@ -657,10 +662,12 @@ function journeyDenominators(doors) {
     return { attempted: legs.length, passed: by('passed'), semantic_hold: by('semantic_hold'),
       provider_failure: by('provider_failure'), failed: by('failed'), not_exercised: by('not_exercised') };
   };
+  const complete = (leg) => leg?.outcome === 'passed' && (leg.lifecycle_fault ?? null) === null;
   return { create: count('create'), edit: count('edit'),
-    full_routes: { passed: exercised.filter((door) => door.legs.create?.outcome === 'passed'
-      && door.legs.edit?.outcome === 'passed').length, of: exercised.length },
-    law: 'an EDIT behind a stopped CREATE was never attempted and counts in no EDIT denominator' };
+    full_routes: { passed: exercised.filter((door) => complete(door.legs.create) && complete(door.legs.edit)).length,
+      of: exercised.length },
+    law: 'an EDIT behind a stopped CREATE was never attempted and counts in no EDIT denominator; '
+      + 'a full route also closed both Sessions without a fault' };
 }
 
 /** Whether the Session's own selection is the seat that was requested. */
@@ -684,15 +691,22 @@ function isRequestedSeat(selected, requested) {
  * reached over ACP, each leg also requires every authoring call to have carried it.
  */
 function judgeJourney(report, expected, requested = null, worldChecks = null, effort = null) {
-  const legsOf = (byLeg) => ({ create: legSummary(report, 'create', byLeg.create),
-    edit: legSummary(report, 'edit', byLeg.edit) });
+  const legsOf = (byLeg, closing = {}) => ({ create: legSummary(report, 'create', byLeg.create, closing.create),
+    edit: legSummary(report, 'edit', byLeg.edit, closing.edit) });
   if (report.error !== null) {
     // A fault fails the journey and the leg it stopped; a leg settled before it keeps the verdicts
-    // of its own evidence.
+    // of its own evidence. One while a leg's Session closes came after that leg settled: the leg
+    // keeps its verdict and carries the fault as its lifecycle's, and a later leg never began.
     const completed = { name: 'the journey completed', verdict: 'failed', observed: report.error };
     const { byLeg } = judgeLegs({ ...report, error: null }, expected, requested, worldChecks, effort);
-    byLeg[report.steps.some((entry) => entry.step.startsWith('edit_')) ? 'edit' : 'create'].push(completed);
-    return { verdict: 'failed', checks: [completed], legs: legsOf(byLeg) };
+    const last = report.steps.at(-1)?.step;
+    const closed = ['create', 'edit'].find((name) => last === `${name}_closing`);
+    if (closed === 'create') byLeg.edit.push(completed);
+    else if (closed === undefined) {
+      byLeg[report.steps.some((entry) => entry.step.startsWith('edit_')) ? 'edit' : 'create'].push(completed);
+    }
+    return { verdict: 'failed', checks: [completed],
+      legs: legsOf(byLeg, closed === undefined ? {} : { [closed]: report.error }) };
   }
   const { checks, byLeg } = judgeLegs(report, expected, requested, worldChecks, effort);
   const verdict = checks.some((entry) => entry.verdict === 'failed') ? 'failed'

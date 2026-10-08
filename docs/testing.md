@@ -439,7 +439,9 @@ call with no documented end, prove no cause; a leg whose requested seat went
 unproven is never attributed that seat's hold), or `not_attempted` (an earlier
 leg stopped first, or a fault came before its words were accepted, the EDIT
 Session's opening included). A fault the journey charged to a leg rides as its
-`fault`, apart from what the leg proved. Beside it ride the calls' ends, the timing and
+`fault`, apart from what the leg proved; one that came while a leg's Session
+closed, after the leg settled, fails the journey and rides as that leg's
+`lifecycle_fault`, never changing its verdict. Beside it ride the calls' ends, the timing and
 the reuse its proposal witnesses: each component of the revision the Session
 states for the bytes, with the engine's witness (`expanded`, `revised`,
 `absent`, `unwitnessed`), `reused`, the components expanded in the very bytes
@@ -450,7 +452,9 @@ task or trace witness read, that stays unknown. A proposal whose Session states
 no revision witnesses nothing (`observable: false`), never "none". The
 journey's `denominators` count CREATE and EDIT apart over the exercised doors:
 an EDIT behind a stopped CREATE was never attempted and counts in no EDIT
-denominator.
+denominator. Business verdicts stay apart from the route's completion: a full
+route is a door whose CREATE and EDIT both passed and whose Sessions both closed
+without a fault.
 
 `NIKA_SESSION_JOURNEY_WORLD` (an absolute path to an ES module) replaces the
 built-in tickets world with another case, kept outside this repository when its

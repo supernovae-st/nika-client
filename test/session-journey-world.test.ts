@@ -545,6 +545,59 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
       create: { attempted: 1, passed: 1 }, edit: { attempted: 0 }, full_routes: { passed: 0, of: 1 } });
   }, WALKS);
 
+  it.each([['CREATE', 1, 'create_closing'], ['EDIT', 2, 'edit_closing']] as const)(
+    'keeps each settled verdict when the %s Session fails to close, the journey failed',
+    async (leg, failing, phase) => {
+      const { dir, project, check } = world();
+      vi.stubEnv('HOME', path.join(dir, 'home'));
+      let opens = 0;
+      const sdk = { Nika: class {
+        openSession = async () => {
+          opens += 1;
+          const own = opens;
+          const session = scriptedSession(project, null, [], null, { opened: CLAUDE, prepared: CLAUDE });
+          return { ...session,
+            close: async () => {
+              if (own === failing) {
+                throw Object.assign(new Error('the Session did not close'), { name: 'NikaTransportError' });
+              }
+              return session.close();
+            },
+            submit: async (shown: unknown, words: string) => {
+              const settled = await session.submit(shown, words);
+              const work = settled.snapshot.work;
+              work.authoring = { ...(work.authoring ?? {}), calls: { requested_model: 'claude-code/opus[1m]',
+                input_tokens: null, output_tokens: null, elapsed_ms: 1, calls: 1,
+                backend: { kind: 'harness_infer', transport: 'acp', observed: call('max', 'max', 'max') } } };
+              work.intelligence = { ...work.intelligence, effort: 'max' };
+              return settled;
+            } };
+        };
+      } };
+      const report = await journey(sdk, { door: 'native', bin: '/x', project, moduleSystem: 'esm', choice: null,
+        intelligence: WORDS, answers: {}, create: 'Create the stale report', edit: 'Raise to 72', checkBin: check,
+        snapshots: path.join(dir, 'legs'), capture: ['out'] });
+      expect(report.error).toMatchObject({ name: 'NikaTransportError', at: phase });
+      const summarized = journey as unknown as { judgeJourney: (...args: unknown[]) => { verdict: string;
+        checks: { name: string }[]; legs: Record<string, any> }; journeyDenominators: (doors: unknown[]) => any };
+      const judged = summarized.judgeJourney(report, TICKETS, WORDS, null, 'max');
+      expect([judged.verdict, judged.checks.map((entry) => entry.name)]).toEqual(['failed', ['the journey completed']]);
+      const fault = { name: 'NikaTransportError', message: 'the Session did not close', at: phase };
+      expect(judged.legs.create).toMatchObject({ outcome: 'passed', fault: null,
+        lifecycle_fault: leg === 'CREATE' ? fault : null });
+      const denominators = summarized.journeyDenominators([{ door: 'native', exercised: true, ...judged }]);
+      if (leg === 'CREATE') {
+        // EDIT never began: no words accepted, in no EDIT denominator.
+        expect(judged.legs.edit).toMatchObject({ attempted: false, outcome: 'not_attempted', fault });
+        expect(denominators).toMatchObject({ create: { attempted: 1, passed: 1 }, edit: { attempted: 0 } });
+      } else {
+        expect(judged.legs.edit).toMatchObject({ outcome: 'passed', fault: null, lifecycle_fault: fault });
+        expect(denominators).toMatchObject({ create: { passed: 1 }, edit: { attempted: 1, passed: 1 } });
+      }
+      // Business verdicts stand; a route whose cleanup failed is not complete.
+      expect(denominators.full_routes).toEqual({ passed: 0, of: 1 });
+    }, WALKS);
+
   it('passes when every authoring call asked, took and read back the requested effort', async () => {
     const judged = journey.judgeJourney(await walked([...call('max', 'max', 'max'), ...call('max', 'max', 'max')]),
       TICKETS, WORDS, null, 'max');

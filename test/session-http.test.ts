@@ -160,6 +160,26 @@ describe('HTTP authoring Session', () => {
     expect(error.message).not.toContain('\n');
   });
 
+  it('reports a malformed JSON body without carrying its text anywhere', async () => {
+    const marker = 'PRIVATE-MARKER-reorder-boxes';
+    const malformed = (status: number) => () => new Response(`{"contract": "${marker}", oops`,
+      { status, headers: { 'Content-Type': 'application/json' } });
+    const opening = server({ 'POST /v1/sessions': malformed(201) });
+    const commanded = server({ 'POST /v1/sessions': opened, [`POST ${base}/commands`]: malformed(200) });
+    const errors = [
+      await failure(opening.client.openSession()),
+      await failure((await commanded.client.openSession()).stop()),
+    ];
+    for (const error of errors) {
+      expect(error).toBeInstanceOf(NikaProtocolError);
+      expect(error.message).toMatch(/did not return valid JSON/);
+      expect(error.cause).toBeUndefined();
+      for (const surface of [inspect(error, { depth: 10 }), JSON.stringify(error), String(error)]) {
+        expect(surface).not.toContain(marker);
+      }
+    }
+  });
+
   it('refuses a refusal whose word is not an identifier, without echoing it', async () => {
     const { client } = server({
       'POST /v1/sessions': opened,

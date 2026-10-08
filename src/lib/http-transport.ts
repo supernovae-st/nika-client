@@ -596,8 +596,16 @@ export class HttpTransport implements Transport {
   private sessionPort(): HttpSessionPort {
     return {
       request: (path, init, unbounded) => this.fetchResponse(path, init, !unbounded, true, false, unbounded),
-      object: (response, path, signal, maxBytes, useRequestTimeout) =>
-        this.readObservationObject(response, path, signal, maxBytes, useRequestTimeout),
+      object: async (response, path, signal, maxBytes, useRequestTimeout) => {
+        try {
+          return await this.readObservationObject(response, path, signal, maxBytes, useRequestTimeout);
+        } catch (error) {
+          // Same diagnostic, no cause: a JSON or UTF-8 failure quotes the body it read, and a
+          // Session body carries what a person wrote.
+          if (error instanceof NikaProtocolError) throw new NikaProtocolError(this.kind, error.message);
+          throw error;
+        }
+      },
       failure: async (response, path) => {
         const refusal = await this.readRefusal(response, path);
         if (refusal) return this.refused(path, { operation: 'session', status: response.status, refusal });

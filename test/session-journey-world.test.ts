@@ -20,6 +20,9 @@ const journey = require('../scripts/packed-consumers/session-journey.cjs') as ((
 const sha256 = (text: string | Buffer) => createHash('sha256').update(text).digest('hex');
 const SINK = 'http://127.0.0.1:1/notifications/hook';
 const WORKFLOW = (threshold: number) => `nika: stale\nconst:\n  max_age_hours: ${threshold}\ntasks: {}\n`;
+// A test walking several scripted journeys runs the real check process at each Save: under a
+// loaded machine that outlasts the default five seconds without anything being wrong.
+const WALKS = 30_000;
 
 type Seat = Record<string, unknown> | null;
 
@@ -375,7 +378,7 @@ describe('a journey opened with the conversation\'s own intelligence', () => {
       path.join(rewritten.home, '.nika', 'session-intelligence.json'), '{"kind":"harness"}\n')),
     config(rewritten.dir, rewritten.project, rewritten.check));
     expect(verdict(journey.judgeJourney(rewrote, null, WORDS), /kept choice/)).toEqual(['failed']);
-  });
+  }, WALKS);
 
   // Independent review of 006bc2c: the judge read the selection at the CREATE open only, so a
   // Session that opened on the requested seat and then prepared with another passed.
@@ -409,7 +412,7 @@ describe('a journey opened with the conversation\'s own intelligence', () => {
     expect(named(unseenOpen, 'the EDIT Session holds the requested intelligence for this conversation alone'))
       .toMatchObject({ verdict: 'not_exercised', why: 'no selection scope was observed at edit_open' });
     expect([unseenReached.verdict, unseenOpen.verdict]).toEqual(['not_exercised', 'not_exercised']);
-  });
+  }, WALKS);
 });
 
 describe('a journey asking an explicit effort of a seat reached over ACP', () => {
@@ -473,7 +476,7 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
     const configured = journey.judgeJourney(await walked(call('max', 'max', 'max'), 'high'), TICKETS, WORDS, null,
       'max');
     expect(effortChecks(configured).map((entry) => entry.verdict)).toEqual(['failed', 'failed']);
-  });
+  }, WALKS);
 
   it('never passes receipts that name no effort, nor a leg with no returned call', async () => {
     const unnamed = journey.judgeJourney(await walked(call('max', null, null)), TICKETS, WORDS, null, 'max');
@@ -482,7 +485,7 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
         + 'configured_effort' });
     const none = journey.judgeJourney(await walked([]), TICKETS, WORDS, null, 'max');
     expect(effortChecks(none)[0]).toMatchObject({ verdict: 'not_exercised', why: 'no authoring call returned on this leg' });
-  });
+  }, WALKS);
 
   // Root review of 3193d70: a returned record with no invocation before it passed, since no
   // `invoking` record meant no missing `requested_effort`.
@@ -493,7 +496,7 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
     const second = journey.judgeJourney(await walked([...call('max', 'max', 'max'), returnedAlone]), TICKETS, WORDS,
       null, 'max');
     expect(effortChecks(second).map((entry) => entry.verdict)).toEqual(['not_exercised', 'not_exercised']);
-  });
+  }, WALKS);
 
   it('reads a call that ended without returning by what it asked, and counts only returned calls', async () => {
     const failed = (asked: string) => [{ status: 'invoking', requested_effort: asked },
@@ -506,7 +509,7 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
     const other = journey.judgeJourney(await walked([...failed('high'), ...call('max', 'max', 'max')]), TICKETS, WORDS,
       null, 'max');
     expect(effortChecks(other)[0]!.observed.other).toEqual([{ at: 'create_turn 0 call 0 requested_effort', value: 'high' }]);
-  });
+  }, WALKS);
 
   // Root review of 3193d70: the reached frame holds its last compile's calls only.
   it('reads every turn of a leg, so an earlier compile\'s effort cannot hide behind the last one', async () => {

@@ -27,7 +27,8 @@ module.exports = async function compileEvidence(sdk, config) {
   for (const door of ['native', 'http']) {
     const started = Date.now();
     const outcome = door === 'native'
-      ? await native.compile({ ...revise, authoringModel: config.model })
+      ? await native.compile({ ...revise, authoringModel: config.model,
+        ...(config.decisionModel ? { decisionModel: config.decisionModel } : {}) })
       : await http.compile({ ...revise, cognition: 'explicitProvider' }, { observe: false });
     rows.push(evidenceRow(sdk, door, outcome, config, Date.now() - started));
   }

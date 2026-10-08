@@ -958,6 +958,15 @@ interface NikaCompileRequestFields {
    */
   authoringModel?: string;
   /**
+   * Local engine only (`--decision-model`): one bounded-decision seat
+   * (`typesafe/<jev>` or `provider/name`) for finite ambiguities and the
+   * verifier's judgment. A revision (`workflow` + `change`) takes it from the
+   * 0.123 integration line (engine `ae6845939`); an earlier engine refuses
+   * `--decision-model` beside `--base` with its usage error. Over HTTP the
+   * server's operator seats it (`compileDecisionSeat`).
+   */
+  decisionModel?: string;
+  /**
    * Local engine only (`--output`): where the engine writes a READY
    * candidate, atomically; relative paths resolve against the client's
    * `cwd`. The engine never writes anything that is not ready. The outcome
@@ -972,11 +981,6 @@ export interface NikaCompileCreateRequest extends NikaCompileRequestFields {
   intent: string;
   /** HTTP only (wire `workflow_id`): names the created workflow. */
   workflow_id?: string;
-  /**
-   * Local engine only (`--decision-model`): one bounded-decision seat
-   * (`typesafe/<jev>` or `provider/name`) for finite ambiguities. Create only.
-   */
-  decisionModel?: string;
   /**
    * Local engine only (`--fresh`): ignore the plan an earlier round recorded
    * for this intent under `.nika/compile/` and read or sample it again.
@@ -1007,7 +1011,6 @@ export interface NikaCompileEditRequest extends NikaCompileRequestFields {
   original_intent?: string;
   intent?: never;
   workflow_id?: never;
-  decisionModel?: never;
   fresh?: never;
 }
 

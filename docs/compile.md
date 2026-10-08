@@ -138,7 +138,7 @@ a local engine has are named after the flag they become.
 | `limits.deadline_ms` | `limits.deadline_ms` | refused: no flag; bound the child with `timeoutMs` |
 | `replay_token` | `replay_token`: with `explicitProvider` the judged answer round, with `deterministicOnly` the zero-call replay | refused |
 | `authoringModel` | refused | `--authoring-model` |
-| `decisionModel` (create) | refused | `--decision-model` |
+| `decisionModel` | refused | `--decision-model`; on a revision, an engine from `ae6845939` on |
 | `fresh` (create) | refused | `--fresh` |
 | `output` | refused | `--output` |
 

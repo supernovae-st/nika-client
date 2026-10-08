@@ -169,8 +169,8 @@ try {
     const model = process.env.NIKA_COMPILE_PROVIDER_MODEL;
     if (!model) return { ran: false, why: 'NIKA_COMPILE_PROVIDER_MODEL unset: deterministic phase only' };
     // The seats each door is given (Serve seats a direct provider only; a native seat may be an
-    // ACP harness such as `claude-code/…` or `codex/…`). The decision seat judges Serve's rounds;
-    // the local engine seats one for a creation only (its `--decision-model` refuses `--base`).
+    // ACP harness such as `claude-code/…` or `codex/…`), and the decision seat both doors judge
+    // with (a local revision takes `--decision-model` from engine ae6845939 on).
     const seats = {
       native: process.env.NIKA_COMPILE_NATIVE_MODEL ?? model,
       serve: process.env.NIKA_COMPILE_SERVE_MODEL ?? model,
@@ -218,7 +218,7 @@ try {
     for (const moduleSystem of ['cjs', 'esm']) {
       const config = path.join(consumer, 'evidence.json');
       writeFileSync(config, JSON.stringify({ bin: binary, project: seatedProject, url: seatedUrl, token, moduleSystem,
-        model: seats.native, base: REVISION_BASE, change: REVISION_CHANGE,
+        model: seats.native, decisionModel: seats.decision, base: REVISION_BASE, change: REVISION_CHANGE,
         originalIntent: REVISION_INTENT, keptLines: REVISION_KEPT }));
       const result = JSON.parse(await owned.run(process.execPath,
         [path.join(consumer, `evidence-consumer.${moduleSystem === 'esm' ? 'mjs' : 'cjs'}`), config],

@@ -112,6 +112,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default. The depth ledger, evidence gate and replay fixtures now count six
   projects; the new row records behavioral verdicts only, never a job id.
 
+### Changed
+
+- A local revision (`workflow` + `change`) may carry `decisionModel`: the
+  0.123 integration engine (`ae6845939`) seats `--decision-model` beside
+  `--base`, so the verifier of a revision can be the decision intelligence its
+  caller chose, as over HTTP. An earlier engine refuses the pair with its own
+  usage error, reported as before.
+
 ### Fixed
 
 - An HTTP provider compile round with no deadline no longer fails after

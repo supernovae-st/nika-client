@@ -226,6 +226,28 @@ describe('a journey walked over a scripted Session', () => {
       .toMatchObject({ verdict: 'not_exercised' });
   });
 
+  it('keeps the Session\'s own outcome words, a refusal\'s reason included, never only their kinds', async () => {
+    const { dir, project, check } = world();
+    const refusal = { kind: 'refusal', text: 'Scripted refusal: the reason in the Session\'s own words.' };
+    const sdk = { Nika: class {
+      openSession = async () => {
+        const session = scriptedSession(project, null, []);
+        return { ...session, submit: async (shown: unknown, line: string) => {
+          const settled = await session.submit(shown, line);
+          settled.snapshot.work = { ...settled.snapshot.work, waiting: { kind: 'free' }, candidate: null };
+          return { ...settled, outcomes: [refusal] };
+        } };
+      };
+    } };
+    const report = await journey(sdk, { door: 'native', bin: '/x', project, moduleSystem: 'esm', choice: null,
+      answers: {}, create: 'Create the stale report', edit: 'Raise to 72', checkBin: check,
+      snapshots: path.join(dir, 'legs'), capture: ['out'] });
+    for (const step of ['create_turn', 'create_reached']) {
+      expect(report.steps.find((entry) => entry.step === step)).toMatchObject({ outcomes: ['refusal'],
+        raw: { outcomes: [refusal] } });
+    }
+  });
+
   it('ends a leg on a cut wait as the harness bound it is, keeping the Session as it was then', async () => {
     const { dir, project, check } = world();
     const sdk = { Nika: class {

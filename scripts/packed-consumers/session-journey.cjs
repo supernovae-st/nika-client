@@ -131,12 +131,12 @@ async function journey(sdk, config, steps, open) {
     // The engine's own check of the exact saved bytes in the project world, as a person runs it: a
     // world's oracle reads this real verdict, never a status assumed for it.
     const check = config.checkBin && saved?.workflow ? checked(config.checkBin, config.project, saved.workflow) : null;
-    record(`${name}_save`, { ...frameRow(consent), saved_bytes_are_previewed: landedExactly(previewed, landed),
+    record(`${name}_save`, { ...journeyRow(consent), saved_bytes_are_previewed: landedExactly(previewed, landed),
       saved_sha256: savedSha, saved_base64: landed === null ? null : landed.toString('base64'),
       save_ran_nothing: ranNothing, check });
     const runStartedAt = Date.now();
     let run = await send(session, consent.snapshot, 'run it', `${name}-run`);
-    record(`${name}_run`, frameRow(run));
+    record(`${name}_run`, journeyRow(run));
     // What the Run asks before it starts: the resident's cost review, which the persona accepts
     // (the Run is the authorized step), and a declared input's value, answered only by a persona
     // rule over its name and asking words, never guessed. Anything else is left to the person.
@@ -144,13 +144,13 @@ async function journey(sdk, config, steps, open) {
       const waiting = run.snapshot.work.waiting;
       if (waiting.kind === 'run_review') {
         run = await send(session, run.snapshot, 'yes', `${name}-run-review-${asked}`);
-        record(`${name}_run_review`, frameRow(run));
+        record(`${name}_run_review`, journeyRow(run));
         continue;
       }
       const answer = waiting.kind === 'input' ? answerFor(persona.answers, { key: waiting.name }, run, 'input') : null;
       if (answer === null) break;
       run = await send(session, run.snapshot, answer.line, `${name}-run-input-${asked}`);
-      record(`${name}_run_input`, { ...frameRow(run), input: waiting.name ?? null, said: answer.why });
+      record(`${name}_run_input`, { ...journeyRow(run), input: waiting.name ?? null, said: answer.why });
     }
     let after = run.snapshot;
     const said = (kinds) => steps.some((entry) => entry.step.startsWith(`${name}_run`)
@@ -239,7 +239,7 @@ async function advance(send, snapshot, line, persona, report) {
     const result = await send(shown, next, `${said}-${turn}`);
     shown = result.snapshot;
     const waiting = shown.work.waiting;
-    report({ turn, said, ...frameRow(result), evidence: evidence(shown.work) });
+    report({ turn, said, ...journeyRow(result), evidence: evidence(shown.work) });
     if (waiting.kind === 'intelligence_choice' && persona.choice) {
       [next, said] = [persona.choice, 'intelligence_choice'];
     } else if (waiting.kind === 'cost_choice' && persona.acceptCost) {
@@ -253,7 +253,7 @@ async function advance(send, snapshot, line, persona, report) {
       // The raw work rides with it, every member as the engine wrote it, unknown ones included.
       const draft = waiting.kind === 'consent' ? null : shown.work.authoring?.draft ?? null;
       return { waiting: waiting.kind, snapshot: shown,
-        summary: { waiting: waiting.kind, key: waiting.key ?? null, outcomes: frameRow(result).outcomes,
+        summary: { waiting: waiting.kind, key: waiting.key ?? null, ...outcomesOf(result),
           turns: turn + 1, evidence: evidence(shown.work), draft,
           draft_sha256: typeof draft === 'string' ? sha256(Buffer.from(draft, 'utf8')) : null,
           ...(waiting.kind === 'consent' ? {} : { work: shown.work }) } };
@@ -292,6 +292,20 @@ function checked(bin, cwd, workflow) {
     maxBuffer: 8 * 1024 * 1024 });
   return { rc: result.status, signal: result.signal, error: result.error?.code ?? null,
     text: `${result.stdout ?? ''}`.slice(0, 65_536) };
+}
+
+/**
+ * One result frame as the journey keeps it: the scenario's row, plus the Session's own outcomes
+ * verbatim under `raw` (a refusal's reason, a fact's text), so a leg that stops says why in the
+ * engine's words, never only by kind.
+ */
+function journeyRow(frame) {
+  return { ...frameRow(frame), ...outcomesOf(frame) };
+}
+
+/** A frame's outcome kinds, and the outcomes themselves as the engine wrote them. */
+function outcomesOf(frame) {
+  return { outcomes: frameRow(frame).outcomes, raw: { outcomes: frame.outcomes ?? [] } };
 }
 
 /** What a snapshot says of who prepared the candidate and of the candidate itself. */

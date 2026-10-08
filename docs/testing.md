@@ -380,7 +380,9 @@ the input's name), and the consent to the proposal a leg reached; anything
 else stops the leg as `not_exercised` with what the Session waits on, without
 waiting out the polling deadline, and keeps the compiler's own draft (shown,
 never offered, such as a candidate a judge held) with its sha256, the raw
-work snapshot as the Session showed it and the Session's own details card. The
+work snapshot as the Session showed it and the Session's own details card.
+Every turn, Save and Run it keeps carries the Session's outcomes verbatim
+(`raw.outcomes`: a refusal's reason, a fact's text) beside their kinds. The
 journey's own bounds are bounds of its observation, never product limits,
 and never a verdict: it answers at most 24 lines per leg, waits for one turn
 and watches one Run within `NIKA_SESSION_JOURNEY_WAIT_MS` (30 minutes unless

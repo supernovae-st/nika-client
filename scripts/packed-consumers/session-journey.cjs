@@ -168,11 +168,36 @@ function evidence(work) {
 }
 
 /**
+ * The seat a first-screen answer names, in the Session's own vocabulary: `1 <app>[/<model>]`
+ * (`acp:` before the app asks for ACP), `2 <provider>[/<model>]`, `3 <local>`, `4`.
+ */
+function requestedSeat(choice) {
+  const [pick, name] = String(choice ?? '').trim().split(/\s+/);
+  const kind = { 1: 'harness', 2: 'api', 3: 'local', 4: 'none' }[pick] ?? null;
+  if (!name) return { kind, via: null, model: null, transport: null };
+  const acp = name.startsWith('acp:');
+  const bare = acp ? name.slice('acp:'.length) : name;
+  const slash = bare.indexOf('/');
+  return { kind, via: slash < 0 ? bare : bare.slice(0, slash), model: slash < 0 ? null : bare.slice(slash + 1),
+    transport: acp ? 'acp' : null };
+}
+
+/** Whether the Session's own selection is the seat that was requested. */
+function isRequestedSeat(selected, requested) {
+  return selected !== null && selected !== undefined && selected.kind === requested.kind
+    && (requested.via === null || selected.via === requested.via)
+    && (requested.model === null || selected.model === requested.model)
+    && (requested.transport === null || selected.transport === requested.transport);
+}
+
+/**
  * What one door's journey must show, per leg. A leg that never reached a proposal, a proposal
  * no model authored, or a Run the Session did not start or observe is `not_exercised` with the
- * engine's own words; a wrong digest, base, bytes or report is `failed`.
+ * engine's own words; a wrong digest, base, bytes or report is `failed`. When `requested`
+ * names the first-screen answer, the journey counts for that seat only if the Session's own
+ * selection is it: a choice kept from elsewhere is never relabelled as the one requested.
  */
-function judgeJourney(report, expected) {
+function judgeJourney(report, expected, requested = null) {
   if (report.error !== null) {
     return { verdict: 'failed', checks: [{ name: 'the journey completed', verdict: 'failed', observed: report.error }] };
   }
@@ -182,6 +207,24 @@ function judgeJourney(report, expected) {
   const gap = (name, why, observed) => checks.push({ name, verdict: 'not_exercised', why, observed });
   const authored = (evidence) => evidence?.calls !== null && evidence?.calls?.calls >= 1
     && ['provider', 'harness'].includes(evidence?.intelligence?.author?.kind);
+  if (requested !== null) {
+    const seat = requestedSeat(requested);
+    const reached = step('create_reached');
+    const selected = reached?.evidence?.intelligence?.selected ?? null;
+    const answered = report.steps.some((entry) => entry.step === 'create_turn' && entry.said === 'intelligence_choice');
+    if (reached === undefined || selected === null) {
+      gap('the Session prepared with the requested intelligence', 'no selection was observed', reached ?? null);
+    } else if (isRequestedSeat(selected, seat)) {
+      check('the Session prepared with the requested intelligence', true, { requested: seat, selected });
+    } else if (answered) {
+      // The persona gave the first screen this answer and the Session selected another seat.
+      check('the Session prepared with the requested intelligence', false, { requested: seat, selected });
+    } else {
+      gap('the Session prepared with the requested intelligence',
+        'the Session opened on a choice kept before this journey, never asked the first screen', { requested: seat,
+          selected });
+    }
+  }
 
   for (const [name, ids, base] of [['create', expected.create, null], ['edit', expected.edit, 'create']]) {
     const reached = step(`${name}_reached`);
@@ -242,3 +285,4 @@ function judgeJourney(report, expected) {
 
 module.exports.judgeJourney = judgeJourney;
 module.exports.advance = advance;
+module.exports.requestedSeat = requestedSeat;

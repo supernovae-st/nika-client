@@ -11,8 +11,9 @@ import { describe, expect, it } from 'vitest';
 const require = createRequire(import.meta.url);
 type Journey = { module_system: string; door: string; steps: any[]; error: any };
 type Judged = { verdict: string; checks: { name: string; verdict: string; why?: string }[] };
-const { judgeJourney, advance } = require('../scripts/packed-consumers/session-journey.cjs') as {
-  judgeJourney: (report: Journey, expected: { create: string[]; edit: string[] }) => Judged;
+const { judgeJourney, advance, requestedSeat } = require('../scripts/packed-consumers/session-journey.cjs') as {
+  judgeJourney: (report: Journey, expected: { create: string[]; edit: string[] }, requested?: string | null) => Judged;
+  requestedSeat: (choice: string) => Record<string, string | null>;
   advance: (session: unknown, snapshot: unknown, line: string, persona: unknown, signal: () => AbortSignal,
     report: (turn: unknown) => void) => Promise<{ waiting: string; summary: any }>;
 };
@@ -122,6 +123,36 @@ describe('a real-intelligence journey is judged leg by leg', () => {
     const judged = judgeJourney({ ...journey(), error: { name: 'NikaSessionWaitError', message: 'cut' } }, EXPECTED);
     expect(judged).toEqual({ verdict: 'failed', checks: [{ name: 'the journey completed', verdict: 'failed',
       observed: { name: 'NikaSessionWaitError', message: 'cut' } }] });
+  });
+});
+
+describe('a journey counts for the seat the Session actually selected', () => {
+  it('reads a first-screen answer in the Session\'s own vocabulary', () => {
+    expect(requestedSeat('1 acp:claude-code/opus')).toEqual({ kind: 'harness', via: 'claude-code', model: 'opus',
+      transport: 'acp' });
+    expect(requestedSeat('2 deepseek/deepseek-v4-flash')).toEqual({ kind: 'api', via: 'deepseek',
+      model: 'deepseek-v4-flash', transport: null });
+    expect(requestedSeat('1 codex')).toEqual({ kind: 'harness', via: 'codex', model: null, transport: null });
+    expect(requestedSeat('4')).toEqual({ kind: 'none', via: null, model: null, transport: null });
+  });
+
+  const seatCheck = (judged: Judged) => judged.checks.find((check) => /requested intelligence/.test(check.name));
+
+  it('credits the requested seat when the Session selected it', () => {
+    expect(seatCheck(judgeJourney(journey(), EXPECTED, '2 deepseek'))).toMatchObject({ verdict: 'passed' });
+  });
+
+  it('never relabels a choice kept before the journey as the requested one', () => {
+    const judged = judgeJourney(journey(), EXPECTED, '1 acp:claude-code/opus');
+    expect(seatCheck(judged)).toMatchObject({ verdict: 'not_exercised',
+      why: 'the Session opened on a choice kept before this journey, never asked the first screen' });
+    expect(judged.verdict).toBe('not_exercised');
+  });
+
+  it('fails a first-screen answer the Session did not honor', () => {
+    const answered = { ...journey(), steps: [{ step: 'create_turn', turn: 0, said: 'intelligence_choice' },
+      ...journey().steps] };
+    expect(seatCheck(judgeJourney(answered, EXPECTED, '1 acp:claude-code/opus'))).toMatchObject({ verdict: 'failed' });
   });
 });
 

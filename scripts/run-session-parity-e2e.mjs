@@ -193,7 +193,11 @@ try {
       mkdirSync(home, { recursive: true });
       const env = { ...baseEnv, HOME: home, NIKA_KEYCHAIN: 'off', ...seats,
         ...Object.fromEntries(keyNames.map((name) => [name, process.env[name]])) };
-      const row = { door, home: keyNames.includes('HOME') ? 'the person\'s own HOME' : 'isolated' };
+      // With the person's own HOME the Session's first screen would keep its answer there
+      // (`~/.nika/session-intelligence.json`): the persona then never answers it, and the
+      // judge reports a choice kept from elsewhere as such.
+      const personHome = keyNames.includes('HOME');
+      const row = { door, home: personHome ? 'the person\'s own HOME: no first-screen answer' : 'isolated' };
       if (door === 'native' && !identity.supportedCapabilities.includes('sessionHost')) {
         return { ...row, exercised: false, why: 'the engine identity lists no sessionHost' };
       }
@@ -202,9 +206,9 @@ try {
         if (served.why !== undefined) return { ...row, exercised: false, why: served.why };
         const config = path.join(base, 'config.json');
         writeFileSync(config, JSON.stringify({ door, bin: binary, project, url: served.url, token, moduleSystem: 'esm',
-          choice, acceptCost, answers, create, edit }));
+          choice: personHome ? null : choice, acceptCost, answers, create, edit }));
         const transcript = JSON.parse(await consume('esm', 'session-journey', config, env));
-        return { ...row, exercised: true, ...judgeJourney(transcript, expected), transcript };
+        return { ...row, exercised: true, ...judgeJourney(transcript, expected, choice), transcript };
       } finally {
         await release(served.server);
       }

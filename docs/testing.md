@@ -310,7 +310,12 @@ gives the Session's first screen its answer, in the Session's own words
 (`2 deepseek/<model>`, `1 acp:claude-code/<model>`, …).
 `NIKA_SESSION_JOURNEY_ENV` names the variables the engine processes receive
 (keys, and `HOME` when an app seat must find its sign-in: the journey then
-uses the person's own `HOME`); their values are never printed.
+uses the person's own `HOME`); their values are never printed. The Session
+keeps a first-screen answer in `~/.nika/session-intelligence.json`, so with
+the person's own `HOME` the persona never answers that screen: the Session
+opens on the choice the person already keeps, and a journey counts for the
+requested seat only when the Session's own selection is that seat (a choice
+kept from elsewhere is reported as such, never relabelled).
 `NIKA_SESSION_DECISION_MODEL` and `NIKA_AUTHORING_REASONING`, when set, seat
 the decision model and the reasoning effort through the engine's own
 environment.

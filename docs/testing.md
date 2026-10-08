@@ -227,7 +227,12 @@ own seat (a native seat may be an ACP harness such as `claude-code/…` or
 `codex/…`; Serve seats a direct provider), `NIKA_COMPILE_DECISION_MODEL` seats
 a decision model beside both doors' authors (a local revision takes it from
 engine `ae6845939` on), and `NIKA_COMPILE_PROVIDER_ENV` takes several variable names,
-comma-separated (`HOME` included when a harness must find its own login).
+comma-separated (`HOME`, `USER` and `LOGNAME` when a harness must find its own
+login: Claude Code reads its keychain sign-in by the account's name, and a
+missing name surfaces as "the app's sign-in has expired or was revoked"). Each
+row also keeps the outcome's own receipts whole (`raw`: the diagnostics,
+questions and provenance as the engine wrote them, with the candidate it still
+shows when nothing is ready), so a held or failed leg stays diagnosable.
 `NIKA_COMPILE_SERVE_FLAGS` gives the seated resident operator flags in its own
 words (`--authoring-max-calls`, `--authoring-repairs`, `--authoring-deadline`,
 `--authoring-timeout`, space-separated); absent, the resident's own defaults
@@ -362,7 +367,8 @@ Run cost review, a Run's declared input only from the same answers (keyed by
 the input's name), and the consent to the proposal a leg reached; anything
 else stops the leg as `not_exercised` with what the Session waits on, without
 waiting out the polling deadline, and keeps the compiler's own draft (shown,
-never offered, such as a candidate a judge held) with its sha256. The
+never offered, such as a candidate a judge held) with its sha256, the raw
+work snapshot as the Session showed it and the Session's own details card. The
 journey's own bounds are bounds of its observation, never product limits,
 and never a verdict: it answers at most 24 lines per leg, waits for one turn
 and watches one Run within `NIKA_SESSION_JOURNEY_WAIT_MS` (30 minutes unless

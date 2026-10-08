@@ -57,6 +57,18 @@ module.exports = async function compileEvidence(sdk, config) {
 };
 module.exports.evidenceRow = evidenceRow;
 module.exports.creationRow = creationRow;
+module.exports.rawEvidence = rawEvidence;
+
+/**
+ * The outcome's own receipts, as the engine wrote them (every member, unknown ones included,
+ * nothing recomputed): the full diagnostics and questions, the whole provenance (plan, decision
+ * with its rehearsal and qualification, authoring receipts) and, when nothing is ready, the
+ * candidate the engine still shows, so a held or failed leg stays diagnosable.
+ */
+function rawEvidence(outcome) {
+  return { diagnostics: outcome.diagnostics, questions: outcome.questions, provenance: outcome.provenance,
+    candidate: outcome.status === 'ready' ? undefined : outcome.candidate };
+}
 
 /**
  * One leg's evidence. The scenario targets a revision: a leg on which the
@@ -118,6 +130,7 @@ function evidenceRow(sdk, door, outcome, config, wallMs) {
       semantic_verification: decision.semantic_verification ?? null,
       route: decision.route ?? null,
     },
+    raw: rawEvidence(outcome),
     strategy: provenance.strategy ?? null,
     revision: revision === undefined ? null : {
       route: revision.route ?? null,
@@ -157,7 +170,7 @@ function creationRow(sdk, door, outcome, config, wallMs) {
     assert.equal(provenance.plan?.document, undefined, `${door}: only the document door settles a creation`);
     return { door, leg: 'create', exercised: false, why: 'no provider round: the document door was not reached',
       status: outcome.status, compile_version: outcome.compile_version, wall_ms: wallMs,
-      strategy: provenance.strategy ?? null, route: provenance.decision?.route ?? null };
+      strategy: provenance.strategy ?? null, route: provenance.decision?.route ?? null, raw: rawEvidence(outcome) };
   }
   const plan = provenance.plan;
   const decision = provenance.decision ?? {};
@@ -209,6 +222,7 @@ function creationRow(sdk, door, outcome, config, wallMs) {
         || diagnostic.target === 'verify_held' || diagnostic.target === 'verify_resume'),
       route: decision.route ?? null,
     },
+    raw: rawEvidence(outcome),
     strategy: provenance.strategy ?? null,
     settled: settled === undefined ? null : {
       version: settled.version,

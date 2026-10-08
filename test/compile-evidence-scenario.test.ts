@@ -45,6 +45,16 @@ describe('provider evidence law', () => {
       .toThrow(/a ready revision keeps its plan and states it there/);
   });
 
+  it('keeps the outcome\'s own receipts whole, unknown members included, and the candidate a judge held', () => {
+    const reports = [{ reason: 'no exact-byte trial: the room could not read ./in/tickets.json', future_member: 1 }];
+    const held = outcome('incomplete', { decision: { rehearsal: { reports }, knowledge_qualification: { x: 1 } } }, true);
+    const row = evidenceRow(sdk, 'http', held, config, 1);
+    expect(row.raw.provenance.decision.rehearsal.reports).toEqual(reports);
+    expect(row.raw.provenance.decision.knowledge_qualification).toEqual({ x: 1 });
+    expect(row.raw.diagnostics).toEqual(held.diagnostics);
+    expect(row.raw.candidate).toBe(CANDIDATE);
+  });
+
   it('marks a leg on which no revision was stated as not exercised', () => {
     const row = evidenceRow(sdk, 'http', outcome('incomplete', { decision: {} }, true), config, 1);
     expect(row.exercised).toBe(false);

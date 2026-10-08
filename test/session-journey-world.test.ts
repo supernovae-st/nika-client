@@ -92,6 +92,7 @@ function scriptedSession(project: string, asked: string | null, sent: string[], 
         changed: ['const.max_age_hours'], components: [] });
     },
     async snapshot() { return snapshot(); },
+    async details() { return { frame: 'details', text: 'Details · scripted: how the last workflow was built' }; },
     async close() { return { frame: 'closed' }; },
   };
 }
@@ -208,8 +209,12 @@ describe('a journey walked over a scripted Session', () => {
     const report = await journey(sdk, { door: 'native', bin: '/x', project, moduleSystem: 'esm', choice: null,
       answers: {}, create: 'Create the stale report', edit: 'Raise to 72', checkBin: check,
       snapshots: path.join(dir, 'legs'), capture: ['out'] });
-    expect(report.steps.find((entry) => entry.step === 'create_reached')).toMatchObject({ waiting: 'free',
-      draft: held, draft_sha256: sha256(held) });
+    const reached = report.steps.find((entry) => entry.step === 'create_reached');
+    expect(reached).toMatchObject({ waiting: 'free', draft: held, draft_sha256: sha256(held),
+      details: 'Details · scripted: how the last workflow was built' });
+    // The raw work rides along, every member as the Session showed it.
+    expect(reached.work).toMatchObject({ waiting: { kind: 'free' }, candidate: null,
+      authoring: { status: 'incomplete', draft: held } });
     expect(journey.judgeJourney(report, null).checks.find((entry) => /CREATE leg reached/.test(entry.name)))
       .toMatchObject({ verdict: 'not_exercised' });
   });

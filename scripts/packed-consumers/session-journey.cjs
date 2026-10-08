@@ -84,7 +84,8 @@ async function journey(sdk, config, steps, open) {
       throw new HarnessBound({ bound: 'turn_wait', limit_ms: waitMs, command,
         why: `the harness stopped waiting for ${command} after ${waitMs} ms: ${OBSERVATION}`,
         busy: now?.busy ?? null, waiting: now?.work?.waiting ?? null, evidence: now ? evidence(now.work) : null,
-        draft, draft_sha256: typeof draft === 'string' ? sha256(Buffer.from(draft, 'utf8')) : null });
+        draft, draft_sha256: typeof draft === 'string' ? sha256(Buffer.from(draft, 'utf8')) : null,
+        work: now?.work ?? null });
     }
   };
 
@@ -103,6 +104,11 @@ async function journey(sdk, config, steps, open) {
   async function walk(name, session, words) {
     const reached = await advance((snapshot, line, command) => send(session, snapshot, line, command),
       session.opened.snapshot, words, persona, (turn) => record(`${name}_turn`, turn));
+    if (reached.waiting !== 'consent') {
+      // What the Session itself says of how it got here (its details card), beside the raw work.
+      reached.summary.details = await Promise.resolve().then(() => session.details({ signal: signal() }))
+        .then((frame) => frame.text ?? null, (error) => ({ unavailable: String(error?.message ?? error) }));
+    }
     record(`${name}_reached`, reached.summary);
     if (reached.waiting !== 'consent') return null;
     const shown = reached.snapshot;
@@ -225,11 +231,13 @@ async function advance(send, snapshot, line, persona, report) {
     } else {
       // Where no proposal waits, the compiler's own draft (shown, never offered) is kept with its
       // digest, so a candidate a judge held stays inspectable after the scratch is gone.
+      // The raw work rides with it, every member as the engine wrote it, unknown ones included.
       const draft = waiting.kind === 'consent' ? null : shown.work.authoring?.draft ?? null;
       return { waiting: waiting.kind, snapshot: shown,
         summary: { waiting: waiting.kind, key: waiting.key ?? null, outcomes: frameRow(result).outcomes,
           turns: turn + 1, evidence: evidence(shown.work), draft,
-          draft_sha256: typeof draft === 'string' ? sha256(Buffer.from(draft, 'utf8')) : null } };
+          draft_sha256: typeof draft === 'string' ? sha256(Buffer.from(draft, 'utf8')) : null,
+          ...(waiting.kind === 'consent' ? {} : { work: shown.work }) } };
     }
   }
   // The persona's own bound, never the Session's: what the Session shows now is kept.
@@ -239,7 +247,7 @@ async function advance(send, snapshot, line, persona, report) {
       harness: { bound: 'persona_turns', limit: PERSONA_TURNS,
         why: `the persona answered ${PERSONA_TURNS} lines and stopped: ${OBSERVATION}` },
       evidence: evidence(shown.work), draft,
-      draft_sha256: typeof draft === 'string' ? sha256(Buffer.from(draft, 'utf8')) : null } };
+      draft_sha256: typeof draft === 'string' ? sha256(Buffer.from(draft, 'utf8')) : null, work: shown.work } };
 }
 
 /**

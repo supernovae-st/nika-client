@@ -119,10 +119,19 @@ class HttpSessionChannel implements SessionChannel {
     const channel = this;
     return {
       async *[Symbol.asyncIterator]() {
+        // A view whose signal already ended is over before it starts: nothing is requested.
+        if (signal?.aborted) return;
         const path = channel.#path('/events');
         const headers = new Headers({ Accept: 'text/event-stream' });
         if (after !== undefined) headers.set('Last-Event-ID', after);
-        const response = await channel.port.request(path, { method: 'GET', headers, signal }, true);
+        let response: Response;
+        try {
+          response = await channel.port.request(path, { method: 'GET', headers, signal }, true);
+        } catch (error) {
+          // Ending the view is the caller's choice, not a failure; it never stops the Session.
+          if (signal?.aborted) return;
+          throw error;
+        }
         if (response.status !== 200) throw await refusal(channel.port, response, path, signal);
         const type = response.headers.get('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase();
         if (type !== 'text/event-stream' || !response.body) {

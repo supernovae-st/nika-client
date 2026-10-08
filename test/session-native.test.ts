@@ -10,6 +10,7 @@ import {
   NikaConfigurationError,
   NikaSessionRefusedError,
   NikaSessionWaitError,
+  NikaTransportError,
 } from '../src/index.js';
 import type { NikaSessionEvent, NikaSessionResult } from '../src/index.js';
 
@@ -206,6 +207,48 @@ describe('native authoring Session', () => {
     await expect(async () => {
       for await (const _ of session.events({ after: 'ses_other:1' })) break;
     }).rejects.toBeInstanceOf(NikaConfigurationError);
+  });
+
+  it('refuses a delayed view whose events left retention, and stays usable', async () => {
+    process.env.NIKA_FAKE_ARGV_LOG = argvLog;
+    const session = await new Nika({ bin: SESSION_ENGINE, eventBufferSize: 4 }).openSession();
+    opened.push(session);
+    const view = session.events({ after: `${session.id}:1` });
+    let shown = await session.snapshot();
+    // Two turns publish six events: the handle keeps the last four, so event 2 is gone.
+    for (const line of ['one', 'two']) shown = (await session.submit(shown, line)).snapshot;
+    const gap = await failure((async () => { for await (const _ of view) break; })());
+    expect(gap).toBeInstanceOf(NikaTransportError);
+    expect(gap.message).toMatch(/no longer retained/);
+    const fresh = (async () => {
+      for await (const event of session.events()) if (event.frame === 'result') return event;
+      return undefined;
+    })();
+    await session.submit(shown, 'three');
+    expect(await fresh).toMatchObject({ frame: 'result', replayed: false });
+  });
+
+  it('ends an event view aborted before it starts, before it iterates, or while it waits', async () => {
+    const session = await open();
+    const seen: string[] = [];
+    const before = new AbortController();
+    before.abort();
+    for await (const event of session.events({ signal: before.signal })) seen.push(event.frame);
+    const between = new AbortController();
+    const view = session.events({ after: `${session.id}:0`, signal: between.signal });
+    between.abort();
+    for await (const event of view) seen.push(event.frame);
+    const during = new AbortController();
+    const waiting = (async () => {
+      for await (const event of session.events({ signal: during.signal })) seen.push(event.frame);
+    })();
+    setTimeout(() => during.abort(), 20);
+    await waiting;
+    expect(seen).toEqual([]);
+    // Ending a view sends no Stop and closes nothing.
+    const snapshot = await session.snapshot();
+    expect(snapshot.busy).toBeNull();
+    expect((await session.submit(snapshot, 'still open')).replayed).toBe(false);
   });
 
   it('closes on its close command and refuses commands afterwards', async () => {

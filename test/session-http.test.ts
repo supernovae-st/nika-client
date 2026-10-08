@@ -243,6 +243,15 @@ describe('HTTP authoring Session', () => {
     await expect(session.snapshot()).rejects.toBeInstanceOf(NikaProtocolError);
   });
 
+  it('ends an event view aborted before it starts without requesting the stream', async () => {
+    const { client, calls } = server({ 'POST /v1/sessions': opened });
+    const session = await client.openSession();
+    const controller = new AbortController();
+    controller.abort();
+    for await (const _ of session.events({ signal: controller.signal })) throw new Error('no event expected');
+    expect(calls.some((call) => call.path.endsWith('/events'))).toBe(false);
+  });
+
   it('streams events with their cursors, resumes with Last-Event-ID and yields a resync as sent', async () => {
     const stream = (frames: Record<string, unknown>[]) => new Response(frames.map((body) => (body.event === undefined
       ? '' : `id: ${SESSION}:${body.event as number}\n`) + `data: ${JSON.stringify(body)}\n\n`).join(''),

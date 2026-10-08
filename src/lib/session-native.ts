@@ -195,11 +195,15 @@ class NativeSessionChannel implements SessionChannel {
     const channel = this;
     return {
       [Symbol.asyncIterator]: (): AsyncIterator<NikaSessionEvent> => {
+        // A view whose signal already ended is over before it starts: it never subscribes.
+        if (signal?.aborted) return { next: async () => ({ value: undefined, done: true }) };
         let from: number;
         try {
+          // Judged when iteration starts, against what is retained then: a cursor whose
+          // events were dropped since is refused, never silently advanced to the survivors.
           from = channel.#cursor(after);
         } catch (error) {
-          // A cursor this Session never issued fails the iteration, never the call.
+          // A cursor the Session cannot resume fails the iteration, never the call.
           return { next: () => Promise.reject(error) };
         }
         const queue: NikaSessionEvent[] = channel.#events.filter((event) => (event.event ?? 0) > from);
@@ -223,7 +227,11 @@ class NativeSessionChannel implements SessionChannel {
         };
         if (channel.#ended === undefined) channel.#subscribers.add(subscriber);
         else subscriber.end(channel.#ended === 'closed' ? undefined : channel.#ended);
-        const abort = () => subscriber.end();
+        // Ending the view drops what it had not delivered; it never stops or closes the Session.
+        const abort = () => {
+          queue.length = 0;
+          subscriber.end();
+        };
         signal?.addEventListener('abort', abort, { once: true });
         return {
           next: async (): Promise<IteratorResult<NikaSessionEvent>> => {
@@ -293,8 +301,9 @@ class NativeSessionChannel implements SessionChannel {
     }
     const oldest = this.#events[0]?.event ?? 1;
     if (event < oldest - 1) {
-      throw new NikaConfigurationError(
-        `session: the events after ${after} are no longer retained; read snapshot() and observe from now`);
+      // A gap, said as one: the view would otherwise start at the survivors.
+      throw new NikaTransportError(transport, `session: the events after ${session}:${event} are no longer `
+        + `retained (the handle keeps ${this.#retention}); read snapshot() and observe from now`);
     }
     return event;
   }

@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Nika, NikaProtocolError } from '../src/index.js';
 import type {
   NikaAuthoringSession,
+  NikaSessionAuthoringCall,
   NikaSessionAuthoringCalls,
   NikaSessionCandidateFile,
   NikaSessionIntelligence,
@@ -65,6 +66,15 @@ const observedRun = (): Record<string, any> => ({ current: true, workflow: 'dige
   trace: '/srv/project/.nika/traces/run.ndjson', execution: null, workflow_sha256: null, chain_head: null,
   chain_len: null });
 
+// The carrier's wire example of `work.authoring.calls` at engine `ca5845b85`
+// (`nika-session-change` `AuthoringCalls` with `per_call`, from the receipt of
+// its allowlist test; keys sorted), byte for byte: one answered call, and one
+// failed call whose malformed digest, unrecorded references and unsafe effort
+// the engine wrote as `null`.
+const CALLS_WIRE = fileURLToPath(new URL('./fixtures/session-host/work-authoring-calls-ca5845b85.json',
+  import.meta.url));
+const wire = (): Record<string, any> => JSON.parse(readFileSync(CALLS_WIRE, 'utf8'));
+
 /** A waiting question as `nika-session-change` serializes it (host 46817419a): no options unless a choice has some. */
 const question = (): Record<string, any> => ({ key: 'model', label: 'Which provider/model runs the language steps?',
   type: 'text', why: 'The compiler cannot invent this authoring value.', mandatory: true });
@@ -105,6 +115,37 @@ describe('Session work members', () => {
     expect(intelligence.decision).toEqual({ model: 'typesafe/jev', refusal: null });
     expect(intelligence.effort).toBe('max');
     expect(intelligence.future_intelligence_member).toEqual({ additive: true });
+  });
+
+  it.each(['http', 'native-process'] as const)('types each authoring call the receipt recorded (%s)', (transport) => {
+    const body = work();
+    body.authoring.calls = { ...wire(), future_calls_member: 'kept' };
+    body.authoring.calls.per_call[0].future_call_member = 'kept';
+    const frame = opened(body);
+    const raw = JSON.stringify(frame);
+    expect(sessionFrame(frame, transport)).toBe(frame);
+    expect(JSON.stringify(frame)).toBe(raw);
+    const calls: NikaSessionAuthoringCalls = (frame.snapshot.work as NikaSessionWork).authoring!.calls!;
+    const [answered, failed]: NikaSessionAuthoringCall[] = calls.per_call!;
+    expect(answered).toEqual({ call: 'document', instruction_sha256: 'a'.repeat(64),
+      schema_sha256: '0123456789abcdef'.repeat(4), message_bytes: 4096, references: 2, max_output_tokens: 16384,
+      timeout_ms: 600000, elapsed_ms: 700, stop_reason: 'EndTurn', failure_kind: null, usage_reported: true,
+      input_tokens: 1000, output_tokens: 250, reasoning_effort: 'high', reasoning_tokens: null,
+      future_call_member: 'kept' });
+    // A failed call names the engine's kind; what the receipt held unsafely or not at all stays null.
+    expect(failed).toMatchObject({ call: 'repair', instruction_sha256: null, references: null, stop_reason: null,
+      failure_kind: 'timeout', usage_reported: null, input_tokens: null, output_tokens: null, reasoning_effort: null });
+    // The totals stay the receipt's own: unknown output stays null though one call reported 250.
+    expect([calls.calls, calls.elapsed_ms, calls.input_tokens, calls.output_tokens]).toEqual([2, 900, 1000, null]);
+  });
+
+  it('reads a receipt without calls, and an engine that does not project them', () => {
+    const empty = work();
+    empty.authoring.calls = { ...wire(), per_call: [] };
+    expect((sessionFrame(opened(empty), 'http').snapshot as { work: NikaSessionWork }).work.authoring!.calls!.per_call)
+      .toEqual([]);
+    const older = (sessionFrame(opened(work()), 'http').snapshot as { work: NikaSessionWork }).work;
+    expect('per_call' in older.authoring!.calls!).toBe(false);
   });
 
   it('types a revised candidate\'s compact revision, bound to its bytes', () => {
@@ -226,6 +267,32 @@ describe('Session work members', () => {
     ['a fractional elapsed time', (b) => { b.authoring.calls.elapsed_ms = 1.5; },
       /work\.authoring\.calls\.elapsed_ms is not a count/],
     ['a backend as text', (b) => { b.authoring.calls.backend = 'acp'; }, /work\.authoring\.calls\.backend is not an object/],
+    ['per-call facts as an object', (b) => { b.authoring.calls = { ...wire(), per_call: {} }; },
+      /work\.authoring\.calls\.per_call is not a list/],
+    ['a call as text', (b) => { b.authoring.calls = { ...wire(), per_call: [SECRET] }; },
+      /work\.authoring\.calls\.per_call\[0\] is not an object/],
+    ['a call without its stop reason member', (b) => { b.authoring.calls = wire();
+      delete b.authoring.calls.per_call[0].stop_reason; },
+    /work\.authoring\.calls\.per_call\[0\]\.stop_reason is absent/],
+    ['a role that is not a word', (b) => { b.authoring.calls = wire(); b.authoring.calls.per_call[1].call = SECRET; },
+      /work\.authoring\.calls\.per_call\[1\]\.call is neither a word nor null/],
+    ['an effort carrying punctuation', (b) => { b.authoring.calls = wire();
+      b.authoring.calls.per_call[0].reasoning_effort = 'high; drop table'; },
+    /work\.authoring\.calls\.per_call\[0\]\.reasoning_effort is neither a word nor null/],
+    ['a stop reason over forty letters', (b) => { b.authoring.calls = wire();
+      b.authoring.calls.per_call[0].stop_reason = 'E'.repeat(41); },
+    /work\.authoring\.calls\.per_call\[0\]\.stop_reason is neither a word nor null/],
+    ['an instruction digest in capitals', (b) => { b.authoring.calls = wire();
+      b.authoring.calls.per_call[0].instruction_sha256 = 'A'.repeat(64); },
+    /work\.authoring\.calls\.per_call\[0\]\.instruction_sha256 is neither a witness nor null/],
+    ['negative message bytes', (b) => { b.authoring.calls = wire(); b.authoring.calls.per_call[0].message_bytes = -1; },
+      /work\.authoring\.calls\.per_call\[0\]\.message_bytes is neither a count nor null/],
+    ['reasoning tokens written as text', (b) => { b.authoring.calls = wire();
+      b.authoring.calls.per_call[1].reasoning_tokens = '0'; },
+    /work\.authoring\.calls\.per_call\[1\]\.reasoning_tokens is neither a count nor null/],
+    ['usage reported as text', (b) => { b.authoring.calls = wire();
+      b.authoring.calls.per_call[0].usage_reported = 'true'; },
+    /work\.authoring\.calls\.per_call\[0\]\.usage_reported is neither a boolean nor null/],
     ['intelligence as text', (b) => { b.intelligence = 'claude'; }, /work\.intelligence is not an object/],
     ['intelligence without its author', (b) => { delete b.intelligence.author; }, /work\.intelligence\.author is absent/],
     ['an author without its kind', (b) => { delete b.intelligence.author.kind; },

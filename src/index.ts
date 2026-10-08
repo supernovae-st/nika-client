@@ -461,6 +461,7 @@ export type {
   NikaNextCompileOptions,
   NikaSessionAuthor,
   NikaSessionAuthoring,
+  NikaSessionAuthoringCall,
   NikaSessionAuthoringCalls,
   NikaSessionBusy,
   NikaSessionCandidate,

@@ -1942,6 +1942,57 @@ export interface NikaSessionAuthoringCalls {
    * the transport said nothing.
    */
   backend?: Record<string, unknown> | null;
+  /**
+   * Each call as the receipt recorded it, in call order (engine
+   * `ca5845b85`). Never summed into the totals above, which stay the
+   * receipt's own. Absent from engines that do not project the calls.
+   */
+  per_call?: NikaSessionAuthoringCall[];
+  [key: string]: unknown;
+}
+
+/**
+ * One authoring call as the compile's receipt recorded it, through the
+ * engine's allowlist of safe facts (`work.authoring.calls.per_call`). A fact
+ * the receipt does not hold, or holds in another shape, is `null`, never
+ * guessed: unreported usage stays unknown, never `0`. Words are ASCII
+ * letters and underscores, digests 64 lowercase hex. No prompt, answer,
+ * proposed object, served model name or error text rides here.
+ */
+export interface NikaSessionAuthoringCall {
+  /** The call's role in the compile (`document`, `plan`, `repair`, …). */
+  call: string | null;
+  /** The sha256 of the call's instruction (its system message). */
+  instruction_sha256: string | null;
+  /** The sha256 of the answer schema the call asked. */
+  schema_sha256: string | null;
+  /** The bytes of the call's messages. */
+  message_bytes: number | null;
+  /** How many knowledge references rode with the call. */
+  references: number | null;
+  /** The output limit the call asked. */
+  max_output_tokens: number | null;
+  /** The time the call was allowed. */
+  timeout_ms: number | null;
+  /** The wall time the call took. */
+  elapsed_ms: number | null;
+  /** How the provider said the answer ended, when it answered. */
+  stop_reason: string | null;
+  /**
+   * How the call failed as the engine recorded it (`admission_refused`,
+   * `provider_error`, `timeout`), when it failed.
+   */
+  failure_kind: string | null;
+  /** Whether the provider reported usage; `null` when the receipt does not say. */
+  usage_reported: boolean | null;
+  /** Reported input tokens. */
+  input_tokens: number | null;
+  /** Reported output tokens. */
+  output_tokens: number | null;
+  /** The reasoning effort the call asked. */
+  reasoning_effort: string | null;
+  /** Reported reasoning tokens. */
+  reasoning_tokens: number | null;
   [key: string]: unknown;
 }
 

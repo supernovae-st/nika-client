@@ -279,13 +279,17 @@ function snapshotBody(value: unknown, transport: NikaTransportKind): NikaSession
 /** A BLAKE3 or sha256 witness: 32 bytes as lowercase hex. */
 const WITNESS = /^[0-9a-f]{64}$/;
 
+/** An engine-written identifier (a call's role, a stop reason, a failure kind, an effort). */
+const WORD = /^[A-Za-z_]{1,40}$/;
+
 /**
  * The work members the SDK names (engine `nika-session-change` `work.rs`;
  * candidate `content`, `authoring.draft`/`calls` and `intelligence` from the
- * 0.123 integration `1b47f34c0`), judged where they are. A member present
- * with another shape is a protocol fault naming its path, never its value;
- * an absent one, `null` where the engine writes it and every unknown member
- * ride through. Nothing is copied or rebuilt.
+ * 0.123 integration `1b47f34c0`, `authoring.calls.per_call` from
+ * `ca5845b85`), judged where they are. A member present with another shape
+ * is a protocol fault naming its path, never its value; an absent one,
+ * `null` where the engine writes it and every unknown member ride through.
+ * Nothing is copied or rebuilt.
  */
 function workMembers(work: Record<string, unknown>, fail: (what: string) => NikaProtocolError): void {
   const member = (record: Record<string, unknown>, key: string, at: string,
@@ -315,6 +319,11 @@ function workMembers(work: Record<string, unknown>, fail: (what: string) => Nika
   const witness = (nullable = false) => (value: unknown, path: string) => {
     if (!(nullable && value === null) && !(typeof value === 'string' && WITNESS.test(value))) {
       throw fail(`${path} is ${nullable ? 'neither a witness nor null' : 'not a witness'}`);
+    }
+  };
+  const word = (value: unknown, path: string) => {
+    if (value !== null && !(typeof value === 'string' && WORD.test(value))) {
+      throw fail(`${path} is neither a word nor null`);
     }
   };
 
@@ -381,6 +390,26 @@ function workMembers(work: Record<string, unknown>, fail: (what: string) => Nika
       member(calls, 'output_tokens', path, count(true));
       member(calls, 'backend', path, (backend, at) => {
         if (backend !== null) object(backend, at);
+      });
+      member(calls, 'per_call', path, (list, at) => {
+        if (!Array.isArray(list)) throw fail(`${at} is not a list`);
+        list.forEach((entry, index) => {
+          const where = `${at}[${index}]`;
+          const call = object(entry, where);
+          for (const key of ['call', 'stop_reason', 'failure_kind', 'reasoning_effort']) {
+            member(call, key, where, word, true);
+          }
+          for (const key of ['instruction_sha256', 'schema_sha256']) member(call, key, where, witness(true), true);
+          for (const key of ['message_bytes', 'references', 'max_output_tokens', 'timeout_ms', 'elapsed_ms',
+            'input_tokens', 'output_tokens', 'reasoning_tokens']) {
+            member(call, key, where, count(true), true);
+          }
+          member(call, 'usage_reported', where, (reported, place) => {
+            if (reported !== null && typeof reported !== 'boolean') {
+              throw fail(`${place} is neither a boolean nor null`);
+            }
+          }, true);
+        });
       });
     });
   }

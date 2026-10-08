@@ -324,9 +324,11 @@ function evidence(work) {
   const calls = work.authoring?.calls ?? null;
   return {
     intelligence: work.intelligence ?? null,
+    // Each call as the receipt recorded it, kept apart from the totals and never summed into them;
+    // `null` when the engine projects no calls.
     calls: calls === null ? null : { requested_model: calls.requested_model, calls: calls.calls,
       input_tokens: calls.input_tokens ?? null, output_tokens: calls.output_tokens ?? null,
-      elapsed_ms: calls.elapsed_ms, backend: calls.backend ?? null },
+      elapsed_ms: calls.elapsed_ms, backend: calls.backend ?? null, per_call: calls.per_call ?? null },
     authoring_status: work.authoring?.status ?? null,
     questions: work.authoring?.questions ?? null,
     diagnostics: (work.authoring?.diagnostics ?? []).map((note) => ({ kind: note.kind ?? null,

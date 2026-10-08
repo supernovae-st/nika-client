@@ -497,6 +497,19 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
     judged.checks.filter((entry) => /carried the requested effort/.test(entry.name));
   const returnedAlone = { status: 'returned', effort_option: 'effort', transmitted_effort: 'max', configured_effort: 'max' };
 
+  it('keeps each call the receipt recorded beside the totals, never summed into them', async () => {
+    const wire = JSON.parse(readFileSync(path.join(import.meta.dirname, 'fixtures', 'session-host',
+      'work-authoring-calls-ca5845b85.json'), 'utf8')) as { per_call: unknown[] };
+    const backend = { kind: 'harness_infer', transport: 'acp', observed: call('max', 'max', 'max') };
+    const reachedCalls = (report: { steps: { step: string; evidence?: any }[] }) =>
+      report.steps.find((step) => step.step === 'create_reached')!.evidence.calls;
+    const projected = reachedCalls(await walked({ calls: 1, backend, per_call: wire.per_call }));
+    expect(projected.per_call).toEqual(wire.per_call);
+    // The totals stay the receipt's own: one call and 1 ms, not the per-call 900 ms.
+    expect([projected.calls, projected.elapsed_ms]).toEqual([1, 1]);
+    expect(reachedCalls(await walked(call('max', 'max', 'max'))).per_call).toBeNull();
+  }, WALKS);
+
   it('passes when every authoring call asked, took and read back the requested effort', async () => {
     const judged = journey.judgeJourney(await walked([...call('max', 'max', 'max'), ...call('max', 'max', 'max')]),
       TICKETS, WORDS, null, 'max');

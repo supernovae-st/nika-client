@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
 
@@ -557,6 +558,24 @@ describe('each leg is summarized for a requalification table', () => {
     expect(doubled.legs.create).toMatchObject({ outcome: 'not_exercised', calls: { invoked: 1, failed: 1,
       complete: false } });
     expect(doubled.legs.create.why).toContain('failed record with no invocation before it');
+  });
+
+  it('witnesses the reuse a CREATE\'s own creation record states, on the bytes saved and run', () => {
+    // The creation record of an actual loopback CREATE (engine `2812ea11b`): composed, no base.
+    const created = JSON.parse(readFileSync(new URL('./fixtures/session-host/candidate-revision-created-2812ea11b.json',
+      import.meta.url), 'utf8'));
+    const bytes: string = created.candidate_sha256;
+    const creating = (ranSha: string) => ({ ...journey(), steps: [{ step: 'create_open' },
+      ...leg('create', bytes, EXPECTED.create, authored(created, [file('stale.nika', bytes)]))
+        .map((step) => (step.step === 'create_run_observed' ? { ...step, run: { ...step.run, workflow_sha256: ranSha } }
+          : step))] });
+    const ran = judgeJourney(creating(bytes), EXPECTED).legs.create;
+    expect(ran).toMatchObject({ outcome: 'passed', reuse: { observable: true, candidate_sha256: bytes, saved_exact: true,
+      ran_exact: true, reused: ['block:typed-inputs-outputs'], present_in_run: ['block:typed-inputs-outputs'] } });
+    // The saved workflow still holds the expansion when a Run ran other bytes: present in no Run.
+    const elsewhere = judgeJourney(creating(OTHER), EXPECTED).legs.create;
+    expect(elsewhere.reuse).toMatchObject({ ran_exact: false, reused: ['block:typed-inputs-outputs'],
+      present_in_run: [] });
   });
 
   it('counts each leg only where its words were sent', () => {

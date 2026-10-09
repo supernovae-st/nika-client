@@ -1,0 +1,84 @@
+{
+  "note": "Recorded from the native Session door of engine fbfb1dccc (no provider key in the launch environment, by the recorder's observation; the seated rows opened on the built-in offline mock provider `2 mock/echo`): the model question asked, and one fresh Session answered it once per row. Each answered record is the engine's, verbatim; rows are named by the act it recorded.",
+  "words": "Summarize ./notes/brief.md in three bullet points and write the summary to ./out/summary.md",
+  "rows": [
+    {
+      "name": "bound_seat_default",
+      "intelligence": "2 mock/echo",
+      "line": "",
+      "question": {
+        "key": "model",
+        "type": "text",
+        "mandatory": true
+      },
+      "asked_waiting": {
+        "kind": "question",
+        "key": "model",
+        "id": "d57927224bec4c25966eb88f82a40d58c6a7b6d61f20a6921f9c13d378b392df"
+      },
+      "after_waiting": {
+        "kind": "consent"
+      },
+      "answered": {
+        "act": "bound",
+        "key": "model",
+        "question": "d57927224bec4c25966eb88f82a40d58c6a7b6d61f20a6921f9c13d378b392df",
+        "reading": "seat_default",
+        "value": "mock/echo"
+      },
+      "reread_identical": true
+    },
+    {
+      "name": "bound_as_typed_seat",
+      "intelligence": "2 mock/echo",
+      "line": "mock/echo",
+      "question": {
+        "key": "model",
+        "type": "text",
+        "mandatory": true
+      },
+      "asked_waiting": {
+        "kind": "question",
+        "key": "model",
+        "id": "d57927224bec4c25966eb88f82a40d58c6a7b6d61f20a6921f9c13d378b392df"
+      },
+      "after_waiting": {
+        "kind": "consent"
+      },
+      "answered": {
+        "act": "bound",
+        "key": "model",
+        "question": "d57927224bec4c25966eb88f82a40d58c6a7b6d61f20a6921f9c13d378b392df",
+        "reading": "as_typed",
+        "value": "mock/echo"
+      },
+      "reread_identical": true
+    },
+    {
+      "name": "refused_empty_answer",
+      "intelligence": null,
+      "line": "",
+      "question": {
+        "key": "model",
+        "type": "text",
+        "mandatory": true
+      },
+      "asked_waiting": {
+        "kind": "question",
+        "key": "model",
+        "id": "a9d90491fe50b02a2fcbdad736b18a21d124dc3d865d308e953b289ff8ef1dd0"
+      },
+      "after_waiting": {
+        "kind": "question",
+        "key": "model",
+        "id": "a9d90491fe50b02a2fcbdad736b18a21d124dc3d865d308e953b289ff8ef1dd0"
+      },
+      "answered": {
+        "act": "refused",
+        "class": "empty_answer",
+        "question": "a9d90491fe50b02a2fcbdad736b18a21d124dc3d865d308e953b289ff8ef1dd0"
+      },
+      "reread_identical": true
+    }
+  ]
+}

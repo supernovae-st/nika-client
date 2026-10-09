@@ -20,6 +20,13 @@
         "reading": "offered_key",
         "value": "csv"
     },
+    "bound_seat_default": {
+        "act": "bound",
+        "key": "model",
+        "question": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+        "reading": "seat_default",
+        "value": "mock/echo"
+    },
     "dropped": {
         "act": "dropped",
         "key": "const.destination_path",

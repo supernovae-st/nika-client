@@ -68,7 +68,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   its class) and checked in place when present: each known act with its own
   members, unknown acts, readings and classes carried as written; it is
   absent when the last line answered nothing, and names the question within
-  its Session only.
+  its Session only. Its readings include `seat_default` (an empty line took
+  the seat the person chose), and recorded frames of real binaries decode
+  unchanged. A created candidate now carries its creation record under
+  `candidate.revision` (no base, `written` or `composed`, each component
+  witnessed on the proposed bytes); journey evidence then witnesses a
+  CREATE's reuse as it does an EDIT's.
 - Compile outcomes type the revision, reuse and intelligence evidence the
   engine records inside `provenance` (0.123 integration carrier `7d98023f9`):
   `plan.source_revision`, `plan.intent_sha256`, `plan.document_revision` and

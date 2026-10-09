@@ -1930,10 +1930,11 @@ export interface NikaSessionAnswered {
   value?: string;
   /**
    * How the line gave the bound value (`bound`): the whole line `as_typed`, an
-   * `offered_key` named alone, or a verbatim part a bounded reading call chose
-   * (`model_read`); the vocabulary stays open.
+   * `offered_key` named alone, a verbatim part a bounded reading call chose
+   * (`model_read`), or the seat the person chose, taken by an empty line
+   * (`seat_default`); the vocabulary stays open.
    */
-  reading?: 'as_typed' | 'offered_key' | 'model_read' | (string & {});
+  reading?: 'as_typed' | 'offered_key' | 'model_read' | 'seat_default' | (string & {});
   /** Why nothing was bound (`waits`): the reason the turn's outcome also shows. */
   why?: string;
   /**
@@ -2109,19 +2110,25 @@ export interface NikaSessionAuthor {
 export interface NikaSessionCandidate {
   files: NikaSessionCandidateFile[];
   /**
-   * How the workflow it lands was revised over its complete document, bound
-   * to these exact bytes (never an earlier candidate's); `null` when it was
-   * not a revision. A compact projection: the compile's own record is fuller.
+   * How the workflow it lands was made, bound to these exact bytes (never an
+   * earlier candidate's): a creation's record (`base_sha256` `null`, `written`
+   * whole or `composed` from admitted components) or a revision over its
+   * complete document; `null` when no record binds these bytes. A compact
+   * projection: the compile's own record is fuller.
    */
   revision?: NikaSessionDocumentRevision | null;
   [key: string]: unknown;
 }
 
-/** The revision a Session candidate carries (`work.candidate.revision`). */
+/** The record of how a Session candidate's workflow was made (`work.candidate.revision`). */
 export interface NikaSessionDocumentRevision {
-  /** `operations` (literal edits and component merges) or `replaced` (the whole source). */
-  mode: 'operations' | 'replaced' | (string & {});
-  /** sha256 (lowercase hex) of the bytes revised; `null` when none was named. */
+  /**
+   * A revision's `operations` (literal edits and component merges) or
+   * `replaced` (the whole source); a creation's `written` (whole) or
+   * `composed` (from admitted components).
+   */
+  mode: 'operations' | 'replaced' | 'written' | 'composed' | (string & {});
+  /** sha256 (lowercase hex) of the bytes revised; `null` for a creation, or when none was named. */
   base_sha256: string | null;
   /** sha256 (lowercase hex) of the candidate's bytes, the ones the record binds. */
   candidate_sha256: string;

@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { sessionCommand, sessionLine, snapshotHandle } from '../src/lib/session-host.js';
 
 // The journey (scripts/packed-consumers/session-journey.cjs) walked end to end over a SCRIPTED
 // Session: no engine, no model. The scripted Session proposes, saves the proposed bytes into a
@@ -29,10 +30,12 @@ type Seat = Record<string, unknown> | null;
 /**
  * One scripted Session over `project`: words propose, `yes` saves, `run it` writes the report,
  * first asking the declared input `runInput` when one is named. `seat` names the selection its
- * opened frame shows and the one every later frame shows.
+ * opened frame shows and the one every later frame shows. Each submit is encoded first with the
+ * SDK's own rule, as both real doors do: a command identity it refuses rejects before anything is
+ * sent; the identities it accepts are kept in `commands`.
  */
 function scriptedSession(project: string, asked: string | null, sent: string[], runInput: string | null = null,
-  seat: { opened: Seat; prepared: Seat } | null = null) {
+  seat: { opened: Seat; prepared: Seat } | null = null, commands: string[] = []) {
   let seq = 1;
   let created: string | null = null;
   const files = () => (existsSync(path.join(project, 'stale.nika'))
@@ -59,8 +62,11 @@ function scriptedSession(project: string, asked: string | null, sent: string[], 
   if (seat !== null) opened.snapshot.work.intelligence.selected = seat.opened;
   return {
     opened,
-    async submit(_shown: unknown, line: string) {
+    async submit(shown: unknown, line: string, options: { command?: string } = {}) {
+      const { command } = sessionCommand('submit', options,
+        { snapshot: snapshotHandle(shown), line: sessionLine(line) });
       sent.push(line);
+      commands.push(command);
       if (line === 'yes' && pending !== null) {
         writeFileSync(path.join(project, 'stale.nika'), pending);
         pending = null;
@@ -107,8 +113,9 @@ function scriptedSession(project: string, asked: string | null, sent: string[], 
   };
 }
 
-function fakeSdk(project: string, asked: string | null, sent: string[], runInput: string | null = null) {
-  return { Nika: class { openSession = async () => scriptedSession(project, asked, sent, runInput); } };
+function fakeSdk(project: string, asked: string | null, sent: string[], runInput: string | null = null,
+  commands: string[] = []) {
+  return { Nika: class { openSession = async () => scriptedSession(project, asked, sent, runInput, null, commands); } };
 }
 
 const scratches: string[] = [];
@@ -159,23 +166,31 @@ describe('a journey walked over a scripted Session', () => {
   it('answers a question by a persona rule on its asking words, and says why', async () => {
     const { dir, project, check } = world();
     const sent: string[] = [];
-    const report = await journey(fakeSdk(project, 'const.target', sent), { door: 'native', bin: '/x', project,
-      moduleSystem: 'esm', choice: null, create: 'Create the stale report', edit: 'Raise to 72', checkBin: check,
-      snapshots: path.join(dir, 'legs'), capture: ['out'],
+    const commands: string[] = [];
+    const report = await journey(fakeSdk(project, 'const.target', sent, null, commands), { door: 'native', bin: '/x',
+      project, moduleSystem: 'esm', choice: null, create: 'Create the stale report', edit: 'Raise to 72',
+      checkBin: check, snapshots: path.join(dir, 'legs'), capture: ['out'],
       answers: [{ text: 'notification', line: SINK, why: 'the observed sink address' }] });
+    expect(report.error).toBeNull();
     expect(sent.slice(0, 2)).toEqual(['Create the stale report', SINK]);
     expect(report.steps.find((entry) => entry.step === 'create_turn' && entry.turn === 1).said)
       .toBe('answer const.target (the observed sink address)');
+    // The answer went under an identity the Session accepts; its readable words stay in the turn.
+    expect(commands).toEqual(['words-0', 'answer-1', 'create-save', 'create-run', 'words-0', 'edit-save',
+      'edit-run']);
   });
 
   it('gives a Run\'s declared input only by a persona rule on its name, then observes the Run', async () => {
     const { dir, project, check } = world();
     const sent: string[] = [];
-    const report = await journey(fakeSdk(project, null, sent, 'sink_url'), { door: 'native', bin: '/x', project,
-      moduleSystem: 'esm', choice: null, create: 'Create the stale report', edit: 'Raise to 72', checkBin: check,
-      snapshots: path.join(dir, 'legs'), capture: ['out'],
+    const commands: string[] = [];
+    const report = await journey(fakeSdk(project, null, sent, 'sink_url', commands), { door: 'native', bin: '/x',
+      project, moduleSystem: 'esm', choice: null, create: 'Create the stale report', edit: 'Raise to 72',
+      checkBin: check, snapshots: path.join(dir, 'legs'), capture: ['out'],
       answers: [{ key: 'sink|url', line: SINK, why: 'the observed sink address' }] });
     expect(sent).toEqual(['Create the stale report', 'yes', 'run it', SINK, 'Raise to 72', 'yes', 'run it', SINK]);
+    expect(commands).toEqual(['words-0', 'create-save', 'create-run', 'create-run-input-0', 'words-0', 'edit-save',
+      'edit-run', 'edit-run-input-0']);
     expect(report.steps.find((entry) => entry.step === 'create_run_input'))
       .toMatchObject({ input: 'sink_url', said: 'the observed sink address' });
     const judged = journey.judgeJourney(report, { create: ['stale-60', 'boundary-72', 'stale-90'],
@@ -207,8 +222,8 @@ describe('a journey walked over a scripted Session', () => {
     const sdk = { Nika: class {
       openSession = async () => {
         const session = scriptedSession(project, null, []);
-        return { ...session, submit: async (shown: unknown, line: string) => {
-          const settled = await session.submit(shown, line);
+        return { ...session, submit: async (shown: unknown, line: string, options?: { command?: string }) => {
+          const settled = await session.submit(shown, line, options);
           // The judge held the candidate: shown as the draft, never offered.
           settled.snapshot.work = { ...settled.snapshot.work, waiting: { kind: 'free' }, candidate: null,
             authoring: { ...settled.snapshot.work.authoring, status: 'incomplete', draft: held } };
@@ -235,8 +250,8 @@ describe('a journey walked over a scripted Session', () => {
     const sdk = { Nika: class {
       openSession = async () => {
         const session = scriptedSession(project, null, []);
-        return { ...session, submit: async (shown: unknown, line: string) => {
-          const settled = await session.submit(shown, line);
+        return { ...session, submit: async (shown: unknown, line: string, options?: { command?: string }) => {
+          const settled = await session.submit(shown, line, options);
           settled.snapshot.work = { ...settled.snapshot.work, waiting: { kind: 'free' }, candidate: null };
           return { ...settled, outcomes: [refusal] };
         } };
@@ -263,9 +278,9 @@ describe('a journey walked over a scripted Session', () => {
         openSession = async () => {
           now += 5;
           const session = scriptedSession(project, 'webhook', []);
-          return { ...session, submit: async (shown: unknown, line: string) => {
+          return { ...session, submit: async (shown: unknown, line: string, options?: { command?: string }) => {
             now += line.startsWith('Create') ? 60 : line === SINK ? 7 : 11;
-            return session.submit(shown, line);
+            return session.submit(shown, line, options);
           } };
         };
       } };
@@ -298,7 +313,7 @@ describe('a journey walked over a scripted Session', () => {
               throw Object.assign(new Error('session: the wait was cut'), { name: 'NikaSessionWaitError',
                 command: options.command });
             }
-            return session.submit(shown, line);
+            return session.submit(shown, line, options);
           },
           snapshot: async () => ({ ...(await session.snapshot()), busy: { command: 'create-run', phase: 'running',
             stop_requested: false } }) };
@@ -479,8 +494,8 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
       openSession = async () => {
         const session = scriptedSession(project, asked, [], null, { opened: CLAUDE, prepared: CLAUDE });
         let line = 0;
-        return { ...session, submit: async (shown: unknown, words: string) => {
-          const settled = await session.submit(shown, words);
+        return { ...session, submit: async (shown: unknown, words: string, options?: { command?: string }) => {
+          const settled = await session.submit(shown, words, options);
           const given = typeof receipts === 'function' ? receipts(line++) : receipts;
           const counted = Array.isArray(given)
             ? { calls: given.filter((record) => (record as { status?: string })?.status === 'invoking').length,
@@ -524,8 +539,8 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
         opens += 1;
         if (opens === 2) throw Object.assign(new Error('the EDIT Session did not open'), { name: 'NikaTransportError' });
         const session = scriptedSession(project, null, [], null, { opened: CLAUDE, prepared: CLAUDE });
-        return { ...session, submit: async (shown: unknown, words: string) => {
-          const settled = await session.submit(shown, words);
+        return { ...session, submit: async (shown: unknown, words: string, options?: { command?: string }) => {
+          const settled = await session.submit(shown, words, options);
           const work = settled.snapshot.work;
           work.authoring = { ...(work.authoring ?? {}), calls: { requested_model: 'claude-code/opus[1m]',
             input_tokens: null, output_tokens: null, elapsed_ms: 1, calls: 1,
@@ -568,8 +583,8 @@ describe('a journey asking an explicit effort of a seat reached over ACP', () =>
               }
               return session.close();
             },
-            submit: async (shown: unknown, words: string) => {
-              const settled = await session.submit(shown, words);
+            submit: async (shown: unknown, words: string, options?: { command?: string }) => {
+              const settled = await session.submit(shown, words, options);
               const work = settled.snapshot.work;
               work.authoring = { ...(work.authoring ?? {}), calls: { requested_model: 'claude-code/opus[1m]',
                 input_tokens: null, output_tokens: null, elapsed_ms: 1, calls: 1,

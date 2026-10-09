@@ -234,6 +234,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is now posted through `node:http`/`node:https`, which set no header or body
   deadline; the caller's `signal` still stops the wait. A `fetch` passed in
   the configuration keeps its own timeouts.
+- The Session runner's journey persona sends every line under a command
+  identity a Session accepts. An answer's identity carried its readable words
+  (`answer KEY (WHY)-N`), which the SDK refuses before sending (an identity is
+  1 to 128 letters, digits, `.`, `_`, `:` or `-`), so on engine `3fb276fca` no
+  simulated answer ever reached a Session. A turn's identity is now its kind
+  and number (`answer-3`); its readable words stay in the turn as `said`,
+  beside the `command` sent. The journey tests' scripted Sessions encode each
+  submit with the SDK's own rule, so such an identity fails them.
 
 ## [0.120.3]
 

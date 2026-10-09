@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { describe, expect, it } from 'vitest';
+import { sessionCommand, sessionLine, snapshotHandle } from '../src/lib/session-host.js';
 
 // The real-intelligence journey's persona and judge
 // (scripts/packed-consumers/session-journey.cjs), on scripted Sessions and
@@ -20,8 +21,8 @@ const { judgeJourney, journeyDenominators, advance, requestedSeat, journeyDoors,
   requestedSeat: (choice: string) => Record<string, string | null>;
   journeyDoors: (value: string | undefined) => string[];
   sessionResult: (walks: unknown[], comparisons: unknown[], journey: unknown) => string;
-  advance: (session: unknown, snapshot: unknown, line: string, persona: unknown, signal: () => AbortSignal,
-    report: (turn: unknown) => void) => Promise<{ waiting: string; summary: any }>;
+  advance: (send: (shown: unknown, line: string, command: string) => Promise<unknown>, snapshot: unknown,
+    line: string, persona: unknown, report: (turn: any) => void) => Promise<{ waiting: string; summary: any }>;
 };
 
 const EXPECTED = { create: ['stale-60', 'boundary-72', 'stale-90'], edit: ['stale-90'] };
@@ -327,18 +328,25 @@ describe('the persona answers only what it was told to', () => {
     work: { waiting: { kind, ...extra }, authoring: null, candidate: null, intelligence: null } });
   function scripted(kinds: [string, Record<string, unknown>?][]) {
     const sent: string[] = [];
+    const commands: string[] = [];
     const session = {
-      submit: async (_shown: unknown, line: string) => {
+      // A Session's submit encodes the command first with the SDK's own rule: an identity it
+      // refuses rejects before anything is sent, as it does on both real doors.
+      submit: async (shown: unknown, line: string, options: { command?: string } = {}) => {
+        const { command } = sessionCommand('submit', options,
+          { snapshot: snapshotHandle(shown), line: sessionLine(line) });
         sent.push(line);
+        commands.push(command);
         const [kind, extra] = kinds.shift()!;
         return { frame: 'result', event: sent.length, op: 'submit', replayed: false, outcomes: [{ kind: 'reply' }],
           snapshot: snapshot(kind, extra) };
       },
     };
-    return { session, sent };
+    return { session, sent, commands };
   }
   // The leg's own sender: one line, one command identity.
-  const via = (session: { submit: (shown: unknown, line: string, options?: unknown) => Promise<unknown> }) =>
+  type Submit = (shown: unknown, line: string, options?: { command?: string }) => Promise<unknown>;
+  const via = (session: { submit: Submit }) =>
     (shown: unknown, line: string, command: string) => session.submit(shown, line, { command });
 
   it('answers the first screen with its choice, then stops at the consent', async () => {
@@ -369,6 +377,24 @@ describe('the persona answers only what it was told to', () => {
     const stopped = await advance(via(unknown.session), snapshot('free'), 'Create it',
       { choice: '1', acceptCost: false, answers: { 'const.webhook_endpoint': 'x' } }, () => {});
     expect([unknown.sent, stopped.waiting, stopped.summary.key]).toEqual([['Create it'], 'question', 'const.audience']);
+  });
+
+  // Found live on engine 3fb276fca: an answer's command identity carried its readable words
+  // (`answer KEY (WHY)-N`), which the SDK refuses before sending, so no answer ever reached a Session.
+  it('sends every line under an identity a Session accepts, its readable words kept in the turn', async () => {
+    const why = 'the literal value world/source.json states for pages_directory (a simulated human clarification)';
+    const { session, sent, commands } = scripted([['intelligence_choice'], ['cost_choice'],
+      ['question', { key: 'const.source_folder' }], ['consent', { proposal: 'p' }]]);
+    const turns: { turn: number; said: string; command: string }[] = [];
+    const persona = { choice: '2 deepseek/deepseek-v4-pro', acceptCost: true,
+      answers: [{ key: 'source_folder', line: 'pages', why }] };
+    const reached = await advance(via(session), snapshot('free'), 'Create it', persona, (turn) => turns.push(turn));
+    expect(reached.waiting).toBe('consent');
+    expect(sent).toEqual(['Create it', '2 deepseek/deepseek-v4-pro', 'yes', 'pages']);
+    expect(commands).toEqual(['words-0', 'intelligence_choice-1', 'cost_choice-2', 'answer-3']);
+    expect(turns.map(({ turn, said, command }) => [turn, said, command])).toEqual([[0, 'words', 'words-0'],
+      [1, 'intelligence_choice', 'intelligence_choice-1'], [2, 'cost_choice', 'cost_choice-2'],
+      [3, `answer const.source_folder (${why})`, 'answer-3']]);
   });
 
   it('stops answering after its own turn bound, keeping what the Session shows, never claiming a result', async () => {

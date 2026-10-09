@@ -243,26 +243,29 @@ function keptChoice() {
 /**
  * Send `line`, then answer only what the persona was told to, until the Session waits on a
  * consent or settles otherwise. Every turn is reported; nothing is guessed for the person.
+ * A turn's command identity is its kind and number (`answer-3`), never its readable words: an
+ * identity is 1 to 128 letters, digits, `.`, `_`, `:` or `-`, and a key or a reason may hold others.
  */
 async function advance(send, snapshot, line, persona, report) {
   let shown = snapshot;
   let next = line;
-  let said = 'words';
+  let [kind, said] = ['words', 'words'];
   for (let turn = 0; turn < PERSONA_TURNS; turn += 1) {
+    const command = `${kind}-${turn}`;
     const sent = performance.now();
-    const result = await send(shown, next, `${said}-${turn}`);
+    const result = await send(shown, next, command);
     // This line alone, sent to settled, on a monotonic clock.
     const ms = Math.round(performance.now() - sent);
     shown = result.snapshot;
     const waiting = shown.work.waiting;
-    report({ turn, said, ms, ...journeyRow(result), evidence: evidence(shown.work) });
+    report({ turn, said, command, ms, ...journeyRow(result), evidence: evidence(shown.work) });
     if (waiting.kind === 'intelligence_choice' && persona.choice) {
-      [next, said] = [persona.choice, 'intelligence_choice'];
+      [next, kind, said] = [persona.choice, 'intelligence_choice', 'intelligence_choice'];
     } else if (waiting.kind === 'cost_choice' && persona.acceptCost) {
-      [next, said] = ['yes', 'cost_choice'];
+      [next, kind, said] = ['yes', 'cost_choice', 'cost_choice'];
     } else if (waiting.kind === 'question' && answerFor(persona.answers, waiting, result) !== null) {
       const answer = answerFor(persona.answers, waiting, result);
-      [next, said] = [answer.line, `answer ${waiting.key} (${answer.why})`];
+      [next, kind, said] = [answer.line, 'answer', `answer ${waiting.key} (${answer.why})`];
     } else {
       // Where no proposal waits, the compiler's own draft (shown, never offered) is kept with its
       // digest, so a candidate a judge held stays inspectable after the scratch is gone.

@@ -165,8 +165,13 @@ class HttpSessionChannel implements SessionChannel {
     };
   }
 
-  #path(suffix: string): string {
-    return `/v1/sessions/${encodeURIComponent(this.session)}${suffix}`;
+  /** This Session's routes, each spelled whole as the pinned contract names it, for the coverage check. */
+  #path(route: '' | '/details' | '/commands' | '/events'): string {
+    const session = encodeURIComponent(this.session);
+    if (route === '/details') return `/v1/sessions/${session}/details`;
+    if (route === '/commands') return `/v1/sessions/${session}/commands`;
+    if (route === '/events') return `/v1/sessions/${session}/events`;
+    return `/v1/sessions/${session}`;
   }
 
   #own(frame: Record<string, unknown>, expected: string): void {

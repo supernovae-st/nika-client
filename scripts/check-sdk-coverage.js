@@ -16,6 +16,8 @@ const SDK_ROOT = resolve(import.meta.dirname, '..');
 const SPEC = join(SDK_ROOT, 'openapi.json');
 const SDK_FILES = [
   join(SDK_ROOT, 'src/lib/http-transport.ts'),
+  // The Session door's routes (`/v1/sessions`), which a resident serving Sessions merges.
+  join(SDK_ROOT, 'src/lib/session-http.ts'),
 ];
 
 const ABSENT = [

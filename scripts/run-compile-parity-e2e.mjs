@@ -144,8 +144,18 @@ try {
     "import { readFileSync } from 'node:fs';",
     'process.stdout.write(JSON.stringify(await scenario(sdk, JSON.parse(readFileSync(process.argv[2], "utf8")))));',
   ].join('\n'));
+  // The package's pin by default. A candidate engine ahead of that pin is compared with the
+  // document NIKA_COMPILE_PARITY_OPENAPI names instead, and the report says which one held.
+  const pinPath = path.resolve(process.env.NIKA_COMPILE_PARITY_OPENAPI ?? path.join(root, 'openapi.json'));
+  const pin = JSON.parse(readFileSync(pinPath, 'utf8'));
+  // The host merges its Session routes only into the document of a resident its operator starts
+  // with Sessions: a pin that declares them is compared with such a resident.
+  const sessions = Object.keys(pin.paths ?? {}).some((route) => route.startsWith('/v1/sessions'));
+  assert(!sessions || (await run(binary, ['serve', '--help'], project)).includes('--sessions'),
+    'the contract pin declares /v1/sessions, and this engine\'s serve has no --sessions to serve them');
   server = owned.start(binary, ['serve', '--bind', '127.0.0.1:0', '--workflows', project,
-    '--token-file', path.join(scratch, 'token'), '--state-root', path.join(scratch, 'state'), '--plain'],
+    '--token-file', path.join(scratch, 'token'), '--state-root', path.join(scratch, 'state'), '--plain',
+    ...(sessions ? ['--sessions'] : [])],
   { cwd: project, env, timeoutMs: 300000 });
   let url;
   const deadline = Date.now() + 15000;
@@ -167,13 +177,9 @@ try {
   assert(health.supportedCapabilities.includes('compile'), 'Serve must advertise compile');
   const openapi = await request('/v1/openapi.json', true);
   assert(openapi.paths['/v1/compile']?.post, 'the live OpenAPI must own POST /v1/compile');
-  // The package's pin by default. A candidate engine ahead of that pin is compared with the
-  // document NIKA_COMPILE_PARITY_OPENAPI names instead, and the report says which one held.
-  const pinPath = path.resolve(process.env.NIKA_COMPILE_PARITY_OPENAPI ?? path.join(root, 'openapi.json'));
-  assert.deepEqual(openapi, JSON.parse(readFileSync(pinPath, 'utf8')),
-    'the contract pin must match this frozen resident');
+  assert.deepEqual(openapi, pin, 'the contract pin must match this frozen resident');
   const openapiPin = { path: pinPath, sha256: await sha256(pinPath),
-    package_pin: pinPath === path.join(root, 'openapi.json') };
+    package_pin: pinPath === path.join(root, 'openapi.json'), resident_sessions: sessions };
   const stateRoot = path.join(scratch, 'state');
   const stateBefore = snapshot(stateRoot);
   const results = [];

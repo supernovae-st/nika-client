@@ -210,7 +210,11 @@ or execution admission qualification.
 The live `/v1/openapi.json` must equal the package's `openapi.json`. A
 candidate engine ahead of that pin is compared with the document named by
 `NIKA_COMPILE_PARITY_OPENAPI` instead (its own live export, never a hand-edited
-copy), and the report's `openapi_pin` says which document held.
+copy), and the report's `openapi_pin` says which document held. A pin that
+declares the `/v1/sessions` routes is compared with a resident started with
+`--sessions`, the only one whose document carries them
+(`openapi_pin.resident_sessions`); the candidate type drift in CI follows the
+same rule.
 
 The revision evidence of a real provider round runs only when you name a seat
 and the one variable holding its key; the key reaches the engine processes and

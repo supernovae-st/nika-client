@@ -871,6 +871,387 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open the project's native Session, or name the live one
+         * @description Only on a server its operator started with sessions (health capability `sessionHost`). The Session opens as bare `nika` opens it in the server's project: the server's kept intelligence choice and census, its HOME history (recovery notice and restored state in `notices`). One live Session per project: its history is one per (HOME, project). A second open answers 409 `session_live` with the live Session's identity to attach to. A history held elsewhere (a terminal Session on that project) answers 409 `session_unavailable` with the Session's own refusal. No field names a path, a model, a provider or a key.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /** @constant */
+                        contract: "nika/session-host@1";
+                        /** @description The intelligence this conversation selects, in the census's own first-screen words (`1 [acp:]<app>[/<model>]`, `2 [<provider>[/<model>]]`, `3 [<engine>[/<model>]]`, `4`), resolved against this server's census and configuration. It holds for this conversation only: the server's kept choice is neither read nor written. Words the census does not read answer 409 `session_unavailable` with its fix. Never an endpoint or a key. */
+                        intelligence?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description The `opened` frame (event 1) */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionFrame"];
+                    };
+                };
+                /** @description A `refused` frame: malformed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionFrame"];
+                    };
+                };
+                /** @description Missing or wrong bearer token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A `refused` frame: session_live or session_unavailable */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionFrame"];
+                    };
+                };
+                /** @description Not application/json */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sessions/{session}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The current snapshot
+         * @description Never waits on a turn: `snapshot.busy` names the command under way and its phase (`preparing`, `running`, `settling`).
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    session: components["parameters"]["SessionId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A `snapshot` frame */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionFrame"];
+                    };
+                };
+                /** @description A `refused` frame: session_not_found (unknown, closed, or another incarnation) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionFrame"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        /**
+         * Close the Session
+         * @description A preparation under way is stopped, nothing more is admitted, the turn under way settles, the runtime releases its history, and `closed` ends the log. A Run under way is not stopped by closing: the close waits for it.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    session: components["parameters"]["SessionId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The `closed` frame (the last event) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionFrame"];
+                    };
+                };
+                /** @description A `refused` frame: session_not_found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionFrame"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sessions/{session}/commands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit a line against a snapshot, or stop the preparation under way
+         * @description A submit reaches the Session only when it names the CURRENT snapshot; the Session receives that snapshot's retained `Waiting`, never one rebuilt from the request. A command identity already known answers first: the same bytes (op, snapshot, line) return the recorded result with `replayed: true` (an original still running is awaited, never run twice); other bytes answer 409 command_conflict. One turn at a time: a submit during a turn answers 409 busy with its line returned unconsumed. The answer to a submit comes once it settled; no request deadline applies, and a disconnected request never cancels the accepted turn. A stop answers at once with its receipt (`stop_requested`, `nothing_to_stop`, `run_underway`); the settlement is the target command's own result.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    session: components["parameters"]["SessionId"];
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["SessionCommand"];
+                };
+            };
+            responses: {
+                /** @description A `result` frame */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionFrame"];
+                    };
+                };
+                /** @description A `refused` frame: malformed */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionFrame"];
+                    };
+                };
+                /** @description Missing or wrong bearer token */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description A `refused` frame: session_not_found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionFrame"];
+                    };
+                };
+                /** @description A `refused` frame: stale_snapshot, unknown_snapshot, busy or command_conflict */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionFrame"];
+                    };
+                };
+                /** @description Body over the server's limit */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Not application/json */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sessions/{session}/details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The details card of the current snapshot
+         * @description The Session's own `/details` text, captured when that snapshot was published; it answers while a provider call runs and stops nothing.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    session: components["parameters"]["SessionId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description A `details` frame */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionFrame"];
+                    };
+                };
+                /** @description A `refused` frame: session_not_found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionFrame"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/sessions/{session}/events": {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description `<session>:<event>` of this Session: the stream resumes after that event. Any other value (another Session or incarnation, beyond the log) gets one `resync` frame with the current snapshot, then the live events. */
+                "Last-Event-ID"?: string;
+            };
+            path: {
+                session: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        /**
+         * The Session's log as server-sent events
+         * @description Each event's `id` is `<session>:<event>` and its `data` one frame that carries `event`. The stream ends after `closed`. Aborting the stream stops nothing.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: {
+                    /** @description `<session>:<event>` of this Session: the stream resumes after that event. Any other value (another Session or incarnation, beyond the log) gets one `resync` frame with the current snapshot, then the live events. */
+                    "Last-Event-ID"?: string;
+                };
+                path: {
+                    session: components["parameters"]["SessionId"];
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description text/event-stream of frames */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/event-stream": string;
+                    };
+                };
+                /** @description A `refused` frame: session_not_found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SessionFrame"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/workflows": {
         parameters: {
             query?: never;
@@ -984,7 +1365,7 @@ export interface components {
         };
         /** @description The engine-owned machine document of one authoring result — the document `nika compile --json` prints, without the CLI-only `written`. No field grants authority, writes or executes source. */
         CompileOutcome: {
-            /** @description Ordinary `.nika` source; may still be incomplete */
+            /** @description Ordinary `.nika` source. It is proposed only when `status` is `ready`; under any other status it is never proposed. Under `incomplete` it is a preview: it may still carry unfilled holes, or, when an `applied` diagnostic targets `verify_held`, it is a candidate the verifier held: it answered on these bytes against the request and did not accept them. A preview is not to be run or saved as an accepted result. Null when no candidate is shown, a withdrawn one included. */
             candidate: string | null;
             /** @description The engine's pure Check report over the source only. No child file, skill, credential probe, access plan or admission was evaluated */
             check_preview: {
@@ -996,6 +1377,7 @@ export interface components {
             } | null;
             /** @constant */
             compile_version: 1;
+            /** @description Findings, in order. `kind` and `target` are their machine-readable part; `message` is for a reader. `target` names what a finding concerns: a question key, a task, a source field, or one of the compiler's own targets, among them `semantic_verification`, a finding on the request against the candidate's bytes (a clause or the whole request that no admitted judgment of these bytes settled, a part a verifier judged missing with its reason, a part it left unsettled or contested, a verification stopped at a judge call that got no answer); `verify_held` (kind `applied`), the candidate is held: the verifier answered on these bytes against the request and did not accept them (it rejected them or abstained), so `candidate` is a preview only, no replayable round is kept, and that verifier is not asked about the same bytes again in this round; and `verify_resume` (kind `applied`), no admitted judgment of the candidate was made (the verifier's call failed or chose no offered answer): the candidate is withdrawn and the round's record kept, and a zero-call replay of that round asks no verifier. Each verification attempt is recorded in `provenance.decision.semantic_verification`. */
             diagnostics: {
                 /** @enum {string} */
                 kind: "applied" | "missed" | "unknown" | "requiresHuman" | "refused";
@@ -1008,20 +1390,45 @@ export interface components {
                 /** @constant */
                 cognition: "deterministicOnly";
                 compiler_version: string;
+                /** @description Bounded compiler decision evidence, including deterministic and replay outcomes; it grants no execution or spending authority. */
+                decision?: {
+                    [key: string]: unknown;
+                };
+                /** @description The compiler record retained in this outcome; a server replay uses its opaque token rather than accepting this object as authority. */
+                plan?: {
+                    [key: string]: unknown;
+                };
                 skeleton: string | null;
                 spec_pin: string;
+                /** @description The compiler strategy that produced this outcome. */
+                strategy?: string;
+                /** @description A suggested candidate file name, never a file written by compilation. */
+                suggested_file?: string | null;
             };
             questions: {
                 /** @description Stable semantic hole path such as `const.request`, never a session id */
                 key: string;
                 label: string;
+                /** @description false: the value belongs to a binding outside the program (a schedule's timezone, missed-run and overlap policies, per-run ceiling) and never blocks a ready candidate */
                 mandatory: boolean;
-                /** @enum {string} */
-                type: "text" | "literal";
+                /** @description Present on a choice question only: the admissible answers, keys spelled by the owning grammar */
+                options?: {
+                    key: string;
+                    label: string;
+                }[];
+                /**
+                 * @description text: a JSON string · literal: one JSON value · choice: a JSON string that is the `key` of one of `options`
+                 * @enum {string}
+                 */
+                type: "text" | "literal" | "choice";
                 why: string;
             }[];
             /** @description The candidate's requested permits, derived by Check. Requested, never granted */
             requested_boundary: {
+                [key: string]: unknown;
+            } | null;
+            /** @description The trigger the request names (kind · source_hint · event_hint · cadence · at · payload_input · status · timezone · missed · overlap · ceiling · cron), stated beside the candidate whose bytes carry no cadence, host or event. A requirement the operator binds through the schedule contract, never a grant or a schedule row. timezone, missed, overlap and ceiling are the answered binding values (null until answered). cron is the exact five-field schedule projection when supported and fully specified, otherwise null; older engines omit it. It never supplies a missing time or timezone. */
+            requested_trigger: {
                 [key: string]: unknown;
             } | null;
             /**
@@ -1030,9 +1437,9 @@ export interface components {
              */
             status: "ready" | "incomplete" | "refused";
         };
-        /** @description Generation 1 of the compile request. The encoded body is limited to 1048576 bytes (or the listener's lower ceiling). Byte bounds below are UTF-8 bytes. Unknown fields, a present null, duplicate keys (including inside `answers`) and positional arrays are refused. No field names a host path: an EDIT base travels inline in `source`. */
+        /** @description Generation 1 of the compile request. The encoded body is limited by the listener's configured HTTP body ceiling; no smaller field-size or answer-count quota is imposed. Unknown fields, a present null, duplicate keys (including inside `answers`) and positional arrays are refused. No field names a host path: an EDIT base travels inline in `source`. */
         CompileRequest: {
-            /** @description Question key → one JSON literal with its type preserved, judged exactly as sent (at most 65536 bytes each) */
+            /** @description Question key → one JSON literal with its type preserved, judged exactly as sent within the HTTP body envelope. */
             answers?: {
                 [key: string]: unknown;
             };
@@ -1040,7 +1447,7 @@ export interface components {
                 set_constant?: {
                     /** @description Bare constant name, not a path */
                     name: string;
-                    /** @description One JSON literal, judged exactly as sent (at most 65536 bytes) */
+                    /** @description One JSON literal, judged exactly as sent within the HTTP body envelope. */
                     value: unknown;
                 };
                 /** @description `Set const.NAME to JSON_LITERAL`, or `Set const.NAME` answered through `answers` */
@@ -1252,6 +1659,10 @@ export interface components {
             active?: boolean;
             /** @enum {string} */
             afterSkip?: "next_slot" | "on_completion";
+            /** @description Per-fire inputs bound on every resident fire (#1370): one scalar per key the workflow declares under `inputs:`, coerced by the declared type exactly as the CLI `--var` edge does, then judged by the same literal admission validator as POST /v1/jobs. Unknown keys, values the declared type refuses, missing required inputs and the `@env:` channel are refused at PUT and again at fire. */
+            inputs?: {
+                [key: string]: string | number | boolean;
+            };
             /** @enum {string} */
             jitter?: "hash";
             maxCostUsd: number;
@@ -1279,6 +1690,63 @@ export interface components {
         /** @description Normalized definition, origin, distinct schedule revision, active/pause state, due verdict, bounded next slots with shift evidence, earliest wake hint, and last durable decision. */
         ScheduleStatus: {
             [key: string]: unknown;
+        };
+        SessionCommand: {
+            command: string;
+            /** @constant */
+            contract: "nika/session-host@1";
+            /** @description submit only: the line, exactly as typed */
+            line?: string;
+            /** @enum {unknown} */
+            op: "submit" | "stop";
+            /** @description submit only: the handle of the snapshot the line was typed against */
+            snapshot?: string;
+        };
+        SessionFrame: {
+            command?: string;
+            /** @constant */
+            contract: "nika/session-host@1";
+            done?: boolean;
+            /** @enum {unknown} */
+            error?: "malformed" | "session_not_found" | "stale_snapshot" | "unknown_snapshot" | "busy" | "command_conflict" | "session_live" | "session_unavailable";
+            /** @description present on frames of the log; a replayed result keeps its original event */
+            event?: number;
+            /** @enum {unknown} */
+            frame: "opened" | "accepted" | "activity" | "result" | "closed" | "refused" | "snapshot" | "details" | "resync";
+            /** @description the refused line, returned whole */
+            line?: string;
+            message?: string;
+            note?: string;
+            notices?: string[];
+            /** @enum {unknown} */
+            op?: "submit" | "stop";
+            outcomes?: components["schemas"]["SessionOutcome"][];
+            phase?: string;
+            /** @enum {unknown} */
+            receipt?: "stop_requested" | "nothing_to_stop" | "run_underway";
+            replayed?: boolean;
+            session: string;
+            snapshot?: components["schemas"]["SessionSnapshot"] | string;
+            target?: string | null;
+            text?: string;
+        };
+        /** @description One TurnOutcome, projected mechanically: reply, facts, help, aside, ask, cancelled (with `withdrawn` outcomes when a Stop withdrew a late result), quit, refusal (`class`), held and proposal (`proposal`), question (`key`), gate (`trace`, `task`), run_requested (`workflow`, `inputs` names only, `max_cost_usd`), resume_requested (`workflow`, `trace`, `answer`), run_review (`review`: the run waits at its fresh cost review), run_reviewed, run_not_started (nothing ran), run_unobserved (admitted, its end not observed: effects unknown), resumed, other. */
+        SessionOutcome: {
+            kind: string;
+            text?: string;
+        };
+        SessionSnapshot: {
+            busy: null | {
+                command: string;
+                /** @enum {unknown} */
+                phase: "preparing" | "running" | "settling";
+                stop_requested: boolean;
+            };
+            /** @description publish order, distinct from event numbers */
+            seq: number;
+            snapshot: string;
+            /** @description The Session's `nika/session-work@0` snapshot, verbatim: `root` names the server's project world, paths are relative to it. */
+            work: Record<string, never>;
         };
         /** @description Compact remote acknowledgement that the exact snapshot was revalidated. This is not the engine's public full check report; SDK callers retain the engine-owned report captured with the snapshot and return it only after this acknowledgement succeeds. */
         SnapshotValidationAck: {
@@ -1331,6 +1799,7 @@ export interface components {
         IfMatch: string;
         IfNoneMatch: "*";
         LastEventId: string;
+        SessionId: string;
     };
     requestBodies: never;
     headers: never;

@@ -1,10 +1,10 @@
 # HTTP contract
 
 `openapi.json` is the checked-in contract pin: the live document of the
-candidate engine `ENGINE_QUAL_PIN` names (`3fb276fca`, engine 0.122.0), served
-by a resident started with `--sessions`, since the host merges its Session
-routes into no other document. It is ahead of the released 0.120.3 engine this
-package bundles.
+engine `ENGINE_QUAL_PIN` names (main `5167aaf5d`, engine 0.122.0, unreleased),
+served by a resident started with `--sessions`, since the host merges its
+Session routes into no other document. It is ahead of the released 0.120.3
+engine this package bundles.
 
 The SDK authenticates every route except public `GET /health`; bearer tokens
 are redacted from failures.

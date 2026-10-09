@@ -163,6 +163,6 @@ Work names the question that waits (`test/fixtures/session-host/`): it sends
 the recorded commands and decodes every recorded frame unchanged. The 0.123 integration engine registers
 `nika session --json` (`3688552f3`); the served `/v1/sessions` routes arrive
 with `nika serve --sessions`, and the pinned `openapi.json` declares them as
-such a resident of candidate engine `3fb276fca` serves them (the work snapshot
-an opaque object there). `scripts/run-session-parity-e2e.mjs` qualifies
+such a resident of engine main `5167aaf5d` serves them (the work snapshot an
+opaque object there). `scripts/run-session-parity-e2e.mjs` qualifies
 both doors of one binary once it hosts them (see `docs/testing.md`).

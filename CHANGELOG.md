@@ -224,7 +224,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   caller chose, as over HTTP. An earlier engine refuses the pair with its own
   usage error, reported as before.
 - `openapi.json` and the generated `src/generated/openapi.d.ts` now pin the
-  live document of candidate engine `3fb276fca` (engine 0.122.0), which
+  live document of engine main `5167aaf5d` (engine 0.122.0, unreleased; the
+  same tree as `3fb276fca`, whose binary served the export), which
   `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name, as a resident started with
   `--sessions` serves it. It adds the six `/v1/sessions` operations and the
   `SessionCommand`, `SessionFrame`, `SessionOutcome` and `SessionSnapshot`

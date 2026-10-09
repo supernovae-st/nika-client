@@ -254,32 +254,37 @@ describe('a journey walked over a scripted Session', () => {
   // Root review: `calls.elapsed_ms` sums the authoring calls only, a lower bound of the wait.
   it('times each open, each line and each leg\'s whole preparation apart from the author\'s own sum', async () => {
     const { dir, project, check } = world();
-    const HELD_MS = 60;
-    const sdk = { Nika: class {
-      openSession = async () => {
-        const session = scriptedSession(project, 'webhook', []);
-        return { ...session, submit: async (shown: unknown, line: string) => {
-          // The first CREATE line waits as a Session preparing would, beyond any authoring call.
-          if (line.startsWith('Create')) await new Promise((resolve) => setTimeout(resolve, HELD_MS));
-          return session.submit(shown, line);
-        } };
-      };
-    } };
-    const report = await journey(sdk, { door: 'native', bin: '/x', project, moduleSystem: 'esm', choice: null,
-      answers: { webhook: SINK }, create: 'Create the stale report', edit: 'Raise to 72', checkBin: check,
-      snapshots: path.join(dir, 'legs'), capture: ['out'] });
-    const steps = (name: string) => report.steps.filter((entry) => entry.step === name);
-    const whole = (value: unknown) => Number.isSafeInteger(value) && (value as number) >= 0;
-    expect([...steps('create_open'), ...steps('edit_open')].every((entry) => whole(entry.open_ms))).toBe(true);
-    const turns = steps('create_turn');
-    expect(turns.map((entry) => entry.said)).toEqual(['words', 'answer webhook (the answer table)']);
-    expect(turns.every((entry) => whole(entry.ms))).toBe(true);
-    expect(turns[0]!.ms).toBeGreaterThanOrEqual(HELD_MS);
-    const { timing } = steps('create_reached')[0]!;
-    // The whole preparation spans every turn; the author's own sum is the engine's receipt (3 ms here).
-    expect(timing.submit_to_settled_ms).toBeGreaterThanOrEqual(turns[0]!.ms + turns[1]!.ms);
-    expect(timing.author_ms).toBe(3);
-    expect(timing.submit_to_settled_ms).toBeGreaterThan(timing.author_ms);
+    // Drive only the measured monotonic clock: real process checks and timeout timers keep running.
+    // A timer scheduled for 60 ms can fire at 59 ms; scheduling jitter is not the duration contract.
+    let now = 1_000;
+    const clock = vi.spyOn(performance, 'now').mockImplementation(() => now);
+    try {
+      const sdk = { Nika: class {
+        openSession = async () => {
+          now += 5;
+          const session = scriptedSession(project, 'webhook', []);
+          return { ...session, submit: async (shown: unknown, line: string) => {
+            now += line.startsWith('Create') ? 60 : line === SINK ? 7 : 11;
+            return session.submit(shown, line);
+          } };
+        };
+      } };
+      const report = await journey(sdk, { door: 'native', bin: '/x', project, moduleSystem: 'esm', choice: null,
+        answers: { webhook: SINK }, create: 'Create the stale report', edit: 'Raise to 72', checkBin: check,
+        snapshots: path.join(dir, 'legs'), capture: ['out'] });
+      expect(report.error).toBeNull();
+      const steps = (name: string) => report.steps.filter((entry) => entry.step === name);
+      expect([...steps('create_open'), ...steps('edit_open')].map((entry) => entry.open_ms)).toEqual([5, 5]);
+      const turns = steps('create_turn');
+      expect(turns.map((entry) => entry.said)).toEqual(['words', 'answer webhook (the answer table)']);
+      expect(turns.map((entry) => entry.ms)).toEqual([60, 7]);
+      // Preparation spans both turns, excludes opening/Save/Run, and keeps the engine's own sum.
+      expect(steps('create_reached')[0]!.timing).toEqual({ submit_to_settled_ms: 67, author_ms: 3 });
+      expect(steps('edit_turn').map((entry) => entry.ms)).toEqual([11]);
+      expect(steps('edit_reached')[0]!.timing).toEqual({ submit_to_settled_ms: 11, author_ms: 3 });
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it('ends a leg on a cut wait as the harness bound it is, keeping the Session as it was then', async () => {

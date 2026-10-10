@@ -16,15 +16,21 @@ import type {
 import { sessionCommand, sessionFrame } from '../src/lib/session-host.js';
 import { healthResponse, jsonResponse, TOKEN_A } from './helpers/http-depth-harness.js';
 
-// The Session doors (nika/session-host@1, additive; engine f8da375e7 on the doors branch over main
-// ad70c9aa7's tree, not yet merged): `steer` and `follow_up` queue a line for the conversation's
-// run under way, a stopped conversation turn says how far the Stop reached and what it returned,
-// an activity names the tool step it observed, and an offered model carries this machine's facts.
-// The wire examples are the engine's own tests at that commit; the native door runs the fake host
-// with NIKA_FAKE_SESSION_DOORS, the HTTP door a mocked fetch. No network, no model.
+// The Session doors (nika/session-host@1, additive; engine main from a3017c495, first written on the
+// doors branch at f8da375e7): `steer` and `follow_up` queue a line for the conversation's run under
+// way, a stopped conversation turn says how far the Stop reached and what it returned, an activity
+// names the tool step it observed, and an offered model carries this machine's facts. The wire
+// examples are the engine's own tests at f8da375e7 (main a3017c495 writes the same wire), then the
+// frames a real a3017c495 binary wrote on both doors; the native door runs the fake host with
+// NIKA_FAKE_SESSION_DOORS, the HTTP door a mocked fetch. No network, no model.
 
 const DOORS = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/session-host/doors-f8da375e7.json',
   import.meta.url)), 'utf8')) as Record<string, any>;
+type Recorded = { step: string; frame?: Record<string, any>; snapshot?: Record<string, any> };
+type RecordedWalk = { steps: Recorded[]; activity?: Record<string, any>[] };
+// Each conversation led by a loopback author, a script on 127.0.0.1 (see the fixture's README).
+const RECORDED = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/session-host/a3017c495/doors.json',
+  import.meta.url)), 'utf8')) as Record<'native' | 'http', Record<'steer' | 'models' | 'stop' | 'full', RecordedWalk>>;
 const SESSION_ENGINE = fileURLToPath(new URL('./fixtures/fake-nika-session.mjs', import.meta.url));
 const CONTRACT = 'nika/session-host@1';
 const SESSION = `ses_${'ab'.repeat(16)}`;
@@ -331,5 +337,125 @@ describe('the Session doors over HTTP', () => {
     expect(error).toBeInstanceOf(NikaSessionRefusedError);
     expect(error).toMatchObject({ code: 'malformed', status: 400, line: 'use b instead' });
     expect((error as NikaSessionRefusedError).message).toContain('unknown op `steer`');
+  });
+});
+
+describe('the Session doors a real a3017c495 binary wrote, on both doors', () => {
+  const doors = [['native', 'native-process'], ['http', 'http']] as const;
+  type Transport = (typeof doors)[number][1];
+  const frameOf = (walk: RecordedWalk, step: string): Record<string, any> =>
+    walk.steps.find((entry) => entry.step === step)!.frame!;
+  const result = (walk: RecordedWalk, step: string, transport: Transport): NikaSessionResult =>
+    sessionFrame(frameOf(walk, step), transport) as unknown as NikaSessionResult;
+
+  it.each(doors)('decodes every frame the %s door wrote, unchanged', (door, transport) => {
+    const recorded = RECORDED[door];
+    expect(Object.fromEntries(Object.entries(recorded).map(([walk, { steps }]) =>
+      [walk, steps.map((entry) => entry.step)]))).toEqual({
+      steer: ['steer_without_turn', 'steer', 'follow_up', 'blank', 'busy', 'settled', 'steer_after_turn'],
+      models: ['settled'], stop: ['follow_up', 'stop', 'settled'], full: ['steer_32', 'steer_33'],
+    });
+    for (const walk of Object.values(recorded)) {
+      for (const value of [...walk.steps.flatMap((entry) => entry.frame ?? []), ...(walk.activity ?? [])]) {
+        const raw = JSON.stringify(value);
+        expect(sessionFrame(value, transport)).toBe(value);
+        expect(JSON.stringify(value)).toBe(raw);
+      }
+    }
+    // A snapshot read returns the snapshot alone: decoded here in the frame that carried it.
+    const read = recorded.steer.steps.find((entry) => entry.step === 'busy')!.snapshot!;
+    const carried = { contract: CONTRACT, frame: 'snapshot', session: frameOf(recorded.steer, 'steer').session,
+      snapshot: read };
+    expect(sessionFrame(carried, transport).snapshot).toBe(read);
+  });
+
+  it.each(doors)('answers each line with its receipt, bound to the turn it found (%s)', (door, transport) => {
+    const { steer, full } = RECORDED[door];
+    const before = result(steer, 'steer_without_turn', transport);
+    expect([before.op, before.receipt, before.target, before.queued]).toEqual(['steer', 'nothing_to_steer', null,
+      undefined]);
+    const steered = result(steer, 'steer', transport);
+    expect([steered.receipt, steered.target]).toEqual(['queued', 'c-1']);
+    const line: NikaSessionQueuedLine = steered.queued!;
+    expect(line).toEqual({ id: 'l1', mode: 'steer', line: 'use b instead', state: 'waiting' });
+    expect(result(steer, 'follow_up', transport).queued).toEqual({ id: 'l2', mode: 'follow_up', line: 'and c',
+      state: 'waiting' });
+    const blank = result(steer, 'blank', transport);
+    expect([blank.receipt, blank.target, blank.queued]).toEqual(['blank', 'c-1', undefined]);
+    // While the run reads them, the busy turn shows both lines waiting.
+    const busy = steer.steps.find((entry) => entry.step === 'busy')!.snapshot!.busy;
+    expect([busy.command, busy.queued.map((entry: NikaSessionQueuedLine) => [entry.id, entry.state])])
+      .toEqual(['c-1', [['l1', 'waiting'], ['l2', 'waiting']]]);
+    // Settled: the steering line entered as the person's next cited line, the follow-up after it.
+    const settled = result(steer, 'settled', transport);
+    expect([settled.op, settled.outcomes!.map((outcome) => outcome.kind), settled.snapshot.busy])
+      .toEqual(['submit', ['reply'], null]);
+    expect(settled.snapshot.work.queued!.map((entry) => [entry.id, entry.mode, entry.state, entry.cite]))
+      .toEqual([['l1', 'steer', 'entered', 'u2'], ['l2', 'follow_up', 'entered', 'u3']]);
+    expect(result(steer, 'steer_after_turn', transport)).toMatchObject({ receipt: 'nothing_to_steer', target: null });
+    // A run takes 32 lines at this engine: the 32nd is queued, the 33rd refused `full`.
+    expect(result(full, 'steer_32', transport).queued).toMatchObject({ id: 'l32', mode: 'steer', state: 'waiting' });
+    const refused = result(full, 'steer_33', transport);
+    expect([refused.receipt, refused.target, refused.queued, refused.snapshot.busy!.queued!.length])
+      .toEqual(['full', 'c-1', undefined, 32]);
+  });
+
+  it.each(doors)('settles a stopped conversation turn with the line it returned unsent (%s)', (door, transport) => {
+    const { stop } = RECORDED[door];
+    expect(result(stop, 'follow_up', transport).queued).toEqual({ id: 'l1', mode: 'follow_up', line: 'then stop',
+      state: 'waiting' });
+    expect(result(stop, 'stop', transport)).toMatchObject({ op: 'stop', receipt: 'stop_requested', target: 'c-1' });
+    const settled = result(stop, 'settled', transport);
+    expect(settled.outcomes).toHaveLength(1);
+    const stopped = settled.outcomes![0] as NikaSessionStopped;
+    expect([stopped.kind, stopped.reach, stopped.candidate]).toEqual(['stopped', 'request_dropped', undefined]);
+    expect(stopped.unsent).toEqual([{ id: 'l1', mode: 'follow_up', line: 'then stop', state: 'returned' }]);
+    expect(stopped.text).toContain('a request already sent may still be billed');
+    expect(stopped.text).toContain('not sent: « then stop »');
+    expect(settled.snapshot.work.queued!.map((entry) => [entry.id, entry.state])).toEqual([['l1', 'returned']]);
+  });
+
+  it.each(doors)('types the tool steps the run observed, never their arguments (%s)', (door, transport) => {
+    const marks = (walk: RecordedWalk): NikaSessionToolMark[] =>
+      walk.activity!.map((value) => (sessionFrame(value, transport) as unknown as NikaSessionEvent).tool!);
+    const failed = marks(RECORDED[door].steer);
+    expect(failed.map((tool) => [tool.name, tool.state])).toEqual([['models', 'started'], ['models', 'failed']]);
+    const asked = marks(RECORDED[door].models);
+    expect(asked.map((tool) => [tool.name, tool.state])).toEqual([['ask', 'started'], ['ask', 'finished']]);
+    for (const [started, ended] of [failed, asked]) {
+      expect(ended!.call).toBe(started!.call);
+      expect(started!.elapsed_ms).toBeUndefined();
+      expect(Number.isInteger(ended!.elapsed_ms)).toBe(true);
+      expect(ended!.elapsed_ms).toBeGreaterThanOrEqual(0);
+    }
+    for (const tool of [...failed, ...asked]) {
+      expect(['call', 'elapsed_ms', 'name', 'state']).toEqual(expect.arrayContaining(Object.keys(tool)));
+    }
+  });
+
+  it.each(doors)('types the facts this machine states for an offered run model, none invented (%s)', (door,
+    transport) => {
+    const settled = result(RECORDED[door].models, 'settled', transport);
+    expect(settled.outcomes).toEqual([{ kind: 'question', key: 'model', text: 'Which model runs the workflow?' }]);
+    const [question] = settled.snapshot.work.questions!;
+    expect([question!.role, question!.state]).toEqual(['run_model', 'open']);
+    const offered = question!.options.map((option) => [option.key, option.values[0]!.value, option.values[0]!.choice]);
+    expect(offered.map(([key, value]) => [key, value])).toEqual([['catalogue', 'deepseek/deepseek-v4-pro'],
+      ['loopback', 'vllm/agent-seat'], ['invented', 'acme/imaginary-1']]);
+    // A catalogue route without its key here: its facts, not configured, with the listed price.
+    const facts = offered[0]![2] as NikaSessionModelFacts;
+    expect(facts).toMatchObject({ role: 'run', model: 'deepseek/deepseek-v4-pro', via: 'deepseek', class: 'api',
+      configured: false, billing: 'api_metered' });
+    expect(facts.output_usd_per_million).toBeGreaterThan(0);
+    // Neither the loopback route's model nor an invented one is offered here for a run: no facts.
+    expect([offered[1]![2], offered[2]![2]]).toEqual([undefined, undefined]);
+  });
+
+  it('writes the same frames on both doors, apart from identities, the project root and timings', () => {
+    const plain = (door: 'native' | 'http') => JSON.stringify(RECORDED[door])
+      .replace(/ses_[0-9a-f]{32}/g, 'ses').replace(/snp_[0-9a-f]{32}/g, 'snp')
+      .replace(/\/private\/tmp\/nika-doors-(?:native|http)-[a-z]+-[A-Za-z0-9]{6}/g, 'root')
+      .replace(/"elapsed_ms":\d+/g, '"elapsed_ms":0').replace(/ · \d+ ms"/g, ' · ms"');
+    expect(plain('http')).toBe(plain('native'));
   });
 });

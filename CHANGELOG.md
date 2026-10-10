@@ -251,7 +251,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   this machine's facts (`choice`, `NikaSessionModelFacts`). An engine without
   the doors refuses these commands `malformed`, naming no command: natively
   the SDK now takes a refusal that names no command as the oldest unanswered
-  line's, read or doors line, in write order, and the Session goes on.
+  line's, read or doors line, in write order, and the Session goes on. The
+  handle is pinned against the engine's own examples and against the doors a
+  real `a3017c495` binary wrote on both doors, each conversation led by a
+  loopback author (a script, not a model, no provider).
 
 ### Changed
 

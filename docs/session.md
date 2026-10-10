@@ -214,7 +214,11 @@ of a real resident through its HTTP Session door, and at `46817419a`, whose
 Work names the question that waits (`test/fixtures/session-host/`): it sends
 the recorded commands and decodes every recorded frame unchanged, and at
 `ad70c9aa7` over one deterministic native walk whose every snapshot states its
-`knowledge` and whose Run sealed its journal. The 0.123 integration engine registers
+`knowledge` and whose Run sealed its journal. At `a3017c495` it decodes the
+Session doors a real binary wrote on both doors, each conversation led by a
+loopback author (a script on 127.0.0.1, not a model, no provider): the
+receipts but `not_reading`, the busy queue, the lines entered or returned, a
+stopped turn, tool steps and the facts of offered models. The 0.123 integration engine registers
 `nika session --json` (`3688552f3`); the served `/v1/sessions` routes arrive
 with `nika serve --sessions`, and the pinned `openapi.json` declares them as
 such a resident of engine main `a3017c495` serves them (the work snapshot an

@@ -68,7 +68,12 @@ line is a consent, an answer or a new request.
 `waiting` says what the next line answers, `candidate` holds the exact changes
 a consent would land, `saved` the last Save and `requested`/`run` the Run
 requested and the Run observed. A preview is not a Save, and a Save is not a
-Run.
+Run. Two waits carry more than their kind: `knowledge_choice` (engine
+`5f1e91c6f`) holds the `line` a refused knowledge source stopped, exactly as
+typed and sent nowhere (`/knowledge embedded` resumes it once, `cancel` drops
+it), and `questions` (engine `6d217dfba`) lists in `ids` the witnesses of the
+questions an intelligence asks together, in the order asked; the next line
+may answer any of them. Neither is answered for the person.
 
 From the 0.123 integration engine on, the snapshot also carries what a remote
 interface needs to show and verify without reading anything else:
@@ -82,7 +87,10 @@ interface needs to show and verify without reading anything else:
 | `question` | `NikaSessionQuestion`, absent otherwise | the compiler's own question while `waiting` is a `question` naming the same key: `key`, `label`, `type` (`text`, `literal`, `choice`, or `other` for a shape the engine does not name), `why`, `mandatory`, and `options` (`[{ key, label }]`, in the compiler's order) for a choice that has some; absent when no question waits, never `null` (host `46817419a`). The answer still names `waiting.id` |
 | `answered` | `NikaSessionAnswered`, absent otherwise | what the Session did with the last line typed for an authoring question, recorded at the act itself: `question` (that question's witness, the string its `waiting.id` carried) and `act`, then that act's own members: `bound` (`key`, `value` exactly as bound, `reading`: `as_typed`, `offered_key`, `model_read`, or `seat_default` when an empty line took the seat the person chose, engine `2812ea11b`), `dropped` (`key`), `restated` (`key`), `waits` (`key`, `why`), `refused` (`class`, the stable refusal word); acts, readings and classes stay open. Never derived from the turn's outcome: a bound value stays bound when the compile that follows fails. Absent when the last line answered nothing (an aside, a read-only command, a line for another prompt) and in a restored Session, never `null`; every line clears it first and rereading returns the same. It names the question within this Session only and grants nothing |
 | `intelligence` | `NikaSessionIntelligence` | configured facts: the person's `selected` intelligence as the engine's machine resolved it, the `author` seat, the `decision` seat selected and the `effort`; a selection is never the model that served a call |
-| `run` | `NikaSessionRun \| null` | the last observed Run with only the identities its observation carried: `current` (the Run of the workflow saved last), `workflow`, `end` (`{ end }`, plus `exit` for `unknown`), `trace`, `execution`, `workflow_sha256` (the source hash its start named), `chain_head`, `chain_len`; every member written, `null` where unobserved. A Run without `workflow_sha256` does not prove which bytes ran: both session-host doors observed none up to host `4271f09ef`; from host `b5d844d84` a run names what it observed of itself (recorded here from a real resident over HTTP at `312c3d5a8`: the sha256 of the bytes it ran, the job's execution uuid and opaque trace, the receipt head) |
+| `knowledge` | `NikaSessionKnowledge`, absent otherwise | the authoring knowledge the Session reads now, a configured fact and never a call receipt, in one `state`: `admitted` (a release the strict door admitted: `source` `embedded` or `disk`, its `version` or `null`, its `manifest_sha256`, and `by`: `default`, `conversation`, `host` or `environment`), `refused` (a source the configuration names, refused: `source`, `by`, the stable `code` and its `cause`, never a host path; a line that would reach a model then waits as `knowledge_choice`) or `unread` (`why`). Engine `5f1e91c6f`; absent when the Session states none, never `null`; states stay open and grant nothing |
+| `authoring.stages` | `NikaSessionStageTimes \| null` | how long the compile's other stages took, as its decision record states them (engine `5f1e91c6f`): `qualification_ms` (the knowledge qualification's wall time, or `null`) and `trials`, each trial of a candidate in the order run with its `attempt` (`completed`, `stopped`, `never_attempted`), `elapsed_ms` (`null` when never attempted, never `0`) and `runtime_bound_ms`; never summed, no output or text of the record; `null` when the record states neither stage |
+| `bindings`, `delegations`, `questions` | lists, each absent when empty | what a conversation led by an intelligence holds (engine `6d217dfba`): the values the candidate binds (`NikaSessionBinding`: `key` when a question asked for it, `role` (`read_source`, `output_path`, `run_model`, `value`), the exact `value`, and its `provenance`: `kind` (`named`, `delegated`, `derived`, `offered`, `answered`, `retained`), the person's line it rests on (`message`: `u1`, `u2`, …) with their `excerpt`, or an accepted offer's `question` and `option`); the choices the person delegated (`NikaSessionDelegation`: `message`, `excerpt`, `scope`); and the questions asked now (`NikaSessionAskedQuestion`: `id` (its witness, what `waiting.ids` lists), `key`, `question`, `why`, `role`, `state` `open` or `after` with the keys it waits for, `options` with their values, `free_text`, `multi_select`). A provenance is a record, never an authorization; questions are never kept across a reopen |
+| `run` | `NikaSessionRun \| null` | the last observed Run with only the identities its observation carried: `current` (the Run of the workflow saved last), `workflow`, `end` (`{ end }`, plus `exit` for `unknown`), `trace`, `execution`, `workflow_sha256` (the source hash its start named), `chain_head`, `chain_len`; every member written, `null` where unobserved. A Run without `workflow_sha256` does not prove which bytes ran: both session-host doors observed none up to host `4271f09ef`; from host `b5d844d84` a run names what it observed of itself (recorded here from a real resident over HTTP at `312c3d5a8`: the sha256 of the bytes it ran, the job's execution uuid and opaque trace, the receipt head). `sealed` (engine `ad70c9aa7`) says whether the Run sealed its journal: an `interrupted` Run that sealed stopped at a wave boundary and its trace verifies, one that did not was cut mid-flight and its trace is incomplete; absent before that engine |
 
 The SDK checks these members where they are, as it checks a compile's
 evidence: a present member of another shape fails with `NikaProtocolError`
@@ -102,9 +110,15 @@ generated unless you pass one). The engine keeps one ledger per Session:
 A `signal` stops your wait only. The engine keeps an accepted turn running;
 the wait fails with `NikaSessionWaitError` naming the command, and sending the
 same command again reads its result. `stop()` asks the turn under way to stop:
-its result is a receipt (`stop_requested`, `nothing_to_stop`, `run_underway`),
-and the stopped turn's own result settles it, ending with a `cancelled`
-outcome whose `withdrawn` lists the proposal or question it withdrew.
+its result is a receipt (`stop_requested`, `run_stopping`, `nothing_to_stop`,
+`run_underway`), and the stopped turn's own result settles it, ending with a
+`cancelled` outcome whose `withdrawn` lists the proposal or question it
+withdrew. From engine `ad70c9aa7` a Stop also reaches the Run a turn executes
+when its door can stop it (the native door can; see below): `run_stopping`
+means the Run took its first signal, as a first Ctrl-C sends it (work in
+flight completes and is counted, no new wave starts) and `busy.phase` reads
+`stopping`; a second Stop sends nothing more and a Stop never escalates to an
+abort.
 `close()` ends the Session (natively, its process); it carries no identity and
 over HTTP is the route's `DELETE`. A second line while a turn runs is refused
 (`busy`) and returned to you. A local handle binds each identity to the bytes
@@ -145,9 +159,17 @@ observation of the Run's end (`facts`, or `gate` when it paused),
 admitted but its end was not observed (its effects are unknown; it is never
 reported as an observed Run). A resident runs it as one of its jobs and may
 hold its cost review first (`run_review`: answer it with a line against that
-snapshot). The Run's own progress arrives as `activity` events; stopping a Run
-is the job's cancel (`POST /v1/jobs/{id}/cancel`), never the Session's
-`stop()`, whose receipt for a Run under way is `run_underway`.
+snapshot). The Run's own progress arrives as `activity` events. Natively, from
+engine `ad70c9aa7`, the Session's `stop()` stops the Run it executes: the
+receipt is `run_stopping` (or `stop_requested` when the Run had not started its
+work: it then starts none), and the turn settles with `run_stopped` (the Run
+stopped at a wave boundary and sealed its trace as cancelled; `work.run.end`
+reads `interrupted` and `work.run.sealed` is `true`) or `run_aborted` (it ended
+without sealing its trace: cut mid-flight, the effects in flight unknown). A
+Stop taken before a held cost review declines it (`run_not_started`). Over
+HTTP the resident's job door cannot stop the Run from the Session: the receipt
+is `run_underway`, and stopping it is the job's cancel
+(`POST /v1/jobs/{id}/cancel`).
 
 ## Status
 
@@ -160,9 +182,12 @@ from its real native and HTTP doors at `e849d08ea`, again on the merged
 cost review, at `312c3d5a8`, whose selection names its scope, with one Run
 of a real resident through its HTTP Session door, and at `46817419a`, whose
 Work names the question that waits (`test/fixtures/session-host/`): it sends
-the recorded commands and decodes every recorded frame unchanged. The 0.123 integration engine registers
+the recorded commands and decodes every recorded frame unchanged, and at
+`ad70c9aa7` over one deterministic native walk whose every snapshot states its
+`knowledge` and whose Run sealed its journal. The 0.123 integration engine registers
 `nika session --json` (`3688552f3`); the served `/v1/sessions` routes arrive
 with `nika serve --sessions`, and the pinned `openapi.json` declares them as
 such a resident of engine main `5167aaf5d` serves them (the work snapshot an
-opaque object there). `scripts/run-session-parity-e2e.mjs` qualifies
+opaque object there).
+`scripts/run-session-parity-e2e.mjs` qualifies
 both doors of one binary once it hosts them (see `docs/testing.md`).

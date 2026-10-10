@@ -215,6 +215,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   webhook, a manual `run()` and a `once` schedule that fires the declared
   default. The depth ledger, evidence gate and replay fixtures now count six
   projects; the new row records behavioral verdicts only, never a job id.
+- The Session work members of the 0.123 integration batches are typed and
+  checked where they are, a malformed one naming its path: `knowledge`
+  (`NikaSessionKnowledge`: `admitted` with the release's version and manifest
+  digest, `refused` with its stable code and cause, or `unread` with why;
+  engine `5f1e91c6f`), `authoring.stages` (`NikaSessionStageTimes`: the
+  knowledge qualification's time and each trial's, `null` when the record
+  states none, never summed), the waits `knowledge_choice` (the held `line`,
+  exactly as typed) and `questions` (the `ids` asked together), the
+  conversation an intelligence leads (`bindings` with each value's
+  `provenance`, `delegations`, and `questions` as `NikaSessionAskedQuestion`
+  with their options and values; engine `6d217dfba`), and `run.sealed`
+  (whether the Run sealed its journal; engine `ad70c9aa7`). A Stop now
+  reaches a Run the native door executes (`busy.phase` `stopping`, the
+  receipt `run_stopping`, then `run_stopped` or `run_aborted`); over HTTP it
+  stays `run_underway`. Unknown members and words still ride through. The
+  handle is pinned against one deterministic native walk a real `ad70c9aa7`
+  binary wrote and against the engine's own serializer examples.
 
 ### Changed
 

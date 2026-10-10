@@ -292,7 +292,10 @@ const ANSWER_ACTS: Record<string, string[]> = {
  * The work members the SDK names (engine `nika-session-change` `work.rs`;
  * candidate `content`, `authoring.draft`/`calls` and `intelligence` from the
  * 0.123 integration `1b47f34c0`, `authoring.calls.per_call` from
- * `ca5845b85`, `answered` as `Answered`/`AnswerAct` serialize), judged where
+ * `ca5845b85`, `answered` as `Answered`/`AnswerAct` serialize; `knowledge`,
+ * `authoring.stages` and the `knowledge_choice` wait from `5f1e91c6f`; the
+ * conversation's `bindings`, `delegations`, `questions` and the `questions`
+ * wait from `6d217dfba`; `run.sealed` from `ad70c9aa7`), judged where
  * they are. A member present with another shape
  * is a protocol fault naming its path, never its value; an absent one,
  * `null` where the engine writes it and every unknown member ride through.
@@ -328,6 +331,16 @@ function workMembers(work: Record<string, unknown>, fail: (what: string) => Nika
       throw fail(`${path} is ${nullable ? 'neither a witness nor null' : 'not a witness'}`);
     }
   };
+  const texts = (value: unknown, path: string) => {
+    if (!Array.isArray(value) || !value.every((entry) => typeof entry === 'string')) {
+      throw fail(`${path} is not a list of text`);
+    }
+  };
+  /** A list whose every entry is an object, each judged by `check` at its own path. */
+  const list = (check: (entry: Record<string, unknown>, at: string) => void) => (value: unknown, path: string) => {
+    if (!Array.isArray(value)) throw fail(`${path} is not a list`);
+    value.forEach((entry, index) => check(object(entry, `${path}[${index}]`), `${path}[${index}]`));
+  };
 
   const candidate = machineObject(work.candidate);
   if (candidate) {
@@ -350,11 +363,7 @@ function workMembers(work: Record<string, unknown>, fail: (what: string) => Nika
       member(revision, 'mode', path, text(), true);
       member(revision, 'base_sha256', path, witness(true), true);
       member(revision, 'candidate_sha256', path, witness(), true);
-      member(revision, 'changed', path, (changed, at) => {
-        if (!Array.isArray(changed) || !changed.every((entry) => typeof entry === 'string')) {
-          throw fail(`${at} is not a list of text`);
-        }
-      }, true);
+      member(revision, 'changed', path, texts, true);
       member(revision, 'preservation', path, text());
       member(revision, 'components', path, (components, at) => {
         if (!Array.isArray(components)) throw fail(`${at} is not a list`);
@@ -415,7 +424,72 @@ function workMembers(work: Record<string, unknown>, fail: (what: string) => Nika
         });
       });
     });
+    // The compile's other stages, as its decision record states them: every member written,
+    // a time it does not state `null`, never `0`.
+    member(authoring, 'stages', 'work.authoring', (value, path) => {
+      if (value === null) return;
+      const stages = object(value, path);
+      member(stages, 'qualification_ms', path, count(true), true);
+      member(stages, 'trials', path, list((trial, at) => {
+        member(trial, 'attempt', at, text(true), true);
+        member(trial, 'elapsed_ms', at, count(true), true);
+        member(trial, 'runtime_bound_ms', at, count(true), true);
+      }), true);
+    });
   }
+  // What a held line or the questions open together carry; the kind itself is checked above.
+  const waiting = machineObject(work.waiting)!;
+  if (waiting.kind === 'knowledge_choice') member(waiting, 'line', 'work.waiting', text(), true);
+  if (waiting.kind === 'questions') member(waiting, 'ids', 'work.waiting', texts, true);
+  // The knowledge the Session reads: left out when it states none (never `null`), each known
+  // state with its own members; a state this SDK has not met rides through.
+  member(work, 'knowledge', 'work', (value, path) => {
+    const knowledge = object(value, path);
+    member(knowledge, 'state', path, text(), true);
+    if (knowledge.state === 'admitted') {
+      member(knowledge, 'source', path, text(), true);
+      member(knowledge, 'version', path, text(true), true);
+      member(knowledge, 'manifest_sha256', path, witness(), true);
+      member(knowledge, 'by', path, text(), true);
+    } else if (knowledge.state === 'refused') {
+      for (const key of ['source', 'by', 'code', 'cause']) member(knowledge, key, path, text(), true);
+    } else if (knowledge.state === 'unread') {
+      member(knowledge, 'why', path, text(), true);
+    }
+  });
+  // What a conversation led by an intelligence holds: each list left out when empty (never `null`).
+  member(work, 'bindings', 'work', list((binding, at) => {
+    member(binding, 'key', at, text());
+    member(binding, 'role', at, text(), true);
+    member(binding, 'value', at, text(), true);
+    member(binding, 'provenance', at, (value, path) => {
+      const provenance = object(value, path);
+      member(provenance, 'kind', path, text(), true);
+      member(provenance, 'message', path, text(), true);
+      for (const key of ['excerpt', 'question', 'option']) member(provenance, key, path, text());
+    }, true);
+  }));
+  member(work, 'delegations', 'work', list((delegation, at) => {
+    for (const key of ['message', 'excerpt', 'scope']) member(delegation, key, at, text(), true);
+  }));
+  member(work, 'questions', 'work', list((asked, at) => {
+    for (const key of ['id', 'key', 'question', 'state']) member(asked, key, at, text(), true);
+    member(asked, 'why', at, text());
+    member(asked, 'role', at, text());
+    member(asked, 'after', at, texts);
+    member(asked, 'free_text', at, flag, true);
+    member(asked, 'multi_select', at, flag, true);
+    member(asked, 'options', at, list((offer, where) => {
+      member(offer, 'key', where, text(), true);
+      member(offer, 'label', where, text(), true);
+      member(offer, 'recommended', where, flag, true);
+      member(offer, 'values', where, list((offered, place) => {
+        member(offered, 'role', place, text(), true);
+        member(offered, 'value', place, text(), true);
+        member(offered, 'name', place, text());
+      }), true);
+    }), true);
+  }));
   member(work, 'intelligence', 'work', (value, path) => {
     if (value === null) return;
     const intelligence = object(value, path);
@@ -477,6 +551,7 @@ function workMembers(work: Record<string, unknown>, fail: (what: string) => Nika
       member(run, key, path, text(true), true);
     }
     member(run, 'chain_len', path, count(true), true);
+    member(run, 'sealed', path, flag);
     member(run, 'end', path, (end, at) => {
       if (end === null) return;
       const ended = object(end, at);

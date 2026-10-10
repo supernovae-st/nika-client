@@ -8,13 +8,21 @@ import { Nika, NikaProtocolError } from '../src/index.js';
 import type {
   NikaAuthoringSession,
   NikaSessionAnswered,
+  NikaSessionAskedQuestion,
   NikaSessionAuthoringCall,
   NikaSessionAuthoringCalls,
+  NikaSessionBinding,
   NikaSessionCandidateFile,
+  NikaSessionDelegation,
   NikaSessionIntelligence,
+  NikaSessionKnowledge,
   NikaSessionQuestion,
+  NikaSessionResult,
   NikaSessionRun,
   NikaSessionRunEnd,
+  NikaSessionSnapshot,
+  NikaSessionStageTimes,
+  NikaSessionWaiting,
   NikaSessionWork,
 } from '../src/index.js';
 import { sessionFrame } from '../src/lib/session-host.js';
@@ -94,6 +102,21 @@ const recordedAnswers = (file: string): { rows: Record<string, any>[] } =>
 // proposed bytes), from the carrier, byte for byte.
 const CREATED = fileURLToPath(new URL('./fixtures/session-host/candidate-revision-created-2812ea11b.json',
   import.meta.url));
+
+// The wire the engine's own serializer tests assert at `ad70c9aa7` for the members the 0.123
+// integration batches added: `knowledge`, `authoring.stages` and the `knowledge_choice` wait
+// (`5f1e91c6f`), the conversation's `bindings`, `delegations`, `questions` and the `questions`
+// wait (`6d217dfba`), and `run.sealed` (`ad70c9aa7`). Byte for byte where a test asserts a whole
+// value, completed by the struct's field order where it asserts a part; never a live call.
+const BATCHES = fileURLToPath(new URL('./fixtures/session-host/work-ad70c9aa7.json', import.meta.url));
+const batches = (): Record<string, any> => JSON.parse(readFileSync(BATCHES, 'utf8'));
+/** The texts the engine's host writes when a Stop reached a Run (`nika-session-host` `worker.rs`, `ad70c9aa7`). */
+const RUN_STOPPED = 'the Stop reached the run: it stopped at a wave boundary · the work in flight completed and is '
+  + 'counted · unstarted tasks were cancelled · its trace is sealed';
+const RUN_ABORTED = 'the run took the Stop but ended without sealing its trace: it was cut mid-flight (an abort or a '
+  + 'crash) · its trace is incomplete · nothing was rolled back and the work in flight has an unknown outcome';
+const decoded = (body: Record<string, any>): NikaSessionWork =>
+  (sessionFrame(opened(body), 'http').snapshot as { work: NikaSessionWork }).work;
 
 /** A waiting question as `nika-session-change` serializes it (host 46817419a): no options unless a choice has some. */
 const question = (): Record<string, any> => ({ key: 'model', label: 'Which provider/model runs the language steps?',
@@ -348,6 +371,135 @@ describe('Session work members', () => {
     }
   });
 
+  it('decodes every frame a real ad70c9aa7 binary wrote through the native door, unchanged', () => {
+    const walk = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/session-host/ad70c9aa7/native-walk.json',
+      import.meta.url)), 'utf8')) as { step: string; frame?: Record<string, any> }[];
+    const frames = walk.filter((entry) => entry.frame !== undefined);
+    expect(frames.map((entry) => entry.step)).toEqual(['open', 'copy', 'consent', 'run', 'details', 'close']);
+    for (const { frame } of frames) {
+      const raw = JSON.stringify(frame);
+      expect(sessionFrame(frame, 'native-process')).toBe(frame);
+      expect(JSON.stringify(frame)).toBe(raw);
+    }
+    const work = (step: string): NikaSessionWork => frames.find((entry) => entry.step === step)!.frame!.snapshot.work;
+    // Every snapshot states the knowledge it reads: the release this build embeds, admitted by default.
+    for (const step of ['open', 'copy', 'consent', 'run', 'close']) {
+      expect(work(step).knowledge).toMatchObject({ state: 'admitted', source: 'embedded', by: 'default' });
+    }
+    expect(work('open').knowledge!.manifest_sha256).toMatch(/^[0-9a-f]{64}$/);
+    // The deterministic compile states no other stage; the observed Run sealed its journal.
+    expect(work('copy').authoring!.stages).toBeNull();
+    expect(work('run').run).toMatchObject({ current: true, end: { end: 'succeeded' }, sealed: true });
+    expect(work('run').run!.workflow_sha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it.each(['admitted', 'refused', 'unread'] as const)('types the knowledge the Session reads: %s', (state) => {
+    const body = work({ knowledge: batches().knowledge[state] });
+    const knowledge: NikaSessionKnowledge = decoded(body).knowledge!;
+    expect(knowledge).toBe(body.knowledge);
+    expect(knowledge).toEqual(batches().knowledge[state]);
+  });
+
+  it('carries a knowledge state this SDK has not met, and no knowledge when none is stated', () => {
+    const later = { state: 'pinned_elsewhere', future_knowledge_member: 'kept' };
+    expect(decoded(work({ knowledge: later })).knowledge).toEqual(later);
+    const nameless = { ...batches().knowledge.admitted, version: null };
+    expect(decoded(work({ knowledge: nameless })).knowledge!.version).toBeNull();
+    expect(decoded(work()).knowledge).toBeUndefined();
+  });
+
+  it('types the line a refused knowledge source holds, exactly as typed', () => {
+    const body = work({ waiting: batches().waiting.knowledge_choice, candidate: null,
+      knowledge: batches().knowledge.refused });
+    const waiting: NikaSessionWaiting = decoded(body).waiting;
+    expect(waiting).toBe(body.waiting);
+    expect(waiting.line).toBe('  summarize « today\'s » news\n');
+  });
+
+  it('types the compile stage times as its decision record states them, never summed', () => {
+    const body = work();
+    body.authoring.stages = batches().stages;
+    const stages: NikaSessionStageTimes = decoded(body).authoring!.stages!;
+    expect(stages).toBe(body.authoring.stages);
+    expect(stages.qualification_ms).toBe(41870);
+    // A trial never attempted has no time: `null`, never `0`.
+    expect(stages.trials.map((trial) => [trial.attempt, trial.elapsed_ms, trial.runtime_bound_ms]))
+      .toEqual([['completed', 1912, 30000], ['never_attempted', null, 30000]]);
+    // A record that states neither stage, and an engine before stages.
+    const quiet = work();
+    quiet.authoring.stages = null;
+    expect(decoded(quiet).authoring!.stages).toBeNull();
+    expect('stages' in decoded(work()).authoring!).toBe(false);
+  });
+
+  it('types a conversation an intelligence leads: its values, delegations and questions asked together', () => {
+    const { bindings, delegations, questions } = batches().conversation;
+    const body = work({ waiting: batches().waiting.questions, candidate: null, bindings, delegations, questions });
+    const typed = decoded(body);
+    const values: NikaSessionBinding[] = typed.bindings!;
+    expect(values).toBe(body.bindings);
+    expect(values.map((value) => [value.role, value.value, value.provenance.kind, value.provenance.message]))
+      .toEqual([['output_path', './news/digest.md', 'offered', 'u2'],
+        ['read_source', 'https://www.lemonde.fr/', 'delegated', 'u1']]);
+    expect(values[0]!.provenance).toMatchObject({ question: 'plan', option: 'recommended' });
+    expect(values[1]!.provenance.excerpt).toBe('tu les choisis');
+    const delegated: NikaSessionDelegation[] = typed.delegations!;
+    expect(delegated).toEqual([{ message: 'u1', excerpt: 'tu les choisis', scope: 'read_source' }]);
+    const asked: NikaSessionAskedQuestion[] = typed.questions!;
+    expect(asked.map((question) => [question.id, question.key, question.state])).toEqual([
+      ['witness-plan', 'plan', 'open'], ['witness-token', 'token', 'after']]);
+    expect(typed.waiting.ids).toEqual(['witness-plan']);
+    expect(asked[0]!.options).toEqual([{ key: 'recommended', label: 'Oui', recommended: true,
+      values: [{ role: 'output_path', value: './news/digest.md' }] }]);
+    expect([asked[0]!.free_text, asked[0]!.multi_select, asked[1]!.after]).toEqual([true, false, ['plan']]);
+  });
+
+  it('carries what a conversation member gains later, and none of its keys without a leading intelligence', () => {
+    const { questions } = batches().conversation;
+    // A model's facts on a `run_model` offer, as the next batch adds them: carried, not judged.
+    questions[0].options[0].values[0] = { role: 'run_model', value: 'deepseek/deepseek-v4-pro',
+      model: { context_window: 1000000 } };
+    expect(decoded(work({ questions })).questions![0]!.options[0]!.values[0]!.model)
+      .toEqual({ context_window: 1000000 });
+    const plain = decoded(work());
+    for (const key of ['bindings', 'delegations', 'questions']) expect(key in plain).toBe(false);
+  });
+
+  it('tells a Run that sealed its journal from one cut mid-flight, and an engine before it from both', () => {
+    const { stopped, cut } = batches().runs;
+    const sealed = (run: Record<string, any>) => {
+      const typed: NikaSessionRun = decoded(work({ waiting: { kind: 'free' }, candidate: null, run })).run!;
+      expect(typed).toBe(run);
+      return [typed.end!.end, typed.sealed];
+    };
+    expect([sealed(stopped), sealed(cut)]).toEqual([['interrupted', true], ['interrupted', false]]);
+    // An engine before the flag writes none: absent, never assumed either way.
+    expect(sealed(observedRun())).toEqual(['succeeded', undefined]);
+  });
+
+  it('carries the Stop vocabulary of engine ad70c9aa7: a stopping turn, its receipt and the Run outcomes', () => {
+    const snapshot = (busy: Record<string, unknown> | null): NikaSessionSnapshot => ({
+      snapshot: `snp_${'1'.repeat(32)}`, seq: 4, busy: busy as NikaSessionSnapshot['busy'],
+      work: work({ waiting: { kind: 'free' }, candidate: null }) as NikaSessionWork });
+    const stopping = { contract: CONTRACT, session: SESSION, frame: 'snapshot',
+      snapshot: snapshot({ command: 'c-9', phase: 'stopping', stop_requested: true }) };
+    expect(sessionFrame(stopping, 'native-process')).toBe(stopping);
+    const receipt = { contract: CONTRACT, session: SESSION, frame: 'result', command: 's-9', op: 'stop',
+      replayed: false, receipt: 'run_stopping', target: 'c-9',
+      snapshot: snapshot({ command: 'c-9', phase: 'stopping', stop_requested: true }) };
+    const stopped = sessionFrame(receipt, 'native-process') as NikaSessionResult;
+    expect([stopped.receipt, stopped.target]).toEqual(['run_stopping', 'c-9']);
+    for (const [kind, text] of [['run_stopped', RUN_STOPPED], ['run_aborted', RUN_ABORTED]]) {
+      const settled = { contract: CONTRACT, session: SESSION, frame: 'result', command: 'c-9', op: 'submit',
+        replayed: false, outcomes: [{ kind: 'run_requested', text: 'run held.nika' }, { kind, text }],
+        snapshot: snapshot(null) };
+      const raw = JSON.stringify(settled);
+      expect((sessionFrame(settled, 'http') as NikaSessionResult).outcomes!.map((outcome) => outcome.kind))
+        .toEqual(['run_requested', kind]);
+      expect(JSON.stringify(settled)).toBe(raw);
+    }
+  });
+
   const malformed: [string, (body: Record<string, any>) => void, RegExp][] = [
     ['candidate files as an object', (b) => { b.candidate.files = {}; }, /work\.candidate\.files is not a list/],
     ['a candidate without its files', (b) => { delete b.candidate.files; }, /work\.candidate\.files is absent/],
@@ -476,6 +628,64 @@ describe('Session work members', () => {
       /work\.answered\.class is not text/],
     ['a restatement without its key', (b) => { b.answered = acts().restated; delete b.answered.key; },
       /work\.answered\.key is absent/],
+    // The engine leaves `knowledge` out when it states none: a written `null` is another shape.
+    ['knowledge as null', (b) => { b.knowledge = null; }, /work\.knowledge is not an object/],
+    ['knowledge without its state', (b) => { b.knowledge = { source: 'embedded' }; },
+      /work\.knowledge\.state is absent/],
+    ['an admitted release without its manifest digest', (b) => { b.knowledge = batches().knowledge.admitted;
+      delete b.knowledge.manifest_sha256; }, /work\.knowledge\.manifest_sha256 is absent/],
+    ['a manifest digest in capitals', (b) => { b.knowledge = { ...batches().knowledge.admitted,
+      manifest_sha256: 'A'.repeat(64) }; }, /work\.knowledge\.manifest_sha256 is not a witness/],
+    ['an admitted version as a number', (b) => { b.knowledge = { ...batches().knowledge.admitted, version: 2 }; },
+      /work\.knowledge\.version is neither text nor null/],
+    ['a refusal without its code', (b) => { b.knowledge = batches().knowledge.refused; delete b.knowledge.code; },
+      /work\.knowledge\.code is absent/],
+    ['a refusal cause as an object', (b) => { b.knowledge = { ...batches().knowledge.refused,
+      cause: { path: SECRET } }; }, /work\.knowledge\.cause is not text/],
+    ['unread knowledge without its reason', (b) => { b.knowledge = { state: 'unread' }; },
+      /work\.knowledge\.why is absent/],
+    ['a knowledge choice without its line', (b) => { b.waiting = { kind: 'knowledge_choice' }; },
+      /work\.waiting\.line is absent/],
+    ['a held line as a list', (b) => { b.waiting = { kind: 'knowledge_choice', line: [SECRET] }; },
+      /work\.waiting\.line is not text/],
+    ['open questions named as text', (b) => { b.waiting = { kind: 'questions', ids: 'witness-plan' }; },
+      /work\.waiting\.ids is not a list of text/],
+    ['stages as a list', (b) => { b.authoring.stages = []; }, /work\.authoring\.stages is not an object/],
+    ['stages without their trials', (b) => { b.authoring.stages = batches().stages; delete b.authoring.stages.trials; },
+      /work\.authoring\.stages\.trials is absent/],
+    ['a qualification time written as text', (b) => { b.authoring.stages = { ...batches().stages,
+      qualification_ms: '41870' }; }, /work\.authoring\.stages\.qualification_ms is neither a count nor null/],
+    ['a trial as text', (b) => { b.authoring.stages = { ...batches().stages, trials: [SECRET] }; },
+      /work\.authoring\.stages\.trials\[0\] is not an object/],
+    ['a trial without its runtime bound member', (b) => { b.authoring.stages = batches().stages;
+      delete b.authoring.stages.trials[1].runtime_bound_ms; },
+    /work\.authoring\.stages\.trials\[1\]\.runtime_bound_ms is absent/],
+    ['a negative trial time', (b) => { b.authoring.stages = batches().stages;
+      b.authoring.stages.trials[0].elapsed_ms = -1; },
+    /work\.authoring\.stages\.trials\[0\]\.elapsed_ms is neither a count nor null/],
+    ['bindings as an object', (b) => { b.bindings = {}; }, /work\.bindings is not a list/],
+    ['a binding without its provenance', (b) => { b.bindings = batches().conversation.bindings;
+      delete b.bindings[0].provenance; }, /work\.bindings\[0\]\.provenance is absent/],
+    ['a provenance without the line it rests on', (b) => { b.bindings = batches().conversation.bindings;
+      delete b.bindings[1].provenance.message; }, /work\.bindings\[1\]\.provenance\.message is absent/],
+    ['a bound value as a number', (b) => { b.bindings = batches().conversation.bindings; b.bindings[0].value = 7; },
+      /work\.bindings\[0\]\.value is not text/],
+    ['a delegation without the words', (b) => { b.delegations = batches().conversation.delegations;
+      delete b.delegations[0].excerpt; }, /work\.delegations\[0\]\.excerpt is absent/],
+    ['a question without its identity', (b) => { b.questions = batches().conversation.questions;
+      delete b.questions[0].id; }, /work\.questions\[0\]\.id is absent/],
+    ['a free-answer flag as text', (b) => { b.questions = batches().conversation.questions;
+      b.questions[0].free_text = 'yes'; }, /work\.questions\[0\]\.free_text is not a boolean/],
+    ['prerequisites as text', (b) => { b.questions = batches().conversation.questions; b.questions[1].after = 'plan'; },
+      /work\.questions\[1\]\.after is not a list of text/],
+    ['an option without its recommendation', (b) => { b.questions = batches().conversation.questions;
+      delete b.questions[0].options[0].recommended; },
+    /work\.questions\[0\]\.options\[0\]\.recommended is absent/],
+    ['an offered value as a number', (b) => { b.questions = batches().conversation.questions;
+      b.questions[0].options[0].values[0].value = 3; },
+    /work\.questions\[0\]\.options\[0\]\.values\[0\]\.value is not text/],
+    ['a sealed flag as text', (b) => { b.run = { ...batches().runs.stopped, sealed: 'true' }; },
+      /work\.run\.sealed is not a boolean/],
   ];
   it.each(malformed)('refuses %s as a protocol fault naming its path, never its value', (_name, mutate, message) => {
     const body = work();

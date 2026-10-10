@@ -324,9 +324,10 @@ describe('a journey counts for the seat the Session actually selected', () => {
 });
 
 describe('the persona answers only what it was told to', () => {
-  const snapshot = (kind: string, extra: Record<string, unknown> = {}) => ({ snapshot: `snp-${kind}`, seq: 1, busy: null,
-    work: { waiting: { kind, ...extra }, authoring: null, candidate: null, intelligence: null } });
-  function scripted(kinds: [string, Record<string, unknown>?][]) {
+  const snapshot = (kind: string, extra: Record<string, unknown> = {}, more: Record<string, unknown> = {}) => ({
+    snapshot: `snp-${kind}`, seq: 1, busy: null,
+    work: { waiting: { kind, ...extra }, authoring: null, candidate: null, intelligence: null, ...more } });
+  function scripted(kinds: [string, Record<string, unknown>?, Record<string, unknown>?][]) {
     const sent: string[] = [];
     const commands: string[] = [];
     const session = {
@@ -337,9 +338,9 @@ describe('the persona answers only what it was told to', () => {
           { snapshot: snapshotHandle(shown), line: sessionLine(line) });
         sent.push(line);
         commands.push(command);
-        const [kind, extra] = kinds.shift()!;
+        const [kind, extra, more] = kinds.shift()!;
         return { frame: 'result', event: sent.length, op: 'submit', replayed: false, outcomes: [{ kind: 'reply' }],
-          snapshot: snapshot(kind, extra) };
+          snapshot: snapshot(kind, extra, more) };
       },
     };
     return { session, sent, commands };
@@ -397,6 +398,56 @@ describe('the persona answers only what it was told to', () => {
       [3, `answer const.source_folder (${why})`, 'answer-3']]);
   });
 
+  /** Questions a conversation asks together, open now, in `nika-session-change`'s shape (`ad70c9aa7`). */
+  const asked = (...questions: [string, string, string][]) => ({
+    questions: questions.map(([id, key, words]) => ({ id, key, question: words, state: 'open', options: [],
+      free_text: true, multi_select: false })) });
+  const PLAN: [string, string, string] = ['witness-plan', 'plan', 'Ça te va ?'];
+  const TOKEN: [string, string, string] = ['witness-token', 'const.api_token', 'Quel jeton utiliser ?'];
+  const RULES = [{ key: '^plan$', line: 'Oui', why: 'the plan offered' },
+    { text: 'jeton', line: 'demo-token', why: 'the token given' }];
+
+  it('answers the questions asked together that it was told to, on one line, each after its key', async () => {
+    const { session, sent, commands } = scripted([
+      ['questions', { ids: ['witness-plan', 'witness-token'] }, asked(PLAN, TOKEN)], ['consent', { proposal: 'p' }]]);
+    const turns: any[] = [];
+    const reached = await advance(via(session), snapshot('free'), 'Create it',
+      { choice: '1', acceptCost: false, answers: RULES }, (turn) => turns.push(turn));
+    expect(reached.waiting).toBe('consent');
+    expect(sent).toEqual(['Create it', 'plan: Oui; const.api_token: demo-token']);
+    expect(commands).toEqual(['words-0', 'answer-1']);
+    expect(turns.map((turn) => turn.said)).toEqual(['words',
+      'answer plan, const.api_token (the plan offered; the token given)']);
+    // The turn keeps what the conversation held when the persona read it.
+    expect(turns[0].evidence.conversation.questions.map((question: { key: string }) => question.key))
+      .toEqual(['plan', 'const.api_token']);
+    expect([turns[0].evidence.knowledge, turns[0].evidence.stages]).toEqual([null, null]);
+  });
+
+  it('answers a lone open question as written, and leaves open what it was never told', async () => {
+    const lone = scripted([['questions', { ids: ['witness-plan'] }, asked(PLAN)], ['consent']]);
+    await advance(via(lone.session), snapshot('free'), 'Create it',
+      { choice: '1', acceptCost: false, answers: RULES }, () => {});
+    expect(lone.sent).toEqual(['Create it', 'Oui']);
+    // Told only the plan: it answers that one, then stops at the token it was never told.
+    const partial = scripted([['questions', { ids: ['witness-plan', 'witness-token'] }, asked(PLAN, TOKEN)],
+      ['questions', { ids: ['witness-token'] }, asked(TOKEN)]]);
+    const stopped = await advance(via(partial.session), snapshot('free'), 'Create it',
+      { choice: '1', acceptCost: false, answers: [RULES[0]] }, () => {});
+    expect(partial.sent).toEqual(['Create it', 'plan: Oui']);
+    expect([stopped.waiting, stopped.summary.key]).toEqual(['questions', 'const.api_token']);
+  });
+
+  it('answers none of the questions asked together when told none, and the leg names them all', async () => {
+    const { session, sent } = scripted([['questions', { ids: ['witness-plan', 'witness-token'] }, asked(PLAN, TOKEN)]]);
+    const stopped = await advance(via(session), snapshot('free'), 'Create it',
+      { choice: '1', acceptCost: true, answers: {} }, () => {});
+    expect([sent, stopped.waiting, stopped.summary.key]).toEqual([['Create it'], 'questions', 'plan, const.api_token']);
+    const judged = judgeJourney(edit(journey(), 'create_reached', stopped.summary), EXPECTED);
+    expect(judged.checks.find((entry) => entry.name === 'the CREATE leg reached a proposal')).toMatchObject({
+      verdict: 'not_exercised', why: 'the Session waits on questions (plan, const.api_token)' });
+  });
+
   it('stops answering after its own turn bound, keeping what the Session shows, never claiming a result', async () => {
     const asks = Array.from({ length: 30 }, (): [string, Record<string, unknown>] =>
       ['question', { key: 'const.again' }]);
@@ -415,7 +466,8 @@ describe('the persona answers only what it was told to', () => {
   });
 
   it('never consents for the person and never answers a gate', async () => {
-    for (const kind of ['gate', 'run_review', 'input', 'activation', 'free']) {
+    // A held line waits on the person's knowledge choice: the persona was never told one.
+    for (const kind of ['gate', 'run_review', 'input', 'activation', 'free', 'knowledge_choice']) {
       const { session, sent } = scripted([[kind]]);
       const reached = await advance(via(session), snapshot('free'), 'Create it',
         { choice: '1', acceptCost: true, answers: {} }, () => {});

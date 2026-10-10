@@ -232,6 +232,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   stays `run_underway`. Unknown members and words still ride through. The
   handle is pinned against one deterministic native walk a real `ad70c9aa7`
   binary wrote and against the engine's own serializer examples.
+- The journey persona answers the questions a conversation asks together
+  (`waiting.kind` `questions`) only from its rules: a lone open question by
+  its line, several on one line, each answer after its question's key; the
+  ones it was never told stay open, and the leg names the keys it waits on. It
+  never answers a `knowledge_choice`. Each turn's evidence keeps the
+  knowledge read, the compile's stage times and what the conversation holds.
 
 ### Changed
 

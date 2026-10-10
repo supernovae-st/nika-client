@@ -266,13 +266,16 @@ async function advance(send, snapshot, line, persona, report) {
     } else if (waiting.kind === 'question' && answerFor(persona.answers, waiting, result) !== null) {
       const answer = answerFor(persona.answers, waiting, result);
       [next, kind, said] = [answer.line, 'answer', `answer ${waiting.key} (${answer.why})`];
+    } else if (waiting.kind === 'questions' && answersFor(persona.answers, shown.work) !== null) {
+      const answer = answersFor(persona.answers, shown.work);
+      [next, kind, said] = [answer.line, 'answer', `answer ${answer.keys.join(', ')} (${answer.why})`];
     } else {
       // Where no proposal waits, the compiler's own draft (shown, never offered) is kept with its
       // digest, so a candidate a judge held stays inspectable after the scratch is gone.
       // The raw work rides with it, every member as the engine wrote it, unknown ones included.
       const draft = waiting.kind === 'consent' ? null : shown.work.authoring?.draft ?? null;
       return { waiting: waiting.kind, snapshot: shown,
-        summary: { waiting: waiting.kind, key: waiting.key ?? null, ...outcomesOf(result),
+        summary: { waiting: waiting.kind, key: waitingKey(shown.work), ...outcomesOf(result),
           turns: turn + 1, evidence: evidence(shown.work), draft,
           draft_sha256: typeof draft === 'string' ? sha256(Buffer.from(draft, 'utf8')) : null,
           ...(waiting.kind === 'consent' ? {} : { work: shown.work }) } };
@@ -281,7 +284,7 @@ async function advance(send, snapshot, line, persona, report) {
   // The persona's own bound, never the Session's: what the Session shows now is kept.
   const draft = shown.work.authoring?.draft ?? null;
   return { waiting: 'harness_bound', snapshot: shown,
-    summary: { waiting: shown.work.waiting.kind, key: shown.work.waiting.key ?? null, turns: PERSONA_TURNS,
+    summary: { waiting: shown.work.waiting.kind, key: waitingKey(shown.work), turns: PERSONA_TURNS,
       harness: { bound: 'persona_turns', limit: PERSONA_TURNS,
         why: `the persona answered ${PERSONA_TURNS} lines and stopped: ${OBSERVATION}` },
       evidence: evidence(shown.work), draft,
@@ -295,14 +298,49 @@ async function advance(send, snapshot, line, persona, report) {
  * asking words) that matches. `null` when nothing the persona was told answers it.
  */
 function answerFor(answers, waiting, result, asking = 'question') {
+  const asked = (result.outcomes ?? []).find((outcome) => outcome.kind === asking)?.text ?? '';
+  return ruleFor(answers, waiting.key, asked);
+}
+
+/** The persona's answer to the value `key` asked in the words `asked`, or `null`. */
+function ruleFor(answers, key, asked) {
   if (Array.isArray(answers)) {
-    const asked = (result.outcomes ?? []).find((outcome) => outcome.kind === asking)?.text ?? '';
-    const rule = answers.find((each) => (each.key !== undefined && new RegExp(each.key, 'i').test(waiting.key ?? ''))
+    const rule = answers.find((each) => (each.key !== undefined && new RegExp(each.key, 'i').test(key ?? ''))
       || (each.text !== undefined && new RegExp(each.text, 'i').test(asked)));
     return rule === undefined ? null : { line: rule.line, why: rule.why ?? 'a persona rule' };
   }
-  const line = answers?.[waiting.key];
+  const line = answers?.[key];
   return typeof line === 'string' ? { line, why: 'the answer table' } : null;
+}
+
+/** The questions a `questions` wait names, as `work.questions` states them, in the order asked. */
+function openQuestions(work) {
+  return (work.waiting.ids ?? []).map((id) => (work.questions ?? []).find((question) => question.id === id))
+    .filter((question) => question !== undefined);
+}
+
+/**
+ * The persona's answer to the questions a conversation asks together (`waiting` `questions`):
+ * each open question its answers name, by key or by the question's own words, in the order asked.
+ * A lone open question takes its line as written; with several, each answer follows its
+ * question's key, all on one line the Session reads as one answer. `null` when the persona was
+ * told to answer none of them; the ones it was not told to answer stay open.
+ */
+function answersFor(answers, work) {
+  const open = openQuestions(work);
+  const given = open.map((question) => ({ key: question.key,
+    answer: ruleFor(answers, question.key, question.question) })).filter((entry) => entry.answer !== null);
+  if (given.length === 0) return null;
+  const line = open.length === 1 ? given[0].answer.line
+    : given.map((entry) => `${entry.key}: ${entry.answer.line}`).join('; ');
+  return { line, keys: given.map((entry) => entry.key), why: given.map((entry) => entry.answer.why).join('; ') };
+}
+
+/** What a wait names: its question's key, or the keys of the questions open together. */
+function waitingKey(work) {
+  if (work.waiting.kind !== 'questions') return work.waiting.key ?? null;
+  const keys = openQuestions(work).map((question) => question.key);
+  return keys.length === 0 ? null : keys.join(', ');
 }
 
 /** The engine's own check of one saved workflow, run where it lives; its words are kept as said. */
@@ -344,6 +382,15 @@ function evidence(work) {
     files: (work.candidate?.files ?? []).map((file) => ({ path: file.path, landing: file.landing ?? null,
       content_sha256: typeof file.content === 'string' ? sha256(Buffer.from(file.content, 'utf8')) : null })),
     revision: work.candidate?.revision ?? null,
+    // The knowledge the Session read (configured, never a receipt) and the time the compile's other
+    // stages took as its record states them; `null` where the engine projects none.
+    knowledge: work.knowledge ?? null,
+    stages: work.authoring?.stages ?? null,
+    // What a conversation led by an intelligence holds: the values bound with their provenance,
+    // the person's delegations and the questions asked together; `null` without one.
+    conversation: ['bindings', 'delegations', 'questions'].some((key) => key in work)
+      ? { bindings: work.bindings ?? [], delegations: work.delegations ?? [], questions: work.questions ?? [] }
+      : null,
   };
 }
 

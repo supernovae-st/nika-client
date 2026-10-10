@@ -376,7 +376,8 @@ const ANSWER_ACTS: Record<string, string[]> = {
  * `ca5845b85`, `answered` as `Answered`/`AnswerAct` serialize; `knowledge`,
  * `authoring.stages` and the `knowledge_choice` wait from `5f1e91c6f`; the
  * conversation's `bindings`, `delegations`, `questions` and the `questions`
- * wait from `6d217dfba`; `run.sealed` from `ad70c9aa7`), judged where
+ * wait from `6d217dfba`; `run.sealed` from `ad70c9aa7`; a proposal's
+ * `open_choices` as NIK-16 change 5 fixes them, engine pending), judged where
  * they are. A member present with another shape
  * is a protocol fault naming its path, never its value; an absent one,
  * `null` where the engine writes it and every unknown member ride through.
@@ -553,7 +554,8 @@ function workMembers(work: Record<string, unknown>, fail: (what: string) => Nika
   member(work, 'delegations', 'work', list((delegation, at) => {
     for (const key of ['message', 'excerpt', 'scope']) member(delegation, key, at, text(), true);
   }));
-  member(work, 'questions', 'work', list((asked, at) => {
+  // A question asked of the person: the shape `questions` and a proposal's `open_choices` share.
+  const askedQuestion = (asked: Record<string, unknown>, at: string) => {
     for (const key of ['id', 'key', 'question', 'state']) member(asked, key, at, text(), true);
     member(asked, 'why', at, text());
     member(asked, 'role', at, text());
@@ -579,7 +581,10 @@ function workMembers(work: Record<string, unknown>, fail: (what: string) => Nika
         });
       }), true);
     }), true);
-  }));
+  };
+  member(work, 'questions', 'work', list(askedQuestion));
+  // The choices the proposal shown leaves open, each with its recommended default: left out when none.
+  member(work, 'open_choices', 'work', list(askedQuestion));
   // The lines the person sent while the last run was under way: left out when none.
   member(work, 'queued', 'work', (value, path) => queuedLines(value, path, fail));
   member(work, 'intelligence', 'work', (value, path) => {

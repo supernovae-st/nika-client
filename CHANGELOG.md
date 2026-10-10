@@ -269,6 +269,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   gate outcome typed as `NikaSessionGate`, with the values its message
   shows (`values`) and the keys it withheld with why (`withheld`). Each is
   checked where it is: a malformed member fails with its path.
+- `work.open_choices` (NIK-16 change 5, the engine side pending): the
+  choices a shown proposal leaves open, each a `NikaSessionAskedQuestion`
+  whose one recommended option is its default, already in the candidate.
+  A consent binds the shown defaults as `offered` bindings cited to the
+  consenting line; a line picking another option binds that pick and waits
+  for the author's revision. The SDK checks them as it checks `questions`
+  (a malformed member fails with its path) and carries them unread.
 
 ### Changed
 

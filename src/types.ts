@@ -1901,6 +1901,18 @@ export interface NikaSessionWork {
    * their identities are renewed.
    */
   questions?: NikaSessionAskedQuestion[];
+  /**
+   * The choices the proposal shown now leaves open, each with its default
+   * (NIK-16 change 5, `nika/author-tools@1` `propose.open`; engine pending):
+   * questions of the `questions` shape, present while a proposal shows them.
+   * Each has exactly one option with `recommended: true`, its default, whose
+   * values the candidate already carries; the proposal's identity covers
+   * them. A consenting line binds every shown default as an `offered`
+   * binding cited to that line (`bindings`); a line picking another option
+   * binds that pick, and the proposal waits for the author's revision (a new
+   * proposal). The engine reads which; the SDK carries the shape.
+   */
+  open_choices?: NikaSessionAskedQuestion[];
   /** The lines the person sent while the last run was under way, and what became of each; absent when none. */
   queued?: NikaSessionQueuedLine[];
   [key: string]: unknown;
@@ -1978,10 +1990,11 @@ export interface NikaSessionDelegation {
 }
 
 /**
- * One question asked of the person (`work.questions`); while an intelligence
- * leads, several may be asked together and the next line may answer any of
- * them. `id` is its witness, the string `waiting.ids` lists; it names the
- * question within its Session only.
+ * One question asked of the person (`work.questions`, or left open by the
+ * proposal shown, `work.open_choices`); while an intelligence leads, several
+ * may be asked together and the next line may answer any of them. `id` is its
+ * witness, the string `waiting.ids` lists; it names the question within its
+ * Session only.
  */
 export interface NikaSessionAskedQuestion {
   id: string;

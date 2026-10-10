@@ -51,10 +51,15 @@ export interface HttpSessionPort {
   sseLimits(maxBytes: number): SseLimits;
 }
 
+/**
+ * `unsteerable`: why the resident takes no line for a run under way (its `/health` lacks
+ * `sessionSteering`), for the handle to refuse such a line before posting it.
+ */
 export async function openHttpSession(
   port: HttpSessionPort,
   signal?: AbortSignal,
   intelligence?: string,
+  unsteerable?: string,
 ): Promise<SessionChannel> {
   const path = '/v1/sessions';
   // The host opens on no body or on the contract it speaks; the contract is stated, as JSON, with
@@ -63,15 +68,17 @@ export async function openHttpSession(
   const frame = await exchange(port, path,
     { method: 'POST', signal, body, headers: { 'Content-Type': 'application/json' } }, [201], false);
   if (frame.frame !== 'opened') throw new NikaProtocolError(transport, 'POST /v1/sessions did not answer opened');
-  return new HttpSessionChannel(port, sessionId(frame.session, transport), frame as unknown as NikaSessionOpened);
+  return new HttpSessionChannel(port, sessionId(frame.session, transport), frame as unknown as NikaSessionOpened,
+    unsteerable);
 }
 
 export async function attachHttpSession(
   port: HttpSessionPort,
   session: string,
   signal?: AbortSignal,
+  unsteerable?: string,
 ): Promise<SessionChannel> {
-  const channel = new HttpSessionChannel(port, session, undefined);
+  const channel = new HttpSessionChannel(port, session, undefined, unsteerable);
   await channel.snapshot(signal);
   return channel;
 }
@@ -83,6 +90,7 @@ class HttpSessionChannel implements SessionChannel {
     private readonly port: HttpSessionPort,
     readonly session: string,
     readonly opened: NikaSessionOpened | undefined,
+    readonly unsteerable: string | undefined,
   ) {}
 
   async snapshot(signal?: AbortSignal): Promise<NikaSessionSnapshot> {

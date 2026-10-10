@@ -63,6 +63,7 @@ import {
   callerSessionId,
   SESSION_HOST_CAPABILITY,
   SESSION_INTELLIGENCE_CAPABILITY,
+  SESSION_STEERING_CAPABILITY,
   sessionIntelligence,
   type SessionChannel,
 } from './session-host.js';
@@ -577,8 +578,8 @@ export class HttpTransport implements Transport {
    */
   async openSession(options: NikaSessionOptions, _retention: number): Promise<SessionChannel> {
     const intelligence = sessionIntelligence(options);
-    await this.requireSessionHost(intelligence !== undefined);
-    return openHttpSession(this.sessionPort(), options.signal, intelligence);
+    const identity = await this.requireSessionHost(intelligence !== undefined);
+    return openHttpSession(this.sessionPort(), options.signal, intelligence, unsteerable(identity));
   }
 
   /** The live Session a `session_live` refusal (or an earlier `openSession`) named. */
@@ -589,11 +590,11 @@ export class HttpTransport implements Transport {
         'attachSession: a live Session keeps its own intelligence; choose another in it (`/intelligence <words>`)',
       );
     }
-    await this.requireSessionHost();
-    return attachHttpSession(this.sessionPort(), session, options.signal);
+    const identity = await this.requireSessionHost();
+    return attachHttpSession(this.sessionPort(), session, options.signal, unsteerable(identity));
   }
 
-  private async requireSessionHost(choosing = false): Promise<void> {
+  private async requireSessionHost(choosing = false): Promise<NikaEngineIdentity> {
     const identity = await this.ensureServerIdentity();
     const advertised = identity.supportedCapabilities.join(', ') || 'nothing';
     if (!identity.supportedCapabilities.includes(SESSION_HOST_CAPABILITY)) {
@@ -611,6 +612,7 @@ export class HttpTransport implements Transport {
         + 'Nothing was posted',
       );
     }
+    return identity;
   }
 
   /** What the Session door borrows: authenticated requests, bounded bodies, Serve's refusals. */
@@ -1709,6 +1711,14 @@ export class HttpTransport implements Transport {
       callerSignal?.removeEventListener('abort', abort);
     }
   }
+}
+
+/** Why a resident takes no line for a conversation's run under way: `/health` lacks `sessionSteering`. */
+function unsteerable(identity: NikaEngineIdentity): string | undefined {
+  if (identity.supportedCapabilities.includes(SESSION_STEERING_CAPABILITY)) return undefined;
+  return `The connected nika serve ${identity.engineVersion} does not advertise ${SESSION_STEERING_CAPABILITY} `
+    + `(advertised: ${identity.supportedCapabilities.join(', ') || 'nothing'}): it takes no line for a `
+    + "conversation's run under way. Nothing was posted";
 }
 
 function refuseLegacyContainedName(workflow: string): void {

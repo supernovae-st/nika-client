@@ -38,6 +38,8 @@ export const SESSION_WORK_CONTRACT = 'nika/session-work@0';
 export const SESSION_HOST_CAPABILITY = 'sessionHost';
 /** The engine (identity) or resident (health) opens a Session with the conversation's own intelligence. */
 export const SESSION_INTELLIGENCE_CAPABILITY = 'sessionIntelligence';
+/** The door takes `steer` and `follow_up`, lines for a conversation's run under way (engine `0e4e1c74f`). */
+export const SESSION_STEERING_CAPABILITY = 'sessionSteering';
 
 /**
  * The first-screen words `openSession({ intelligence })` passes, checked for shape only (the
@@ -86,6 +88,12 @@ export interface SessionChannel {
   readonly session: string;
   /** The `opened` event, when this door opened the Session (an attached one has none). */
   readonly opened: NikaSessionOpened | undefined;
+  /**
+   * Why this door takes no line for a conversation's run under way, as the identity it advertised
+   * when the Session opened says (no `sessionSteering`); `undefined` when it takes them. The
+   * handle then refuses a steer or a follow-up itself, typed, before anything is written.
+   */
+  readonly unsteerable: string | undefined;
   snapshot(signal?: AbortSignal): Promise<NikaSessionSnapshot>;
   details(signal?: AbortSignal): Promise<NikaSessionDetails>;
   /** Resolves with the command's `result` (or `closed`) frame; a refusal rejects typed. */
@@ -706,8 +714,10 @@ export class NikaAuthoringSession {
 
   /**
    * Ask the turn under way to stop. The result's `receipt` says whether a
-   * Stop was requested; the stopped turn's own result settles it. A Run in
-   * progress is not stopped here (`run_underway`).
+   * Stop was requested; the stopped turn's own result settles it. A Run the
+   * turn executes takes it as a first Ctrl-C (`run_stopping`) on a door that
+   * can stop it (natively from engine `ad70c9aa7`, a resident from
+   * `0e4e1c74f`); another door answers `run_underway`.
    */
   async stop(options: NikaSessionCommandOptions = {}): Promise<NikaSessionResult> {
     return this.#channel.send(sessionCommand('stop', options), options.signal) as Promise<NikaSessionResult>;
@@ -721,22 +731,31 @@ export class NikaAuthoringSession {
    * conversation's run reads: send the line once it settled), `nothing_to_steer`
    * (no turn: submit the line), `blank` or `full`. A queued line enters as the
    * person's next cited line, and only then authorizes anything; what became of
-   * it is in `busy.queued` while the run reads it, then in `work.queued`. An
-   * engine without the doors refuses the command (`malformed`).
+   * it is in `busy.queued` while the run reads it, then in `work.queued`. A
+   * door whose identity did not advertise `sessionSteering` when the Session
+   * opened is refused here (`NikaCompatibilityError`), nothing written.
    */
   async steer(line: string, options: NikaSessionCommandOptions = {}): Promise<NikaSessionResult> {
     const command = sessionCommand('steer', options, { line: sessionLine(line) });
+    this.#steerable();
     return this.#channel.send(command, options.signal) as Promise<NikaSessionResult>;
   }
 
   /**
    * Send a line to the conversation's run under way, to enter when the run
-   * would end (the Session doors); the receipt and the line's fate are those of
-   * `steer()`.
+   * would end (the Session doors); the receipt, the line's fate and the
+   * `sessionSteering` gate are those of `steer()`.
    */
   async followUp(line: string, options: NikaSessionCommandOptions = {}): Promise<NikaSessionResult> {
     const command = sessionCommand('follow_up', options, { line: sessionLine(line) });
+    this.#steerable();
     return this.#channel.send(command, options.signal) as Promise<NikaSessionResult>;
+  }
+
+  /** A door without `sessionSteering` takes no line for a run under way: refused before any write. */
+  #steerable(): void {
+    const why = this.#channel.unsteerable;
+    if (why !== undefined) throw new NikaCompatibilityError(SESSION_STEERING_CAPABILITY, this.#channel.transport, why);
   }
 
   /**

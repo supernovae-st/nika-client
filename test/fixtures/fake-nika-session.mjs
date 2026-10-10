@@ -30,11 +30,15 @@ const IDENTITY = {
   traceFormatVersion: 2,
   supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'trace', 'inputsLiteral', 'compile',
     ...(process.env.NIKA_FAKE_NO_SESSION_HOST ? [] : ['sessionHost']),
-    ...(process.env.NIKA_FAKE_SESSION_INTELLIGENCE ? ['sessionIntelligence'] : [])],
+    ...(process.env.NIKA_FAKE_SESSION_INTELLIGENCE ? ['sessionIntelligence'] : []),
+    // `NIKA_FAKE_SESSION_STEERING` claims the doors' word without the doors: a host that breaks its word.
+    ...(process.env.NIKA_FAKE_SESSION_DOORS || process.env.NIKA_FAKE_SESSION_STEERING ? ['sessionSteering'] : [])],
 };
 
 if (argv[0] === '--sdk-identity') {
-  process.stdout.write(`${JSON.stringify(IDENTITY)}\n`);
+  // `NIKA_FAKE_IDENTITY_FILE` names the identity a real engine printed, printed here as it is.
+  const recorded = process.env.NIKA_FAKE_IDENTITY_FILE;
+  process.stdout.write(`${recorded ? readFileSync(recorded, 'utf8').trim() : JSON.stringify(IDENTITY)}\n`);
   process.exit(0);
 }
 // `session --json`, optionally with one `--intelligence <words>` (host 92bc996c8 `machine_selection`).
@@ -67,9 +71,11 @@ let stopRequested = false;
 let saved = null;
 let waiting = { kind: 'free' };
 let candidate = null;
-// The Session doors (engine main a3017c495), with `NIKA_FAKE_SESSION_DOORS`: a `slow …` turn stands for a
-// conversation's run that reads its queue; `steer` and `follow_up` queue lines for it while it runs.
+// The Session doors (engine main 0e4e1c74f), with `NIKA_FAKE_SESSION_DOORS`: a `slow …` turn stands for a
+// conversation's run that reads its queue; `steer` and `follow_up` queue lines for it while it runs; the
+// identity lists `sessionSteering` and a line it cannot parse is refused naming its valid identity.
 const DOORS = Boolean(process.env.NIKA_FAKE_SESSION_DOORS);
+const IDENTITY_WORD = /^[A-Za-z0-9._:-]{1,128}$/;
 let reads = false;
 let queue = [];
 let workQueued = [];
@@ -147,6 +153,8 @@ emit({ frame: 'opened', snapshot: publish(), notices: ['fake host'] }, true);
 
 const input = createInterface({ input: process.stdin });
 input.on('line', (line) => {
+  // `NIKA_FAKE_SESSION_LINES` names a file that keeps every line this host was written.
+  if (process.env.NIKA_FAKE_SESSION_LINES) appendFileSync(process.env.NIKA_FAKE_SESSION_LINES, `${line}\n`);
   let command;
   try {
     command = JSON.parse(line);
@@ -162,13 +170,16 @@ input.on('line', (line) => {
   const members = Object.keys(command).filter((key) => key !== 'contract' && key !== 'op').sort().join();
   const expected = { submit: 'command,line,snapshot', stop: 'command', close: '', snapshot: '', details: '',
     ...(DOORS ? { steer: 'command,line', follow_up: 'command,line' } : {}) };
-  // As `machine.rs` answers a line it cannot parse: `malformed`, naming no command, in line order.
+  // As `machine.rs` answers a line it cannot parse: `malformed`, in line order, naming the valid identity
+  // the line carries from engine 0e4e1c74f (the doors here), and no command before it.
+  const named = DOORS && typeof command.command === 'string' && IDENTITY_WORD.test(command.command)
+    ? { command: command.command } : {};
   if (!(command.op in expected)) {
-    emit({ frame: 'refused', error: 'malformed', message: `unknown op \`${command.op}\`` });
+    emit({ frame: 'refused', error: 'malformed', message: `unknown op \`${command.op}\``, ...named });
     return;
   }
   if (members !== expected[command.op]) {
-    emit({ frame: 'refused', error: 'malformed', message: `\`${command.op}\` takes other members` });
+    emit({ frame: 'refused', error: 'malformed', message: `\`${command.op}\` takes other members`, ...named });
     return;
   }
   if (command.op === 'snapshot') { emit({ frame: 'snapshot', snapshot: reading() }); return; }

@@ -70,6 +70,7 @@ import {
 import {
   SESSION_HOST_CAPABILITY,
   SESSION_INTELLIGENCE_CAPABILITY,
+  SESSION_STEERING_CAPABILITY,
   sessionIntelligence,
   type SessionChannel,
 } from './session-host.js';
@@ -634,8 +635,14 @@ export class NativeProcessTransport implements Transport {
         + 'conversation, and the SDK will not answer its first screen for you. Nothing was started',
       );
     }
+    // Lines for a conversation's run under way need the doors; without them the handle refuses
+    // such a line itself, before anything is written.
+    const unsteerable = identity.supportedCapabilities.includes(SESSION_STEERING_CAPABILITY) ? undefined
+      : `Engine ${identity.engineVersion} at ${this.options.engine.bin} does not advertise `
+        + `${SESSION_STEERING_CAPABILITY} (advertised: ${advertised}): it takes no line for a conversation's run `
+        + 'under way. Nothing was sent';
     return openNativeSession({
-      bin: this.options.engine.bin, cwd: this.options.cwd, signal: options.signal, retention, intelligence,
+      bin: this.options.engine.bin, cwd: this.options.cwd, signal: options.signal, retention, intelligence, unsteerable,
     });
   }
 

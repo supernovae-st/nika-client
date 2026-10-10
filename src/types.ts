@@ -2569,8 +2569,9 @@ export interface NikaSessionResult extends NikaSessionFrameBase {
   outcomes?: NikaSessionOutcome[];
   /**
    * Stop: `stop_requested`, `run_stopping` (the Run took its first signal;
-   * engine `ad70c9aa7`), `nothing_to_stop` or `run_underway` (this door
-   * cannot stop the Run). Steer and follow-up: `queued` (with its `queued`
+   * engine `ad70c9aa7`, over HTTP `0e4e1c74f`), `nothing_to_stop` or
+   * `run_underway` (this door cannot stop the Run: a resident before
+   * `0e4e1c74f`). Steer and follow-up: `queued` (with its `queued`
    * line), `not_reading` (a turn runs that no conversation's run reads: send
    * the line once it settled), `nothing_to_steer` (no turn: submit the line),
    * `blank`, `full` (the run took as many lines as it takes). A receipt is not

@@ -228,8 +228,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with their options and values; engine `6d217dfba`), and `run.sealed`
   (whether the Run sealed its journal; engine `ad70c9aa7`). A Stop now
   reaches a Run the native door executes (`busy.phase` `stopping`, the
-  receipt `run_stopping`, then `run_stopped` or `run_aborted`); over HTTP it
-  stays `run_underway`. Unknown members and words still ride through. The
+  receipt `run_stopping`, then `run_stopped` or `run_aborted`), and from
+  engine `0e4e1c74f` a Run a resident executes too, through the job's own
+  cancellation (recorded on a real `0e4e1c74f` binary); an earlier resident
+  answers `run_underway`. Unknown members and words still ride through. The
   handle is pinned against one deterministic native walk a real `ad70c9aa7`
   binary wrote and against the engine's own serializer examples.
 - The journey persona answers the questions a conversation asks together
@@ -248,13 +250,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`NikaSessionStopped`: `reach`, `text`, the lines returned `unsent`, the
   draft revision kept), an `activity` names the tool step it observed
   (`NikaSessionToolMark`, never its arguments), and an offered model carries
-  this machine's facts (`choice`, `NikaSessionModelFacts`). An engine without
-  the doors refuses these commands `malformed`, naming no command: natively
-  the SDK now takes a refusal that names no command as the oldest unanswered
-  line's, read or doors line, in write order, and the Session goes on. The
-  handle is pinned against the engine's own examples and against the doors a
-  real `a3017c495` binary wrote on both doors, each conversation led by a
-  loopback author (a script, not a model, no provider).
+  this machine's facts (`choice`, `NikaSessionModelFacts`). The handle sends
+  these lines only to a door whose identity named `sessionSteering` when the
+  Session opened (engine `0e4e1c74f`: the native identity and a resident's
+  `/health`); elsewhere `steer()` and `followUp()` reject with
+  `NikaCompatibilityError` and nothing is written. A host refuses a line it
+  cannot parse `malformed`, naming the valid command identity it carries
+  (engine `0e4e1c74f`); natively the SDK takes a refusal that names none as
+  the oldest unanswered line's, read or doors line, in write order, and the
+  Session goes on. The handle is pinned against the engine's own examples,
+  against the doors a real `a3017c495` binary wrote on both doors, each
+  conversation led by a loopback author (a script, not a model, no
+  provider), and against the identities, refusals and Stop a real
+  `0e4e1c74f` binary wrote.
 
 ### Changed
 
@@ -264,9 +272,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   caller chose, as over HTTP. An earlier engine refuses the pair with its own
   usage error, reported as before.
 - `openapi.json` and the generated `src/generated/openapi.d.ts` now pin the
-  live document of engine main `a3017c495` (reporting 0.123.0-preview.1,
+  live document of engine main `0e4e1c74f` (reporting 0.123.0-preview.1,
   unreleased), which `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name, as a
-  resident started with `--sessions` serves it. It adds the six
+  resident started with `--sessions` serves it (the same bytes as at
+  `a3017c495`; its `/health` adds `sessionSteering`). It adds the six
   `/v1/sessions` operations and the `SessionCommand`, `SessionFrame`,
   `SessionKnowledge`, `SessionOutcome`, `SessionQueued`, `SessionSnapshot` and
   `SessionTool` schemas: the work snapshot, otherwise an object the engine

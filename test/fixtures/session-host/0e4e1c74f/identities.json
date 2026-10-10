@@ -1,0 +1,147 @@
+{
+  "0e4e1c74f": {
+    "native": {
+      "engine_version": "0.123.0-preview.1",
+      "build_sha": "0e4e1c74f",
+      "spec_sha": "a88d3c6e400d9f79fcbbbc4604a03ab22e2d46f0",
+      "api_version": "v1",
+      "engineVersion": "0.123.0-preview.1",
+      "buildSha": "0e4e1c74f",
+      "specSha": "a88d3c6e400d9f79fcbbbc4604a03ab22e2d46f0",
+      "machineProtocolVersion": 1,
+      "snapshotFormatVersion": 1,
+      "checkReportVersion": 1,
+      "eventFormatVersion": 1,
+      "traceFormatVersion": 2,
+      "supportedCapabilities": [
+        "check",
+        "executionSnapshot",
+        "eventStream",
+        "trace",
+        "inputsLiteral",
+        "compile",
+        "sessionHost",
+        "sessionIntelligence",
+        "sessionSteering"
+      ]
+    },
+    "http": {
+      "status": "ok",
+      "service": "nika-serve",
+      "storeFormatVersion": {
+        "jobs": 3,
+        "schedules": 1
+      },
+      "engine_version": "0.123.0-preview.1",
+      "build_sha": "0e4e1c74f",
+      "spec_sha": "a88d3c6e400d9f79fcbbbc4604a03ab22e2d46f0",
+      "api_version": "v1",
+      "engineVersion": "0.123.0-preview.1",
+      "buildSha": "0e4e1c74f",
+      "specSha": "a88d3c6e400d9f79fcbbbc4604a03ab22e2d46f0",
+      "machineProtocolVersion": 1,
+      "snapshotFormatVersion": 1,
+      "checkReportVersion": 1,
+      "eventFormatVersion": 1,
+      "traceFormatVersion": 2,
+      "supportedCapabilities": [
+        "check",
+        "executionSnapshot",
+        "eventStream",
+        "cancel",
+        "jobInputs",
+        "compile",
+        "schedule",
+        "sessionHost",
+        "sessionIntelligence",
+        "sessionSteering"
+      ]
+    },
+    "http_without_sessions": {
+      "status": "ok",
+      "service": "nika-serve",
+      "storeFormatVersion": {
+        "jobs": 3,
+        "schedules": 1
+      },
+      "engine_version": "0.123.0-preview.1",
+      "build_sha": "0e4e1c74f",
+      "spec_sha": "a88d3c6e400d9f79fcbbbc4604a03ab22e2d46f0",
+      "api_version": "v1",
+      "engineVersion": "0.123.0-preview.1",
+      "buildSha": "0e4e1c74f",
+      "specSha": "a88d3c6e400d9f79fcbbbc4604a03ab22e2d46f0",
+      "machineProtocolVersion": 1,
+      "snapshotFormatVersion": 1,
+      "checkReportVersion": 1,
+      "eventFormatVersion": 1,
+      "traceFormatVersion": 2,
+      "supportedCapabilities": [
+        "check",
+        "executionSnapshot",
+        "eventStream",
+        "cancel",
+        "jobInputs",
+        "compile",
+        "schedule"
+      ]
+    }
+  },
+  "a3017c495": {
+    "native": {
+      "engine_version": "0.123.0-preview.1",
+      "build_sha": "a3017c495",
+      "spec_sha": "a88d3c6e400d9f79fcbbbc4604a03ab22e2d46f0",
+      "api_version": "v1",
+      "engineVersion": "0.123.0-preview.1",
+      "buildSha": "a3017c495",
+      "specSha": "a88d3c6e400d9f79fcbbbc4604a03ab22e2d46f0",
+      "machineProtocolVersion": 1,
+      "snapshotFormatVersion": 1,
+      "checkReportVersion": 1,
+      "eventFormatVersion": 1,
+      "traceFormatVersion": 2,
+      "supportedCapabilities": [
+        "check",
+        "executionSnapshot",
+        "eventStream",
+        "trace",
+        "inputsLiteral",
+        "compile",
+        "sessionHost",
+        "sessionIntelligence"
+      ]
+    },
+    "http": {
+      "status": "ok",
+      "service": "nika-serve",
+      "storeFormatVersion": {
+        "jobs": 3,
+        "schedules": 1
+      },
+      "engine_version": "0.123.0-preview.1",
+      "build_sha": "a3017c495",
+      "spec_sha": "a88d3c6e400d9f79fcbbbc4604a03ab22e2d46f0",
+      "api_version": "v1",
+      "engineVersion": "0.123.0-preview.1",
+      "buildSha": "a3017c495",
+      "specSha": "a88d3c6e400d9f79fcbbbc4604a03ab22e2d46f0",
+      "machineProtocolVersion": 1,
+      "snapshotFormatVersion": 1,
+      "checkReportVersion": 1,
+      "eventFormatVersion": 1,
+      "traceFormatVersion": 2,
+      "supportedCapabilities": [
+        "check",
+        "executionSnapshot",
+        "eventStream",
+        "cancel",
+        "jobInputs",
+        "compile",
+        "schedule",
+        "sessionHost",
+        "sessionIntelligence"
+      ]
+    }
+  }
+}

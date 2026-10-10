@@ -82,6 +82,8 @@ export interface NativeSessionOptions {
   retention: number;
   /** The conversation's own first-screen words (`--intelligence`), when the opener names them. */
   intelligence?: string;
+  /** Why the engine takes no line for a run under way (its identity lacks `sessionSteering`). */
+  unsteerable?: string;
 }
 
 export async function openNativeSession(options: NativeSessionOptions): Promise<SessionChannel> {
@@ -92,7 +94,7 @@ export async function openNativeSession(options: NativeSessionOptions): Promise<
     shell: false,
     stdio: ['pipe', 'pipe', 'pipe'],
   });
-  const channel = new NativeSessionChannel(child, options.retention);
+  const channel = new NativeSessionChannel(child, options.retention, options.unsteerable);
   try {
     await channel.open(options.signal);
   } catch (error) {
@@ -130,7 +132,7 @@ class NativeSessionChannel implements SessionChannel {
   #ended: Error | 'closed' | undefined;
   #opening?: { resolve(frame: NikaSessionOpened): void; reject(error: Error): void };
 
-  constructor(child: Child, retention: number) {
+  constructor(child: Child, retention: number, readonly unsteerable: string | undefined) {
     this.#child = child;
     this.#retention = retention;
     child.stdin.on('error', () => {});

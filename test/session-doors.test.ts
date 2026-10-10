@@ -22,7 +22,9 @@ import { healthResponse, jsonResponse, TOKEN_A } from './helpers/http-depth-harn
 // names the tool step it observed, and an offered model carries this machine's facts. The wire
 // examples are the engine's own tests at f8da375e7 (main a3017c495 writes the same wire), then the
 // frames a real a3017c495 binary wrote on both doors; the native door runs the fake host with
-// NIKA_FAKE_SESSION_DOORS, the HTTP door a mocked fetch. No network, no model.
+// NIKA_FAKE_SESSION_DOORS, the HTTP door a mocked fetch. No network, no model. Each door here
+// advertises `sessionSteering` (engine 0e4e1c74f), the word without which the handle sends no such
+// line at all (test/session-steering.test.ts).
 
 const DOORS = JSON.parse(readFileSync(fileURLToPath(new URL('./fixtures/session-host/doors-f8da375e7.json',
   import.meta.url)), 'utf8')) as Record<string, any>;
@@ -198,9 +200,10 @@ describe('the Session doors on the wire', () => {
 
 describe('the Session doors over the native door', () => {
   const opened: NikaAuthoringSession[] = [];
-  async function open(doors = true): Promise<NikaAuthoringSession> {
-    if (doors) process.env.NIKA_FAKE_SESSION_DOORS = '1';
-    else delete process.env.NIKA_FAKE_SESSION_DOORS;
+  /** `doors`: the doors and their word; `claimed`: the word without the doors (a host breaking its word). */
+  async function open(host: 'doors' | 'claimed' = 'doors'): Promise<NikaAuthoringSession> {
+    if (host === 'doors') process.env.NIKA_FAKE_SESSION_DOORS = '1';
+    else process.env.NIKA_FAKE_SESSION_STEERING = '1';
     const session = await new Nika({ bin: SESSION_ENGINE }).openSession();
     opened.push(session);
     return session;
@@ -208,6 +211,7 @@ describe('the Session doors over the native door', () => {
   afterEach(async () => {
     for (const session of opened.splice(0)) await session.close().catch(() => {});
     delete process.env.NIKA_FAKE_SESSION_DOORS;
+    delete process.env.NIKA_FAKE_SESSION_STEERING;
   });
   /** Until the turn under way is the one `command` names. */
   async function underway(session: NikaAuthoringSession, command: string): Promise<void> {
@@ -271,10 +275,11 @@ describe('the Session doors over the native door', () => {
     expect(tools.map((tool) => [tool.state, tool.elapsed_ms ?? null])).toEqual([['started', null], ['finished', 42]]);
   });
 
-  // An engine without the doors refuses the line it cannot parse naming no command (machine.rs at
-  // ad70c9aa7): the refusal is the steer's, in line order, and the Session goes on.
-  it('takes an engine\'s refusal of a line it cannot parse as that line\'s, and the Session goes on', async () => {
-    const session = await open(false);
+  // A host whose identity claims `sessionSteering` without the doors refuses the line it cannot parse
+  // naming no command, as one without the doors does (machine.rs at ad70c9aa7): the refusal is still
+  // the steer's, in line order, and the Session goes on.
+  it('takes a host\'s refusal naming no command as its line\'s, in write order, and the Session goes on', async () => {
+    const session = await open('claimed');
     const reading = session.snapshot();
     const error = await failure(session.steer('use b instead', { command: 's-1' }));
     expect(error).toBeInstanceOf(NikaSessionRefusedError);
@@ -300,7 +305,7 @@ describe('the Session doors over HTTP', () => {
       calls.push({ method, path: pathname, body: (init.body as string) ?? null });
       if (pathname === '/health') {
         return healthResponse({ engineVersion: '0.123.0', supportedCapabilities: ['check', 'executionSnapshot',
-          'eventStream', 'cancel', 'jobInputs', 'compile', 'sessionHost'] });
+          'eventStream', 'cancel', 'jobInputs', 'compile', 'sessionHost', 'sessionSteering'] });
       }
       if (method === 'POST' && pathname === '/v1/sessions') {
         return jsonResponse(frame({ frame: 'opened', event: 1, snapshot: snapshot(1), notices: [] }), 201);
@@ -327,16 +332,16 @@ describe('the Session doors over HTTP', () => {
     expect(posted).toEqual([DOORS.commands.steer, DOORS.commands.follow_up.replace('"c-7"', '"c-8"')]);
   });
 
-  // A resident without the doors cannot parse the op: it refuses it as its http.rs does at ad70c9aa7,
-  // `malformed` and naming no command.
-  it('carries the engine\'s refusal of a line it does not read, the line kept', async () => {
-    const { client } = server(() => jsonResponse(frame({ frame: 'refused', session: SESSION, error: 'malformed',
-      message: 'unknown op `steer`' }), 400));
+  // A resident refuses a line it cannot parse `malformed`, naming the identity it carries (http.rs at
+  // 0e4e1c74f): the refusal answers that line's request, the line kept.
+  it('carries the host\'s refusal of a line, naming its command and keeping the line', async () => {
+    const { client } = server((body) => jsonResponse(frame({ frame: 'refused', session: SESSION, error: 'malformed',
+      message: 'the line is not one this host reads', command: body.command }), 400));
     const session = await client.openSession();
     const error = await failure(session.steer('use b instead', { command: 'c-7' }));
     expect(error).toBeInstanceOf(NikaSessionRefusedError);
-    expect(error).toMatchObject({ code: 'malformed', status: 400, line: 'use b instead' });
-    expect((error as NikaSessionRefusedError).message).toContain('unknown op `steer`');
+    expect(error).toMatchObject({ code: 'malformed', status: 400, command: 'c-7', line: 'use b instead' });
+    expect((error as NikaSessionRefusedError).message).toContain('the line is not one this host reads');
   });
 });
 

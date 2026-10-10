@@ -115,11 +115,11 @@ its result is a receipt (`stop_requested`, `run_stopping`, `nothing_to_stop`,
 `run_underway`), and the stopped turn's own result settles it, ending with a
 `cancelled` outcome whose `withdrawn` lists the proposal or question it
 withdrew. From engine `ad70c9aa7` a Stop also reaches the Run a turn executes
-when its door can stop it (the native door can; see below): `run_stopping`
-means the Run took its first signal, as a first Ctrl-C sends it (work in
-flight completes and is counted, no new wave starts) and `busy.phase` reads
-`stopping`; a second Stop sends nothing more and a Stop never escalates to an
-abort.
+when its door can stop it (the native door can, and from `0e4e1c74f` a
+resident too; see below): `run_stopping` means the Run took its first signal,
+as a first Ctrl-C sends it (work in flight completes and is counted, no new
+wave starts) and `busy.phase` reads `stopping`; a second Stop sends nothing
+more and a Stop never escalates to an abort.
 `close()` ends the Session (natively, its process); it carries no identity and
 over HTTP is the route's `DELETE`. A second line while a turn runs is refused
 (`busy`) and returned to you. A local handle binds each identity to the bytes
@@ -149,11 +149,18 @@ unsent). Stopping such a turn settles it with a `stopped` outcome
 (`NikaSessionStopped`): `reach` (`between_steps`, `request_dropped`: a request
 already sent may still be billed, or `agent_cancelled`: the agent was asked
 once and ended its turn), the Session's `text`, the lines it returned `unsent`
-and the draft revision it kept (`candidate`). No capability names the doors at
-`a3017c495`, so the SDK sends these commands as asked: an engine without the
-doors cannot parse them and refuses them `malformed`, naming no command;
-natively the SDK takes that refusal as the line's own, in the order the lines
-were written, and the Session goes on.
+and the draft revision it kept (`candidate`).
+
+From engine `0e4e1c74f` both doors name the doors' word, `sessionSteering`
+(the native identity and a resident's `/health`), and the handle sends these
+lines only to a door whose identity listed it when the Session opened.
+Elsewhere (`a3017c495`, which takes them without saying so, or an engine
+without the doors) `steer()` and `followUp()` reject with
+`NikaCompatibilityError` (`capability: 'sessionSteering'`) and nothing is
+written. A line a host cannot parse is refused `malformed`, naming the valid
+command identity it carries (engine `0e4e1c74f`); natively, a refusal that
+names none is still taken as the oldest unanswered line's, in the order the
+lines were written, and the Session goes on.
 
 ## Events
 
@@ -189,17 +196,18 @@ observation of the Run's end (`facts`, or `gate` when it paused),
 admitted but its end was not observed (its effects are unknown; it is never
 reported as an observed Run). A resident runs it as one of its jobs and may
 hold its cost review first (`run_review`: answer it with a line against that
-snapshot). The Run's own progress arrives as `activity` events. Natively, from
-engine `ad70c9aa7`, the Session's `stop()` stops the Run it executes: the
-receipt is `run_stopping` (or `stop_requested` when the Run had not started its
-work: it then starts none), and the turn settles with `run_stopped` (the Run
-stopped at a wave boundary and sealed its trace as cancelled; `work.run.end`
-reads `interrupted` and `work.run.sealed` is `true`) or `run_aborted` (it ended
-without sealing its trace: cut mid-flight, the effects in flight unknown). A
-Stop taken before a held cost review declines it (`run_not_started`). Over
-HTTP the resident's job door cannot stop the Run from the Session: the receipt
-is `run_underway`, and stopping it is the job's cancel
-(`POST /v1/jobs/{id}/cancel`).
+snapshot). The Run's own progress arrives as `activity` events. Natively from
+engine `ad70c9aa7`, and over HTTP from `0e4e1c74f`, the Session's `stop()`
+stops the Run it executes: the receipt is `run_stopping` (or `stop_requested`
+when the Run had not started its work: it then starts none), and the turn
+settles with `run_stopped` (the Run stopped at a wave boundary and sealed its
+trace as cancelled; `work.run.end` reads `interrupted` and `work.run.sealed`
+is `true`) or `run_aborted` (it ended without sealing its trace: cut
+mid-flight, the effects in flight unknown). A Stop taken before a held cost
+review declines it (`run_not_started`). A resident asks its own job
+cancellation once (the one `POST /v1/jobs/{id}/cancel` takes), so the job
+itself ends `cancelled`; an earlier resident cannot stop the Run from the
+Session, answers `run_underway`, and stopping it is that job's cancel.
 
 ## Status
 
@@ -218,10 +226,12 @@ the recorded commands and decodes every recorded frame unchanged, and at
 Session doors a real binary wrote on both doors, each conversation led by a
 loopback author (a script on 127.0.0.1, not a model, no provider): the
 receipts but `not_reading`, the busy queue, the lines entered or returned, a
-stopped turn, tool steps and the facts of offered models. The 0.123 integration engine registers
+stopped turn, tool steps and the facts of offered models. At `0e4e1c74f` it
+reads the doors' word as both doors print it, the refusals of lines a host
+cannot parse, and a Stop that reaches the Run on both doors. The 0.123 integration engine registers
 `nika session --json` (`3688552f3`); the served `/v1/sessions` routes arrive
 with `nika serve --sessions`, and the pinned `openapi.json` declares them as
-such a resident of engine main `a3017c495` serves them (the work snapshot an
+such a resident of engine main `0e4e1c74f` serves them (the work snapshot an
 object whose `knowledge` member alone is described there).
 `scripts/run-session-parity-e2e.mjs` qualifies
 both doors of one binary once it hosts them (see `docs/testing.md`).

@@ -1,0 +1,68 @@
+{
+  "source": "The Session doors as the engine's own tests write them at f8da375e7 (ThibautMelen/claude-nika-session-doors-i3-20261010 over 3f97bbb46, main ad70c9aa7's tree): nika-session-host wire/tests.rs steer_and_follow_up_are_commands_bound_to_their_line and a_stopped_turn_and_a_tool_step_are_typed_on_the_wire, host/steer_tests.rs a_line_while_the_conversation_reads_is_queued_with_its_identity_and_shown_busy, nika-session-change work/tests.rs queued_lines_and_offered_model_facts_reach_hosts_typed and a_stopped_turn_says_how_it_reached_the_run_and_what_was_not_sent; texts as Stopped::text() writes them (outcome.rs). Engine examples, not a live call, not yet merged into main.",
+  "commands": {
+    "steer": "{\"contract\":\"nika/session-host@1\",\"op\":\"steer\",\"command\":\"c-7\",\"line\":\"use b instead\"}",
+    "follow_up": "{\"contract\":\"nika/session-host@1\",\"op\":\"follow_up\",\"command\":\"c-7\",\"line\":\"use b instead\"}"
+  },
+  "queued": {
+    "id": "l1",
+    "mode": "steer",
+    "line": "use b instead",
+    "state": "waiting"
+  },
+  "stopped": {
+    "kind": "stopped",
+    "reach": "agent_cancelled",
+    "text": "stopped by you · the agent was asked to stop and ended its turn · the conversation and its draft are kept · not sent: « and c »",
+    "unsent": [
+      {
+        "id": "l2",
+        "mode": "follow_up",
+        "line": "and c",
+        "state": "returned"
+      }
+    ],
+    "candidate": 2
+  },
+  "stopped_between_steps": {
+    "kind": "stopped",
+    "reach": "between_steps",
+    "text": "stopped by you · nothing was under way · the conversation and its draft are kept"
+  },
+  "activity": {
+    "phase": "checking",
+    "note": "verify · 42 ms",
+    "done": true,
+    "tool": {
+      "call": "toolu_1",
+      "name": "verify",
+      "state": "finished",
+      "elapsed_ms": 42
+    }
+  },
+  "offered_model": {
+    "role": "run_model",
+    "value": "deepseek/deepseek-chat",
+    "choice": {
+      "role": "run",
+      "model": "deepseek/deepseek-chat",
+      "via": "deepseek",
+      "class": "api",
+      "configured": true,
+      "billing": "api_metered",
+      "output_usd_per_million": 1.1
+    }
+  },
+  "offered_unknown_model": {
+    "role": "run_model",
+    "value": "acme/imaginary-1"
+  },
+  "unpriced_facts": {
+    "role": "run",
+    "model": "seat/model",
+    "via": "",
+    "class": "harness",
+    "configured": false,
+    "billing": "unknown"
+  }
+}

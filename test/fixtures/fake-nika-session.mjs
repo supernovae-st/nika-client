@@ -67,6 +67,14 @@ let stopRequested = false;
 let saved = null;
 let waiting = { kind: 'free' };
 let candidate = null;
+// The Session doors (engine f8da375e7), with `NIKA_FAKE_SESSION_DOORS`: a `slow …` turn stands for a
+// conversation's run that reads its queue; `steer` and `follow_up` queue lines for it while it runs.
+const DOORS = Boolean(process.env.NIKA_FAKE_SESSION_DOORS);
+let reads = false;
+let queue = [];
+let workQueued = [];
+let lines = 0;
+let cited = 0;
 
 function emitAs(name, frame, then) {
   process.stdout.write(`${JSON.stringify({ contract: CONTRACT, ...frame, session: name })}\n`, then);
@@ -80,9 +88,14 @@ function emit(frame, withEvent = false, then = undefined) {
   return body;
 }
 
+/** The turn under way, with the lines its run reads now (the doors' `busy.queued`). */
+function busyView() {
+  return busy && reads && queue.length > 0 ? { ...busy, queued: queue.map((entry) => ({ ...entry })) } : busy;
+}
+
 /** The current snapshot as a read sees it: the last published one, with the turn under way. */
 function reading() {
-  return { ...current, busy };
+  return { ...current, busy: busyView() };
 }
 
 function publish() {
@@ -108,6 +121,7 @@ function publish() {
       rail: { draft: candidate ? 'working' : 'pending', saved: saved ? 'done' : 'pending', checked: 'pending',
         active: 'pending', run: 'pending' },
       future_work_member: { additive: true },
+      ...(workQueued.length > 0 ? { queued: workQueued } : {}),
     },
   };
   return current;
@@ -146,8 +160,14 @@ input.on('line', (line) => {
   }
   // `deny_unknown_fields` and per-op members: close and reads take no command, snapshot or line.
   const members = Object.keys(command).filter((key) => key !== 'contract' && key !== 'op').sort().join();
-  const expected = { submit: 'command,line,snapshot', stop: 'command', close: '', snapshot: '', details: '' };
-  if (!(command.op in expected) || members !== expected[command.op]) {
+  const expected = { submit: 'command,line,snapshot', stop: 'command', close: '', snapshot: '', details: '',
+    ...(DOORS ? { steer: 'command,line', follow_up: 'command,line' } : {}) };
+  // As `machine.rs` answers a line it cannot parse: `malformed`, naming no command, in line order.
+  if (!(command.op in expected)) {
+    emit({ frame: 'refused', error: 'malformed', message: `unknown op \`${command.op}\`` });
+    return;
+  }
+  if (members !== expected[command.op]) {
     emit({ frame: 'refused', error: 'malformed', message: `\`${command.op}\` takes other members` });
     return;
   }
@@ -182,6 +202,26 @@ input.on('line', (line) => {
     emit({ frame: 'closed', snapshot: current }, true, () => process.exit(0));
     return;
   }
+  if (command.op === 'steer' || command.op === 'follow_up') {
+    // A line for the conversation's run under way: queued while it reads, refused truthfully otherwise.
+    const target = busy?.command ?? null;
+    let receipt;
+    let queued;
+    if (!busy) receipt = 'nothing_to_steer';
+    else if (!reads) receipt = 'not_reading';
+    else if (command.line.trim() === '') receipt = 'blank';
+    else if (queue.length >= 32) receipt = 'full';
+    else {
+      lines += 1;
+      queued = { id: `l${lines}`, mode: command.op, line: command.line, state: 'waiting' };
+      queue.push(queued);
+      receipt = 'queued';
+    }
+    const result = emit({ frame: 'result', command: command.command, op: command.op, replayed: false, receipt,
+      ...(queued ? { queued: { ...queued } } : {}), target, snapshot: reading() }, true);
+    ledger.set(command.command, { bytes, result });
+    return;
+  }
   if (command.op !== 'submit') {
     emit({ frame: 'refused', command: command.command, error: 'malformed', message: 'unknown op' });
     return;
@@ -201,11 +241,37 @@ input.on('line', (line) => {
   ledger.set(command.command, entry);
   busy = { command: command.command, phase: 'preparing', stop_requested: false };
   stopRequested = false;
+  cited += 1;
+  // With the doors, a `slow …` turn is a conversation's run: it reads its queue and calls a tool.
+  reads = DOORS && command.line.startsWith('slow');
+  queue = [];
   emit({ frame: 'accepted', command: command.command, op: 'submit' }, true);
   emit({ frame: 'activity', command: command.command, phase: 'authoring', note: 'thinking', done: false }, true);
+  if (reads) {
+    emit({ frame: 'activity', command: command.command, phase: 'checking', note: 'verify', done: false,
+      tool: { call: 'toolu_1', name: 'verify', state: 'started' } }, true);
+  }
   const settle = () => {
     let outcomes;
-    if (stopRequested) {
+    if (reads) {
+      // What became of each queued line: returned unsent by a Stop, else entered as a cited line.
+      for (const entry of queue) {
+        if (stopRequested) entry.state = 'returned';
+        else Object.assign(entry, { state: 'entered', cite: `u${(cited += 1)}` });
+      }
+      workQueued = queue.map((entry) => ({ ...entry }));
+      if (!stopRequested) {
+        emit({ frame: 'activity', command: command.command, phase: 'checking', note: 'verify · 42 ms', done: true,
+          tool: { call: 'toolu_1', name: 'verify', state: 'finished', elapsed_ms: 42 } }, true);
+      }
+    }
+    if (stopRequested && reads) {
+      // `Outcome::Stopped`: a conversation's turn the person stopped, its queued lines returned unsent.
+      const unsent = queue.map((entry) => ({ ...entry }));
+      const text = 'stopped by you · nothing was under way · the conversation and its draft are kept'
+        + (unsent.length > 0 ? ` · not sent: ${unsent.map((entry) => `« ${entry.line} »`).join(' · ')}` : '');
+      outcomes = [{ kind: 'stopped', reach: 'between_steps', text, ...(unsent.length > 0 ? { unsent } : {}) }];
+    } else if (stopRequested) {
       // `Outcome::Cancelled { withdrawn }` lists what the Stop withdrew.
       outcomes = [{ kind: 'cancelled', text: 'stopped',
         withdrawn: [{ kind: 'proposal', proposal: 'p'.repeat(64), text: 'Save digest.nika?' }] }];
@@ -224,6 +290,8 @@ input.on('line', (line) => {
       outcomes = [{ kind: 'reply', text: `read: ${command.line}` }];
     }
     busy = null;
+    reads = false;
+    queue = [];
     const result = emit({ frame: 'result', command: command.command, op: 'submit', replayed: false, outcomes,
       snapshot: publish() }, true);
     entry.result = result;

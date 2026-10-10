@@ -42,10 +42,22 @@ type Child = ChildProcessByStdio<Writable, Readable, Readable>;
 
 interface Read {
   readonly kind: 'snapshot' | 'details';
+  /** Its place among the lines this handle wrote that a reply naming no command may answer. */
+  readonly seq: number;
   /** A read whose caller stopped waiting keeps its place, so later replies stay aligned. */
   abandoned: boolean;
   resolve(frame: Record<string, unknown>): void;
   reject(error: Error): void;
+}
+
+/**
+ * A `steer` or `follow_up` line this handle wrote and no frame has answered yet. A doors engine
+ * answers it with a logged result naming its command; an engine without the doors cannot parse it
+ * and refuses it in line order with a frame that names no command.
+ */
+interface DoorsLine {
+  readonly command: string;
+  readonly seq: number;
 }
 
 interface Waiter {
@@ -98,6 +110,9 @@ class NativeSessionChannel implements SessionChannel {
   readonly #child: Child;
   readonly #retention: number;
   readonly #reads: Read[] = [];
+  readonly #doorsLines: DoorsLine[] = [];
+  /** The order of the lines a reply naming no command may answer: reads and doors lines. */
+  #sequence = 0;
   readonly #waiters = new Map<string, Waiter[]>();
   /**
    * The bytes each identity this handle sent is bound to, as the host's ledger binds them:
@@ -201,6 +216,9 @@ class NativeSessionChannel implements SessionChannel {
       waiters.push(waiter);
       this.#waiters.set(command.command, waiters);
       signal?.addEventListener('abort', abort, { once: true });
+      if (command.op === 'steer' || command.op === 'follow_up') {
+        this.#doorsLines.push({ command: command.command, seq: ++this.#sequence });
+      }
       this.#write(command.body);
     });
   }
@@ -293,6 +311,7 @@ class NativeSessionChannel implements SessionChannel {
       };
       const read: Read = {
         kind,
+        seq: ++this.#sequence,
         abandoned: false,
         resolve: (frame) => { signal?.removeEventListener('abort', abort); if (!read.abandoned) resolve(frame); },
         reject: (error) => { signal?.removeEventListener('abort', abort); if (!read.abandoned) reject(error); },
@@ -396,8 +415,21 @@ class NativeSessionChannel implements SessionChannel {
           // A command's refusal; its caller may have stopped waiting already. A refusal the host
           // records nothing for (busy, a stale or unknown snapshot, …) frees the identity again.
           if (frame.error !== 'command_conflict') this.#bound.delete(command);
+          this.#answered(command);
           const waiters = this.#waiters.get(command) ?? [];
           this.#waiters.delete(command);
+          for (const waiter of waiters) waiter.reject(sessionRefusal(frame, transport, 0, waiter.line));
+          return;
+        }
+        // A refusal naming no command answers, in line order, the oldest line no frame answered
+        // yet: a read, or a doors line an engine without the doors could not parse (the host
+        // recorded nothing for it, so its identity is free again).
+        const line = this.#doorsLines[0];
+        if (line && (this.#reads.length === 0 || line.seq < this.#reads[0]!.seq)) {
+          this.#doorsLines.shift();
+          this.#bound.delete(line.command);
+          const waiters = this.#waiters.get(line.command) ?? [];
+          this.#waiters.delete(line.command);
           for (const waiter of waiters) waiter.reject(sessionRefusal(frame, transport, 0, waiter.line));
           return;
         }
@@ -430,7 +462,15 @@ class NativeSessionChannel implements SessionChannel {
     for (const subscriber of this.#subscribers) subscriber.push(event);
   }
 
+  /** A frame named `command`: none of its doors lines is still waiting for an unnamed reply. */
+  #answered(command: string): void {
+    for (let index = this.#doorsLines.length - 1; index >= 0; index -= 1) {
+      if (this.#doorsLines[index]!.command === command) this.#doorsLines.splice(index, 1);
+    }
+  }
+
   #settle(command: string, frame: NikaSessionResult | NikaSessionClosed): void {
+    this.#answered(command);
     const waiters = this.#waiters.get(command);
     if (!waiters) return;
     this.#waiters.delete(command);

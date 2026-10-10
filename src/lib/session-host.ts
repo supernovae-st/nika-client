@@ -66,14 +66,14 @@ const IDENTITY = /^[A-Za-z0-9._:-]{1,128}$/;
 /** A refusal word, as Serve's own error codes are spelled. */
 const REFUSAL_WORD = /^[A-Za-z][A-Za-z0-9_.:-]{0,63}$/;
 
-export type SessionOp = 'submit' | 'stop' | 'close';
+export type SessionOp = 'submit' | 'stop' | 'close' | 'steer' | 'follow_up';
 
 /** The command a handle sends: its exact bytes, and what its owner keeps. */
 export interface SessionCommand {
   readonly op: SessionOp;
   readonly command: string;
   readonly body: string;
-  /** A submit's line, returned to its owner if the host refuses it. */
+  /** A submit's, steer's or follow-up's line, returned to its owner if the host refuses it. */
   readonly line?: string;
 }
 
@@ -98,12 +98,14 @@ export const CLOSE_KEY = '\0close';
 
 /**
  * Encode one command with the contract's field names; the host judges the rest. A close
- * carries no identity (the host keeps no ledger for it): it is keyed locally only.
+ * carries no identity (the host keeps no ledger for it): it is keyed locally only. A submit
+ * names the snapshot its line answers; a steer or a follow-up carries only its line, for the
+ * conversation's run it finds under way.
  */
 export function sessionCommand(
   op: SessionOp,
   options: NikaSessionCommandOptions,
-  submit?: { snapshot: string; line: string },
+  submit?: { snapshot?: string; line: string },
 ): SessionCommand {
   if (op === 'close') {
     return { op, command: CLOSE_KEY, body: JSON.stringify({ contract: SESSION_HOST_CONTRACT, op }) };
@@ -116,7 +118,7 @@ export function sessionCommand(
   }
   const body: Record<string, unknown> = { contract: SESSION_HOST_CONTRACT, op, command };
   if (submit !== undefined) {
-    body.snapshot = submit.snapshot;
+    if (submit.snapshot !== undefined) body.snapshot = submit.snapshot;
     body.line = submit.line;
   }
   return { op, command, body: JSON.stringify(body), ...(submit === undefined ? {} : { line: submit.line }) };
@@ -210,6 +212,10 @@ export function sessionFrame(
       }
       if (frame.receipt !== undefined) text('receipt');
       if (frame.target !== undefined) text('target', true);
+      if (frame.queued !== undefined) queuedLine(frame.queued, 'result.queued', fail);
+      for (const [index, outcome] of ((frame.outcomes ?? []) as Record<string, unknown>[]).entries()) {
+        if (outcome.kind === 'stopped') stoppedOutcome(outcome, `result.outcomes[${index}]`, fail);
+      }
       snapshotBody(frame.snapshot, transport);
       break;
     case 'refused':
@@ -229,12 +235,62 @@ export function sessionFrame(
       break;
     case 'activity':
       text('command');
+      if (frame.tool !== undefined) toolMark(frame.tool, 'activity.tool', fail);
       break;
     default:
       // A frame kind this contract version does not name: carried, never acted upon.
       break;
   }
   return frame as Record<string, unknown> & { frame: string };
+}
+
+/** A count, as the engine writes one: a non-negative safe integer. */
+const isCount = (value: unknown) => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
+
+/** Each named member of `record` is text: absent and another shape are faults naming the path. */
+function textMembers(record: Record<string, unknown>, keys: string[], path: string,
+  fail: (what: string) => NikaProtocolError): void {
+  for (const key of keys) {
+    if (typeof record[key] !== 'string') {
+      throw fail(`${path}.${key} is ${Object.hasOwn(record, key) ? 'not text' : 'absent'}`);
+    }
+  }
+}
+
+/**
+ * One line queued for a conversation's run (`nika-session-change` `Queued`, the Session doors):
+ * its identity, mode, words and state, and the citation an `entered` line got. Unknown modes,
+ * states and members ride through.
+ */
+function queuedLine(value: unknown, path: string, fail: (what: string) => NikaProtocolError): void {
+  const queued = machineObject(value);
+  if (!queued) throw fail(`${path} is not an object`);
+  textMembers(queued, ['id', 'mode', 'line', 'state'], path, fail);
+  if (queued.state === 'entered' || Object.hasOwn(queued, 'cite')) textMembers(queued, ['cite'], path, fail);
+}
+
+/** A list of queued lines, each judged at its own path. */
+function queuedLines(value: unknown, path: string, fail: (what: string) => NikaProtocolError): void {
+  if (!Array.isArray(value)) throw fail(`${path} is not a list`);
+  value.forEach((entry, index) => queuedLine(entry, `${path}[${index}]`, fail));
+}
+
+/** A stopped conversation turn: how far the Stop reached, its words, what it returned and kept. */
+function stoppedOutcome(outcome: Record<string, unknown>, path: string,
+  fail: (what: string) => NikaProtocolError): void {
+  textMembers(outcome, ['reach', 'text'], path, fail);
+  if (Object.hasOwn(outcome, 'unsent')) queuedLines(outcome.unsent, `${path}.unsent`, fail);
+  if (Object.hasOwn(outcome, 'candidate') && !isCount(outcome.candidate)) {
+    throw fail(`${path}.candidate is not a count`);
+  }
+}
+
+/** A tool step of a conversation's run: its call, name and state, and its time once it answered. */
+function toolMark(value: unknown, path: string, fail: (what: string) => NikaProtocolError): void {
+  const tool = machineObject(value);
+  if (!tool) throw fail(`${path} is not an object`);
+  textMembers(tool, ['call', 'name', 'state'], path, fail);
+  if (Object.hasOwn(tool, 'elapsed_ms') && !isCount(tool.elapsed_ms)) throw fail(`${path}.elapsed_ms is not a count`);
 }
 
 /** The snapshot body: its handle, publish counter, turn under way and the work verbatim. */
@@ -254,6 +310,8 @@ function snapshotBody(value: unknown, transport: NikaTransportKind): NikaSession
       || typeof busy.stop_requested !== 'boolean') {
       throw fail('busy is neither null nor the turn under way');
     }
+    // The lines the conversation's run reads now: left out when none.
+    if (Object.hasOwn(busy, 'queued')) queuedLines(busy.queued, 'busy.queued', fail);
   }
   const work = machineObject(body.work);
   if (!work) throw fail('carries no work');
@@ -487,9 +545,20 @@ function workMembers(work: Record<string, unknown>, fail: (what: string) => Nika
         member(offered, 'role', place, text(), true);
         member(offered, 'value', place, text(), true);
         member(offered, 'name', place, text());
+        // A model's facts as this machine's inventory states them: left out when it offers no such model.
+        member(offered, 'choice', place, (value, at) => {
+          const facts = object(value, at);
+          for (const key of ['role', 'model', 'via', 'class', 'billing']) member(facts, key, at, text(), true);
+          member(facts, 'configured', at, flag, true);
+          member(facts, 'output_usd_per_million', at, (price, spot) => {
+            if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) throw fail(`${spot} is not a price`);
+          });
+        });
       }), true);
     }), true);
   }));
+  // The lines the person sent while the last run was under way: left out when none.
+  member(work, 'queued', 'work', (value, path) => queuedLines(value, path, fail));
   member(work, 'intelligence', 'work', (value, path) => {
     if (value === null) return;
     const intelligence = object(value, path);
@@ -642,6 +711,32 @@ export class NikaAuthoringSession {
    */
   async stop(options: NikaSessionCommandOptions = {}): Promise<NikaSessionResult> {
     return this.#channel.send(sessionCommand('stop', options), options.signal) as Promise<NikaSessionResult>;
+  }
+
+  /**
+   * Send a line to the conversation's run under way, to enter after the calls
+   * under way (the Session doors). It answers at once with a receipt, bound to
+   * the turn it found (`target`): `queued` with the line as it waits (`queued`,
+   * its identity `l1`, `l2`, …), `not_reading` (a turn runs that no
+   * conversation's run reads: send the line once it settled), `nothing_to_steer`
+   * (no turn: submit the line), `blank` or `full`. A queued line enters as the
+   * person's next cited line, and only then authorizes anything; what became of
+   * it is in `busy.queued` while the run reads it, then in `work.queued`. An
+   * engine without the doors refuses the command (`malformed`).
+   */
+  async steer(line: string, options: NikaSessionCommandOptions = {}): Promise<NikaSessionResult> {
+    const command = sessionCommand('steer', options, { line: sessionLine(line) });
+    return this.#channel.send(command, options.signal) as Promise<NikaSessionResult>;
+  }
+
+  /**
+   * Send a line to the conversation's run under way, to enter when the run
+   * would end (the Session doors); the receipt and the line's fate are those of
+   * `steer()`.
+   */
+  async followUp(line: string, options: NikaSessionCommandOptions = {}): Promise<NikaSessionResult> {
+    const command = sessionCommand('follow_up', options, { line: sessionLine(line) });
+    return this.#channel.send(command, options.signal) as Promise<NikaSessionResult>;
   }
 
   /**

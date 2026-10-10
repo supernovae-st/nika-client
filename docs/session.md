@@ -89,7 +89,8 @@ interface needs to show and verify without reading anything else:
 | `intelligence` | `NikaSessionIntelligence` | configured facts: the person's `selected` intelligence as the engine's machine resolved it, the `author` seat, the `decision` seat selected and the `effort`; a selection is never the model that served a call |
 | `knowledge` | `NikaSessionKnowledge`, absent otherwise | the authoring knowledge the Session reads now, a configured fact and never a call receipt, in one `state`: `admitted` (a release the strict door admitted: `source` `embedded` or `disk`, its `version` or `null`, its `manifest_sha256`, and `by`: `default`, `conversation`, `host` or `environment`), `refused` (a source the configuration names, refused: `source`, `by`, the stable `code` and its `cause`, never a host path; a line that would reach a model then waits as `knowledge_choice`) or `unread` (`why`). Engine `5f1e91c6f`; absent when the Session states none, never `null`; states stay open and grant nothing |
 | `authoring.stages` | `NikaSessionStageTimes \| null` | how long the compile's other stages took, as its decision record states them (engine `5f1e91c6f`): `qualification_ms` (the knowledge qualification's wall time, or `null`) and `trials`, each trial of a candidate in the order run with its `attempt` (`completed`, `stopped`, `never_attempted`), `elapsed_ms` (`null` when never attempted, never `0`) and `runtime_bound_ms`; never summed, no output or text of the record; `null` when the record states neither stage |
-| `bindings`, `delegations`, `questions` | lists, each absent when empty | what a conversation led by an intelligence holds (engine `6d217dfba`): the values the candidate binds (`NikaSessionBinding`: `key` when a question asked for it, `role` (`read_source`, `output_path`, `run_model`, `value`), the exact `value`, and its `provenance`: `kind` (`named`, `delegated`, `derived`, `offered`, `answered`, `retained`), the person's line it rests on (`message`: `u1`, `u2`, …) with their `excerpt`, or an accepted offer's `question` and `option`); the choices the person delegated (`NikaSessionDelegation`: `message`, `excerpt`, `scope`); and the questions asked now (`NikaSessionAskedQuestion`: `id` (its witness, what `waiting.ids` lists), `key`, `question`, `why`, `role`, `state` `open` or `after` with the keys it waits for, `options` with their values, `free_text`, `multi_select`). A provenance is a record, never an authorization; questions are never kept across a reopen |
+| `bindings`, `delegations`, `questions` | lists, each absent when empty | what a conversation led by an intelligence holds (engine `6d217dfba`): the values the candidate binds (`NikaSessionBinding`: `key` when a question asked for it, `role` (`read_source`, `output_path`, `run_model`, `value`), the exact `value`, and its `provenance`: `kind` (`named`, `delegated`, `derived`, `offered`, `answered`, `retained`), the person's line it rests on (`message`: `u1`, `u2`, …) with their `excerpt`, or an accepted offer's `question` and `option`); the choices the person delegated (`NikaSessionDelegation`: `message`, `excerpt`, `scope`); and the questions asked now (`NikaSessionAskedQuestion`: `id` (its witness, what `waiting.ids` lists), `key`, `question`, `why`, `role`, `state` `open` or `after` with the keys it waits for, `options` with their values, `free_text`, `multi_select`). A provenance is a record, never an authorization; questions are never kept across a reopen. With the doors (engine `f8da375e7`, not yet in main) an offered `run_model` value carries `choice` (`NikaSessionModelFacts`: the `role` it would serve, the exact `model`, the route `via`, its `class`, whether it is `configured` here, its `billing`, and `output_usd_per_million` on a metered route, absent when unknown, never `0`), absent when this machine's inventory offers no such model |
+| `queued` | `NikaSessionQueuedLine[]`, absent when none | with the doors: the lines the person sent while the last run was under way (`steer()`, `followUp()`) and what became of each: `entered` with its `cite`, or `returned` unsent |
 | `run` | `NikaSessionRun \| null` | the last observed Run with only the identities its observation carried: `current` (the Run of the workflow saved last), `workflow`, `end` (`{ end }`, plus `exit` for `unknown`), `trace`, `execution`, `workflow_sha256` (the source hash its start named), `chain_head`, `chain_len`; every member written, `null` where unobserved. A Run without `workflow_sha256` does not prove which bytes ran: both session-host doors observed none up to host `4271f09ef`; from host `b5d844d84` a run names what it observed of itself (recorded here from a real resident over HTTP at `312c3d5a8`: the sha256 of the bytes it ran, the job's execution uuid and opaque trace, the receipt head). `sealed` (engine `ad70c9aa7`) says whether the Run sealed its journal: an `interrupted` Run that sealed stopped at a wave boundary and its trace verifies, one that did not was cut mid-flight and its trace is incomplete; absent before that engine |
 
 The SDK checks these members where they are, as it checks a compile's
@@ -128,10 +129,37 @@ cancelled.
 
 Reads (`snapshot()`, `details()`) and `stop()` never wait for the turn.
 
+### Lines for a conversation's run under way
+
+With the engine's Session doors (engine `f8da375e7` on the doors branch, not
+yet in main), a person can speak to the run an intelligence leads while it
+works. `steer(line)` sends a line that enters after the calls under way;
+`followUp(line)` one that enters when the run would end. Both are commands
+with an identity, answered at once with a receipt bound to the turn they found
+(`target`): `queued`, with the line as it waits (`queued`: its identity `l1`,
+`l2`, …, `mode`, the words and `state`), `not_reading` (a turn runs that no
+conversation's run reads: send the line once it settled), `nothing_to_steer`
+(no turn: submit the line), `blank` or `full`. A queued line enters as the
+person's next cited line (`u2`, …) and only then authorizes anything; a line
+is never kept for a later run. `busy.queued` shows the lines the run reads
+now; `work.queued` keeps what became of each after the run (`entered` with its
+`cite`, or `returned` unsent). Stopping such a turn settles it with a
+`stopped` outcome (`NikaSessionStopped`): `reach` (`between_steps`,
+`request_dropped`: a request already sent may still be billed, or
+`agent_cancelled`: the agent was asked once and ended its turn), the
+Session's `text`, the lines it returned `unsent` and the draft revision it
+kept (`candidate`). An engine without the doors cannot parse these commands and
+refuses them `malformed`, naming no command: natively the SDK takes that
+refusal as the line's own, in the order the lines were written, and the
+Session goes on.
+
 ## Events
 
 `events({ after })` yields the Session's events (`opened`, `accepted`,
-`activity`, `result`, `closed`) as the engine wrote them, each with a `cursor`
+`activity`, `result`, `closed`) as the engine wrote them (with the doors, an
+`activity` of a conversation's run names the tool step it observed in `tool`:
+`call`, `name`, `started`/`finished`/`failed` and `elapsed_ms` once it
+answered, never its arguments or reply), each with a `cursor`
 (`<session>:<event>`) to resume from. Without `after`, a view starts with every
 event the door still holds: the server's whole log, or the events a local
 handle retains (`eventBufferSize`). Over HTTP a cursor the server cannot resume

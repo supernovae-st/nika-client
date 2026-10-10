@@ -1901,6 +1901,8 @@ export interface NikaSessionWork {
    * their identities are renewed.
    */
   questions?: NikaSessionAskedQuestion[];
+  /** The lines the person sent while the last run was under way, and what became of each; absent when none. */
+  queued?: NikaSessionQueuedLine[];
   [key: string]: unknown;
 }
 
@@ -2022,6 +2024,8 @@ export interface NikaSessionOfferValue {
   value: string;
   /** What the person reads for it, when it differs from the value. */
   name?: string;
+  /** For a model, what this machine's inventory states of it; absent when it offers no such model. */
+  choice?: NikaSessionModelFacts;
   [key: string]: unknown;
 }
 
@@ -2441,6 +2445,30 @@ export interface NikaSessionBusy {
    */
   phase: string;
   stop_requested: boolean;
+  /**
+   * The lines queued for the conversation's run while it reads them
+   * (`steer()`, `followUp()`), in the order sent; absent when none.
+   */
+  queued?: NikaSessionQueuedLine[];
+  [key: string]: unknown;
+}
+
+/**
+ * One line the person sent while a conversation's run was under way
+ * (`busy.queued`, `work.queued`, a queued receipt): its identity in the
+ * conversation (`l1`, `l2`, …), how it waits (`steer`: after the calls under
+ * way; `follow_up`: when the run would end), the words exactly as typed, and
+ * what became of it: `waiting`, `entered` (it became the person's cited line
+ * `cite`, and only then authorizes anything) or `returned` (unsent: the run
+ * stopped, waited for the person or ended before reading it). Words stay open.
+ */
+export interface NikaSessionQueuedLine {
+  id: string;
+  mode: 'steer' | 'follow_up' | (string & {});
+  line: string;
+  state: 'waiting' | 'entered' | 'returned' | (string & {});
+  /** `entered`: the citation the line got (`u2`, …). */
+  cite?: string;
   [key: string]: unknown;
 }
 
@@ -2462,6 +2490,57 @@ export interface NikaSessionOutcome {
   [key: string]: unknown;
 }
 
+/**
+ * The outcome of a conversation turn the person stopped (`kind` `stopped`):
+ * how far the Stop reached (`between_steps`; `request_dropped`, a request
+ * already sent may still be billed; `agent_cancelled`, the agent was asked
+ * once and ended its turn), the Session's words, the queued lines it returned
+ * unsent, and the draft revision it kept. The tree and the draft are kept.
+ */
+export interface NikaSessionStopped extends NikaSessionOutcome {
+  kind: 'stopped';
+  reach: 'between_steps' | 'request_dropped' | 'agent_cancelled' | (string & {});
+  text: string;
+  /** The queued lines returned, with their identities; absent when none. */
+  unsent?: NikaSessionQueuedLine[];
+  /** The draft revision kept; absent when none. */
+  candidate?: number;
+}
+
+/**
+ * One tool the conversation's intelligence called, as its run observed it
+ * (an `activity` event's `tool`): the call's identity, the tool's name,
+ * `started`, `finished` or `failed`, and the milliseconds it took once it
+ * answered. Never its arguments or reply.
+ */
+export interface NikaSessionToolMark {
+  call: string;
+  name: string;
+  state: 'started' | 'finished' | 'failed' | (string & {});
+  elapsed_ms?: number;
+  [key: string]: unknown;
+}
+
+/**
+ * What this machine's model inventory states of a model an option offers
+ * (`work.questions[].options[].values[].choice`, on a `run_model` value): the
+ * role it would serve (`run`, `author`, `decision`), the exact model, the
+ * route that serves it (`via`, its `class`, whether it is `configured` here
+ * and how it `billing`s) and the catalogue's output list price on a metered
+ * route. Absent when the inventory offers no such model: never invented. An
+ * unknown or unmetered price is absent, never free.
+ */
+export interface NikaSessionModelFacts {
+  role: string;
+  model: string;
+  via: string;
+  class: string;
+  configured: boolean;
+  billing: string;
+  output_usd_per_million?: number;
+  [key: string]: unknown;
+}
+
 /** Members every frame carries. */
 interface NikaSessionFrameBase {
   contract: string;
@@ -2477,22 +2556,31 @@ export interface NikaSessionOpened extends NikaSessionFrameBase {
   notices?: unknown[];
 }
 
-/** A settled command: its outcomes (submit), its receipt (stop), and the snapshot it published. */
+/**
+ * A settled command: its outcomes (submit), its receipt (stop, steer,
+ * follow-up), and the snapshot it published.
+ */
 export interface NikaSessionResult extends NikaSessionFrameBase {
   frame: 'result';
   command: string;
-  op: 'submit' | 'stop' | 'close' | (string & {});
+  op: 'submit' | 'stop' | 'close' | 'steer' | 'follow_up' | (string & {});
   /** `true` when the recorded result of an earlier identical command came back. */
   replayed: boolean;
   outcomes?: NikaSessionOutcome[];
   /**
-   * Stop only: `stop_requested`, `run_stopping` (the Run took its first
-   * signal; engine `ad70c9aa7`), `nothing_to_stop` or `run_underway` (this
-   * door cannot stop the Run). A receipt is not a settlement.
+   * Stop: `stop_requested`, `run_stopping` (the Run took its first signal;
+   * engine `ad70c9aa7`), `nothing_to_stop` or `run_underway` (this door
+   * cannot stop the Run). Steer and follow-up: `queued` (with its `queued`
+   * line), `not_reading` (a turn runs that no conversation's run reads: send
+   * the line once it settled), `nothing_to_steer` (no turn: submit the line),
+   * `blank`, `full` (the run took as many lines as it takes). A receipt is not
+   * a settlement; the vocabulary stays open.
    */
   receipt?: string;
-  /** Stop only: the command it targeted, or `null`. */
+  /** Stop, steer and follow-up: the command they found under way, or `null`. */
   target?: string | null;
+  /** Steer and follow-up, `queued`: the line as it waits, with its identity. */
+  queued?: NikaSessionQueuedLine;
   snapshot: NikaSessionSnapshot;
 }
 
@@ -2518,4 +2606,6 @@ export interface NikaSessionEvent extends NikaSessionFrameBase {
   frame: string;
   /** `<session>:<event>`; a `resync` carries the point it resynchronized to. */
   cursor?: string;
+  /** An `activity` event of a conversation's run: the tool step it observed, when it is one. */
+  tool?: NikaSessionToolMark;
 }

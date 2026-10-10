@@ -238,6 +238,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ones it was never told stay open, and the leg names the keys it waits on. It
   never answers a `knowledge_choice`. Each turn's evidence keeps the
   knowledge read, the compile's stage times and what the conversation holds.
+- The Session doors, as the engine's doors branch writes them at `f8da375e7`
+  (not yet in main): `steer(line)` and `followUp(line)` send a line to the
+  conversation's run under way, answered at once with a receipt (`queued` with
+  the line's identity and state, `not_reading`, `nothing_to_steer`, `blank`,
+  `full`) bound to the turn it found; `busy.queued` and `work.queued`
+  (`NikaSessionQueuedLine`) say what became of each line, entered as a cited
+  line or returned unsent. A stopped conversation turn is typed
+  (`NikaSessionStopped`: `reach`, `text`, the lines returned `unsent`, the
+  draft revision kept), an `activity` names the tool step it observed
+  (`NikaSessionToolMark`, never its arguments), and an offered model carries
+  this machine's facts (`choice`, `NikaSessionModelFacts`). An engine without
+  the doors refuses these commands `malformed`, naming no command: natively
+  the SDK now takes a refusal that names no command as the oldest unanswered
+  line's, read or doors line, in write order, and the Session goes on.
 
 ### Changed
 

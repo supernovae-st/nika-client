@@ -67,7 +67,7 @@ let stopRequested = false;
 let saved = null;
 let waiting = { kind: 'free' };
 let candidate = null;
-// The Session doors (engine f8da375e7), with `NIKA_FAKE_SESSION_DOORS`: a `slow …` turn stands for a
+// The Session doors (engine main a3017c495), with `NIKA_FAKE_SESSION_DOORS`: a `slow …` turn stands for a
 // conversation's run that reads its queue; `steer` and `follow_up` queue lines for it while it runs.
 const DOORS = Boolean(process.env.NIKA_FAKE_SESSION_DOORS);
 let reads = false;

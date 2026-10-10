@@ -131,27 +131,29 @@ Reads (`snapshot()`, `details()`) and `stop()` never wait for the turn.
 
 ### Lines for a conversation's run under way
 
-With the engine's Session doors (engine `f8da375e7` on the doors branch, not
-yet in main), a person can speak to the run an intelligence leads while it
-works. `steer(line)` sends a line that enters after the calls under way;
-`followUp(line)` one that enters when the run would end. Both are commands
-with an identity, answered at once with a receipt bound to the turn they found
-(`target`): `queued`, with the line as it waits (`queued`: its identity `l1`,
-`l2`, …, `mode`, the words and `state`), `not_reading` (a turn runs that no
+With the engine's Session doors (engine main from `a3017c495`), a person can
+speak to the run an intelligence leads while it works. `steer(line)` sends a
+line that enters after the calls under way (a tool call the intelligence asked
+for meanwhile is not run: it reads the person's line first); `followUp(line)`
+one that enters when the run would end. Both are commands with an identity,
+answered at once with a receipt bound to the turn they found (`target`):
+`queued`, with the line as it waits (`queued`: its identity `l1`, `l2`, …,
+`mode`, the words and `state`), `not_reading` (a turn runs that no
 conversation's run reads: send the line once it settled), `nothing_to_steer`
-(no turn: submit the line), `blank` or `full`. A queued line enters as the
-person's next cited line (`u2`, …) and only then authorizes anything; a line
-is never kept for a later run. `busy.queued` shows the lines the run reads
-now; `work.queued` keeps what became of each after the run (`entered` with its
-`cite`, or `returned` unsent). Stopping such a turn settles it with a
-`stopped` outcome (`NikaSessionStopped`): `reach` (`between_steps`,
-`request_dropped`: a request already sent may still be billed, or
-`agent_cancelled`: the agent was asked once and ended its turn), the
-Session's `text`, the lines it returned `unsent` and the draft revision it
-kept (`candidate`). An engine without the doors cannot parse these commands and
-refuses them `malformed`, naming no command: natively the SDK takes that
-refusal as the line's own, in the order the lines were written, and the
-Session goes on.
+(no turn: submit the line), `blank` or `full` (the run took as many lines as
+it takes, 32 at `a3017c495`). A queued line enters as the person's next cited
+line (`u2`, …) and only then authorizes anything; a line is never kept for a
+later run. `busy.queued` shows the lines the run reads now; `work.queued` keeps
+what became of each after the run (`entered` with its `cite`, or `returned`
+unsent). Stopping such a turn settles it with a `stopped` outcome
+(`NikaSessionStopped`): `reach` (`between_steps`, `request_dropped`: a request
+already sent may still be billed, or `agent_cancelled`: the agent was asked
+once and ended its turn), the Session's `text`, the lines it returned `unsent`
+and the draft revision it kept (`candidate`). No capability names the doors at
+`a3017c495`, so the SDK sends these commands as asked: an engine without the
+doors cannot parse them and refuses them `malformed`, naming no command;
+natively the SDK takes that refusal as the line's own, in the order the lines
+were written, and the Session goes on.
 
 ## Events
 
@@ -215,7 +217,7 @@ the recorded commands and decodes every recorded frame unchanged, and at
 `knowledge` and whose Run sealed its journal. The 0.123 integration engine registers
 `nika session --json` (`3688552f3`); the served `/v1/sessions` routes arrive
 with `nika serve --sessions`, and the pinned `openapi.json` declares them as
-such a resident of engine main `ad70c9aa7` serves them (the work snapshot an
+such a resident of engine main `a3017c495` serves them (the work snapshot an
 object whose `knowledge` member alone is described there).
 `scripts/run-session-parity-e2e.mjs` qualifies
 both doors of one binary once it hosts them (see `docs/testing.md`).

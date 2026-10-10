@@ -451,7 +451,7 @@ answers with a usage error; a server without a field answers
 mean to use.
 
 The pinned `openapi.json` and `src/generated/openapi.d.ts` describe an
-unseated resident of the engine `ENGINE_QUAL_PIN` names (main `ad70c9aa7`),
+unseated resident of the engine `ENGINE_QUAL_PIN` names (main `a3017c495`),
 whose document carries no generation 2. The generation-2 types are
 written by hand from the engine source: `nika-serve/src/server/compile/v2.rs`,
 `author.rs` and `openapi-native.json` (at `158a961cd` for the judged answer

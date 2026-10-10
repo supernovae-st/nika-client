@@ -238,11 +238,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ones it was never told stay open, and the leg names the keys it waits on. It
   never answers a `knowledge_choice`. Each turn's evidence keeps the
   knowledge read, the compile's stage times and what the conversation holds.
-- The Session doors, as the engine's doors branch writes them at `f8da375e7`
-  (not yet in main): `steer(line)` and `followUp(line)` send a line to the
-  conversation's run under way, answered at once with a receipt (`queued` with
-  the line's identity and state, `not_reading`, `nothing_to_steer`, `blank`,
-  `full`) bound to the turn it found; `busy.queued` and `work.queued`
+- The Session doors, as engine main writes them from `a3017c495`:
+  `steer(line)` and `followUp(line)` send a line to the conversation's run
+  under way, answered at once with a receipt (`queued` with the line's
+  identity and state, `not_reading`, `nothing_to_steer`, `blank`, `full`)
+  bound to the turn it found; `busy.queued` and `work.queued`
   (`NikaSessionQueuedLine`) say what became of each line, entered as a cited
   line or returned unsent. A stopped conversation turn is typed
   (`NikaSessionStopped`: `reach`, `text`, the lines returned `unsent`, the
@@ -261,16 +261,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   caller chose, as over HTTP. An earlier engine refuses the pair with its own
   usage error, reported as before.
 - `openapi.json` and the generated `src/generated/openapi.d.ts` now pin the
-  live document of engine main `ad70c9aa7` (reporting 0.123.0-preview.1,
+  live document of engine main `a3017c495` (reporting 0.123.0-preview.1,
   unreleased), which `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name, as a
   resident started with `--sessions` serves it. It adds the six
   `/v1/sessions` operations and the `SessionCommand`, `SessionFrame`,
-  `SessionKnowledge`, `SessionOutcome` and `SessionSnapshot` schemas: the work
-  snapshot, otherwise an object the engine carries verbatim, describes its
-  `knowledge` (engine `5f1e91c6f`), and a turn's `busy.phase` may read
-  `stopping`, a stop's receipt `run_stopping` and an outcome `run_stopped` or
-  `run_aborted` (engine `ad70c9aa7`). No operation is removed or changed. A
-  compile outcome declares `requested_trigger` (now required),
+  `SessionKnowledge`, `SessionOutcome`, `SessionQueued`, `SessionSnapshot` and
+  `SessionTool` schemas: the work snapshot, otherwise an object the engine
+  carries verbatim, describes its `knowledge` (engine `5f1e91c6f`); a turn's
+  `busy.phase` may read `stopping`, a stop's receipt `run_stopping` and an
+  outcome `run_stopped` or `run_aborted` (engine `ad70c9aa7`); a command may
+  be `steer` or `follow_up`, answered with its receipt and `queued` line, a
+  busy turn lists its `queued` lines, an activity its `tool` step, and an
+  outcome may read `stopped` (engine `a3017c495`). No operation is removed or
+  changed. A compile outcome declares `requested_trigger` (now required),
   `provenance.decision`, `plan`, `strategy` and `suggested_file`, and choice
   questions with their `options`; a compile request keeps only the HTTP body
   ceiling, its per-field byte and answer-count bounds gone; a schedule PUT

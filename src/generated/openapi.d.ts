@@ -1053,8 +1053,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Submit a line against a snapshot, or stop the turn under way
-         * @description A submit reaches the Session only when it names the CURRENT snapshot; the Session receives that snapshot's retained `Waiting`, never one rebuilt from the request. A command identity already known answers first: the same bytes (op, snapshot, line) return the recorded result with `replayed: true` (an original still running is awaited, never run twice); other bytes answer 409 command_conflict. One turn at a time: a submit during a turn answers 409 busy with its line returned unconsumed. The answer to a submit comes once it settled; no request deadline applies, and a disconnected request never cancels the accepted turn. A stop answers at once with its receipt; the settlement is the target command's own result. `stop_requested`: the preparation under way stops, or the Run it executes had not started its work yet (it starts none, or takes the Stop as it starts). `run_stopping`: the Run took its first signal, as a first Ctrl-C sends it: in-flight work completes and is counted, no new wave starts, and its result carries `run_stopped` once its trace sealed as cancelled (`run_aborted` when it ended without sealing it). `nothing_to_stop`: no turn, the turn is settling, or its Run already ended. `run_underway`: this door cannot stop the Run. A replayed stop answers its recorded receipt, and a second stop while one is under way sends nothing more: a stop never escalates to an abort.
+         * Submit a line against a snapshot, stop the turn under way, or queue a line for the conversation's run under way
+         * @description A submit reaches the Session only when it names the CURRENT snapshot; the Session receives that snapshot's retained `Waiting`, never one rebuilt from the request. A command identity already known answers first: the same bytes (op, snapshot, line) return the recorded result with `replayed: true` (an original still running is awaited, never run twice); other bytes answer 409 command_conflict. One turn at a time: a submit during a turn answers 409 busy with its line returned unconsumed. The answer to a submit comes once it settled; no request deadline applies, and a disconnected request never cancels the accepted turn. A stop answers at once with its receipt; the settlement is the target command's own result. `stop_requested`: the preparation under way stops, or the Run it executes had not started its work yet (it starts none, or takes the Stop as it starts). `run_stopping`: the Run took its first signal, as a first Ctrl-C sends it: in-flight work completes and is counted, no new wave starts, and its result carries `run_stopped` once its trace sealed as cancelled (`run_aborted` when it ended without sealing it). `nothing_to_stop`: no turn, the turn is settling, or its Run already ended. `run_underway`: this door cannot stop the Run. A replayed stop answers its recorded receipt, and a second stop while one is under way sends nothing more: a stop never escalates to an abort. A `steer` (the line enters after the calls under way) or a `follow_up` (it enters when the run would end) answers at once with its receipt: `queued` with the line's identity and state (`queued`), `not_reading` (a turn runs that no conversation's run reads: send the line once it settled), `nothing_to_steer` (no turn: submit the line), `blank`, `full` (the run took as many lines as it takes: send the line once it ended); what became of each queued line is in the snapshot's `busy.queued` while the run reads it, then in the work's `queued`.
          */
         post: {
             parameters: {
@@ -1695,10 +1695,10 @@ export interface components {
             command: string;
             /** @constant */
             contract: "nika/session-host@1";
-            /** @description submit only: the line, exactly as typed */
+            /** @description submit, steer and follow_up: the line, exactly as typed */
             line?: string;
             /** @enum {unknown} */
-            op: "submit" | "stop";
+            op: "submit" | "stop" | "steer" | "follow_up";
             /** @description submit only: the handle of the snapshot the line was typed against */
             snapshot?: string;
         };
@@ -1719,16 +1719,18 @@ export interface components {
             note?: string;
             notices?: string[];
             /** @enum {unknown} */
-            op?: "submit" | "stop";
+            op?: "submit" | "stop" | "steer" | "follow_up";
             outcomes?: components["schemas"]["SessionOutcome"][];
             phase?: string;
+            queued?: components["schemas"]["SessionQueued"];
             /** @enum {unknown} */
-            receipt?: "stop_requested" | "run_stopping" | "nothing_to_stop" | "run_underway";
+            receipt?: "stop_requested" | "run_stopping" | "nothing_to_stop" | "run_underway" | "queued" | "not_reading" | "nothing_to_steer" | "blank" | "full";
             replayed?: boolean;
             session: string;
             snapshot?: components["schemas"]["SessionSnapshot"] | string;
             target?: string | null;
             text?: string;
+            tool?: components["schemas"]["SessionTool"];
         };
         /** @description The authoring knowledge the Session reads now, a configured fact and never a call receipt: `admitted` (a release the strict door admitted: `source` `embedded` or `disk`, its `version`, its `manifest_sha256`, and `by` `default`, `conversation`, `host` or `environment`), `refused` (a source the configuration names, refused: `source` `snapshot`, `pack` or `embedded`, `by`, the stable `code` and its `cause`, never a host path; a line that would reach a model waits as `knowledge_choice`), or `unread` (`why`: knowledge off, the strategy `off`, or a configuration refused before its knowledge resolved). */
         SessionKnowledge: {
@@ -1742,16 +1744,28 @@ export interface components {
             version?: string | null;
             why?: string;
         };
-        /** @description One TurnOutcome, projected mechanically: reply, facts, help, aside, ask, cancelled (with `withdrawn` outcomes when a Stop withdrew a late result), quit, refusal (`class`), held and proposal (`proposal`), question (`key`), gate (`trace`, `task`), run_requested (`workflow`, `inputs` names only, `max_cost_usd`), resume_requested (`workflow`, `trace`, `answer`), run_review (`review`: the run waits at its fresh cost review), run_reviewed, run_not_started (nothing ran), run_unobserved (admitted, its end not observed: effects unknown), run_stopped (a Stop reached the run and it sealed its trace as cancelled), run_aborted (a Stop reached the run but it ended without sealing its trace: cut mid-flight, effects in flight unknown), resumed, other. A kind this list does not name is shown as unknown, never guessed. */
+        /** @description One TurnOutcome, projected mechanically: reply, facts, help, aside, ask, cancelled (with `withdrawn` outcomes when a Stop withdrew a late result), stopped (a turn of the conversation the selected intelligence leads, stopped by the person: `reach` `between_steps`, `request_dropped` (a request already sent may still be billed) or `agent_cancelled` (the agent was asked once, `session/cancel`), `unsent` queued lines, `candidate` the draft revision kept), quit, refusal (`class`), held and proposal (`proposal`), question (`key`), gate (`trace`, `task`), run_requested (`workflow`, `inputs` names only, `max_cost_usd`), resume_requested (`workflow`, `trace`, `answer`), run_review (`review`: the run waits at its fresh cost review), run_reviewed, run_not_started (nothing ran), run_unobserved (admitted, its end not observed: effects unknown), run_stopped (a Stop reached the run and it sealed its trace as cancelled), run_aborted (a Stop reached the run but it ended without sealing its trace: cut mid-flight, effects in flight unknown), resumed, other. A kind this list does not name is shown as unknown, never guessed. */
         SessionOutcome: {
             kind: string;
             text?: string;
+        };
+        /** @description One line the person sent while the conversation's run was under way: its identity (`l1`, `l2`, …), how it waits, the words, and what became of it — `waiting`, `entered` (it became the person's line `cite`), `returned` (unsent: the run stopped, waited for the person or ended before reading it). */
+        SessionQueued: {
+            cite?: string;
+            id: string;
+            line: string;
+            /** @enum {unknown} */
+            mode: "steer" | "follow_up";
+            /** @enum {unknown} */
+            state: "waiting" | "entered" | "returned";
         };
         SessionSnapshot: {
             busy: null | {
                 command: string;
                 /** @enum {unknown} */
                 phase: "preparing" | "running" | "stopping" | "settling";
+                /** @description the lines queued for the conversation's run while it reads them */
+                queued?: components["schemas"]["SessionQueued"][];
                 stop_requested: boolean;
             };
             /** @description publish order, distinct from event numbers */
@@ -1761,6 +1775,14 @@ export interface components {
             work: {
                 knowledge?: components["schemas"]["SessionKnowledge"];
             };
+        };
+        /** @description One tool the conversation's intelligence called, as its run observed it — never its arguments or reply: the call's identity, the tool, `started`, `finished` or `failed`, and the milliseconds it took once it answered. */
+        SessionTool: {
+            call: string;
+            elapsed_ms?: number;
+            name: string;
+            /** @enum {unknown} */
+            state: "started" | "finished" | "failed";
         };
         /** @description Compact remote acknowledgement that the exact snapshot was revalidated. This is not the engine's public full check report; SDK callers retain the engine-owned report captured with the snapshot and return it only after this acknowledgement succeeds. */
         SnapshotValidationAck: {

@@ -1,10 +1,11 @@
 # HTTP contract
 
 `openapi.json` is the checked-in contract pin: the live document of the
-engine `ENGINE_QUAL_PIN` names (main `5167aaf5d`, engine 0.122.0, unreleased),
-served by a resident started with `--sessions`, since the host merges its
-Session routes into no other document. It is ahead of the released 0.120.3
-engine this package bundles.
+engine `ENGINE_QUAL_PIN` names (main `ad70c9aa7`, reporting 0.123.0-preview.1,
+unreleased: the pre-release `v0.123.0-preview.1` was cut earlier, at
+`fd981b4e9`), served by a resident started with `--sessions`, since the host
+merges its Session routes into no other document. It is ahead of the released
+0.120.3 engine this package bundles.
 
 The SDK authenticates every route except public `GET /health`; bearer tokens
 are redacted from failures.
@@ -33,7 +34,7 @@ Any other non-2xx body is discarded and reported as a redacted
 | `POST /v1/sessions` | `openSession()` | the served project's one live Session (201), gated on `sessionHost`; a second open answers 409 `session_live` with its identity; `intelligence` needs `sessionIntelligence` |
 | `GET /v1/sessions/{session}` | session `snapshot()` / `attachSession(id)` | the current snapshot; never waits on a turn |
 | `GET /v1/sessions/{session}/details` | session `details()` | the details card of the current snapshot |
-| `POST /v1/sessions/{session}/commands` | session `submit()` / `stop()` | one command keyed by its identity, answered once it settled; the same identity and bytes replay, other bytes answer 409 `command_conflict` |
+| `POST /v1/sessions/{session}/commands` | session `submit()` / `stop()` | one command keyed by its identity, answered once it settled; the same identity and bytes replay, other bytes answer 409 `command_conflict`; a stop answers its receipt at once, `run_underway` for a Run this door cannot stop (the job's cancel does) |
 | `GET /v1/sessions/{session}/events` | session `events({ after })` | the Session's log as SSE, resumed after a cursor, ending with `closed` |
 | `DELETE /v1/sessions/{session}` | session `close()` | stops a preparation, waits for a Run under way, ends the log |
 

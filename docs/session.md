@@ -187,7 +187,7 @@ the recorded commands and decodes every recorded frame unchanged, and at
 `knowledge` and whose Run sealed its journal. The 0.123 integration engine registers
 `nika session --json` (`3688552f3`); the served `/v1/sessions` routes arrive
 with `nika serve --sessions`, and the pinned `openapi.json` declares them as
-such a resident of engine main `5167aaf5d` serves them (the work snapshot an
-opaque object there).
+such a resident of engine main `ad70c9aa7` serves them (the work snapshot an
+object whose `knowledge` member alone is described there).
 `scripts/run-session-parity-e2e.mjs` qualifies
 both doors of one binary once it hosts them (see `docs/testing.md`).

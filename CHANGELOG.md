@@ -247,23 +247,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   caller chose, as over HTTP. An earlier engine refuses the pair with its own
   usage error, reported as before.
 - `openapi.json` and the generated `src/generated/openapi.d.ts` now pin the
-  live document of engine main `5167aaf5d` (engine 0.122.0, unreleased; the
-  same tree as `3fb276fca`, whose binary served the export), which
-  `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name, as a resident started with
-  `--sessions` serves it. It adds the six `/v1/sessions` operations and the
-  `SessionCommand`, `SessionFrame`, `SessionOutcome` and `SessionSnapshot`
-  schemas; the Session work stays the opaque object the engine exposes. No
-  operation is removed or changed. A compile outcome declares
-  `requested_trigger` (now required), `provenance.decision`, `plan`,
-  `strategy` and `suggested_file`, and choice questions with their `options`;
-  a compile request keeps only the HTTP body ceiling, its per-field byte and
-  answer-count bounds gone; a schedule PUT takes per-fire `inputs`;
-  `info.version` reads 0.122.0. The candidate type drift and the compile
-  parity runner start their resident with `--sessions` whenever the pin
-  declares the Session routes, and the coverage check reads the Session door.
-  The pin is ahead of the released 0.120.3 engine this package bundles, so the
-  checks bound to that release cannot match it until an engine release serves
-  it.
+  live document of engine main `ad70c9aa7` (reporting 0.123.0-preview.1,
+  unreleased), which `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name, as a
+  resident started with `--sessions` serves it. It adds the six
+  `/v1/sessions` operations and the `SessionCommand`, `SessionFrame`,
+  `SessionKnowledge`, `SessionOutcome` and `SessionSnapshot` schemas: the work
+  snapshot, otherwise an object the engine carries verbatim, describes its
+  `knowledge` (engine `5f1e91c6f`), and a turn's `busy.phase` may read
+  `stopping`, a stop's receipt `run_stopping` and an outcome `run_stopped` or
+  `run_aborted` (engine `ad70c9aa7`). No operation is removed or changed. A
+  compile outcome declares `requested_trigger` (now required),
+  `provenance.decision`, `plan`, `strategy` and `suggested_file`, and choice
+  questions with their `options`; a compile request keeps only the HTTP body
+  ceiling, its per-field byte and answer-count bounds gone; a schedule PUT
+  takes per-fire `inputs`; `info.version` reads 0.123.0-preview.1. The
+  candidate type drift and the compile parity runner start their resident with
+  `--sessions` whenever the pin declares the Session routes, and the coverage
+  check reads the Session door. The pin is ahead of the released 0.120.3
+  engine this package bundles, so the checks bound to that release cannot
+  match it until an engine release serves it.
 
 ### Fixed
 

@@ -1,0 +1,157 @@
+{
+  "opened": {
+    "contract": "nika/session-host@1",
+    "event": 1,
+    "frame": "opened",
+    "notices": [],
+    "session": "ses_765d32444b7129c8a190962debc2bcd1",
+    "snapshot": {
+      "busy": null,
+      "seq": 1,
+      "snapshot": "snp_d5d29cde60c615343b1e7ebbbf1f0a21",
+      "work": {
+        "authoring": null,
+        "candidate": null,
+        "contract": "nika/session-work@0",
+        "intelligence": {
+          "author": {
+            "kind": "deterministic",
+            "model": null,
+            "seat": null,
+            "transport": null,
+            "why": null
+          },
+          "decision": null,
+          "effort": null,
+          "selected": {
+            "kind": "local",
+            "locus": "local · private · project context stays on this machine",
+            "model": null,
+            "ready": true,
+            "refusal": null,
+            "scope": "operator_default",
+            "transport": null,
+            "via": "ollama"
+          }
+        },
+        "rail": {
+          "active": "pending",
+          "checked": "pending",
+          "draft": "pending",
+          "run": "pending",
+          "saved": "pending"
+        },
+        "request": {
+          "decisions": [],
+          "goal": null,
+          "unresolved": []
+        },
+        "requested": null,
+        "root": "/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpV3NjhE",
+        "run": null,
+        "saved": null,
+        "waiting": {
+          "kind": "free"
+        }
+      }
+    }
+  },
+  "ran": {
+    "command": "c-3",
+    "contract": "nika/session-host@1",
+    "event": 5,
+    "frame": "result",
+    "op": "submit",
+    "outcomes": [
+      {
+        "inputs": [],
+        "kind": "run_requested",
+        "max_cost_usd": 0.25,
+        "text": "check · `root.nika` · clean ✔",
+        "workflow": "root.nika"
+      },
+      {
+        "kind": "facts",
+        "text": "Done · `root.nika` · 4 ms · 1 task ran\n  cost · no model usage recorded\n  `/proof` shows the records and their limits · « run it » runs it again\n  run observed · exit 0 · succeeded · trace `/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpV3NjhE/.nika/traces/2026-10-08T15-06-25Z-aef6.ndjson`"
+      }
+    ],
+    "replayed": false,
+    "session": "ses_765d32444b7129c8a190962debc2bcd1",
+    "snapshot": {
+      "busy": null,
+      "seq": 2,
+      "snapshot": "snp_d1939c0c658dd1b98b3e8dbc2529a291",
+      "work": {
+        "authoring": null,
+        "candidate": null,
+        "contract": "nika/session-work@0",
+        "intelligence": {
+          "author": {
+            "kind": "deterministic",
+            "model": null,
+            "seat": null,
+            "transport": null,
+            "why": null
+          },
+          "decision": null,
+          "effort": null,
+          "selected": {
+            "kind": "local",
+            "locus": "local · private · project context stays on this machine",
+            "model": null,
+            "ready": true,
+            "refusal": null,
+            "scope": "operator_default",
+            "transport": null,
+            "via": "ollama"
+          }
+        },
+        "rail": {
+          "active": "pending",
+          "checked": "pending",
+          "draft": "pending",
+          "run": "done",
+          "saved": "pending"
+        },
+        "request": {
+          "decisions": [],
+          "goal": null,
+          "unresolved": []
+        },
+        "requested": {
+          "inputs": [],
+          "workflow": "root.nika",
+          "world": {
+            "basis": "declared",
+            "credentials": [],
+            "places": [],
+            "reach": "local"
+          }
+        },
+        "root": "/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpV3NjhE",
+        "run": {
+          "chain_head": "64245cdae7bf350f06110657c1dc2c4d68c1ad7e3e6f46420eaa50fc35f26bee",
+          "chain_len": null,
+          "current": true,
+          "end": {
+            "end": "succeeded"
+          },
+          "execution": "01a11c0d-211f-742a-9143-e49c4c0caef6",
+          "trace": "01a11c0d211f742a9143e49c4c0caef6",
+          "workflow": "root.nika",
+          "workflow_sha256": "97a555902c1eaae38b84a1233181744ce8eb873fa685209f61a8e7457a003008"
+        },
+        "saved": {
+          "check_clean": null,
+          "workflow": "root.nika",
+          "world": null
+        },
+        "waiting": {
+          "kind": "free"
+        }
+      }
+    }
+  },
+  "workflow": "nika: root\npermits:\n  tools: [\"nika:jq\"]\ntasks:\n  value:\n    invoke:\n      tool: nika:jq\n      args: { input: 1, expression: \".\" }\n",
+  "workflow_sha256": "97a555902c1eaae38b84a1233181744ce8eb873fa685209f61a8e7457a003008"
+}

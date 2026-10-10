@@ -1,7 +1,14 @@
 # HTTP contract
 
-`openapi.json` is the checked-in contract pin. The SDK authenticates every
-route except public `GET /health`; bearer tokens are redacted from failures.
+`openapi.json` is the checked-in contract pin: the live document of the
+engine `ENGINE_QUAL_PIN` names (main `0e4e1c74f`, reporting 0.123.0-preview.1,
+unreleased: the pre-release `v0.123.0-preview.1` was cut earlier, at
+`fd981b4e9`), served by a resident started with `--sessions`, since the host
+merges its Session routes into no other document. It is ahead of the released
+0.120.3 engine this package bundles.
+
+The SDK authenticates every route except public `GET /health`; bearer tokens
+are redacted from failures.
 A non-2xx answer typed as `{ error: { code, message } }` becomes a
 `NikaOperationError` carrying `status`, `code`, and the refused `operation`;
 For a check by served name, a typed 404 or 422 instead returns
@@ -24,6 +31,15 @@ Any other non-2xx body is discarded and reported as a redacted
 | `POST /v1/jobs/{id}/cancel` | `run.cancel()` | 200 a settled job or its terminal replay; 202 the request accepted on a running job, settled later by observation |
 | `GET /v1/jobs/{id}/trace/verify` | `traceVerify(receipt)` | engine-owned typed trace verdict; `reason` only on a verdict that does not hold |
 | `GET/PUT /v1/schedules/{id}` | `scheduleStatus()` / `schedule()` | resident schedule projection and CAS mutation |
+| `POST /v1/sessions` | `openSession()` | the served project's one live Session (201), gated on `sessionHost`; a second open answers 409 `session_live` with its identity; `intelligence` needs `sessionIntelligence` |
+| `GET /v1/sessions/{session}` | session `snapshot()` / `attachSession(id)` | the current snapshot; never waits on a turn |
+| `GET /v1/sessions/{session}/details` | session `details()` | the details card of the current snapshot |
+| `POST /v1/sessions/{session}/commands` | session `submit()` / `stop()` / `steer()` / `followUp()` | one command keyed by its identity, answered once it settled; the same identity and bytes replay, other bytes answer 409 `command_conflict`; a stop answers its receipt at once (`run_stopping` for a Run it reaches, `run_underway` from a resident before `0e4e1c74f`, whose job cancel stops it); a steer or a follow-up answers its receipt at once and is posted only when `/health` lists `sessionSteering` |
+| `GET /v1/sessions/{session}/events` | session `events({ after })` | the Session's log as SSE, resumed after a cursor, ending with `closed` |
+| `DELETE /v1/sessions/{session}` | session `close()` | stops a preparation, waits for a Run under way, ends the log |
+
+The Session routes and their frames are described in [session.md](session.md);
+the work snapshot stays the opaque object the engine exposes.
 
 ## Connection rules
 
@@ -124,8 +140,8 @@ generation-2 answer is read up to 8 MiB. Refusals add 409 (`compile_replay_unava
 `compile_new_intent_required`, 500 `compile_disclosure_refused` and 503
 `compile_replay_capacity` or `stopping`.
 
-This contract is ahead of the pinned `openapi.json`, which describes the
-released 0.120.3 resident: the default document never carries it, and a
+This contract is ahead of the pinned `openapi.json`, which describes an
+unseated resident: the default document never carries it, and a
 seated resident merges it into its live document. Its types are written by
 hand from the engine source (`nika-serve/src/server/compile/v2.rs`,
 `author.rs`, `openapi-native.json`). Released engines 0.121.0 and later serve
@@ -148,7 +164,8 @@ not know. Engine main adds two optional fields that are
 ahead of the pinned `openapi.json`: no released engine writes them yet, and a
 resident that predates them never sends them, so nothing changes against a
 released resident. They are read so that a resident built from engine main can
-be observed at all; the pin itself moves only with a release.
+be observed at all; the pin itself moves only with an engine the SDK is
+qualified against.
 
 - `JobEvent.at` is when the resident admitted the event: an RFC 3339 timestamp
   in UTC, outside the event's hash chain. It rides `event.raw.at` untouched.

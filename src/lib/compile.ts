@@ -31,6 +31,7 @@ import type {
   NikaCompileTrigger,
   NikaTransportKind,
 } from '../types.js';
+import { validateCompileEvidence } from './compile-evidence.js';
 import type { EngineCapture } from './engine-capture.js';
 import { encodeLiteralInputs } from './literal-inputs.js';
 import { machineObject } from './machine.js';
@@ -180,11 +181,11 @@ const LIMIT_BOUNDS: Readonly<Record<keyof NikaCompileLimits, readonly [number, n
   call_timeout_ms: [1, Number.MAX_SAFE_INTEGER],
   deadline_ms: [1, Number.MAX_SAFE_INTEGER],
 };
-const CREATE_ONLY_FIELDS = ['workflow_id', 'decisionModel', 'fresh'] as const;
+const CREATE_ONLY_FIELDS = ['workflow_id', 'fresh'] as const;
 const REQUEST_FIELDS = new Set<string>([
   'intent', ...CREATE_ONLY_FIELDS,
   'workflow', 'change', 'original_intent',
-  'answers', 'cognition', 'limits', 'replay_token', 'authoringModel', 'output',
+  'answers', 'cognition', 'limits', 'replay_token', 'authoringModel', 'decisionModel', 'output',
 ]);
 const signalAborted = Object.getOwnPropertyDescriptor(AbortSignal.prototype, 'aborted')!.get!;
 const removeSignalListener = EventTarget.prototype.removeEventListener;
@@ -194,7 +195,7 @@ const signalInterface = new Set([
 
 type SharedRequestFields = Pick<
   NikaCompileCreateRequest,
-  'cognition' | 'limits' | 'replay_token' | 'authoringModel' | 'output'
+  'cognition' | 'limits' | 'replay_token' | 'authoringModel' | 'decisionModel' | 'output'
 >;
 
 /**
@@ -246,8 +247,6 @@ export function normalizeCompileRequest(
     if (workflowId !== undefined) create.workflow_id = workflowId;
     if (answers !== undefined) create.answers = answers as Record<string, unknown>;
     Object.assign(create, sharedFields(record));
-    const decisionModel = optionalText(record.decisionModel, 'decisionModel');
-    if (decisionModel !== undefined) create.decisionModel = decisionModel;
     const fresh = record.fresh;
     if (fresh !== undefined && typeof fresh !== 'boolean') {
       throw new NikaConfigurationError('compile: fresh must be a boolean');
@@ -321,6 +320,10 @@ function sharedFields(record: Record<string, unknown>): SharedRequestFields {
   }
   const authoringModel = optionalText(record.authoringModel, 'authoringModel');
   if (authoringModel !== undefined) fields.authoringModel = authoringModel;
+  // A creation's or a revision's: an engine from before revisions took one refuses it beside
+  // `--base` with its own usage error.
+  const decisionModel = optionalText(record.decisionModel, 'decisionModel');
+  if (decisionModel !== undefined) fields.decisionModel = decisionModel;
   if (record.limits !== undefined) {
     const limits = normalizeLimits(record.limits);
     if (cognition === 'deterministicOnly') {
@@ -1150,6 +1153,8 @@ function provenanceFrom(
       : 'a compile_version 2 outcome carries no provenance.authoring receipt');
   }
   if (receipt) authoringFrom(provenance.authoring, protocol);
+  // Revision, reuse and backend evidence: judged in place, returned as the engine wrote it.
+  validateCompileEvidence(provenance, protocol);
   return provenance as unknown as NikaCompileProvenance;
 }
 

@@ -4,11 +4,17 @@ import { copyFileSync, createReadStream, existsSync, lstatSync, mkdirSync, mkdte
 import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { setTimeout as delay } from 'node:timers/promises';
+import { isDeepStrictEqual } from 'node:util';
 import { OwnedProcesses } from './one-door/process.mjs';
 import { stopResident, waitForHealth } from './one-door/resident.mjs';
 
-// Explicit frozen binary only; no Cargo, providers or paid calls. The SDK is
-// installed from its tarball and both public module faces drive both real doors.
+// Explicit frozen binary only; no Cargo. The SDK is installed from its tarball
+// and both public module faces drive both real doors. The deterministic phase
+// makes no provider call. The provider phase runs only when
+// NIKA_COMPILE_PROVIDER_MODEL names a seat and NIKA_COMPILE_PROVIDER_ENV names
+// the one variable holding its key (passed to the engine, never printed): one
+// document revision per door per module system, separate generations judged by
+// the evidence law alone, never compared byte for byte.
 const root = path.resolve(import.meta.dirname, '..');
 const binary = process.env.NIKA_BIN;
 const reportPath = process.env.NIKA_COMPILE_PARITY_REPORT;
@@ -19,6 +25,82 @@ const project = path.join(scratch, 'project');
 const consumer = path.join(scratch, 'consumer');
 const isolatedHome = path.join(scratch, 'home');
 const token = 'compile-parity-test-only-token-0123456789';
+// The provider phase's base: comments, Unicode, every envelope section and an
+// input the change does not touch. It checks clean and runs on the 0.122 carrier:
+// `nika:read` returns the file's text, so the jq step decodes it (`fromjson`)
+// before reading `.items`, as FIXTURE_RUNS witnesses before any generation.
+const REVISION_BASE = [
+  '# Stock watch: keeps a rolling window of the stock pages.',
+  '# Libellés en français : « Relevé — semaine » ✓ 🦋',
+  'nika: stock-watch',
+  'inputs:',
+  '  region:',
+  '    type: string',
+  '    default: eu-west',
+  'const:',
+  '  window_hours: 48 # hours of history kept',
+  '  label: "Relevé — semaine"',
+  '  pages_path: ./data/stock.json',
+  'permits:',
+  '  fs:',
+  '    read:',
+  '      - ./data/stock.json',
+  '  tools:',
+  '    - nika:read',
+  '    - nika:jq',
+  'tasks:',
+  '  read_pages:',
+  '    invoke:',
+  '      tool: nika:read',
+  '      args:',
+  '        path: ${{ const.pages_path }}',
+  '  window:',
+  '    after:',
+  '      read_pages: success',
+  '    with:',
+  '      pages: ${{ tasks.read_pages.output }}',
+  '    invoke:',
+  '      tool: nika:jq',
+  '      args:',
+  '        input: ${{ with.pages }}',
+  '        expression: "fromjson | [.items[] | select(.age_hours <= ${{ const.window_hours }})] | length"',
+  'outputs:',
+  '  kept: ${{ tasks.window.output }}',
+  '  label: ${{ const.label }}',
+  '  region: ${{ inputs.region }}',
+  '',
+].join('\n');
+const REVISION_INTENT = 'Read ./data/stock.json, count the stock pages younger than two days and label the result '
+  + '« Relevé — semaine ».';
+const REVISION_CHANGE = 'Keep three days of history instead of two.';
+/** Lines the change does not touch: an operations revision keeps them byte for byte. */
+const REVISION_KEPT = ['# Stock watch: keeps a rolling window of the stock pages.',
+  '# Libellés en français : « Relevé — semaine » ✓ 🦋', '  label: "Relevé — semaine"', '    default: eu-west'];
+// The base's behavior on the binary, witnessed before any generation (no model, no priced call):
+// over pages below, at and above both windows the base keeps 1, the requested change (two days
+// to three) keeps 2, and the undecoded base this fixture replaced still fails, so the witness
+// discriminates. A base that does not run as its request describes is never sent to an author.
+const FIXTURE_PAGES = { items: [{ id: 'young', age_hours: 24 }, { id: 'edge', age_hours: 72 },
+  { id: 'old', age_hours: 73 }] };
+const FIXTURE_OUTPUTS = (kept) => ({ kept, label: 'Relevé — semaine', region: 'eu-west' });
+const FIXTURE_RUNS = [
+  { name: 'base', source: REVISION_BASE, expect: { status: 'succeeded', outputs: FIXTURE_OUTPUTS(1) } },
+  { name: 'requested change', source: REVISION_BASE.replace('window_hours: 48 #', 'window_hours: 72 #'),
+    expect: { status: 'succeeded', outputs: FIXTURE_OUTPUTS(2) } },
+  { name: 'undecoded base', source: REVISION_BASE.replace('fromjson | ', ''),
+    expect: { status: 'failed', error: 'NIKA-BUILTIN-JQ-001' } },
+];
+assert(FIXTURE_RUNS.slice(1).every((run) => run.source !== REVISION_BASE), 'each fixture control differs from the base');
+// The CREATE leg's words: a new document from words alone, with a part only an author writes (a
+// summary), so the document door is reached; a schedule's bindings stay optional questions. A
+// language owner's pinned intent replaces it through NIKA_COMPILE_CREATE_INTENT_FILE.
+const CREATE_INTENT = process.env.NIKA_COMPILE_CREATE_INTENT_FILE
+  ? readFileSync(process.env.NIKA_COMPILE_CREATE_INTENT_FILE, 'utf8').trim()
+  : 'Create a new workflow named weekly-digest. Every Monday, read ./notes/brief.md, write a three-line summary '
+    + 'of it in French under the title « Relevé — semaine ✓ », and save it to ./out/digest.md. Keep the number of '
+    + 'lines as a constant.';
+// Which provider legs run (`edit`, `create`): both by default, each a separate generation per door.
+const PROVIDER_LEGS = (process.env.NIKA_COMPILE_PROVIDER_LEGS ?? 'edit,create').split(',').filter(Boolean);
 const env = { ...Object.fromEntries(['PATH', 'TMPDIR', 'TMP', 'TEMP', 'LANG', 'LC_ALL']
   .filter((key) => process.env[key] !== undefined).map((key) => [key, process.env[key]])),
 HOME: isolatedHome, NIKA_KEYCHAIN: 'off' };
@@ -30,6 +112,7 @@ const handlers = new Map(['SIGINT', 'SIGTERM', 'SIGHUP'].map((signal) => [signal
 }]));
 for (const [signal, handler] of handlers) process.on(signal, handler);
 let server;
+let seated;
 let report;
 try {
   for (const directory of [project, consumer, isolatedHome]) mkdirSync(directory);
@@ -42,6 +125,9 @@ try {
   const identity = JSON.parse(await run(binary, ['--sdk-identity'], project));
   assert(identity.supportedCapabilities.includes('compile'), 'native must advertise compile');
   const version = (await run(binary, ['--version'], project)).trim();
+  // The SDK source the package was built from; untracked files count (a scenario may be one).
+  const commit = (await run('git', ['rev-parse', 'HEAD'])).trim();
+  const dirty = (await run('git', ['status', '--porcelain'])).trim() !== '';
   await run('npm', ['run', 'build']);
   const [packed] = JSON.parse(await run('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', scratch]));
   const tarball = path.join(scratch, packed.filename);
@@ -58,8 +144,18 @@ try {
     "import { readFileSync } from 'node:fs';",
     'process.stdout.write(JSON.stringify(await scenario(sdk, JSON.parse(readFileSync(process.argv[2], "utf8")))));',
   ].join('\n'));
+  // The package's pin by default. A candidate engine ahead of that pin is compared with the
+  // document NIKA_COMPILE_PARITY_OPENAPI names instead, and the report says which one held.
+  const pinPath = path.resolve(process.env.NIKA_COMPILE_PARITY_OPENAPI ?? path.join(root, 'openapi.json'));
+  const pin = JSON.parse(readFileSync(pinPath, 'utf8'));
+  // The host merges its Session routes only into the document of a resident its operator starts
+  // with Sessions: a pin that declares them is compared with such a resident.
+  const sessions = Object.keys(pin.paths ?? {}).some((route) => route.startsWith('/v1/sessions'));
+  assert(!sessions || (await run(binary, ['serve', '--help'], project)).includes('--sessions'),
+    'the contract pin declares /v1/sessions, and this engine\'s serve has no --sessions to serve them');
   server = owned.start(binary, ['serve', '--bind', '127.0.0.1:0', '--workflows', project,
-    '--token-file', path.join(scratch, 'token'), '--state-root', path.join(scratch, 'state'), '--plain'],
+    '--token-file', path.join(scratch, 'token'), '--state-root', path.join(scratch, 'state'), '--plain',
+    ...(sessions ? ['--sessions'] : [])],
   { cwd: project, env, timeoutMs: 300000 });
   let url;
   const deadline = Date.now() + 15000;
@@ -81,8 +177,9 @@ try {
   assert(health.supportedCapabilities.includes('compile'), 'Serve must advertise compile');
   const openapi = await request('/v1/openapi.json', true);
   assert(openapi.paths['/v1/compile']?.post, 'the live OpenAPI must own POST /v1/compile');
-  assert.deepEqual(openapi, JSON.parse(readFileSync(path.join(root, 'openapi.json'), 'utf8')),
-    'the packed contract pin must match this frozen resident');
+  assert.deepEqual(openapi, pin, 'the contract pin must match this frozen resident');
+  const openapiPin = { path: pinPath, sha256: await sha256(pinPath),
+    package_pin: pinPath === path.join(root, 'openapi.json'), resident_sessions: sessions };
   const stateRoot = path.join(scratch, 'state');
   const stateBefore = snapshot(stateRoot);
   const results = [];
@@ -93,23 +190,192 @@ try {
       [path.join(consumer, `consumer.${moduleSystem === 'esm' ? 'mjs' : 'cjs'}`), config], consumer)));
   }
   assert.deepEqual(snapshot(stateRoot), stateBefore, 'compile must not create or mutate resident job state');
+  // The deterministic resident's part is done: it never outlives its phase into the provider's.
+  await stopResident(server);
+  server = undefined;
+  const provider = await providerPhase();
   assert.equal(await sha256(binary), binarySha, 'frozen binary changed during parity');
-  report = { result: 'green', scope: 'compile foundation; no general authoring or execution grant',
+  // A provider phase whose rounds stated no revision, or whose creations settled no record,
+  // did not exercise what it targets: the report keeps every row, and the result withholds
+  // the qualification.
+  // A module system the harness stopped watching, or one never reached after it, exercised less
+  // than the phase targets: never green.
+  const exercised = !provider.ran || (provider.results.length === 2 && provider.results.every(
+    ({ rows, created, harness_bound: bound }) => bound === undefined
+      && [...rows, ...created].every((row) => row.exercised)));
+  report = { result: exercised ? 'green' : 'not_exercised',
+    scope: 'compile foundation; no general authoring or execution grant',
     engine: { version, binary_sha256: binarySha, identity, health },
-    sdk: { version: packed.version, package_sha256: await sha256(tarball) },
-    compile_openapi: openapi.paths['/v1/compile'], resident_state_unchanged: true, results };
+    sdk: { version: packed.version, package_sha256: await sha256(tarball), commit, dirty },
+    openapi_pin: openapiPin, compile_openapi: openapi.paths['/v1/compile'], resident_state_unchanged: true,
+    results, provider };
+
+  async function providerPhase() {
+    const model = process.env.NIKA_COMPILE_PROVIDER_MODEL;
+    if (!model) return { ran: false, why: 'NIKA_COMPILE_PROVIDER_MODEL unset: deterministic phase only' };
+    assert(PROVIDER_LEGS.length > 0 && PROVIDER_LEGS.every((leg) => leg === 'edit' || leg === 'create'),
+      'NIKA_COMPILE_PROVIDER_LEGS names edit and/or create, comma-separated');
+    assert(CREATE_INTENT.length > 0, 'the CREATE leg needs words');
+    // Before anything is seated or asked: the EDIT base runs on this binary as its request says.
+    const witness = await fixtureWitness();
+    assert(witness.passed, `the EDIT base does not run as its request describes on this binary: ${JSON.stringify(witness.runs)}`);
+    // The seats each door is given (Serve seats a direct provider only; a native seat may be an
+    // ACP harness such as `claude-code/…` or `codex/…`), and the decision seat both doors judge
+    // with (a local revision takes `--decision-model` from engine ae6845939 on).
+    const seats = {
+      native: process.env.NIKA_COMPILE_NATIVE_MODEL ?? model,
+      serve: process.env.NIKA_COMPILE_SERVE_MODEL ?? model,
+      decision: process.env.NIKA_COMPILE_DECISION_MODEL ?? null,
+    };
+    // The variables the engine processes receive, by name only (keys, and HOME when a harness
+    // must find its own login); their values are never printed.
+    const keyNames = (process.env.NIKA_COMPILE_PROVIDER_ENV ?? '').split(',').filter(Boolean);
+    assert(keyNames.length > 0 && keyNames.every((name) => /^[A-Z][A-Z0-9_]*$/.test(name) && process.env[name]),
+      'NIKA_COMPILE_PROVIDER_ENV must name the set variables the seats need, comma-separated');
+    const seatedEnv = { ...env, ...Object.fromEntries(keyNames.map((name) => [name, process.env[name]])) };
+    // The operator's grants for the seated resident (its call ceiling per authoring round, repairs,
+    // deadlines), in its own flag words; absent, the resident's defaults. Recorded in the report.
+    const serveFlags = (process.env.NIKA_COMPILE_SERVE_FLAGS ?? '').split(/\s+/).filter(Boolean);
+    // How long the harness watches one module system's rounds (six hours unless set): a bound of
+    // its own observation, recorded in the report, never a limit on the authoring itself.
+    const providerWaitMs = Number(process.env.NIKA_COMPILE_PROVIDER_WAIT_MS ?? 21_600_000);
+    assert(Number.isSafeInteger(providerWaitMs) && providerWaitMs > 0 && providerWaitMs <= 0x7fffffff,
+      'NIKA_COMPILE_PROVIDER_WAIT_MS is a positive number of milliseconds');
+    assert(serveFlags.every((flag) => /^(--[a-z][a-z0-9-]*|[A-Za-z0-9._/:-]+)$/.test(flag)),
+      'NIKA_COMPILE_SERVE_FLAGS holds the resident\'s own flags and values, space-separated');
+    // Its own project: a native provider round records its plan under .nika/compile/ there.
+    const seatedProject = path.join(scratch, 'seated-project');
+    mkdirSync(seatedProject);
+    writeFileSync(path.join(seatedProject, 'nika.yaml'), 'nika: compile-evidence\n');
+    copyFileSync(path.join(root, 'scripts/packed-consumers/compile-evidence.cjs'), path.join(consumer, 'evidence.cjs'));
+    writeFileSync(path.join(consumer, 'evidence-consumer.cjs'), [
+      "const sdk = require('@supernovae-st/nika');", "const scenario = require('./evidence.cjs');",
+      "const config = JSON.parse(require('node:fs').readFileSync(process.argv[2], 'utf8'));",
+      'scenario(sdk, config).then((result) => process.stdout.write(JSON.stringify(result)));',
+    ].join('\n'));
+    writeFileSync(path.join(consumer, 'evidence-consumer.mjs'), [
+      "import * as sdk from '@supernovae-st/nika';", "import scenario from './evidence.cjs';",
+      "import { readFileSync } from 'node:fs';",
+      'process.stdout.write(JSON.stringify(await scenario(sdk, JSON.parse(readFileSync(process.argv[2], "utf8")))));',
+    ].join('\n'));
+    seated = owned.start(binary, ['serve', '--bind', '127.0.0.1:0', '--workflows', seatedProject,
+      '--token-file', path.join(scratch, 'token'), '--state-root', path.join(scratch, 'seated-state'), '--plain',
+      '--authoring-model', seats.serve, ...(seats.decision ? ['--decision-model', seats.decision] : []), ...serveFlags],
+    { cwd: seatedProject, env: seatedEnv, timeoutMs: 3_600_000 });
+    let seatedUrl;
+    const until = Date.now() + 15000;
+    while (!seatedUrl && Date.now() < until) {
+      abort.signal.throwIfAborted();
+      assert.equal(seated.child.exitCode, null, `seated Serve exited: ${seated.stderr}`);
+      seatedUrl = `${seated.stdout}\n${seated.stderr}`.match(/nika serve[^\n]*listening (http:\/\/127\.0\.0\.1:\d+)/)?.[1];
+      if (!seatedUrl) await delay(25);
+    }
+    assert(seatedUrl, 'the seated Serve did not announce its listener');
+    await waitForHealth(seatedUrl, seated, abort.signal, { timeoutMs: 10000 });
+    const seatedHealth = await (await fetch(`${seatedUrl}/health`,
+      { signal: AbortSignal.any([abort.signal, AbortSignal.timeout(10000)]) })).json();
+    assert(seatedHealth.supportedCapabilities.includes('compileNativeV2'), 'the seated Serve must speak generation 2');
+    const rows = [];
+    for (const moduleSystem of ['cjs', 'esm']) {
+      const config = path.join(consumer, 'evidence.json');
+      const progress = path.join(consumer, `evidence-${moduleSystem}.jsonl`);
+      writeFileSync(progress, '');
+      writeFileSync(config, JSON.stringify({ bin: binary, project: seatedProject, url: seatedUrl, token, moduleSystem,
+        model: seats.native, decisionModel: seats.decision, base: REVISION_BASE, change: REVISION_CHANGE,
+        originalIntent: REVISION_INTENT, keptLines: REVISION_KEPT, createIntent: CREATE_INTENT, legs: PROVIDER_LEGS,
+        progress }));
+      let result;
+      try {
+        result = JSON.parse(await owned.run(process.execPath,
+          [path.join(consumer, `evidence-consumer.${moduleSystem === 'esm' ? 'mjs' : 'cjs'}`), config],
+          { cwd: consumer, env: seatedEnv, timeoutMs: providerWaitMs, maxBuffer: 16 * 1024 * 1024 }));
+      } catch (error) {
+        if (!/timed out after \d+ms$/.test(String(error?.message))) throw error;
+        // The harness stopped watching (its window, never a product limit): the legs that landed
+        // are kept, the rest is withheld, and no further generation is asked.
+        const landed = readFileSync(progress, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line));
+        rows.push({ module_system: moduleSystem, rows: landed.filter((entry) => entry.leg === 'edit')
+          .map((entry) => entry.row), created: landed.filter((entry) => entry.leg === 'create').map((entry) => entry.row),
+        harness_bound: { bound: 'provider_wait', limit_ms: providerWaitMs,
+          why: `the harness stopped watching ${moduleSystem} after ${providerWaitMs} ms: an observation bound of this `
+            + 'harness, never a product limit' } });
+        break;
+      }
+      for (const row of result.rows) {
+        // Operations claim every byte outside their spans: the base's comments and Unicode survive.
+        if (row.revision?.mode === 'operations') {
+          assert.equal(row.candidate_keeps_comments_and_unicode, true,
+            `${moduleSystem} ${row.door}: an operations revision kept the base's untouched lines`);
+        }
+      }
+      rows.push(result);
+    }
+    await stopResident(seated);
+    seated = undefined;
+    return { ran: true, model, seats, key_env: keyNames, legs: PROVIDER_LEGS,
+      serve_flags: serveFlags.length > 0 ? serveFlags : 'the resident\'s defaults',
+      observation_ms: providerWaitMs,
+      base_sha256: createHash('sha256').update(REVISION_BASE).digest('hex'), fixture_witness: witness,
+      change: REVISION_CHANGE, original_intent: REVISION_INTENT,
+      create_intent: CREATE_INTENT, create_intent_sha256: createHash('sha256').update(CREATE_INTENT).digest('hex'),
+      create_intent_source: process.env.NIKA_COMPILE_CREATE_INTENT_FILE ?? 'scripts/run-compile-parity-e2e.mjs',
+      seated_capabilities: seatedHealth.supportedCapabilities, results: rows,
+      law: 'separate generations: each door judged by the evidence law, never compared byte for byte' };
+  }
+
+  /**
+   * FIXTURE_RUNS on this binary, in a project of their own holding FIXTURE_PAGES: each run's end
+   * as the engine settled it (status, outputs, error code). No model, no priced call.
+   */
+  async function fixtureWitness() {
+    const dir = path.join(scratch, 'fixture-witness');
+    mkdirSync(path.join(dir, 'data'), { recursive: true });
+    writeFileSync(path.join(dir, 'nika.yaml'), 'nika: fixture-witness\n');
+    writeFileSync(path.join(dir, 'data', 'stock.json'), `${JSON.stringify(FIXTURE_PAGES)}\n`);
+    const runs = [];
+    for (const [index, run] of FIXTURE_RUNS.entries()) {
+      const file = `witness-${index}.nika`;
+      writeFileSync(path.join(dir, file), run.source);
+      const ended = await owned.start(binary, ['run', file, '--json', '--no-gc', '--no-trace-file'],
+        { cwd: dir, env, timeoutMs: 60_000 }).done;
+      const settled = `${ended.stdout}`.split('\n').map((line) => {
+        try { return JSON.parse(line); } catch { return null; }
+      }).find((event) => event?.kind === 'run_settled') ?? null;
+      const observed = { status: settled?.status ?? null, outputs: settled?.outputs ?? null,
+        error: settled?.error?.code ?? null };
+      const passed = observed.status === run.expect.status
+        && (run.expect.outputs === undefined || isDeepStrictEqual(observed.outputs, run.expect.outputs))
+        && (run.expect.error === undefined || observed.error === run.expect.error);
+      runs.push({ name: run.name, workflow_sha256: createHash('sha256').update(run.source).digest('hex'),
+        exit: ended.code, ...observed, expected: run.expect, passed });
+    }
+    return { pages: FIXTURE_PAGES, runs, passed: runs.every((run) => run.passed) };
+  }
 } catch (error) {
   if (reportPath) writeFileSync(reportPath, JSON.stringify({ result: 'failed', message: error.message }, null, 2) + '\n');
   throw error;
 } finally {
-  try { await stopResident(server); }
-  finally { await owned.close(); }
+  try {
+    if (seated) await stopResident(seated);
+    if (server) await stopResident(server);
+  } finally { await owned.close(); }
   rmSync(scratch, { recursive: true, force: true });
   for (const [signal, handler] of handlers) process.off(signal, handler);
 }
 abort.signal.throwIfAborted();
 if (reportPath) writeFileSync(reportPath, JSON.stringify(report, null, 2) + '\n');
-console.log(`compile parity green after owned cleanup: ${report.results[0].rows.length} cases × 2 doors × 2 module systems`);
+if (report.result !== 'green') {
+  const bounded = report.provider?.results?.find((entry) => entry.harness_bound)?.harness_bound;
+  console.error(bounded ? `compile parity held back: ${bounded.why} (the legs that landed are in the report)`
+    : 'compile parity held back: a provider round stated no revision, or a creation settled no record, so '
+    + 'the evidence it targets was not exercised (see the report rows)');
+  process.exitCode = 1;
+} else {
+  console.log(`compile parity green after owned cleanup: ${report.results[0].rows.length} cases × 2 doors × 2 module systems`
+    + (report.provider.ran
+      ? `; provider evidence (${report.provider.legs.join(', ')}) ${report.provider.results.length} module systems `
+        + `× 2 doors on ${report.provider.model}` : ''));
+}
 
 async function sha256(file) {
   const hash = createHash('sha256');

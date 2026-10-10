@@ -246,6 +246,117 @@ module.exports = async function compileScenario(sdk, engines) {
     report.generation2Unseated = await refusal(sdk, () => new sdk.Nika({
       url: 'https://nika.example', token: TOKEN, bin: '/missing-packed-v2-engine', fetch: resident(ready).fetch,
     }).compile(first));
+
+    // NIK-17: a document revision's evidence (the fixture's VALUES are synthetic,
+    // its shapes the engine's) decodes to the engine's own objects on both doors.
+    const evidence = JSON.parse(readFileSync(engines.evidence, 'utf8'));
+    const revise = { workflow: evidence.base, change: evidence.change, original_intent: evidence.original_intent };
+    const evidenceResident = (document) => async (url) => {
+      const { pathname } = new URL(String(url));
+      if (pathname === '/health') {
+        return Response.json({ status: 'ok', service: 'nika-serve', engineVersion: '0.122.0',
+          machineProtocolVersion: 1, snapshotFormatVersion: 1, checkReportVersion: 1, eventFormatVersion: 1,
+          traceFormatVersion: 2, supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'compile', 'compileNativeV2',
+            'compileJudgedAnswerRound'] });
+      }
+      return Response.json(document, { headers: { 'Cache-Control': 'no-store', 'Nika-Compile-Replay': REPLAY } });
+    };
+    const remoteRevision = (document) => new sdk.Nika({ url: 'https://nika.example', token: TOKEN,
+      bin: '/missing-packed-evidence-engine', fetch: evidenceResident(document) })
+      .compile({ ...revise, cognition: 'explicitProvider' });
+    const localRevision = await native.compile({ ...revise, authoringModel: 'deepseek/deepseek-flash' });
+    const { replay_token: _token, judged_answer_round_available: _judged, ...remoteRevised } = await remoteRevision(evidence.document);
+    assert.deepStrictEqual(remoteRevised, localRevision, 'both doors decode the same evidence');
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(localRevision.provenance)), evidence.document.provenance,
+      'every provenance member survives, additive ones included');
+    const revision = localRevision.provenance.plan.document_revision;
+    const backend = localRevision.provenance.authoring.backend;
+    const reuse = localRevision.provenance.decision.knowledge_qualification.reuse;
+    const malformedRevision = structuredClone(evidence.document);
+    malformedRevision.provenance.plan.document_revision.base_sha256 = 48;
+    report.evidence = {
+      candidateExact: localRevision.candidate === evidence.document.candidate
+        && remoteRevised.candidate === evidence.document.candidate,
+      revision: { mode: revision.mode, base: revision.base_sha256, candidate: revision.candidate_sha256,
+        changed: revision.changed, decisionSame: JSON.stringify(localRevision.provenance.decision.document_revision) === JSON.stringify(revision),
+        components: revision.components.map((receipt) => ({ id: receipt.component.id, release: receipt.component.release.version,
+          bindings: receipt.bindings.map((binding) => [binding.path, binding.hole, binding.component_literal, binding.bound]),
+          invocation: receipt.invocation ?? null, child: receipt.child?.candidate_sha256 ?? null })) },
+      source: localRevision.provenance.plan.source_revision,
+      reuse: { counts: [reuse.expanded, reuse.invoked, reuse.revised, reuse.absent, reuse.consulted],
+        uses: reuse.references.map((reference) => [reference.id, reference.use]) },
+      backend: { requested: backend.requested_model, decision: backend.decision_model, observed: backend.observed_models,
+        unreported: backend.unreported_models, served: backend.served_model, forwardedAbsent: !('forwarded_model' in backend),
+        selection: backend.selection },
+      malformedNative: await refusal(sdk, () => native.compile({ ...revise, change: 'evidence-malformed',
+        authoringModel: 'deepseek/deepseek-flash' })),
+      malformedHttp: await refusal(sdk, () => remoteRevision(malformedRevision)),
+    };
+
+    // NIK-17: a complete-document creation's evidence (the fixture's VALUES are synthetic,
+    // its shapes the engine's): settled on the ready leg, nothing settled while a
+    // mandatory question is open, the same objects on both doors.
+    const created = JSON.parse(readFileSync(engines.created, 'utf8'));
+    const remoteCreation = (document, intent) => new sdk.Nika({ url: 'https://nika.example', token: TOKEN,
+      bin: '/missing-packed-create-engine', fetch: evidenceResident(document) })
+      .compile({ intent, cognition: 'explicitProvider' });
+    report.created = {};
+    for (const leg of ['ready', 'written', 'continuation']) {
+      const { intent, document } = created[leg];
+      const local = await native.compile({ intent, authoringModel: 'claude-code/opus' });
+      const { replay_token: _created, judged_answer_round_available: _judgedCreated, ...remote } =
+        await remoteCreation(document, intent);
+      assert.deepStrictEqual(remote, local, `${leg}: both doors decode the same creation evidence`);
+      assert.deepStrictEqual(JSON.parse(JSON.stringify(local.provenance)), document.provenance,
+        `${leg}: every provenance member survives, additive ones included`);
+      const settled = local.provenance.plan.document;
+      const made = local.provenance.decision.document_create;
+      report.created[leg] = {
+        status: local.status,
+        candidateExact: local.candidate === document.candidate && remote.candidate === document.candidate,
+        settled: settled === undefined ? null : { version: settled.version, candidate: settled.candidate_sha256,
+          request: settled.request, base: settled.base_sha256, mode: settled.mode,
+          components: settled.components.map((receipt) => ({ id: receipt.component.id,
+            bindings: receipt.bindings.map((binding) => [binding.path, binding.component_literal, binding.bound]) })) },
+        made: { mode: made.mode, base: made.base_sha256, candidate: made.candidate_sha256, operations: made.operations,
+          reuse: made.reuse.references.map((reference) => [reference.id, reference.use]) },
+      };
+    }
+    const malformedCreation = structuredClone(created.ready.document);
+    malformedCreation.provenance.plan.document.candidate_sha256 = 'x';
+    report.created.malformedNative = await refusal(sdk, () => native.compile({ intent: 'create-evidence-malformed',
+      authoringModel: 'claude-code/opus' }));
+    report.created.malformedHttp = await refusal(sdk, () => remoteCreation(malformedCreation, created.ready.intent));
+
+    // NIK-17: outcome documents the engine itself wrote (recorded with scripted seats): every
+    // member through both doors, and the created bytes revised 48 → 72 by a later change.
+    report.recorded = {};
+    for (const leg of ['ready-composed', 'ready-written', 'continuation', 'edit-created', 'edit-revised']) {
+      const file = path.join(engines.recorded, `${leg}.outcome.json`);
+      const document = JSON.parse(readFileSync(file, 'utf8'));
+      process.env.NIKA_FAKE_COMPILE_OUTCOME = file;
+      let local;
+      try {
+        local = await native.compile({ intent: 'recorded', authoringModel: 'mock/authoring' });
+      } finally {
+        delete process.env.NIKA_FAKE_COMPILE_OUTCOME;
+      }
+      const { replay_token: _recorded, judged_answer_round_available: _judgedRecorded, ...remote } =
+        await new sdk.Nika({ url: 'https://nika.example', token: TOKEN, bin: '/missing-packed-recorded-engine',
+          fetch: evidenceResident(document) }).compile({ intent: 'recorded', cognition: 'explicitProvider' });
+      assert.deepStrictEqual(remote, local, `${leg}: both doors decode the recorded outcome alike`);
+      assert.deepStrictEqual(JSON.parse(JSON.stringify(local.provenance)), document.provenance,
+        `${leg}: every recorded provenance member survives`);
+      const revision = local.provenance.plan?.document_revision;
+      report.recorded[leg] = {
+        status: local.status,
+        candidateExact: local.candidate === document.candidate && remote.candidate === document.candidate,
+        settled: local.provenance.plan?.document?.candidate_sha256 ?? null,
+        revision: revision === undefined ? null : { base: revision.base_sha256, candidate: revision.candidate_sha256,
+          rebound: revision.components.map((receipt) => [receipt.component.id, receipt.bindings[0].component_literal,
+            receipt.bindings[0].bound, receipt.revises]) },
+      };
+    }
     return report;
   } finally {
     delete process.env.NIKA_FAKE_ARGV_LOG;

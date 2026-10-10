@@ -1,0 +1,52 @@
+{
+  "ready-composed": {
+    "file": "ready-composed.outcome.json",
+    "file_sha256": "34b472aa84f94bd4ba4bf77ea7d590ae09fc1d4e1ab142e41a5e36250a411173",
+    "status": "ready",
+    "candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+    "plan_document_candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+    "has_plan_document": true,
+    "has_plan_document_create": true,
+    "recorded_from_log": "cognition-lib-document-create-4.log"
+  },
+  "ready-written": {
+    "file": "ready-written.outcome.json",
+    "file_sha256": "f1d4cef31a3b36b623b20e7c14ed414e16a26ad776c4fa58aa7bf0320c7ef11f",
+    "status": "ready",
+    "candidate_sha256": "032128e6e8b31f03d0edb19905aaae7e5abfc7090730ddb6aae649a2727321cc",
+    "plan_document_candidate_sha256": "032128e6e8b31f03d0edb19905aaae7e5abfc7090730ddb6aae649a2727321cc",
+    "has_plan_document": true,
+    "has_plan_document_create": true,
+    "recorded_from_log": "compile-document-create-suite.log"
+  },
+  "continuation": {
+    "file": "continuation.outcome.json",
+    "file_sha256": "9c00a84608040bc169fc74e13d22bbb2fa91c3cbf5503db9a9487f2a20c011d1",
+    "status": "incomplete",
+    "candidate_sha256": null,
+    "plan_document_candidate_sha256": null,
+    "has_plan_document": false,
+    "has_plan_document_create": true,
+    "recorded_from_log": "compile-document-create-suite.log"
+  },
+  "edit-created": {
+    "file": "edit-created.outcome.json",
+    "file_sha256": "21a62befe0928b7c97db117347a28d8614cec949ddd68be9b575134a7d9d8386",
+    "status": "ready",
+    "candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+    "plan_document_candidate_sha256": "43584452cc22022f41dcbdcbaea7f116ea4f4e3468ef932e167efdeb8f0e4f7a",
+    "has_plan_document": true,
+    "has_plan_document_create": true,
+    "recorded_from_log": "record-edit-leg.log"
+  },
+  "edit-revised": {
+    "file": "edit-revised.outcome.json",
+    "file_sha256": "ecb6cc6a3f5e9c925a5bf4a6fa164f8bcfc4fe2f75b4e014145e972c04152c0c",
+    "status": "ready",
+    "candidate_sha256": "b9629509ef9a02c275bbfd4bed45e1ac49f0f8e211c2e2c711d264774820c72d",
+    "plan_document_candidate_sha256": null,
+    "has_plan_document": false,
+    "has_plan_document_create": false,
+    "recorded_from_log": "record-edit-leg.log"
+  }
+}

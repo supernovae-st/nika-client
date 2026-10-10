@@ -23,6 +23,7 @@ import type {
   NikaScheduleApplyResult,
   NikaScheduleOptions,
   NikaScheduleStatus,
+  NikaSessionOptions,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
   NikaTransportKind,
@@ -66,6 +67,14 @@ import {
   runRefusalError,
   type RunRefusal,
 } from './run-refusal.js';
+import {
+  SESSION_HOST_CAPABILITY,
+  SESSION_INTELLIGENCE_CAPABILITY,
+  SESSION_STEERING_CAPABILITY,
+  sessionIntelligence,
+  type SessionChannel,
+} from './session-host.js';
+import { openNativeSession } from './session-native.js';
 import type { Transport, TransportRun } from './transport.js';
 
 interface Captured {
@@ -597,6 +606,53 @@ export class NativeProcessTransport implements Transport {
         resolve({ exitCode: code ?? 3, stdout, stderr });
       });
     });
+  }
+
+  /**
+   * The engine's authoring Session in this client's `cwd` (`nika session
+   * --json`): one process, one Session, opened as bare `nika` opens it there.
+   * An engine without the host is refused before any spawn.
+   */
+  async openSession(options: NikaSessionOptions, retention: number): Promise<SessionChannel> {
+    const intelligence = sessionIntelligence(options);
+    const identity = await this.ensureReady();
+    const advertised = identity.supportedCapabilities.join(', ') || 'nothing';
+    if (!identity.supportedCapabilities.includes(SESSION_HOST_CAPABILITY)) {
+      throw new NikaCompatibilityError(
+        SESSION_HOST_CAPABILITY,
+        this.kind,
+        `Engine ${identity.engineVersion} at ${this.options.engine.bin} does not advertise `
+        + `${SESSION_HOST_CAPABILITY} (advertised: ${advertised}); `
+        + 'the authoring Session needs an engine that hosts `nika session --json`. Nothing was started',
+      );
+    }
+    if (intelligence !== undefined && !identity.supportedCapabilities.includes(SESSION_INTELLIGENCE_CAPABILITY)) {
+      throw new NikaCompatibilityError(
+        SESSION_INTELLIGENCE_CAPABILITY,
+        this.kind,
+        `Engine ${identity.engineVersion} at ${this.options.engine.bin} does not advertise `
+        + `${SESSION_INTELLIGENCE_CAPABILITY} (advertised: ${advertised}): it cannot hold an intelligence for one `
+        + 'conversation, and the SDK will not answer its first screen for you. Nothing was started',
+      );
+    }
+    // Lines for a conversation's run under way need the doors; without them the handle refuses
+    // such a line itself, before anything is written.
+    const unsteerable = identity.supportedCapabilities.includes(SESSION_STEERING_CAPABILITY) ? undefined
+      : `Engine ${identity.engineVersion} at ${this.options.engine.bin} does not advertise `
+        + `${SESSION_STEERING_CAPABILITY} (advertised: ${advertised}): it takes no line for a conversation's run `
+        + 'under way. Nothing was sent';
+    return openNativeSession({
+      bin: this.options.engine.bin, cwd: this.options.cwd, signal: options.signal, retention, intelligence, unsteerable,
+    });
+  }
+
+  async attachSession(_id: string, _options: NikaSessionOptions): Promise<SessionChannel> {
+    throw new NikaCompatibilityError(
+      'attachSession',
+      this.kind,
+      'A native Session is the process that opened it: keep its handle. attachSession() reaches a '
+      + 'Session a nika serve holds',
+    );
   }
 
   /** The verified engine's identity is kept: its capabilities gate what a run may ask. */

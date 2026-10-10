@@ -1,6 +1,7 @@
 import type {
   NikaOperation,
   NikaOperationFinding,
+  NikaSessionSnapshot,
   NikaTransportKind,
 } from './types.js';
 
@@ -168,6 +169,72 @@ export class NikaEventBufferOverflowError extends NikaError {
       this.observed = replay.observed;
       this.retained = replay.retained;
     }
+  }
+}
+
+/**
+ * The Session's host refused a command or an opening, with its own word
+ * (`code`): `busy`, `stale_snapshot`, `unknown_snapshot`,
+ * `command_conflict`, `malformed`, `session_not_found`, `session_live`,
+ * `session_unavailable`; the vocabulary stays open. Nothing reached the
+ * runtime, so nothing is to undo: the refused `line` is returned to its
+ * owner, never retried or re-targeted by the SDK. `snapshot`, when the host
+ * sent one, is the current snapshot to show before anything is sent again.
+ *
+ * `line` and `snapshot` carry what a person wrote and the Session's work, so
+ * they are not enumerable: logging or serializing the error never prints
+ * them; read them by name.
+ */
+export class NikaSessionRefusedError extends NikaOperationError {
+  /** The command refused, when the refusal names one. */
+  declare readonly command?: string;
+  /** The line a refused submit carried, kept for its owner. */
+  declare readonly line?: string;
+  /** The current snapshot the host sent with the refusal. */
+  declare readonly snapshot?: NikaSessionSnapshot;
+  /** `session_live`: the live Session to attach to instead. */
+  declare readonly session?: string;
+
+  constructor(
+    transport: NikaTransportKind,
+    code: string,
+    message: string,
+    details: {
+      status: number;
+      command?: string;
+      line?: string;
+      snapshot?: NikaSessionSnapshot;
+      session?: string;
+    },
+  ) {
+    super('session', transport, code, message, { status: details.status, machineCode: code });
+    this.name = 'NikaSessionRefusedError';
+    if (details.command !== undefined) this.command = details.command;
+    if (details.session !== undefined) this.session = details.session;
+    // Content stays off the enumerable surface every logger and serializer reads.
+    for (const key of ['line', 'snapshot'] as const) {
+      if (details[key] !== undefined) {
+        Object.defineProperty(this, key, {
+          value: details[key], enumerable: false, writable: false, configurable: false,
+        });
+      }
+    }
+  }
+}
+
+/**
+ * This wait for a command's result stopped (`signal`, a cut connection, the
+ * native door closing) before the result arrived. The engine may still be
+ * running the turn: send the same `command` with the same bytes again to
+ * read its result, `stop()` to stop it.
+ */
+export class NikaSessionWaitError extends NikaTransportError {
+  readonly command: string;
+
+  constructor(transport: NikaTransportKind, command: string, message: string, options?: ErrorOptions) {
+    super(transport, message, options);
+    this.name = 'NikaSessionWaitError';
+    this.command = command;
   }
 }
 

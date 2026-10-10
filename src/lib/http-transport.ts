@@ -28,6 +28,7 @@ import type {
   NikaScheduleOptions,
   NikaScheduleStatus,
   NikaSettlement,
+  NikaSessionOptions,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
   NikaWorkflowMetadata,
@@ -58,6 +59,15 @@ import {
 } from './compile.js';
 import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
 import { readSettlement } from './settlement.js';
+import {
+  callerSessionId,
+  SESSION_HOST_CAPABILITY,
+  SESSION_INTELLIGENCE_CAPABILITY,
+  SESSION_STEERING_CAPABILITY,
+  sessionIntelligence,
+  type SessionChannel,
+} from './session-host.js';
+import { attachHttpSession, openHttpSession, type HttpSessionPort } from './session-http.js';
 import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
 import type { Transport, TransportRun } from './transport.js';
 import {
@@ -559,6 +569,75 @@ export class HttpTransport implements Transport {
       ...object,
       verified: POSITIVE_TRACE_VERDICTS.has(object.verdict.toUpperCase()) && traceBound,
     } as NikaTraceVerifyResult;
+  }
+
+  /**
+   * The served project's authoring Session (`POST /v1/sessions`), gated on the
+   * resident's `sessionHost` capability. The server holds the Session, its
+   * project world and its runs; the client sends lines and reads frames.
+   */
+  async openSession(options: NikaSessionOptions, _retention: number): Promise<SessionChannel> {
+    const intelligence = sessionIntelligence(options);
+    const identity = await this.requireSessionHost(intelligence !== undefined);
+    return openHttpSession(this.sessionPort(), options.signal, intelligence, unsteerable(identity));
+  }
+
+  /** The live Session a `session_live` refusal (or an earlier `openSession`) named. */
+  async attachSession(id: string, options: NikaSessionOptions): Promise<SessionChannel> {
+    const session = callerSessionId(id);
+    if (options.intelligence !== undefined) {
+      throw new NikaConfigurationError(
+        'attachSession: a live Session keeps its own intelligence; choose another in it (`/intelligence <words>`)',
+      );
+    }
+    const identity = await this.requireSessionHost();
+    return attachHttpSession(this.sessionPort(), session, options.signal, unsteerable(identity));
+  }
+
+  private async requireSessionHost(choosing = false): Promise<NikaEngineIdentity> {
+    const identity = await this.ensureServerIdentity();
+    const advertised = identity.supportedCapabilities.join(', ') || 'nothing';
+    if (!identity.supportedCapabilities.includes(SESSION_HOST_CAPABILITY)) {
+      throw this.gap(
+        SESSION_HOST_CAPABILITY,
+        `The connected nika serve ${identity.engineVersion} does not advertise ${SESSION_HOST_CAPABILITY} `
+        + `(advertised: ${advertised}): it hosts no authoring Session. Nothing was posted`,
+      );
+    }
+    if (choosing && !identity.supportedCapabilities.includes(SESSION_INTELLIGENCE_CAPABILITY)) {
+      throw this.gap(
+        SESSION_INTELLIGENCE_CAPABILITY,
+        `The connected nika serve ${identity.engineVersion} does not advertise ${SESSION_INTELLIGENCE_CAPABILITY} `
+        + `(advertised: ${advertised}): it cannot open a Session with this conversation's own intelligence. `
+        + 'Nothing was posted',
+      );
+    }
+    return identity;
+  }
+
+  /** What the Session door borrows: authenticated requests, bounded bodies, Serve's refusals. */
+  private sessionPort(): HttpSessionPort {
+    return {
+      request: (path, init, unbounded) => this.fetchResponse(path, init, !unbounded, true, false, unbounded),
+      object: async (response, path, signal, maxBytes, useRequestTimeout) => {
+        try {
+          return await this.readObservationObject(response, path, signal, maxBytes, useRequestTimeout);
+        } catch (error) {
+          // Same diagnostic, no cause: a JSON or UTF-8 failure quotes the body it read, and a
+          // Session body carries what a person wrote.
+          if (error instanceof NikaProtocolError) throw new NikaProtocolError(this.kind, error.message);
+          throw error;
+        }
+      },
+      failure: async (response, path) => {
+        const refusal = await this.readRefusal(response, path);
+        if (refusal) return this.refused(path, { operation: 'session', status: response.status, refusal });
+        await discardResponse(response);
+        return new NikaTransportError(this.kind, `HTTP ${response.status} for ${path}: [REDACTED]`);
+      },
+      redact: (text) => this.redact(text),
+      sseLimits: (maxBytes) => ({ maxLineBytes: maxBytes, maxFrameBytes: maxBytes, maxBufferBytes: maxBytes }),
+    };
   }
 
   private httpRun(
@@ -1632,6 +1711,14 @@ export class HttpTransport implements Transport {
       callerSignal?.removeEventListener('abort', abort);
     }
   }
+}
+
+/** Why a resident takes no line for a conversation's run under way: `/health` lacks `sessionSteering`. */
+function unsteerable(identity: NikaEngineIdentity): string | undefined {
+  if (identity.supportedCapabilities.includes(SESSION_STEERING_CAPABILITY)) return undefined;
+  return `The connected nika serve ${identity.engineVersion} does not advertise ${SESSION_STEERING_CAPABILITY} `
+    + `(advertised: ${identity.supportedCapabilities.join(', ') || 'nothing'}): it takes no line for a `
+    + "conversation's run under way. Nothing was posted";
 }
 
 function refuseLegacyContainedName(workflow: string): void {

@@ -138,7 +138,7 @@ a local engine has are named after the flag they become.
 | `limits.deadline_ms` | `limits.deadline_ms` | refused: no flag; bound the child with `timeoutMs` |
 | `replay_token` | `replay_token`: with `explicitProvider` the judged answer round, with `deterministicOnly` the zero-call replay | refused |
 | `authoringModel` | refused | `--authoring-model` |
-| `decisionModel` (create) | refused | `--decision-model` |
+| `decisionModel` | refused | `--decision-model`; on a revision, an engine from `ae6845939` on |
 | `fresh` (create) | refused | `--fresh` |
 | `output` | refused | `--output` |
 
@@ -191,6 +191,63 @@ Not exposed: `--authoring-samples`, `--authoring-strategy`,
 
 Showing or hiding any of these is your application's choice; the SDK imposes
 no display or masking.
+
+## Revision, creation, reuse and intelligence evidence
+
+A provider round can record how it revised or created a workflow, what of the
+recalled knowledge the candidate's bytes really hold, and which intelligence
+answered. The engine writes these records inside `provenance`; the SDK types
+them, checks their known members and hands you the engine's own objects. It
+adds, removes, copies, recomputes and corrects nothing.
+
+| Where | Type | What it states |
+|---|---|---|
+| `provenance.plan.source_revision` | `NikaCompileSourceRevision` | `base_sha256` (the bytes revised), `candidate_sha256` (the bytes written), `resolved` (the words they now answer) |
+| `provenance.plan.intent_sha256` | `string` | the digest of the words the record answers |
+| `provenance.plan.document_revision`, `provenance.decision.document_revision` | `NikaCompileDocumentRevision` | `mode` (`operations` or `replaced`), both digests, `changed` in order, the `preservation` claimed, the `components` receipts |
+| `provenance.plan.document` | `NikaCompileCreatedDocument` | a created document's settled record: `version` (`1`), `candidate_sha256` (the final bytes), `request` (the words they answer), `base_sha256` (`null`: a creation revises no program), `mode` (`written` or `composed`), the `components` receipts |
+| `provenance.plan.document_create` | `NikaCompileDocumentCreateSection` | what the complete-document door made, as its answer rounds replay it: `mode`, `resolved`, `base_sha256`, `operations`, `changed`, `preservation`, `components` |
+| `provenance.decision.document_create` | `NikaCompileDocumentCreate` | how the door made the document: `mode`, `base_sha256` (the author's own document a `composed` answer's operations applied to, `null` when written), `operations`, `changed`, `preservation`, `components`, their `reuse` witnessed on the outcome's candidate, and `candidate_sha256` (`null` when the outcome holds none) |
+| `…components[]` | `NikaCompileComponentReceipt` | the component's identity in its release, each hole bound (`component_literal`, `bound`), node digests, the candidate digest, and for an invoked component its calling task and child program apart |
+| `provenance.decision.knowledge_qualification.reuse` | `NikaCompileReuse` | per reference: `consulted`, `expanded`, `invoked`, `revised`, `absent` or `unreadable`, each component witnessed on the candidate's own bytes |
+| `provenance.authoring.backend` | `NikaCompileAuthoringBackend` | the seated backend and its model identities, kept apart: requested (`requested_model`), transmitted (`forwarded_model`), configured (`decision_model`, `host`, `endpoint_basis`), reported (`observed_models`, `unreported_models`, a harness's `observed` rows) and attested (`served_model`, `null` when unknown) |
+
+Every record is optional: an older engine, a deterministic round or a door
+that made no such record carries none, and its outcome reads exactly as before.
+A present record
+must have its producer's shape: a digest that is not 64 lowercase hex
+characters, a count that is not a non-negative integer, `null` where the
+engine never writes `null`, or a missing digest, id, binding or count fails the
+compile with `NikaProtocolError` naming the member's path (never its value).
+Members the SDK does not know and new vocabulary words (`mode`, `use`,
+`verdict`, `kind`) ride through untouched, and explicit `null` stays distinct
+from an absent member.
+
+Read the evidence for what it says:
+
+- The plan is the round's replayable record. The engine drops it whole when
+  its verifier holds, withdraws or doubts the candidate; the decision record
+  then still states the revision that was made, for a preview or for a
+  withdrawn candidate whose digest names bytes you never received.
+- `base_sha256` identifies the source parent: it is not a session sequence and
+  does not prove that earlier revisions are kept.
+- A creation settles only when it is ready. `plan.document` binds the final
+  bytes, after answers, defaults and the model seating changed them; a round
+  still waiting on a mandatory question carries `document_create` and no
+  `document`. The engine reads `plan.document` as the program history of those
+  bytes: a later change to them is a revision over them, never an answer round
+  of the creation. Read `plan.document`'s other members only when its
+  `version` is `1`: a record of another version rides through unjudged.
+- `decision.document_create.base_sha256` names the author's own earlier
+  document inside the creation, never a program you sent.
+- A digest is the engine's sha256 of the UTF-8 bytes. Comparing it with your
+  own `sha256(candidate)` or `sha256(base)` is your check to make; the SDK
+  never makes it for you.
+- At engine `7d98023f9` (the 0.123 integration carrier), neither `nika compile`
+  nor `POST /v1/compile` lends a component catalogue: a compile revision
+  carries `components: []`, and receipts with bindings come from the Session's
+  authoring. A receipt is evidence of construction, never a grant: a component's
+  permits, model and name are not inherited.
 
 ## Answer rounds
 
@@ -393,13 +450,19 @@ answers with a usage error; a server without a field answers
 `422 malformed_compile_request`. Point `NIKA_BIN` (or `bin`) at the engine you
 mean to use.
 
-The pinned `openapi.json` and `src/generated/openapi.d.ts` describe the
-released 0.120.3 resident and stay pinned to it. The generation-2 types are
+The pinned `openapi.json` and `src/generated/openapi.d.ts` describe an
+unseated resident of the engine `ENGINE_QUAL_PIN` names (main `0e4e1c74f`),
+whose document carries no generation 2. The generation-2 types are
 written by hand from the engine source: `nika-serve/src/server/compile/v2.rs`,
 `author.rs` and `openapi-native.json` (at `158a961cd` for the judged answer
 round), `nika-serve/src/server/model.rs` (at `b7dace1e5` for its capability),
 `nika-compile/src/wire.rs` and `nika-cli-host/src/compile.rs` with
-`compile/render.rs`.
+`compile/render.rs`. The evidence types follow their producers at the
+integration carrier `7d98023f9`: `nika-compile-seats` `foundry/document.rs`,
+`instance.rs`, `invoke.rs`, `witness.rs` and `foundry.rs`, and the authoring
+backend of `nika-providers` `authoring.rs`, `nika-cli-host`
+`compile/authoring.rs`, `nika-serve` `compile/author.rs` with its
+`openapi-native.json` and `nika-harness`; no release writes them yet.
 
 ## Example
 

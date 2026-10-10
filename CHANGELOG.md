@@ -9,6 +9,147 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `nika.openSession()` reaches the engine's authoring Session (the
+  `SessionRuntime` the terminal opens) through its host doors, contract
+  `nika/session-host@1`: `nika session --json` in the client's `cwd`, or the
+  served project's `/v1/sessions` (gated on the `sessionHost` capability,
+  refused typed before anything starts or is posted otherwise).
+  `submit(snapshot, line)` sends a line with the handle of the snapshot it
+  answers; the engine reads it, and a line for a snapshot that is no longer
+  current is refused (`NikaSessionRefusedError`, the line kept) with nothing
+  sent to the runtime. Commands carry identities: the same identity and bytes
+  return the recorded result (`replayed: true`), other bytes are a
+  `command_conflict`. A cut wait (`NikaSessionWaitError`) never stops the turn;
+  `stop()` does, with a receipt the stopped turn's own result settles.
+  `snapshot()`, `details()`, `events({ after })` and `close()` complete the
+  handle; `attachSession(id)` reaches the live Session a resident holds. The
+  work snapshot is the engine's own, carried verbatim. No released engine
+  hosts the contract yet; see `docs/session.md`. The handle is pinned against
+  frames the engine's host recorded from both doors at `e849d08ea`, on the
+  merged `eb89e1893` (the current Work members, and a resident's Run cost
+  review: a stale yes refused with its line, one admission and its replay, a
+  decline that admits nothing) and at `312c3d5a8` (the selection's `scope`, and
+  one real resident Run over HTTP whose `work.run` names the sha256 of the
+  bytes it ran, which the Session judge reads as the proof it is). `openSession({ intelligence })` opens the
+  Session with an intelligence held for this conversation alone, in the
+  engine's own first-screen words (natively `--intelligence`, over HTTP the
+  `intelligence` member of the open body), gated on `sessionIntelligence`
+  before anything starts or is posted; the operator's kept choice is neither
+  read nor written, and `selected.scope` (`conversation`,
+  `operator_default`) is typed and checked in place. The Session runner's
+  journey opens with it under `NIKA_SESSION_JOURNEY_INTELLIGENCE`, and then
+  requires, of both legs' Sessions, the requested selection held for the
+  conversation at the opened frame and the frame each leg reached (either
+  showing none leaves the leg `not_exercised`, never passed) and in every
+  turn that shows a selection, and the operator's kept choice unchanged byte
+  for byte; an effort asked of a seat reached over ACP must be carried by
+  every authoring call of every turn, each invocation paired with its own
+  end, asked, taken and read back by the engine's receipts; an incomplete
+  receipt proves nothing. The observed Run is typed (`NikaSessionRun`,
+  `NikaSessionRunEnd`) and checked in place: every member written, `null`
+  where its observation carried none, never filled by the SDK; a Run without
+  `workflow_sha256` does not prove which bytes ran. The question a Session
+  waits on (`work.question`, host `46817419a`) is typed
+  (`NikaSessionQuestion`: key, label, type, why, mandatory, and a choice's
+  options in the compiler's order) and checked in place when present; it is
+  absent when no question waits, and recorded frames at that head decode
+  unchanged. Each authoring call of the receipt (`work.authoring.calls.per_call`,
+  engine `ca5845b85`, hyphenated roles kept since `2db30c6e2`) is typed
+  (`NikaSessionAuthoringCall`: role, instruction and schema digests, message
+  bytes, reference count, bounds, wall time, stop reason or failure kind,
+  reported reasoning and usage) and checked in place: every fact written,
+  `null` when unrecorded, digests as 64 lowercase hex, the engine's words
+  (hyphenated repair roles included) as it spells them, never summed into the
+  totals; snapshots without it decode unchanged, and journey evidence keeps it
+  beside the totals. What the Session did with the last line typed for an
+  authoring question (`work.answered`) is typed (`NikaSessionAnswered`: the
+  question's witness and the act, `bound` with its key, exact value and
+  reading, `dropped`, `restated`, `waits` with its reason, or `refused` with
+  its class) and checked in place when present: each known act with its own
+  members, unknown acts, readings and classes carried as written; it is
+  absent when the last line answered nothing, and names the question within
+  its Session only. Its readings include `seat_default` (an empty line took
+  the seat the person chose), and recorded frames of real binaries decode
+  unchanged. A created candidate now carries its creation record under
+  `candidate.revision` (no base, `written` or `composed`, each component
+  witnessed on the proposed bytes); journey evidence then witnesses a
+  CREATE's reuse as it does an EDIT's.
+- Compile outcomes type the revision, reuse and intelligence evidence the
+  engine records inside `provenance` (0.123 integration carrier `7d98023f9`):
+  `plan.source_revision`, `plan.intent_sha256`, `plan.document_revision` and
+  `decision.document_revision` (`NikaCompileDocumentRevision`, with each
+  component receipt's identity, bindings and node digests),
+  `decision.knowledge_qualification.reuse` (`NikaCompileReuse`: consulted,
+  expanded, invoked, revised, absent or unreadable, witnessed on the
+  candidate's bytes) and `authoring.backend` (`NikaCompileAuthoringBackend`,
+  keeping requested, transmitted, configured, reported and attested model
+  identities apart). Both doors check a present record's known members and
+  refuse a malformed one with `NikaProtocolError` naming its path; absent
+  records, unknown members, new vocabulary words and explicit `null` ride
+  through untouched, and the outcome still holds the engine's own objects.
+- Session snapshots type what the 0.123 integration engine (`1b47f34c0`) adds
+  to `nika/session-work@0`: each candidate file's exact `content` (beside its
+  BLAKE3 `bytes` witness), `authoring.draft`, the `authoring.calls` receipt
+  (`NikaSessionAuthoringCalls`: requested model, calls, reported usage with
+  unknown kept `null`, the backend as reported) and the configured
+  `intelligence` (`NikaSessionIntelligence`: selection, author seat, decision
+  seat, effort), as well as the candidate's compact `revision`
+  (`NikaSessionDocumentRevision`: digests, ordered changes, components with
+  their bindings and witness). Both doors check these members where they are;
+  a malformed one is a `NikaProtocolError` naming its path, and absent members,
+  explicit `null` and unknown members ride through.
+- `scripts/run-session-parity-e2e.mjs` walks the authoring Session through
+  both real doors of one frozen binary (`nika session --json` and a served
+  project's `/v1/sessions`) from the packed CommonJS and ESM faces, keyless on
+  the engine's deterministic compiler: stale, cross-Session and restarted
+  answers, the same command with the same and other bytes, preview before
+  Save (the saved bytes are the previewed ones), Save versus Run in the same
+  project world, Stop, event resumption and close, judged check by check and
+  compared door to door and module system to module system. A door the binary
+  does not host is `not_exercised`, never a pass. The compile and Session
+  reports name the SDK commit and whether its tree was dirty. With
+  `NIKA_SESSION_JOURNEY_CHOICE` (the first screen's answer in the Session's own
+  words) it also runs a real intelligence's journey per door: CREATE from
+  words, Save, Run; a new Session; EDIT in words, Save, Run. A persona answers
+  only what it was told to, and each leg is judged by its own evidence (a model
+  authored it, the Save landed the proposed bytes and ran nothing, the EDIT
+  revises the created bytes, the observed Run of the saved bytes succeeded and
+  its report names exactly the tickets each threshold selects), never by byte
+  parity with another generation. `NIKA_SESSION_JOURNEY_WORLD` names a world
+  module that replaces the tickets with another case (its project, services,
+  words, persona rules, captured paths and its own per-leg judgment), kept
+  outside the repository when its data is private; each leg's world is copied
+  after its Run, and the saved bytes are checked by the engine itself. A Run's
+  declared input is given only by the persona's answers, and a Session waiting
+  on what the persona was never told stops the leg at once. Both Session judges
+  prove the bytes a Run ran only by the source hash the Session names
+  (`work.run.workflow_sha256`): another hash fails, none leaves them unproven
+  (`not_exercised`), as both session-host doors report a Run today.
+- Compile outcomes type the record of a document the engine's 0.123
+  complete-document door created: `plan.document`
+  (`NikaCompileCreatedDocument`, settled on a ready outcome only: version 1,
+  the final bytes' digest, the request they answer, no program base, `written`
+  or `composed`, the component receipts), `plan.document_create`
+  (`NikaCompileDocumentCreateSection`) and `decision.document_create`
+  (`NikaCompileDocumentCreate`, with the reuse witnessed on the candidate).
+  A round still waiting on a mandatory question carries no `plan.document`; a
+  settled record of another version rides through unjudged. Both doors check
+  the known members as they do a revision's, and the packed CommonJS and ESM
+  consumers decode the same objects on both doors, including outcome documents
+  the engine itself recorded for a creation and for a later revision of the
+  created bytes (its component receipt rebound from 48 to 72).
+- `scripts/run-compile-parity-e2e.mjs` gains an opt-in real-provider phase
+  (`NIKA_COMPILE_PROVIDER_MODEL`, `NIKA_COMPILE_PROVIDER_ENV`): each packed
+  module system revises one rich base (EDIT) and creates one document from
+  words (CREATE) through a native seat and a seated resident, and each round
+  is judged by its evidence (exact base and candidate digests, one revision in
+  plan and decision, kept lines; a ready creation's settled record on the exact
+  bytes received), never compared byte for byte with another generation; a
+  round that stated no revision or settled no creation record is
+  `not_exercised`. `NIKA_COMPILE_PROVIDER_LEGS` picks the legs and
+  `NIKA_COMPILE_CREATE_INTENT_FILE` the CREATE words. `NIKA_COMPILE_PARITY_OPENAPI` compares a
+  candidate engine ahead of the package pin with its own exported OpenAPI, and
+  the report names the document that held.
 - Over HTTP, a generation-2 compile request carries what the local engine
   observes of the files the request names (`nika compile --observe-only`,
   run in the client's `cwd`: headers, keys, short repeated values, never a
@@ -74,6 +215,86 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   webhook, a manual `run()` and a `once` schedule that fires the declared
   default. The depth ledger, evidence gate and replay fixtures now count six
   projects; the new row records behavioral verdicts only, never a job id.
+- The Session work members of the 0.123 integration batches are typed and
+  checked where they are, a malformed one naming its path: `knowledge`
+  (`NikaSessionKnowledge`: `admitted` with the release's version and manifest
+  digest, `refused` with its stable code and cause, or `unread` with why;
+  engine `5f1e91c6f`), `authoring.stages` (`NikaSessionStageTimes`: the
+  knowledge qualification's time and each trial's, `null` when the record
+  states none, never summed), the waits `knowledge_choice` (the held `line`,
+  exactly as typed) and `questions` (the `ids` asked together), the
+  conversation an intelligence leads (`bindings` with each value's
+  `provenance`, `delegations`, and `questions` as `NikaSessionAskedQuestion`
+  with their options and values; engine `6d217dfba`), and `run.sealed`
+  (whether the Run sealed its journal; engine `ad70c9aa7`). A Stop now
+  reaches a Run the native door executes (`busy.phase` `stopping`, the
+  receipt `run_stopping`, then `run_stopped` or `run_aborted`), and from
+  engine `0e4e1c74f` a Run a resident executes too, through the job's own
+  cancellation (recorded on a real `0e4e1c74f` binary); an earlier resident
+  answers `run_underway`. Unknown members and words still ride through. The
+  handle is pinned against one deterministic native walk a real `ad70c9aa7`
+  binary wrote and against the engine's own serializer examples.
+- The journey persona answers the questions a conversation asks together
+  (`waiting.kind` `questions`) only from its rules: a lone open question by
+  its line, several on one line, each answer after its question's key; the
+  ones it was never told stay open, and the leg names the keys it waits on. It
+  never answers a `knowledge_choice`. Each turn's evidence keeps the
+  knowledge read, the compile's stage times and what the conversation holds.
+- The Session doors, as engine main writes them from `a3017c495`:
+  `steer(line)` and `followUp(line)` send a line to the conversation's run
+  under way, answered at once with a receipt (`queued` with the line's
+  identity and state, `not_reading`, `nothing_to_steer`, `blank`, `full`)
+  bound to the turn it found; `busy.queued` and `work.queued`
+  (`NikaSessionQueuedLine`) say what became of each line, entered as a cited
+  line or returned unsent. A stopped conversation turn is typed
+  (`NikaSessionStopped`: `reach`, `text`, the lines returned `unsent`, the
+  draft revision kept), an `activity` names the tool step it observed
+  (`NikaSessionToolMark`, never its arguments), and an offered model carries
+  this machine's facts (`choice`, `NikaSessionModelFacts`). The handle sends
+  these lines only to a door whose identity named `sessionSteering` when the
+  Session opened (engine `0e4e1c74f`: the native identity and a resident's
+  `/health`); elsewhere `steer()` and `followUp()` reject with
+  `NikaCompatibilityError` and nothing is written. A host refuses a line it
+  cannot parse `malformed`, naming the valid command identity it carries
+  (engine `0e4e1c74f`); natively the SDK takes a refusal that names none as
+  the oldest unanswered line's, read or doors line, in write order, and the
+  Session goes on. The handle is pinned against the engine's own examples,
+  against the doors a real `a3017c495` binary wrote on both doors, each
+  conversation led by a loopback author (a script, not a model, no
+  provider), and against the identities, refusals and Stop a real
+  `0e4e1c74f` binary wrote.
+
+### Changed
+
+- A local revision (`workflow` + `change`) may carry `decisionModel`: the
+  0.123 integration engine (`ae6845939`) seats `--decision-model` beside
+  `--base`, so the verifier of a revision can be the decision intelligence its
+  caller chose, as over HTTP. An earlier engine refuses the pair with its own
+  usage error, reported as before.
+- `openapi.json` and the generated `src/generated/openapi.d.ts` now pin the
+  live document of engine main `0e4e1c74f` (reporting 0.123.0-preview.1,
+  unreleased), which `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name, as a
+  resident started with `--sessions` serves it (the same bytes as at
+  `a3017c495`; its `/health` adds `sessionSteering`). It adds the six
+  `/v1/sessions` operations and the `SessionCommand`, `SessionFrame`,
+  `SessionKnowledge`, `SessionOutcome`, `SessionQueued`, `SessionSnapshot` and
+  `SessionTool` schemas: the work snapshot, otherwise an object the engine
+  carries verbatim, describes its `knowledge` (engine `5f1e91c6f`); a turn's
+  `busy.phase` may read `stopping`, a stop's receipt `run_stopping` and an
+  outcome `run_stopped` or `run_aborted` (engine `ad70c9aa7`); a command may
+  be `steer` or `follow_up`, answered with its receipt and `queued` line, a
+  busy turn lists its `queued` lines, an activity its `tool` step, and an
+  outcome may read `stopped` (engine `a3017c495`). No operation is removed or
+  changed. A compile outcome declares `requested_trigger` (now required),
+  `provenance.decision`, `plan`, `strategy` and `suggested_file`, and choice
+  questions with their `options`; a compile request keeps only the HTTP body
+  ceiling, its per-field byte and answer-count bounds gone; a schedule PUT
+  takes per-fire `inputs`; `info.version` reads 0.123.0-preview.1. The
+  candidate type drift and the compile parity runner start their resident with
+  `--sessions` whenever the pin declares the Session routes, and the coverage
+  check reads the Session door. The pin is ahead of the released 0.120.3
+  engine this package bundles, so the checks bound to that release cannot
+  match it until an engine release serves it.
 
 ### Fixed
 
@@ -85,6 +306,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is now posted through `node:http`/`node:https`, which set no header or body
   deadline; the caller's `signal` still stops the wait. A `fetch` passed in
   the configuration keeps its own timeouts.
+- The Session runner's journey persona sends every line under a command
+  identity a Session accepts. An answer's identity carried its readable words
+  (`answer KEY (WHY)-N`), which the SDK refuses before sending (an identity is
+  1 to 128 letters, digits, `.`, `_`, `:` or `-`), so on engine `3fb276fca` no
+  simulated answer ever reached a Session. A turn's identity is now its kind
+  and number (`answer-3`); its readable words stay in the turn as `said`,
+  beside the `command` sent. The journey tests' scripted Sessions encode each
+  submit with the SDK's own rule, so such an identity fails them.
 
 ## [0.120.3]
 

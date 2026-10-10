@@ -1,0 +1,764 @@
+{
+  "line": "run held.nika with a ceiling of 0.01",
+  "native": {
+    "steps": [
+      {
+        "step": "held",
+        "snapshot": {
+          "snapshot": "snp_6796aa7d86cc66d1af9c300291964514",
+          "seq": 1,
+          "busy": {
+            "command": "c-1",
+            "phase": "running",
+            "stop_requested": false
+          },
+          "work": {
+            "authoring": null,
+            "candidate": null,
+            "contract": "nika/session-work@0",
+            "intelligence": {
+              "author": {
+                "kind": "deterministic",
+                "model": null,
+                "seat": null,
+                "transport": null,
+                "why": "no conversational intelligence: free intents are read deterministically — `/intelligence` to choose a model that reads them"
+              },
+              "decision": null,
+              "effort": null,
+              "selected": null
+            },
+            "knowledge": {
+              "by": "default",
+              "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+              "source": "embedded",
+              "state": "admitted",
+              "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+            },
+            "rail": {
+              "active": "pending",
+              "checked": "pending",
+              "draft": "pending",
+              "run": "pending",
+              "saved": "pending"
+            },
+            "request": {
+              "decisions": [],
+              "goal": null,
+              "unresolved": []
+            },
+            "requested": null,
+            "root": "/private/tmp/nika-run-stop-native-wFy4Du",
+            "run": null,
+            "saved": null,
+            "waiting": {
+              "kind": "free"
+            }
+          }
+        }
+      },
+      {
+        "step": "stop",
+        "frame": {
+          "contract": "nika/session-host@1",
+          "frame": "result",
+          "session": "ses_0574f6ffc10d851428b2d4f24305f426",
+          "event": 6,
+          "command": "s-1",
+          "op": "stop",
+          "replayed": false,
+          "receipt": "run_stopping",
+          "target": "c-1",
+          "snapshot": {
+            "snapshot": "snp_6796aa7d86cc66d1af9c300291964514",
+            "seq": 1,
+            "busy": {
+              "command": "c-1",
+              "phase": "stopping",
+              "stop_requested": true
+            },
+            "work": {
+              "authoring": null,
+              "candidate": null,
+              "contract": "nika/session-work@0",
+              "intelligence": {
+                "author": {
+                  "kind": "deterministic",
+                  "model": null,
+                  "seat": null,
+                  "transport": null,
+                  "why": "no conversational intelligence: free intents are read deterministically — `/intelligence` to choose a model that reads them"
+                },
+                "decision": null,
+                "effort": null,
+                "selected": null
+              },
+              "knowledge": {
+                "by": "default",
+                "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                "source": "embedded",
+                "state": "admitted",
+                "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+              },
+              "rail": {
+                "active": "pending",
+                "checked": "pending",
+                "draft": "pending",
+                "run": "pending",
+                "saved": "pending"
+              },
+              "request": {
+                "decisions": [],
+                "goal": null,
+                "unresolved": []
+              },
+              "requested": null,
+              "root": "/private/tmp/nika-run-stop-native-wFy4Du",
+              "run": null,
+              "saved": null,
+              "waiting": {
+                "kind": "free"
+              }
+            }
+          }
+        }
+      },
+      {
+        "step": "settled",
+        "frame": {
+          "contract": "nika/session-host@1",
+          "frame": "result",
+          "session": "ses_0574f6ffc10d851428b2d4f24305f426",
+          "event": 11,
+          "command": "c-1",
+          "op": "submit",
+          "replayed": false,
+          "outcomes": [
+            {
+              "kind": "run_requested",
+              "text": "check · `held.nika` · clean ✔",
+              "workflow": "held.nika",
+              "inputs": [],
+              "max_cost_usd": 0.01
+            },
+            {
+              "kind": "facts",
+              "text": "run observed · exit 130 · interrupted before it finished (Ctrl+C) — the trace shows what ran · trace `.nika/traces/2026-10-10T21-01-51Z-9bda.ndjson`"
+            },
+            {
+              "kind": "run_stopped",
+              "text": "the Stop reached the run: it stopped at a wave boundary · the work in flight completed and is counted · unstarted tasks were cancelled · its trace is sealed"
+            }
+          ],
+          "snapshot": {
+            "snapshot": "snp_b475829ef3e081ba7bbdf4b4fe3b0d9a",
+            "seq": 2,
+            "busy": null,
+            "work": {
+              "authoring": null,
+              "candidate": null,
+              "contract": "nika/session-work@0",
+              "intelligence": {
+                "author": {
+                  "kind": "deterministic",
+                  "model": null,
+                  "seat": null,
+                  "transport": null,
+                  "why": "no conversational intelligence: free intents are read deterministically — `/intelligence` to choose a model that reads them"
+                },
+                "decision": null,
+                "effort": null,
+                "selected": null
+              },
+              "knowledge": {
+                "by": "default",
+                "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                "source": "embedded",
+                "state": "admitted",
+                "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+              },
+              "rail": {
+                "active": "pending",
+                "checked": "pending",
+                "draft": "pending",
+                "run": "attention",
+                "saved": "pending"
+              },
+              "request": {
+                "decisions": [],
+                "goal": null,
+                "unresolved": []
+              },
+              "requested": {
+                "inputs": [],
+                "workflow": "held.nika",
+                "world": {
+                  "basis": "declared",
+                  "credentials": [],
+                  "places": [
+                    {
+                      "kind": "program",
+                      "target": "cat",
+                      "tasks": [
+                        "b"
+                      ]
+                    }
+                  ],
+                  "reach": "undetermined"
+                }
+              },
+              "root": "/private/tmp/nika-run-stop-native-wFy4Du",
+              "run": {
+                "chain_head": "191dbe5cb971ea9fb7aef89f7c9b54116c4f199c7abcbc31e8a034f562e2ffd7",
+                "chain_len": 14,
+                "current": true,
+                "end": {
+                  "end": "interrupted"
+                },
+                "execution": "01a1279f-44e6-7368-83a6-ae5cefd59bda",
+                "sealed": true,
+                "trace": ".nika/traces/2026-10-10T21-01-51Z-9bda.ndjson",
+                "workflow": "held.nika",
+                "workflow_sha256": "0100fecf31022984f155101cbd29390570131fab5bbe8de12ea97c4b5771ec33"
+              },
+              "saved": {
+                "check_clean": null,
+                "workflow": "held.nika",
+                "world": null
+              },
+              "waiting": {
+                "kind": "free"
+              }
+            }
+          }
+        }
+      },
+      {
+        "step": "stop_replayed",
+        "frame": {
+          "contract": "nika/session-host@1",
+          "frame": "result",
+          "session": "ses_0574f6ffc10d851428b2d4f24305f426",
+          "event": 6,
+          "command": "s-1",
+          "op": "stop",
+          "replayed": true,
+          "receipt": "run_stopping",
+          "target": "c-1",
+          "snapshot": {
+            "snapshot": "snp_6796aa7d86cc66d1af9c300291964514",
+            "seq": 1,
+            "busy": {
+              "command": "c-1",
+              "phase": "stopping",
+              "stop_requested": true
+            },
+            "work": {
+              "authoring": null,
+              "candidate": null,
+              "contract": "nika/session-work@0",
+              "intelligence": {
+                "author": {
+                  "kind": "deterministic",
+                  "model": null,
+                  "seat": null,
+                  "transport": null,
+                  "why": "no conversational intelligence: free intents are read deterministically — `/intelligence` to choose a model that reads them"
+                },
+                "decision": null,
+                "effort": null,
+                "selected": null
+              },
+              "knowledge": {
+                "by": "default",
+                "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                "source": "embedded",
+                "state": "admitted",
+                "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+              },
+              "rail": {
+                "active": "pending",
+                "checked": "pending",
+                "draft": "pending",
+                "run": "pending",
+                "saved": "pending"
+              },
+              "request": {
+                "decisions": [],
+                "goal": null,
+                "unresolved": []
+              },
+              "requested": null,
+              "root": "/private/tmp/nika-run-stop-native-wFy4Du",
+              "run": null,
+              "saved": null,
+              "waiting": {
+                "kind": "free"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "run_record": {
+      "trace": ".nika/traces/2026-10-10T21-01-51Z-9bda.ndjson",
+      "events": 14,
+      "last": [
+        {
+          "chain": "e06cf0a21b3b6ea4deee54dba6bc5d1a119a42dd1257e417451b97b91b26b1b2",
+          "correlation": null,
+          "execution": {
+            "uuid": "01a1279f-44e6-7368-83a6-ae5cefd59bda"
+          },
+          "fields": [
+            {
+              "key": "task",
+              "value": "c"
+            },
+            {
+              "key": "note",
+              "value": "cancelled by the operator"
+            },
+            {
+              "key": "outcome",
+              "value": "{\"cause\":\"operator\",\"class\":\"cancelled\",\"payload\":{\"reason\":\"operator\"}}"
+            }
+          ],
+          "id": {
+            "uuid": "01a1279f-4593-7017-b5b8-f0ea8bd36075"
+          },
+          "kind": "task_cancelled",
+          "run": null,
+          "timestamp": 1791666111891000000
+        },
+        {
+          "chain": "a3a5a01a5c264c22b367c6902a9eb2e845f703f74d24529dedac132b20cb10d2",
+          "correlation": null,
+          "execution": {
+            "uuid": "01a1279f-44e6-7368-83a6-ae5cefd59bda"
+          },
+          "fields": [
+            {
+              "key": "workflow",
+              "value": "held-session-stop"
+            },
+            {
+              "key": "detail",
+              "value": "cancelled by the operator — in-flight work completed and was counted · unstarted tasks were cancelled"
+            },
+            {
+              "key": "status",
+              "value": "cancelled"
+            },
+            {
+              "key": "cause",
+              "value": "operator"
+            },
+            {
+              "key": "elapsed_ms",
+              "value": 35
+            },
+            {
+              "key": "tasks_total",
+              "value": 3
+            },
+            {
+              "key": "tasks_ok",
+              "value": 2
+            },
+            {
+              "key": "tasks_failed",
+              "value": 0
+            },
+            {
+              "key": "tasks_recovered",
+              "value": 0
+            },
+            {
+              "key": "tasks_skipped",
+              "value": 0
+            },
+            {
+              "key": "tasks_cancelled",
+              "value": 1
+            },
+            {
+              "key": "tasks_never_started",
+              "value": 1
+            },
+            {
+              "key": "priced_calls",
+              "value": 0
+            },
+            {
+              "key": "unpriced_calls",
+              "value": 0
+            },
+            {
+              "key": "cost_qualifier",
+              "value": "unmetered"
+            }
+          ],
+          "id": {
+            "uuid": "01a1279f-4593-7017-b5b8-f0eb8bd1a670"
+          },
+          "kind": "workflow_cancelled",
+          "run": null,
+          "timestamp": 1791666111891000000
+        }
+      ]
+    }
+  },
+  "http": {
+    "steps": [
+      {
+        "step": "held",
+        "snapshot": {
+          "snapshot": "snp_8b496dd4ec6d4be07ccc2de84473ee74",
+          "seq": 1,
+          "busy": {
+            "command": "c-1",
+            "phase": "running",
+            "stop_requested": false
+          },
+          "work": {
+            "authoring": null,
+            "candidate": null,
+            "contract": "nika/session-work@0",
+            "intelligence": {
+              "author": {
+                "kind": "deterministic",
+                "model": null,
+                "seat": null,
+                "transport": null,
+                "why": "no conversational intelligence: free intents are read deterministically — `/intelligence` to choose a model that reads them"
+              },
+              "decision": null,
+              "effort": null,
+              "selected": null
+            },
+            "knowledge": {
+              "by": "default",
+              "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+              "source": "embedded",
+              "state": "admitted",
+              "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+            },
+            "rail": {
+              "active": "pending",
+              "checked": "pending",
+              "draft": "pending",
+              "run": "pending",
+              "saved": "pending"
+            },
+            "request": {
+              "decisions": [],
+              "goal": null,
+              "unresolved": []
+            },
+            "requested": null,
+            "root": "/private/tmp/nika-run-stop-http-60dgbo",
+            "run": null,
+            "saved": null,
+            "waiting": {
+              "kind": "free"
+            }
+          }
+        }
+      },
+      {
+        "step": "stop",
+        "frame": {
+          "contract": "nika/session-host@1",
+          "frame": "result",
+          "session": "ses_238f4bfdc2a931dc1c5db73d246645cc",
+          "event": 4,
+          "command": "s-1",
+          "op": "stop",
+          "replayed": false,
+          "receipt": "run_stopping",
+          "target": "c-1",
+          "snapshot": {
+            "snapshot": "snp_8b496dd4ec6d4be07ccc2de84473ee74",
+            "seq": 1,
+            "busy": {
+              "command": "c-1",
+              "phase": "stopping",
+              "stop_requested": true
+            },
+            "work": {
+              "authoring": null,
+              "candidate": null,
+              "contract": "nika/session-work@0",
+              "intelligence": {
+                "author": {
+                  "kind": "deterministic",
+                  "model": null,
+                  "seat": null,
+                  "transport": null,
+                  "why": "no conversational intelligence: free intents are read deterministically — `/intelligence` to choose a model that reads them"
+                },
+                "decision": null,
+                "effort": null,
+                "selected": null
+              },
+              "knowledge": {
+                "by": "default",
+                "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                "source": "embedded",
+                "state": "admitted",
+                "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+              },
+              "rail": {
+                "active": "pending",
+                "checked": "pending",
+                "draft": "pending",
+                "run": "pending",
+                "saved": "pending"
+              },
+              "request": {
+                "decisions": [],
+                "goal": null,
+                "unresolved": []
+              },
+              "requested": null,
+              "root": "/private/tmp/nika-run-stop-http-60dgbo",
+              "run": null,
+              "saved": null,
+              "waiting": {
+                "kind": "free"
+              }
+            }
+          }
+        }
+      },
+      {
+        "step": "settled",
+        "frame": {
+          "contract": "nika/session-host@1",
+          "frame": "result",
+          "session": "ses_238f4bfdc2a931dc1c5db73d246645cc",
+          "event": 6,
+          "command": "c-1",
+          "op": "submit",
+          "replayed": false,
+          "outcomes": [
+            {
+              "kind": "run_requested",
+              "text": "check · `held.nika` · clean ✔",
+              "workflow": "held.nika",
+              "inputs": [],
+              "max_cost_usd": 0.01
+            },
+            {
+              "kind": "facts",
+              "text": "run observed · exit 130 · interrupted before it finished (Ctrl+C) — the trace shows what ran · trace `.nika/traces/2026-10-10T21-01-52Z-92ca.ndjson`"
+            },
+            {
+              "kind": "run_stopped",
+              "text": "the Stop reached the run: it stopped at a wave boundary · the work in flight completed and is counted · unstarted tasks were cancelled · its trace is sealed"
+            }
+          ],
+          "snapshot": {
+            "snapshot": "snp_b25f0e53db297ef83ceff9acae638354",
+            "seq": 2,
+            "busy": null,
+            "work": {
+              "authoring": null,
+              "candidate": null,
+              "contract": "nika/session-work@0",
+              "intelligence": {
+                "author": {
+                  "kind": "deterministic",
+                  "model": null,
+                  "seat": null,
+                  "transport": null,
+                  "why": "no conversational intelligence: free intents are read deterministically — `/intelligence` to choose a model that reads them"
+                },
+                "decision": null,
+                "effort": null,
+                "selected": null
+              },
+              "knowledge": {
+                "by": "default",
+                "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                "source": "embedded",
+                "state": "admitted",
+                "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+              },
+              "rail": {
+                "active": "pending",
+                "checked": "pending",
+                "draft": "pending",
+                "run": "attention",
+                "saved": "pending"
+              },
+              "request": {
+                "decisions": [],
+                "goal": null,
+                "unresolved": []
+              },
+              "requested": {
+                "inputs": [],
+                "workflow": "held.nika",
+                "world": {
+                  "basis": "declared",
+                  "credentials": [],
+                  "places": [
+                    {
+                      "kind": "program",
+                      "target": "cat",
+                      "tasks": [
+                        "b"
+                      ]
+                    }
+                  ],
+                  "reach": "undetermined"
+                }
+              },
+              "root": "/private/tmp/nika-run-stop-http-60dgbo",
+              "run": {
+                "chain_head": "17543b881d9e211df8115f1ed7fb30025d1a2c87ac5b6445c52057b7a679a38b",
+                "chain_len": null,
+                "current": true,
+                "end": {
+                  "end": "interrupted"
+                },
+                "execution": "01a1279f-4854-7721-8dfe-a24b0ad592ca",
+                "sealed": true,
+                "trace": "01a1279f485477218dfea24b0ad592ca",
+                "workflow": "held.nika",
+                "workflow_sha256": "0100fecf31022984f155101cbd29390570131fab5bbe8de12ea97c4b5771ec33"
+              },
+              "saved": {
+                "check_clean": null,
+                "workflow": "held.nika",
+                "world": null
+              },
+              "waiting": {
+                "kind": "free"
+              }
+            }
+          }
+        }
+      },
+      {
+        "step": "stop_replayed",
+        "frame": {
+          "contract": "nika/session-host@1",
+          "frame": "result",
+          "session": "ses_238f4bfdc2a931dc1c5db73d246645cc",
+          "event": 4,
+          "command": "s-1",
+          "op": "stop",
+          "replayed": true,
+          "receipt": "run_stopping",
+          "target": "c-1",
+          "snapshot": {
+            "snapshot": "snp_8b496dd4ec6d4be07ccc2de84473ee74",
+            "seq": 1,
+            "busy": {
+              "command": "c-1",
+              "phase": "stopping",
+              "stop_requested": true
+            },
+            "work": {
+              "authoring": null,
+              "candidate": null,
+              "contract": "nika/session-work@0",
+              "intelligence": {
+                "author": {
+                  "kind": "deterministic",
+                  "model": null,
+                  "seat": null,
+                  "transport": null,
+                  "why": "no conversational intelligence: free intents are read deterministically — `/intelligence` to choose a model that reads them"
+                },
+                "decision": null,
+                "effort": null,
+                "selected": null
+              },
+              "knowledge": {
+                "by": "default",
+                "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                "source": "embedded",
+                "state": "admitted",
+                "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+              },
+              "rail": {
+                "active": "pending",
+                "checked": "pending",
+                "draft": "pending",
+                "run": "pending",
+                "saved": "pending"
+              },
+              "request": {
+                "decisions": [],
+                "goal": null,
+                "unresolved": []
+              },
+              "requested": null,
+              "root": "/private/tmp/nika-run-stop-http-60dgbo",
+              "run": null,
+              "saved": null,
+              "waiting": {
+                "kind": "free"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "run_record": {
+      "job": "1033d3c1-75b6-494a-a4d3-d68d08cf5e19",
+      "reads": [
+        {
+          "route": "/v1/jobs/1033d3c1-75b6-494a-a4d3-d68d08cf5e19",
+          "status": 200,
+          "body": {
+            "id": "1033d3c1-75b6-494a-a4d3-d68d08cf5e19",
+            "status": "cancelled",
+            "execution_id": "exe-01a1279f-4854-7721-8dfe-a24b0ad592ca",
+            "trace_id": "01a1279f485477218dfea24b0ad592ca",
+            "receipt": {
+              "job_id": "1033d3c1-75b6-494a-a4d3-d68d08cf5e19",
+              "execution_id": "exe-01a1279f-4854-7721-8dfe-a24b0ad592ca",
+              "trace_id": "01a1279f485477218dfea24b0ad592ca",
+              "snapshot_digest": "af35b4b21cca8c41aa1c6c760fa307945028aaf26b6df3348c7ac9c7367b7888",
+              "origin": {
+                "kind": "manual"
+              },
+              "chain_head": "17543b881d9e211df8115f1ed7fb30025d1a2c87ac5b6445c52057b7a679a38b"
+            },
+            "settlement": {
+              "cause": "operator",
+              "elapsed_ms": 26,
+              "spend": {
+                "priced_calls": 0,
+                "qualifier": "unmetered",
+                "unpriced_calls": 0
+              },
+              "status": "cancelled",
+              "tasks": {
+                "cancelled": 1,
+                "failed": 0,
+                "never_started": 1,
+                "ok": 2,
+                "recovered": 0,
+                "skipped": 0,
+                "total": 3
+              }
+            }
+          }
+        },
+        {
+          "route": "/v1/jobs/1033d3c1-75b6-494a-a4d3-d68d08cf5e19/status",
+          "status": 200,
+          "body": {
+            "status": "cancelled"
+          }
+        }
+      ]
+    }
+  }
+}

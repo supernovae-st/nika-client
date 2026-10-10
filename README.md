@@ -1275,6 +1275,8 @@ To report a vulnerability privately, follow
   [HTTP contract](https://github.com/supernovae-st/nika-client/blob/main/docs/http-api.md)
   (every route, recovery, idempotency and schedule revisions),
   [testing and release evidence](https://github.com/supernovae-st/nika-client/blob/main/docs/testing.md),
+  [the authoring Session](https://github.com/supernovae-st/nika-client/blob/main/docs/session.md)
+  (the engine's conversation through its host doors; no released engine hosts it yet),
   [migrating to 0.116](https://github.com/supernovae-st/nika-client/blob/main/docs/migrating-to-0.116.md)
   and the [changelog](https://github.com/supernovae-st/nika-client/blob/main/CHANGELOG.md).
 - **Upstream:** [the engine](https://github.com/supernovae-st/nika) and

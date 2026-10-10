@@ -351,6 +351,22 @@ async function compile() {
     return;
   }
 
+  if (change !== undefined && change.startsWith('evidence-')) {
+    // A document revision with its full evidence (fixture `compile-evidence/document-revision.json`:
+    // SYNTHETIC values in the engine's shapes). The base must arrive byte for byte.
+    const fixture = JSON.parse(readFileSync(new URL('./compile-evidence/document-revision.json', import.meta.url), 'utf8'));
+    if (readFileSync(base, 'utf8') !== fixture.base || intent !== fixture.original_intent) {
+      failure('read_base', 'the fixture base or original intent did not arrive byte for byte', 3);
+      return;
+    }
+    const document = structuredClone(fixture.document);
+    if (change === 'evidence-malformed') document.provenance.plan.document_revision.base_sha256 = 48;
+    if (change === 'evidence-null-revision') document.provenance.decision.document_revision = null;
+    // The native render adds its CLI-only fact.
+    outcome({ ...document, written: null }, document.status === 'ready' ? 0 : 2);
+    return;
+  }
+
   if (change !== undefined) {
     // EDIT: echo proves the exact base bytes, change text and original intent that arrived.
     const baseBytes = readFileSync(base, 'utf8');
@@ -365,6 +381,28 @@ async function compile() {
       }],
     }, 0);
     return;
+  }
+
+  if (process.env.NIKA_FAKE_COMPILE_OUTCOME) {
+    // A recorded engine outcome document, carried as the engine wrote it; the native render adds
+    // its CLI-only fact.
+    const document = JSON.parse(readFileSync(process.env.NIKA_FAKE_COMPILE_OUTCOME, 'utf8'));
+    outcome({ ...document, written: null }, document.status === 'ready' ? 0 : 2);
+    return;
+  }
+
+  if (intent !== undefined && flags.authoringModel !== undefined) {
+    // A complete-document creation with its full evidence (fixture `compile-evidence/document-create.json`:
+    // SYNTHETIC values in the engine's shapes). The request must arrive byte for byte.
+    const created = JSON.parse(readFileSync(new URL('./compile-evidence/document-create.json', import.meta.url), 'utf8'));
+    const leg = intent === 'create-evidence-malformed' ? created.ready
+      : [created.ready, created.written, created.continuation].find((each) => each.intent === intent);
+    if (leg !== undefined) {
+      const document = structuredClone(leg.document);
+      if (intent === 'create-evidence-malformed') document.provenance.plan.document.candidate_sha256 = 'x';
+      outcome({ ...document, written: null }, document.status === 'ready' ? 0 : 2);
+      return;
+    }
   }
 
   if (intent === 'refuse-me') {

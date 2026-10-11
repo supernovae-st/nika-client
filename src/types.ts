@@ -1903,7 +1903,7 @@ export interface NikaSessionWork {
   questions?: NikaSessionAskedQuestion[];
   /**
    * The choices the proposal shown now leaves open, each with its default
-   * (NIK-16 change 5, `nika/author-tools@1` `propose.open`; engine pending):
+   * (NIK-16 change 5, `nika/author-tools@1` `propose.open`; engine main from `90d2472cd`):
    * questions of the `questions` shape, present while a proposal shows them.
    * Each has exactly one option with `recommended: true`, its default, whose
    * values the candidate already carries; the proposal's identity covers
@@ -2536,7 +2536,7 @@ export interface NikaSessionToolMark {
   /** The size of its reply in bytes, once it answered; never the reply. */
   reply_bytes?: number;
   /**
-   * `failed` only (ADR-148 point 11, engine pending): the tool's reply as a
+   * `failed` only (ADR-148 point 11, engine main from `90d2472cd`): the tool's reply as a
    * host may show it, its obvious secret shapes redacted first, on one line,
    * at most 512 bytes (a cut is marked `…`).
    */
@@ -2569,7 +2569,7 @@ export interface NikaSessionCallMark {
 
 /**
  * A run the turn executes paused at a human gate (`kind` `gate`): its trace
- * and task, the Session's words, and (ADR-148 point 12, engine pending) the
+ * and task, the Session's words, and (ADR-148 point 12, engine main from `90d2472cd`) the
  * values the gate's message shows, by key (`values`: each value as the
  * message renders it, typed), and the keys whose value the pause withheld,
  * each with why (`withheld`: `secret` for a value derived from a secret,

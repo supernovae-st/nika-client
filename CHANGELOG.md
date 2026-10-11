@@ -263,20 +263,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   conversation led by a loopback author (a script, not a model, no
   provider), and against the identities, refusals and Stop a real
   `0e4e1c74f` binary wrote.
-- Two additive members of the Session host contract, engine pending
-  (ADR-148 points 11 and 12): a failed tool step's `tool.reply`, the
-  tool's reply as a host may show it (`NikaSessionToolMark.reply`), and a
-  gate outcome typed as `NikaSessionGate`, with the values its message
-  shows (`values`) and the keys it withheld with why (`withheld`). Each is
-  checked where it is: a malformed member fails with its path.
-- `work.open_choices` (NIK-16 change 5, the engine side pending): the
+- Two additive members of the Session host contract, as engine main writes
+  them from `90d2472cd` (nika#1787; ADR-148 points 11 and 12): a failed
+  tool step's `tool.reply`, the tool's reply as a host may show it
+  (`NikaSessionToolMark.reply`), and a gate outcome typed as
+  `NikaSessionGate`, with the values its message shows (`values`) and the
+  keys it withheld with why (`withheld`). Each is checked where it is: a
+  malformed member fails with its path.
+- `work.open_choices` (NIK-16 change 5, engine main from `90d2472cd`): the
   choices a shown proposal leaves open, each a `NikaSessionAskedQuestion`
   whose one recommended option is its default, already in the candidate.
   A consent binds the shown defaults as `offered` bindings cited to the
   consenting line; a line picking another option binds that pick and waits
   for the author's revision. The SDK checks them as it checks `questions`
   (a malformed member fails with its path) and carries them unread.
-- Session call activity: an `activity` event of a model request is typed
+- Session call activity (engine main from `90d2472cd`): an `activity` event of a model request is typed
   in `call` (`NikaSessionCallMark`: its `ordinal` in the turn, `role`,
   requested `model`, `state`, and, when its producer reported them,
   `at_ms`, `elapsed_ms`, `input_tokens` and `output_tokens`), and a tool
@@ -293,10 +294,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   caller chose, as over HTTP. An earlier engine refuses the pair with its own
   usage error, reported as before.
 - `openapi.json` and the generated `src/generated/openapi.d.ts` now pin the
-  live document of engine main `0e4e1c74f` (reporting 0.123.0-preview.1,
-  unreleased), which `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name, as a
-  resident started with `--sessions` serves it (the same bytes as at
-  `a3017c495`; its `/health` adds `sessionSteering`). It adds the six
+  live document of engine main `90d2472cd` (nika#1787, reporting
+  0.123.0-preview.1, unreleased), which `ENGINE_QUAL_PIN` and
+  `ENGINE_CANDIDATE` name, as a resident started with `--sessions` serves it.
+  Against the previous pin `0e4e1c74f` (whose bytes `a3017c495` and
+  `501e2fd29` serve too) the paths, operations and schemas stay;
+  `SessionTool` declares `reply` (text, at most 512 bytes) and its and
+  `SessionOutcome`'s descriptions name the failed step's reply; the plain
+  document is byte-identical. Both doors' identities name Spec `34ad76c5`,
+  which replaces `a88d3c6e`, with the same capability words
+  (`sessionSteering` since `0e4e1c74f`). Since the released 0.120.3
+  contract the pin adds the six
   `/v1/sessions` operations and the `SessionCommand`, `SessionFrame`,
   `SessionKnowledge`, `SessionOutcome`, `SessionQueued`, `SessionSnapshot` and
   `SessionTool` schemas: the work snapshot, otherwise an object the engine

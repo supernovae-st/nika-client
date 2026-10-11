@@ -5,10 +5,10 @@ import type { NikaSessionEvent, NikaSessionGate, NikaSessionResult, NikaSessionT
 import { sessionFrame } from '../src/lib/session-host.js';
 
 // Two additive members of nika/session-host@1 written for the Session writer (ADR-148 points 11 and
-// 12, lanes/sdk/session-patches; engine pending): a failed tool step's activity says why (`tool.reply`,
+// 12, lanes/sdk/session-patches; engine main from 90d2472cd): a failed tool step's activity says why (`tool.reply`,
 // the tool's reply as a host may show it), and a gate outcome carries the values its message shows
 // (`values`) and names the keys it withheld (`withheld`). The frames are written here in the exact
-// shapes the patched engine's own wire tests assert; no engine writes them yet.
+// shapes the engine's own wire tests assert (engine main 90d2472cd writes them).
 
 const CONTRACT = 'nika/session-host@1';
 const SESSION = `ses_${'ef'.repeat(16)}`;

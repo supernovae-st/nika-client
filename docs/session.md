@@ -90,7 +90,7 @@ interface needs to show and verify without reading anything else:
 | `knowledge` | `NikaSessionKnowledge`, absent otherwise | the authoring knowledge the Session reads now, a configured fact and never a call receipt, in one `state`: `admitted` (a release the strict door admitted: `source` `embedded` or `disk`, its `version` or `null`, its `manifest_sha256`, and `by`: `default`, `conversation`, `host` or `environment`), `refused` (a source the configuration names, refused: `source`, `by`, the stable `code` and its `cause`, never a host path; a line that would reach a model then waits as `knowledge_choice`) or `unread` (`why`). Engine `5f1e91c6f`; absent when the Session states none, never `null`; states stay open and grant nothing |
 | `authoring.stages` | `NikaSessionStageTimes \| null` | how long the compile's other stages took, as its decision record states them (engine `5f1e91c6f`): `qualification_ms` (the knowledge qualification's wall time, or `null`) and `trials`, each trial of a candidate in the order run with its `attempt` (`completed`, `stopped`, `never_attempted`), `elapsed_ms` (`null` when never attempted, never `0`) and `runtime_bound_ms`; never summed, no output or text of the record; `null` when the record states neither stage |
 | `bindings`, `delegations`, `questions` | lists, each absent when empty | what a conversation led by an intelligence holds (engine `6d217dfba`): the values the candidate binds (`NikaSessionBinding`: `key` when a question asked for it, `role` (`read_source`, `output_path`, `run_model`, `value`), the exact `value`, and its `provenance`: `kind` (`named`, `delegated`, `derived`, `offered`, `answered`, `retained`), the person's line it rests on (`message`: `u1`, `u2`, …) with their `excerpt`, or an accepted offer's `question` and `option`); the choices the person delegated (`NikaSessionDelegation`: `message`, `excerpt`, `scope`); and the questions asked now (`NikaSessionAskedQuestion`: `id` (its witness, what `waiting.ids` lists), `key`, `question`, `why`, `role`, `state` `open` or `after` with the keys it waits for, `options` with their values, `free_text`, `multi_select`). A provenance is a record, never an authorization; questions are never kept across a reopen. With the doors (engine main from `a3017c495`) an offered `run_model` value carries `choice` (`NikaSessionModelFacts`: the `role` it would serve, the exact `model`, the route `via`, its `class`, whether it is `configured` here, its `billing`, and `output_usd_per_million` on a metered route, absent when unknown, never `0`), absent when this machine's inventory offers no such model |
-| `open_choices` | `NikaSessionAskedQuestion[]`, absent when none | the choices the proposal shown now leaves open (NIK-16 change 5; engine pending), in the `questions` shape: each has exactly one option with `recommended: true`, its default, whose values the candidate already carries, and the proposal's identity covers them. A consenting line binds every shown default as an `offered` binding cited to that line (`bindings`); a line picking another option binds that pick and the proposal waits for the author's revision (a new proposal). Which a line does is the engine's reading |
+| `open_choices` | `NikaSessionAskedQuestion[]`, absent when none | the choices the proposal shown now leaves open (NIK-16 change 5; engine main from `90d2472cd`), in the `questions` shape: each has exactly one option with `recommended: true`, its default, whose values the candidate already carries, and the proposal's identity covers them. A consenting line binds every shown default as an `offered` binding cited to that line (`bindings`); a line picking another option binds that pick and the proposal waits for the author's revision (a new proposal). Which a line does is the engine's reading |
 | `queued` | `NikaSessionQueuedLine[]`, absent when none | with the doors: the lines the person sent while the last run was under way (`steer()`, `followUp()`) and what became of each: `entered` with its `cite`, or `returned` unsent |
 | `run` | `NikaSessionRun \| null` | the last observed Run with only the identities its observation carried: `current` (the Run of the workflow saved last), `workflow`, `end` (`{ end }`, plus `exit` for `unknown`), `trace`, `execution`, `workflow_sha256` (the source hash its start named), `chain_head`, `chain_len`; every member written, `null` where unobserved. A Run without `workflow_sha256` does not prove which bytes ran: both session-host doors observed none up to host `4271f09ef`; from host `b5d844d84` a run names what it observed of itself (recorded here from a real resident over HTTP at `312c3d5a8`: the sha256 of the bytes it ran, the job's execution uuid and opaque trace, the receipt head). `sealed` (engine `ad70c9aa7`) says whether the Run sealed its journal: an `interrupted` Run that sealed stopped at a wave boundary and its trace verifies, one that did not was cut mid-flight and its trace is incomplete; absent before that engine |
 
@@ -171,7 +171,7 @@ lines were written, and the Session goes on.
 `call`, `name`, `started`/`finished`/`failed` and `elapsed_ms` once it
 answered, `at_ms` (when it began, Unix milliseconds) and `reply_bytes` (its
 reply's size, never the reply) when the run reported them, never its arguments;
-once it failed, and from the engine that carries ADR-148 point 11 (pending),
+once it failed, and from engine main `90d2472cd` (ADR-148 point 11),
 `reply`: the tool's reply as a host may show it, its secret shapes redacted, on
 one line, at most 512 bytes; an `activity` of a model request names it in
 `call`: its one-based `ordinal` in the turn, the compiler's `role`, the
@@ -203,7 +203,7 @@ A Save is never a Run: `run it` (or the person's own words) requests one, and
 the outcomes say what the engine did: `run_requested`, then the Session's own
 observation of the Run's end (`facts`, or `gate` when it paused:
 `NikaSessionGate`, its `trace`, `task` and words, and from the engine that
-carries ADR-148 point 12 (pending) the values the gate's message shows, by key
+carries ADR-148 point 12 (engine main from `90d2472cd`) the values the gate's message shows, by key
 (`values`), and the keys withheld with why (`withheld`: `secret` for a value
 derived from a secret, `size`, `unresolved`)),
 `run_not_started` when nothing ran, or `run_unobserved` when the Run was
@@ -245,7 +245,12 @@ reads the doors' word as both doors print it, the refusals of lines a host
 cannot parse, and a Stop that reaches the Run on both doors. The 0.123 integration engine registers
 `nika session --json` (`3688552f3`); the served `/v1/sessions` routes arrive
 with `nika serve --sessions`, and the pinned `openapi.json` declares them as
-such a resident of engine main `0e4e1c74f` serves them (the work snapshot an
-object whose `knowledge` member alone is described there).
+such a resident of engine main `90d2472cd` serves them (the work snapshot an
+object whose `knowledge` member alone is described there; of the activity
+marks, a tool step's `reply` is declared, its `at_ms` and `reply_bytes` and
+a model request's `call` are not, so they, a gate's `values` and `withheld`,
+and `work.open_choices` are typed from the engine source at that commit).
+At `90d2472cd` both doors' identities are recorded again
+(`test/fixtures/session-host/90d2472cd`).
 `scripts/run-session-parity-e2e.mjs` qualifies
 both doors of one binary once it hosts them (see `docs/testing.md`).

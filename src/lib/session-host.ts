@@ -395,7 +395,7 @@ const ANSWER_ACTS: Record<string, string[]> = {
  * `authoring.stages` and the `knowledge_choice` wait from `5f1e91c6f`; the
  * conversation's `bindings`, `delegations`, `questions` and the `questions`
  * wait from `6d217dfba`; `run.sealed` from `ad70c9aa7`; a proposal's
- * `open_choices` as NIK-16 change 5 fixes them, engine pending), judged where
+ * `open_choices` as NIK-16 change 5 fixes them, engine main from `90d2472cd`), judged where
  * they are. A member present with another shape
  * is a protocol fault naming its path, never its value; an absent one,
  * `null` where the engine writes it and every unknown member ride through.

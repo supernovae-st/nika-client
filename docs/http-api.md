@@ -1,7 +1,7 @@
 # HTTP contract
 
 `openapi.json` is the checked-in contract pin: the live document of the
-engine `ENGINE_QUAL_PIN` names (main `0e4e1c74f`, reporting 0.123.0-preview.1,
+engine `ENGINE_QUAL_PIN` names (main `90d2472cd`, reporting 0.123.0-preview.1,
 unreleased: the pre-release `v0.123.0-preview.1` was cut earlier, at
 `fd981b4e9`), served by a resident started with `--sessions`, since the host
 merges its Session routes into no other document. It is ahead of the released

@@ -4,12 +4,13 @@ import { NikaProtocolError } from '../src/index.js';
 import type { NikaSessionAskedQuestion, NikaSessionResult, NikaSessionWork } from '../src/index.js';
 import { sessionFrame } from '../src/lib/session-host.js';
 
-// NIK-16 change 5 (the ADR-153 amendment whose wire the writer fixed on 2026-10-10; the engine side is
-// pending): a proposal may leave choices open, each shown with its default. The machine door's work
+// NIK-16 change 5 (the ADR-153 amendment whose wire the writer fixed on 2026-10-10; engine main from
+// 90d2472cd): a proposal may leave choices open, each shown with its default. The machine door's work
 // carries them as `open_choices`, questions of the `questions` shape whose one recommended option is
 // the default the candidate already holds. A consenting line binds the shown defaults as `offered`
 // bindings cited to it; a line picking another option binds that pick, and the proposal waits for the
-// author's revision. The frames are written here to that shape by hand: no engine writes them yet.
+// author's revision. The frames are written here to that shape by hand: a keyless walk cannot make an
+// author show choices.
 
 const CONTRACT = 'nika/session-host@1';
 const SESSION = `ses_${'0c'.repeat(16)}`;

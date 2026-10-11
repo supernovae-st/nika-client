@@ -1,0 +1,90 @@
+{
+  "90d2472cd": {
+    "native": {
+      "engine_version": "0.123.0-preview.1",
+      "build_sha": "90d2472cd",
+      "spec_sha": "34ad76c5376ab6b1fb02e3e4c455ff23f1c1312c",
+      "api_version": "v1",
+      "engineVersion": "0.123.0-preview.1",
+      "buildSha": "90d2472cd",
+      "specSha": "34ad76c5376ab6b1fb02e3e4c455ff23f1c1312c",
+      "machineProtocolVersion": 1,
+      "snapshotFormatVersion": 1,
+      "checkReportVersion": 1,
+      "eventFormatVersion": 1,
+      "traceFormatVersion": 2,
+      "supportedCapabilities": [
+        "check",
+        "executionSnapshot",
+        "eventStream",
+        "trace",
+        "inputsLiteral",
+        "compile",
+        "sessionHost",
+        "sessionIntelligence",
+        "sessionSteering"
+      ]
+    },
+    "http": {
+      "status": "ok",
+      "service": "nika-serve",
+      "storeFormatVersion": {
+        "jobs": 3,
+        "schedules": 1
+      },
+      "engine_version": "0.123.0-preview.1",
+      "build_sha": "90d2472cd",
+      "spec_sha": "34ad76c5376ab6b1fb02e3e4c455ff23f1c1312c",
+      "api_version": "v1",
+      "engineVersion": "0.123.0-preview.1",
+      "buildSha": "90d2472cd",
+      "specSha": "34ad76c5376ab6b1fb02e3e4c455ff23f1c1312c",
+      "machineProtocolVersion": 1,
+      "snapshotFormatVersion": 1,
+      "checkReportVersion": 1,
+      "eventFormatVersion": 1,
+      "traceFormatVersion": 2,
+      "supportedCapabilities": [
+        "check",
+        "executionSnapshot",
+        "eventStream",
+        "cancel",
+        "jobInputs",
+        "compile",
+        "schedule",
+        "sessionHost",
+        "sessionIntelligence",
+        "sessionSteering"
+      ]
+    },
+    "http_without_sessions": {
+      "status": "ok",
+      "service": "nika-serve",
+      "storeFormatVersion": {
+        "jobs": 3,
+        "schedules": 1
+      },
+      "engine_version": "0.123.0-preview.1",
+      "build_sha": "90d2472cd",
+      "spec_sha": "34ad76c5376ab6b1fb02e3e4c455ff23f1c1312c",
+      "api_version": "v1",
+      "engineVersion": "0.123.0-preview.1",
+      "buildSha": "90d2472cd",
+      "specSha": "34ad76c5376ab6b1fb02e3e4c455ff23f1c1312c",
+      "machineProtocolVersion": 1,
+      "snapshotFormatVersion": 1,
+      "checkReportVersion": 1,
+      "eventFormatVersion": 1,
+      "traceFormatVersion": 2,
+      "supportedCapabilities": [
+        "check",
+        "executionSnapshot",
+        "eventStream",
+        "cancel",
+        "jobInputs",
+        "compile",
+        "schedule"
+      ]
+    }
+  }
+}

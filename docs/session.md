@@ -250,7 +250,8 @@ object whose `knowledge` member alone is described there; of the activity
 marks, a tool step's `reply` is declared, its `at_ms` and `reply_bytes` and
 a model request's `call` are not, so they, a gate's `values` and `withheld`,
 and `work.open_choices` are typed from the engine source at that commit).
-At `90d2472cd` both doors' identities are recorded again
+At `90d2472cd` both doors' identities are recorded again, with the call and
+tool marks both doors wrote for conversations a loopback author led
 (`test/fixtures/session-host/90d2472cd`).
 `scripts/run-session-parity-e2e.mjs` qualifies
 both doors of one binary once it hosts them (see `docs/testing.md`).

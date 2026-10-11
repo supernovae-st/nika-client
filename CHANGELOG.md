@@ -263,6 +263,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   conversation led by a loopback author (a script, not a model, no
   provider), and against the identities, refusals and Stop a real
   `0e4e1c74f` binary wrote.
+- Two additive members of the Session host contract, engine pending
+  (ADR-148 points 11 and 12): a failed tool step's `tool.reply`, the
+  tool's reply as a host may show it (`NikaSessionToolMark.reply`), and a
+  gate outcome typed as `NikaSessionGate`, with the values its message
+  shows (`values`) and the keys it withheld with why (`withheld`). Each is
+  checked where it is: a malformed member fails with its path.
 
 ### Changed
 

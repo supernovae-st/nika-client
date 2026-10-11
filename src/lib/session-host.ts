@@ -223,6 +223,7 @@ export function sessionFrame(
       if (frame.queued !== undefined) queuedLine(frame.queued, 'result.queued', fail);
       for (const [index, outcome] of ((frame.outcomes ?? []) as Record<string, unknown>[]).entries()) {
         if (outcome.kind === 'stopped') stoppedOutcome(outcome, `result.outcomes[${index}]`, fail);
+        if (outcome.kind === 'gate') gateOutcome(outcome, `result.outcomes[${index}]`, fail);
       }
       snapshotBody(frame.snapshot, transport);
       break;
@@ -293,12 +294,26 @@ function stoppedOutcome(outcome: Record<string, unknown>, path: string,
   }
 }
 
-/** A tool step of a conversation's run: its call, name and state, and its time once it answered. */
+/** A run paused at a gate: its trace, task and words, and what its message shows, structured. */
+function gateOutcome(outcome: Record<string, unknown>, path: string,
+  fail: (what: string) => NikaProtocolError): void {
+  textMembers(outcome, ['trace', 'task', 'text'], path, fail);
+  if (Object.hasOwn(outcome, 'values') && !machineObject(outcome.values)) throw fail(`${path}.values is not an object`);
+  if (Object.hasOwn(outcome, 'withheld')) {
+    const withheld = machineObject(outcome.withheld);
+    if (!withheld || !Object.values(withheld).every((why) => typeof why === 'string')) {
+      throw fail(`${path}.withheld is not an object of words`);
+    }
+  }
+}
+
+/** A tool step of a conversation's run: its call, name and state, its time, and why it failed. */
 function toolMark(value: unknown, path: string, fail: (what: string) => NikaProtocolError): void {
   const tool = machineObject(value);
   if (!tool) throw fail(`${path} is not an object`);
   textMembers(tool, ['call', 'name', 'state'], path, fail);
   if (Object.hasOwn(tool, 'elapsed_ms') && !isCount(tool.elapsed_ms)) throw fail(`${path}.elapsed_ms is not a count`);
+  if (Object.hasOwn(tool, 'reply') && typeof tool.reply !== 'string') throw fail(`${path}.reply is not text`);
 }
 
 /** The snapshot body: its handle, publish counter, turn under way and the work verbatim. */

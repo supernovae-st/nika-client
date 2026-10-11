@@ -477,6 +477,7 @@ export type {
   NikaSessionDocumentRevision,
   NikaSessionEvent,
   NikaSessionEventsOptions,
+  NikaSessionGate,
   NikaSessionIntelligence,
   NikaSessionKnowledge,
   NikaSessionModelFacts,

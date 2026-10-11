@@ -2511,14 +2511,38 @@ export interface NikaSessionStopped extends NikaSessionOutcome {
  * One tool the conversation's intelligence called, as its run observed it
  * (an `activity` event's `tool`): the call's identity, the tool's name,
  * `started`, `finished` or `failed`, and the milliseconds it took once it
- * answered. Never its arguments or reply.
+ * answered. Never its arguments; of its reply only why it failed.
  */
 export interface NikaSessionToolMark {
   call: string;
   name: string;
   state: 'started' | 'finished' | 'failed' | (string & {});
   elapsed_ms?: number;
+  /**
+   * `failed` only (ADR-148 point 11, engine pending): the tool's reply as a
+   * host may show it, its obvious secret shapes redacted first, on one line,
+   * at most 512 bytes (a cut is marked `…`).
+   */
+  reply?: string;
   [key: string]: unknown;
+}
+
+/**
+ * A run the turn executes paused at a human gate (`kind` `gate`): its trace
+ * and task, the Session's words, and (ADR-148 point 12, engine pending) the
+ * values the gate's message shows, by key (`values`: each value as the
+ * message renders it, typed), and the keys whose value the pause withheld,
+ * each with why (`withheld`: `secret` for a value derived from a secret,
+ * `size`, `unresolved`). A consent review can bind exactly the values shown;
+ * a value derived from a secret is only ever named.
+ */
+export interface NikaSessionGate extends NikaSessionOutcome {
+  kind: 'gate';
+  trace: string;
+  task: string;
+  text: string;
+  values?: Record<string, unknown>;
+  withheld?: Record<string, 'secret' | 'size' | 'unresolved' | (string & {})>;
 }
 
 /**

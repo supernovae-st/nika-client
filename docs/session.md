@@ -168,7 +168,9 @@ lines were written, and the Session goes on.
 `activity`, `result`, `closed`) as the engine wrote them (with the doors, an
 `activity` of a conversation's run names the tool step it observed in `tool`:
 `call`, `name`, `started`/`finished`/`failed` and `elapsed_ms` once it
-answered, never its arguments or reply), each with a `cursor`
+answered, never its arguments; once it failed, and from the engine that carries
+ADR-148 point 11 (pending), `reply`: the tool's reply as a host may show it,
+its secret shapes redacted, on one line, at most 512 bytes), each with a `cursor`
 (`<session>:<event>`) to resume from. Without `after`, a view starts with every
 event the door still holds: the server's whole log, or the events a local
 handle retains (`eventBufferSize`). Over HTTP a cursor the server cannot resume
@@ -191,7 +193,11 @@ keep Serve's own error envelope (`NikaOperationError`).
 
 A Save is never a Run: `run it` (or the person's own words) requests one, and
 the outcomes say what the engine did: `run_requested`, then the Session's own
-observation of the Run's end (`facts`, or `gate` when it paused),
+observation of the Run's end (`facts`, or `gate` when it paused:
+`NikaSessionGate`, its `trace`, `task` and words, and from the engine that
+carries ADR-148 point 12 (pending) the values the gate's message shows, by key
+(`values`), and the keys withheld with why (`withheld`: `secret` for a value
+derived from a secret, `size`, `unresolved`)),
 `run_not_started` when nothing ran, or `run_unobserved` when the Run was
 admitted but its end was not observed (its effects are unknown; it is never
 reported as an observed Run). A resident runs it as one of its jobs and may

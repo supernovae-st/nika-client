@@ -169,9 +169,16 @@ lines were written, and the Session goes on.
 `activity`, `result`, `closed`) as the engine wrote them (with the doors, an
 `activity` of a conversation's run names the tool step it observed in `tool`:
 `call`, `name`, `started`/`finished`/`failed` and `elapsed_ms` once it
-answered, never its arguments; once it failed, and from the engine that carries
-ADR-148 point 11 (pending), `reply`: the tool's reply as a host may show it,
-its secret shapes redacted, on one line, at most 512 bytes), each with a `cursor`
+answered, `at_ms` (when it began, Unix milliseconds) and `reply_bytes` (its
+reply's size, never the reply) when the run reported them, never its arguments;
+once it failed, and from the engine that carries ADR-148 point 11 (pending),
+`reply`: the tool's reply as a host may show it, its secret shapes redacted, on
+one line, at most 512 bytes; an `activity` of a model request names it in
+`call`: its one-based `ordinal` in the turn, the compiler's `role`, the
+requested `model` (never proof of the model that served it), `state`
+`started`/`finished`/`cancelled`, and, when its producer reported them,
+`at_ms`, `elapsed_ms`, `input_tokens` and `output_tokens`, never a prompt or
+an answer), each with a `cursor`
 (`<session>:<event>`) to resume from. Without `after`, a view starts with every
 event the door still holds: the server's whole log, or the events a local
 handle retains (`eventBufferSize`). Over HTTP a cursor the server cannot resume

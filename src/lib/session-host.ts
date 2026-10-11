@@ -245,6 +245,7 @@ export function sessionFrame(
     case 'activity':
       text('command');
       if (frame.tool !== undefined) toolMark(frame.tool, 'activity.tool', fail);
+      if (frame.call !== undefined) callMark(frame.call, 'activity.call', fail);
       break;
     default:
       // A frame kind this contract version does not name: carried, never acted upon.
@@ -307,13 +308,30 @@ function gateOutcome(outcome: Record<string, unknown>, path: string,
   }
 }
 
-/** A tool step of a conversation's run: its call, name and state, its time, and why it failed. */
+/** Each named member of `record` that is present is a count. */
+function countMembers(record: Record<string, unknown>, keys: string[], path: string,
+  fail: (what: string) => NikaProtocolError): void {
+  for (const key of keys) {
+    if (Object.hasOwn(record, key) && !isCount(record[key])) throw fail(`${path}.${key} is not a count`);
+  }
+}
+
+/** A tool step of a conversation's run: its call, name and state, its times and size, and why it failed. */
 function toolMark(value: unknown, path: string, fail: (what: string) => NikaProtocolError): void {
   const tool = machineObject(value);
   if (!tool) throw fail(`${path} is not an object`);
   textMembers(tool, ['call', 'name', 'state'], path, fail);
-  if (Object.hasOwn(tool, 'elapsed_ms') && !isCount(tool.elapsed_ms)) throw fail(`${path}.elapsed_ms is not a count`);
+  countMembers(tool, ['elapsed_ms', 'at_ms', 'reply_bytes'], path, fail);
   if (Object.hasOwn(tool, 'reply') && typeof tool.reply !== 'string') throw fail(`${path}.reply is not text`);
+}
+
+/** A model request an activity reported: its rank, role, model and state, and its times and tokens. */
+function callMark(value: unknown, path: string, fail: (what: string) => NikaProtocolError): void {
+  const call = machineObject(value);
+  if (!call) throw fail(`${path} is not an object`);
+  if (!isCount(call.ordinal)) throw fail(`${path}.ordinal is ${Object.hasOwn(call, 'ordinal') ? 'not a count' : 'absent'}`);
+  textMembers(call, ['role', 'model', 'state'], path, fail);
+  countMembers(call, ['at_ms', 'elapsed_ms', 'input_tokens', 'output_tokens'], path, fail);
 }
 
 /** The snapshot body: its handle, publish counter, turn under way and the work verbatim. */

@@ -276,6 +276,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   consenting line; a line picking another option binds that pick and waits
   for the author's revision. The SDK checks them as it checks `questions`
   (a malformed member fails with its path) and carries them unread.
+- Session call activity: an `activity` event of a model request is typed
+  in `call` (`NikaSessionCallMark`: its `ordinal` in the turn, `role`,
+  requested `model`, `state`, and, when its producer reported them,
+  `at_ms`, `elapsed_ms`, `input_tokens` and `output_tokens`), and a tool
+  step names when it began and its reply's size (`at_ms`, `reply_bytes`).
+  Each member is checked where it is: a malformed one fails with its path,
+  never its value. Neither mark carries a prompt, an answer, arguments or a
+  reply.
 
 ### Changed
 

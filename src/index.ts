@@ -467,6 +467,7 @@ export type {
   NikaSessionAuthoringCalls,
   NikaSessionBinding,
   NikaSessionBusy,
+  NikaSessionCallMark,
   NikaSessionCandidate,
   NikaSessionCandidateFile,
   NikaSessionClosed,

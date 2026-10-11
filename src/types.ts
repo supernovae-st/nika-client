@@ -2531,12 +2531,39 @@ export interface NikaSessionToolMark {
   name: string;
   state: 'started' | 'finished' | 'failed' | (string & {});
   elapsed_ms?: number;
+  /** When the call began, in Unix milliseconds, when the run reported it. */
+  at_ms?: number;
+  /** The size of its reply in bytes, once it answered; never the reply. */
+  reply_bytes?: number;
   /**
    * `failed` only (ADR-148 point 11, engine pending): the tool's reply as a
    * host may show it, its obvious secret shapes redacted first, on one line,
    * at most 512 bytes (a cut is marked `…`).
    */
   reply?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * One physical model request an `activity` event reports (its `call`): its
+ * rank in the turn's activity scope (one-based), the compiler's exact role,
+ * the requested model (never proof of the model that served it), and where
+ * it is (`started`, about to leave; `finished`, returned, failures and
+ * timeouts included; `cancelled`, its preparation dropped before it
+ * returned). When it left (Unix milliseconds), how long it took and the
+ * tokens the provider reported (input with cached ones, output with
+ * reasoning) are present only when its producer reported them. Never a
+ * prompt, an answer or a credential.
+ */
+export interface NikaSessionCallMark {
+  ordinal: number;
+  role: string;
+  model: string;
+  state: 'started' | 'finished' | 'cancelled' | (string & {});
+  at_ms?: number;
+  elapsed_ms?: number;
+  input_tokens?: number;
+  output_tokens?: number;
   [key: string]: unknown;
 }
 
@@ -2646,4 +2673,6 @@ export interface NikaSessionEvent extends NikaSessionFrameBase {
   cursor?: string;
   /** An `activity` event of a conversation's run: the tool step it observed, when it is one. */
   tool?: NikaSessionToolMark;
+  /** An `activity` event of a model request: the request it reported, when it is one. */
+  call?: NikaSessionCallMark;
 }

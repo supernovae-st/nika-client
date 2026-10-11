@@ -1,0 +1,19 @@
+{
+    "base_sha256": null,
+    "candidate_sha256": "9bed10c11a81ed459b6f4476ad4ded57cb1b2f81da9b506f1687cede44c5eb16",
+    "changed": [
+        "component block:typed-inputs-outputs"
+    ],
+    "components": [
+        {
+            "bindings": [],
+            "file_sha256": "43624907bfe8fc891c03d6f2b7b8ca0f026887c34c0e6c02b705b69809598683",
+            "id": "block:typed-inputs-outputs",
+            "release": "6476372aa7eedf02e3b718dcd1c51769d97450eb0ae825a62b33fcf10a2471af",
+            "version": "knowledge-0.123.0-r2-publication-recut-20261008",
+            "witness": "expanded"
+        }
+    ],
+    "mode": "composed",
+    "preservation": "by construction: each component's entries inserted into the author's document; not re-verified byte by byte"
+}

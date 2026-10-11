@@ -1,0 +1,1007 @@
+{
+  "candidate": "# SPDX-License-Identifier: Apache-2.0\n# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json\n#\n# 08 · The deployment's knobs — one authority, two roles.\n#\n# THREE authorities can put a value in a workflow: `inputs:` (declared once,\n# supplied by the caller OR by its own `default:`) · `const:` (the author,\n# fixed in the file) · `secrets:` (a governed store reference, masked, and it\n# lives with the jobs · CONVENTIONS §3).\n#\n# A deployment knob — a region label, a verbosity switch — is an `inputs:`\n# entry with `required: false` and a `default:`. It used to have a block of\n# its own, `config:`, and that block is dead: it had zero usage in real work,\n# its `default:` was its only possible source, and under the taint lattice\n# `config.p` and `inputs.p` produced the SAME refusal by the same path. Two\n# authorities the checker cannot tell apart are one authority.\n#\n# Demonstrates ·\n#   - a knob · typed, `required: false`, `default:`-carrying\n#   - declared-only resolution · an undeclared `${{ inputs.x }}` is\n#     `NIKA-VAR-001` — the engine NEVER falls back to the OS environment\n#     (spec/01-envelope.md §inputs)\n#   - `when:` on a knob · a quiet run and a verbose run, one file\n#   - who supplies what · `--var` reaches every `inputs:` entry, knob or not\n#\n# Run · nika run examples/08-config-values.nika\n#   The verbose twin · flip `verbose.default` to true and run again.\n\nnika: config-values\n\npermits:\n  tools: [\"nika:jq\", \"nika:log\"]\n\ninputs:\n  team:\n    type: string\n    default: \"atelier\"\n    required: true\n    description: \"Whose report this is — the CALLER's value · --var team=…\"\n  # The deployment's knobs — `required: false` + a `default:` is what makes\n  # this file runnable everywhere with nobody supplying anything. Never a\n  # credential here: an input's value appears in logs and traces\n  # (spec/01-envelope.md §secrets) — a value that must stay masked belongs\n  # to `secrets:`.\n  region:\n    required: false\n    type: string\n    default: \"eu\"\n    description: \"Which region label the report carries\"\n  verbose:\n    required: false\n    type: bool\n    default: false\n    description: \"Emit the debug dump task when true\"\n\nconst:\n  # The author's number — fixed in the file, never supplied by anyone.\n  window_days: 7\n\ntasks:\n  report:\n    invoke:\n      tool: \"nika:jq\"\n      args:\n        input:\n          team: \"${{ inputs.team }}\"\n          region: \"${{ inputs.region }}\"\n          window_days: \"${{ const.window_days }}\"\n        expression: '. + {title: \"\\(.team) · \\(.region) · last \\(.window_days) days\"}'\n\n  debug_dump:\n    with:\n      report: ${{ tasks.report.output }}\n    # A knob routes WORK — it never stands in for a human decision\n    # (spec/10-authority.md · \"a `when:` on an input flag is not a gate\").\n    # False by default: this task settles `skipped`, and nothing downstream\n    # reads it, so the quiet run stays quiet. The shape rule (cel-subset)\n    # wants an explicit relation — `== true`, never the bare flag.\n    when: ${{ inputs.verbose == true }}\n    invoke:\n      tool: \"nika:log\"\n      args:\n        level: debug\n        message: \"full report object\"\n        data: \"${{ with.report }}\"\n\noutputs:\n  report:\n    value: ${{ tasks.report.output }}\n    description: \"The shaped report · title carries team + region + window\"\n",
+  "check_preview": {
+    "report": {
+      "analysis": {
+        "blast_radius": [
+          {
+            "blocks": 1,
+            "task": "report"
+          }
+        ],
+        "pinch_points": [
+          "report",
+          "debug_dump"
+        ],
+        "width": 1,
+        "width_witness": [
+          "debug_dump"
+        ]
+      },
+      "capability_escapes": [],
+      "certificate": {
+        "derivation": [
+          {
+            "attempts": 1,
+            "deps": [],
+            "fanout": {
+              "known": 1
+            },
+            "finally_effect": 0,
+            "finally_llm": 0,
+            "finally_spend_micros": 0,
+            "main_effect": 1,
+            "main_llm": 0,
+            "main_spend_micros": 0,
+            "task": "report"
+          },
+          {
+            "attempts": 1,
+            "deps": [
+              "report"
+            ],
+            "fanout": {
+              "known": 1
+            },
+            "finally_effect": 0,
+            "finally_llm": 0,
+            "finally_spend_micros": 0,
+            "main_effect": 1,
+            "main_llm": 0,
+            "main_spend_micros": 0,
+            "task": "debug_dump"
+          }
+        ],
+        "effect_calls": {
+          "constant": 2,
+          "terms": []
+        },
+        "effects": {
+          "boundary_declared": true,
+          "escapes": 0,
+          "needed": {
+            "exec": false,
+            "tools": [
+              "nika:jq",
+              "nika:log"
+            ]
+          }
+        },
+        "llm_calls": {
+          "constant": 0,
+          "terms": []
+        },
+        "span_attempts": 2,
+        "task_attempts": {
+          "constant": 2,
+          "terms": []
+        },
+        "usd_micros": {
+          "constant": 0,
+          "terms": []
+        }
+      },
+      "composition": [],
+      "conformance": [],
+      "consent_findings": [],
+      "cost": {
+        "bounded_total_usd": 0.0,
+        "has_unbounded": false,
+        "min_path_total_usd": 0.0,
+        "tasks": []
+      },
+      "data_journey": {
+        "classification": "internal",
+        "consents": [],
+        "destinations": [],
+        "model_endpoints": [],
+        "secrets_used": [],
+        "sources": [],
+        "trace_retention": [],
+        "writes": []
+      },
+      "energy": {
+        "counts": {
+          "never_runs": 0,
+          "total": 0,
+          "uncapped": 0,
+          "unpriced": 0,
+          "unpriced_local": 0
+        },
+        "scope_subtotals": [],
+        "tasks": []
+      },
+      "exec_floor_findings": [],
+      "findings": [],
+      "gate_findings": [],
+      "hints": [],
+      "lift_findings": [],
+      "missing_args": [],
+      "order_findings": [],
+      "permit_taints": [],
+      "permits": {
+        "declared": {
+          "tools": [
+            "nika:jq",
+            "nika:log"
+          ]
+        },
+        "needed": {
+          "exec": false,
+          "tools": [
+            "nika:jq",
+            "nika:log"
+          ]
+        },
+        "notes": [],
+        "partial": {
+          "composed": false,
+          "exec": false,
+          "fs": false,
+          "net": false
+        },
+        "source": "declared"
+      },
+      "report_version": 1,
+      "requirements": {
+        "inputs_read": [
+          "region",
+          "team",
+          "verbose"
+        ],
+        "inputs_required": [],
+        "models": [],
+        "secrets": []
+      },
+      "retry_safety_findings": [],
+      "run_decl_findings": [],
+      "schema_findings": [],
+      "schema_lints": [],
+      "secret_egresses": [],
+      "secret_leaks": [],
+      "sink_findings": [],
+      "slot_findings": [],
+      "trifecta_findings": [],
+      "trifecta_mitigations": [],
+      "unknown_args": [],
+      "unknown_tools": [],
+      "unverifiable_output_refs": [],
+      "waves": [
+        [
+          0
+        ],
+        [
+          1
+        ]
+      ],
+      "workflow_semantic": null,
+      "write_conflicts": []
+    },
+    "scope": "sourceOnly"
+  },
+  "compile_version": 2,
+  "diagnostics": [
+    {
+      "kind": "applied",
+      "message": "The authoring conversation recorded 1 round(s), including 1 candidate or sketch judgment(s): round 0: accepted.",
+      "target": "authoring_native"
+    }
+  ],
+  "provenance": {
+    "authoring": {
+      "backend": null,
+      "calls": 2,
+      "context": [
+        {
+          "call": "document",
+          "elapsed_ms": 0,
+          "instruction_sha256": "2bce75bb1f0ea370255b897dacbf5d604679f55f1a452efd741302090f024ebe",
+          "max_output_tokens": 8192,
+          "message_bytes": 82031,
+          "reasoning": {
+            "configured": null,
+            "reasoning_tokens": null,
+            "response_model": null,
+            "served": "unknown",
+            "transmitted": "unobserved"
+          },
+          "references": [
+            {
+              "bytes": 108,
+              "id": "family:C11",
+              "kind": "family",
+              "sha256": "5619a87a3799bc23eee1755011f697db83052ffd3273defceeea0eebcd511f12"
+            },
+            {
+              "bytes": 116,
+              "id": "family:D16",
+              "kind": "family",
+              "sha256": "3f6e08c5be56a751d795800bc53961e471cfe8d4179297e9756c3331de3ca419"
+            },
+            {
+              "bytes": 115,
+              "id": "family:H05",
+              "kind": "family",
+              "sha256": "1133783ef4cce4ead7bc02ca890352275a570527ee3bd6b2fcd03b048195883f"
+            },
+            {
+              "bytes": 85,
+              "id": "family:H12",
+              "kind": "family",
+              "sha256": "64ec7809985efcad469fda1d9c788f48e1bf14c204d86a5a660c71e8b6898545"
+            },
+            {
+              "bytes": 138,
+              "id": "family:B18",
+              "kind": "family",
+              "sha256": "62c9ed7951d9acea7c05cd02a217869baf68c02c513aebf613b022af9ec5347d"
+            },
+            {
+              "bytes": 79,
+              "id": "family:A07",
+              "kind": "family",
+              "sha256": "f408d2422bb0d41cec77ae2e513af8c35ed27a0b69106f7da6d146310b016dbf"
+            },
+            {
+              "bytes": 6058,
+              "id": "skeleton:human-gated-ship",
+              "kind": "skeleton",
+              "sha256": "07b43707bfc08baf146287151b883899e7f56d822cbfba57dfb4efb396fbaab0"
+            },
+            {
+              "bytes": 102,
+              "id": "family:J15",
+              "kind": "family",
+              "sha256": "a80c0e89ef6c173935f26a03a388f362a8f0ae6a53417a769b0c0c991ba05dd1"
+            },
+            {
+              "bytes": 140,
+              "id": "family:B16",
+              "kind": "family",
+              "sha256": "8b34c241896738da53fffe1d4e4bff79d1ef56e562e5ad29006673e33f57d4ea"
+            },
+            {
+              "bytes": 602,
+              "id": "nika:read",
+              "kind": "callable",
+              "sha256": "fff39e4ea07d3c4ae37554df32320f3542c27e15a1b293a37a9c5e760122116d"
+            },
+            {
+              "bytes": 3590,
+              "id": "nika:write",
+              "kind": "callable",
+              "sha256": "48206ce8d11614bb26afa73617a45746f4a517976930d180dafc054867735d57"
+            },
+            {
+              "bytes": 502,
+              "id": "nika:glob",
+              "kind": "callable",
+              "sha256": "95aa17cfe1ab03216099821a2eaeecca2c56c13e7d9e1d698e9921f93e589bdc"
+            },
+            {
+              "bytes": 1751,
+              "id": "nika:jq",
+              "kind": "callable",
+              "sha256": "8428da51891358a9ac13278f6c3cc19867ec6c068d58a4e5580889d4058970b2"
+            },
+            {
+              "bytes": 3570,
+              "id": "nika:convert",
+              "kind": "callable",
+              "sha256": "a5f950e3865f8dd37753c89d412d582f88fb9cf01979f26c2e148cc1ab0b63e5"
+            },
+            {
+              "bytes": 2007,
+              "id": "nika:prompt",
+              "kind": "callable",
+              "sha256": "3d3d85d621bb318d37173505b31880bf63cdc38d3b16db94fad6794d137c62f0"
+            },
+            {
+              "bytes": 8733,
+              "id": "nika:fetch",
+              "kind": "callable",
+              "sha256": "e5ff229470c56700025334f15fc7ba9071aa27ef738781d89339e85dfb9d4ae2"
+            },
+            {
+              "bytes": 1712,
+              "id": "nika:notify",
+              "kind": "callable",
+              "sha256": "cb41dd7856f2cbaa3de5c554dc94787fffbbfa5b0d649a7e8831694acf871bd2"
+            },
+            {
+              "bytes": 1109,
+              "id": "nika:grep",
+              "kind": "callable",
+              "sha256": "63da77b711a29d52e9840e008cee0588a3ea0c6ff086ddf4e32627155b417d88"
+            },
+            {
+              "bytes": 853,
+              "id": "nika:assert",
+              "kind": "callable",
+              "sha256": "e8f64df0086ba485d35232b77f54aef17351388efb172cb5c825642ccd6b9666"
+            },
+            {
+              "bytes": 26574,
+              "id": "spec:workflow.schema.json",
+              "kind": "language",
+              "sha256": "2ee485310a02d13e97798e0985ba68a21c16c9ae046758f82a9771b360e630ce"
+            },
+            {
+              "bytes": 2,
+              "count": 0,
+              "id": "catalogue:components",
+              "kind": "components",
+              "release": null,
+              "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            }
+          ],
+          "response": {
+            "blocks": 1,
+            "bytes": 3573,
+            "sha256": "40245e19d41c83f33b75e7595926dc7c76de92ca42a667c6d0d21da1a018ed77"
+          },
+          "result": {
+            "input_tokens": 300,
+            "output_tokens": 200,
+            "stop_reason": "EndTurn",
+            "usage_reported": true
+          },
+          "schema_sha256": "ea9a1facb84d7c6aa379aa2a055117db1702fef135a5347c59824f330df4aa85",
+          "timeout_ms": 5000
+        },
+        {
+          "call": "judge_request",
+          "elapsed_ms": 0,
+          "instruction_sha256": "89e2e350a9eb9ea09159b9cd19208da5afd5715daf458350c1e3fc9e7ab4f121",
+          "max_output_tokens": 8192,
+          "message_bytes": 15177,
+          "reasoning": {
+            "configured": null,
+            "reasoning_tokens": null,
+            "response_model": null,
+            "served": "unknown",
+            "transmitted": "unobserved"
+          },
+          "references": [
+            {
+              "bytes": 5332,
+              "id": "conventions",
+              "kind": "conventions",
+              "sha256": "758b93f062817682977a8d632e56bede4d94b000df312619b1236d56a68242cb"
+            },
+            {
+              "bytes": 1529,
+              "id": "card#language",
+              "kind": "language",
+              "sha256": "e3faae4b2d792dd4b8a25926fed381a2587ee78772bd1a3b15f503e6ae629ad5"
+            },
+            {
+              "bytes": 1751,
+              "id": "nika:jq",
+              "kind": "callable",
+              "sha256": "8428da51891358a9ac13278f6c3cc19867ec6c068d58a4e5580889d4058970b2"
+            },
+            {
+              "bytes": 350,
+              "id": "nika:log",
+              "kind": "callable",
+              "sha256": "2d5392ba1907304f943e6232fdacfcc2996a90208568c689d17889891c269816"
+            }
+          ],
+          "response": {
+            "blocks": 1,
+            "bytes": 21,
+            "sha256": "d7e167e00be468f1025fede5e6563e3901d5f1194333fcc26e5a912e67474164"
+          },
+          "result": {
+            "input_tokens": 1,
+            "output_tokens": 1,
+            "stop_reason": "EndTurn",
+            "usage_reported": true
+          },
+          "schema_sha256": "ec698c79e4e8aed9febbae3dfdd14aebe1ca7c93129c5383ff51251bbd53b9ae",
+          "timeout_ms": 5000
+        }
+      ],
+      "elapsed_ms": 0,
+      "input_tokens": 301,
+      "model": "mock/authoring",
+      "output_tokens": 201,
+      "sampling": {
+        "effective": "providerDefaultUnknown",
+        "seed": null,
+        "temperature": null
+      }
+    },
+    "cognition": "explicitProvider",
+    "compiler_version": "0.122.0",
+    "decision": {
+      "agenda": [
+        {
+          "action": "compose: document",
+          "missing": {
+            "open_readings": false,
+            "untyped_clauses": 7,
+            "whole_reading": true
+          }
+        }
+      ],
+      "cold": {
+        "diagnostics": [],
+        "questions": [],
+        "status": "incomplete"
+      },
+      "document_create": {
+        "base_sha256": null,
+        "candidate_sha256": "032128e6e8b31f03d0edb19905aaae7e5abfc7090730ddb6aae649a2727321cc",
+        "changed": [],
+        "components": [],
+        "mode": "written",
+        "operations": 0,
+        "preservation": "none claimed: the author wrote the whole document",
+        "reuse": {
+          "absent": 0,
+          "consulted": 0,
+          "expanded": 0,
+          "invoked": 0,
+          "law": "reuse: a component is expanded (or invoked) when every node its receipt names is re-derived, digest for digest, from the candidate's own bytes, and every bound literal holds; a shown reference no receipt names is consulted; lexical overlap never decides",
+          "references": [],
+          "revised": 0
+        },
+        "route": "native: document"
+      },
+      "forensic": {
+        "attempts": [
+          {
+            "call": null,
+            "candidate_sha256": "032128e6e8b31f03d0edb19905aaae7e5abfc7090730ddb6aae649a2727321cc",
+            "diagnostics": 0,
+            "phase": "document",
+            "round": 0,
+            "sketch_sha256": null
+          }
+        ],
+        "calls": {
+          "decision_seat": {
+            "cold_choice": false,
+            "verification": [
+              {
+                "attempt": 0,
+                "attempted": 1,
+                "judge": "authoring_provider",
+                "returned": 1
+              }
+            ],
+            "warm_questions": 0
+          },
+          "generative": {
+            "by_role": {
+              "document": 1,
+              "judge_request": 1
+            },
+            "count": 2,
+            "delivery": {
+              "answered": 2
+            },
+            "failed": 0,
+            "input_tokens": 301,
+            "output_tokens": 201,
+            "usage": "complete"
+          }
+        },
+        "door": {
+          "name": "native_source",
+          "reason": "complete_document_door",
+          "source_owner": "model"
+        },
+        "doors_tried": {
+          "cold_plan": "not_tried",
+          "hot": {
+            "rejected": "6 unresolved clause(s); nothing recognized; 1 prose clause(s) the reader cannot parse; 3 constraint(s) with no operation to carry them"
+          },
+          "warm": "not_tried"
+        },
+        "evidence": {
+          "behavioral_judge": {
+            "state": "not_run",
+            "why": "rehearsal observes execution; no behavioral judge ran in this compile"
+          },
+          "candidate_sha256": "032128e6e8b31f03d0edb19905aaae7e5abfc7090730ddb6aae649a2727321cc",
+          "check": "clean",
+          "rehearsal": {
+            "state": "not_offered"
+          },
+          "satisfaction": "UNKNOWN",
+          "semantic_judge": {
+            "attempts": 1,
+            "candidate_binding": "bound",
+            "last_contested": 0,
+            "last_declined": false,
+            "last_defects": 0,
+            "last_settled_by": "verify-request",
+            "last_unknown": 0,
+            "state": "recorded"
+          },
+          "status": "ready"
+        },
+        "foundry": {
+          "attached": [],
+          "attached_not_presented": [],
+          "delivery_unknown": [],
+          "prepared": [
+            "family:C11",
+            "family:D16",
+            "family:H05",
+            "family:H12",
+            "family:B18",
+            "family:A07",
+            "skeleton:human-gated-ship",
+            "family:J15",
+            "family:B16",
+            "nika:read",
+            "nika:write",
+            "nika:glob",
+            "nika:jq",
+            "nika:convert",
+            "nika:prompt",
+            "nika:fetch",
+            "nika:notify",
+            "nika:grep",
+            "nika:assert",
+            "spec:workflow.schema.json",
+            "catalogue:components",
+            "conventions",
+            "card#language",
+            "nika:log"
+          ],
+          "presented": [
+            "family:C11",
+            "family:D16",
+            "family:H05",
+            "family:H12",
+            "family:B18",
+            "family:A07",
+            "skeleton:human-gated-ship",
+            "family:J15",
+            "family:B16",
+            "nika:read",
+            "nika:write",
+            "nika:glob",
+            "nika:jq",
+            "nika:convert",
+            "nika:prompt",
+            "nika:fetch",
+            "nika:notify",
+            "nika:grep",
+            "nika:assert",
+            "spec:workflow.schema.json",
+            "catalogue:components",
+            "conventions",
+            "card#language",
+            "nika:log"
+          ]
+        },
+        "identity": {
+          "card_sha256": "7c88a86714dd954795f01666f5c536bf51982d3e4420185557b27d9506bdac1b",
+          "conventions_sha256": "758b93f062817682977a8d632e56bede4d94b000df312619b1236d56a68242cb",
+          "engine": "0.122.0",
+          "foundry": null,
+          "pack": "0.2.0-draft",
+          "spec_pin": "41eab15111f7e3826d8fa525f4ac99052492e9bf"
+        },
+        "intent": {
+          "effective_sha256": "33d5c32ffb75e6af3461057aa0eebbff4bd5fb531a8f75c40192b66550f9ea80",
+          "kind": "create",
+          "original_sha256": "33d5c32ffb75e6af3461057aa0eebbff4bd5fb531a8f75c40192b66550f9ea80",
+          "replaced_by_clarification": false
+        },
+        "not_captured": [
+          "transform_program_proposals: the verified-transform calls keep their journal entries, not their decoded programs",
+          "decision_seat_usage: a caller's seat reports usage in its own receipt, outside this compile",
+          "behavioral_satisfaction: no behavioral judge compares observations with the request's obligations"
+        ],
+        "proposal": {
+          "author": "model",
+          "kind": "source",
+          "payload": "decision.native.rounds[*].candidate",
+          "state": "NOT_CAPTURED",
+          "why": "source-direct generation: the model wrote the candidate itself and no private semantic plan exists"
+        },
+        "universe": {
+          "state": "not_applicable",
+          "why": "this route built no finite candidate universe"
+        },
+        "version": 1
+      },
+      "intent_sha256": "33d5c32ffb75e6af3461057aa0eebbff4bd5fb531a8f75c40192b66550f9ea80",
+      "native": {
+        "accepted": true,
+        "identity": {
+          "card_sha256": "7c88a86714dd954795f01666f5c536bf51982d3e4420185557b27d9506bdac1b",
+          "conventions_sha256": "758b93f062817682977a8d632e56bede4d94b000df312619b1236d56a68242cb",
+          "engine": "0.122.0",
+          "pack": "0.2.0-draft",
+          "spec_pin": "41eab15111f7e3826d8fa525f4ac99052492e9bf"
+        },
+        "knowledge": null,
+        "references": [
+          {
+            "bytes": 108,
+            "id": "family:C11",
+            "kind": "family",
+            "sha256": "5619a87a3799bc23eee1755011f697db83052ffd3273defceeea0eebcd511f12"
+          },
+          {
+            "bytes": 116,
+            "id": "family:D16",
+            "kind": "family",
+            "sha256": "3f6e08c5be56a751d795800bc53961e471cfe8d4179297e9756c3331de3ca419"
+          },
+          {
+            "bytes": 115,
+            "id": "family:H05",
+            "kind": "family",
+            "sha256": "1133783ef4cce4ead7bc02ca890352275a570527ee3bd6b2fcd03b048195883f"
+          },
+          {
+            "bytes": 85,
+            "id": "family:H12",
+            "kind": "family",
+            "sha256": "64ec7809985efcad469fda1d9c788f48e1bf14c204d86a5a660c71e8b6898545"
+          },
+          {
+            "bytes": 138,
+            "id": "family:B18",
+            "kind": "family",
+            "sha256": "62c9ed7951d9acea7c05cd02a217869baf68c02c513aebf613b022af9ec5347d"
+          },
+          {
+            "bytes": 79,
+            "id": "family:A07",
+            "kind": "family",
+            "sha256": "f408d2422bb0d41cec77ae2e513af8c35ed27a0b69106f7da6d146310b016dbf"
+          },
+          {
+            "bytes": 6058,
+            "id": "skeleton:human-gated-ship",
+            "kind": "skeleton",
+            "sha256": "07b43707bfc08baf146287151b883899e7f56d822cbfba57dfb4efb396fbaab0"
+          },
+          {
+            "bytes": 102,
+            "id": "family:J15",
+            "kind": "family",
+            "sha256": "a80c0e89ef6c173935f26a03a388f362a8f0ae6a53417a769b0c0c991ba05dd1"
+          },
+          {
+            "bytes": 140,
+            "id": "family:B16",
+            "kind": "family",
+            "sha256": "8b34c241896738da53fffe1d4e4bff79d1ef56e562e5ad29006673e33f57d4ea"
+          },
+          {
+            "bytes": 602,
+            "id": "nika:read",
+            "kind": "callable",
+            "sha256": "fff39e4ea07d3c4ae37554df32320f3542c27e15a1b293a37a9c5e760122116d"
+          },
+          {
+            "bytes": 3590,
+            "id": "nika:write",
+            "kind": "callable",
+            "sha256": "48206ce8d11614bb26afa73617a45746f4a517976930d180dafc054867735d57"
+          },
+          {
+            "bytes": 502,
+            "id": "nika:glob",
+            "kind": "callable",
+            "sha256": "95aa17cfe1ab03216099821a2eaeecca2c56c13e7d9e1d698e9921f93e589bdc"
+          },
+          {
+            "bytes": 1751,
+            "id": "nika:jq",
+            "kind": "callable",
+            "sha256": "8428da51891358a9ac13278f6c3cc19867ec6c068d58a4e5580889d4058970b2"
+          },
+          {
+            "bytes": 3570,
+            "id": "nika:convert",
+            "kind": "callable",
+            "sha256": "a5f950e3865f8dd37753c89d412d582f88fb9cf01979f26c2e148cc1ab0b63e5"
+          },
+          {
+            "bytes": 2007,
+            "id": "nika:prompt",
+            "kind": "callable",
+            "sha256": "3d3d85d621bb318d37173505b31880bf63cdc38d3b16db94fad6794d137c62f0"
+          },
+          {
+            "bytes": 8733,
+            "id": "nika:fetch",
+            "kind": "callable",
+            "sha256": "e5ff229470c56700025334f15fc7ba9071aa27ef738781d89339e85dfb9d4ae2"
+          },
+          {
+            "bytes": 1712,
+            "id": "nika:notify",
+            "kind": "callable",
+            "sha256": "cb41dd7856f2cbaa3de5c554dc94787fffbbfa5b0d649a7e8831694acf871bd2"
+          },
+          {
+            "bytes": 1109,
+            "id": "nika:grep",
+            "kind": "callable",
+            "sha256": "63da77b711a29d52e9840e008cee0588a3ea0c6ff086ddf4e32627155b417d88"
+          },
+          {
+            "bytes": 853,
+            "id": "nika:assert",
+            "kind": "callable",
+            "sha256": "e8f64df0086ba485d35232b77f54aef17351388efb172cb5c825642ccd6b9666"
+          },
+          {
+            "bytes": 26574,
+            "id": "spec:workflow.schema.json",
+            "kind": "language",
+            "sha256": "2ee485310a02d13e97798e0985ba68a21c16c9ae046758f82a9771b360e630ce"
+          },
+          {
+            "bytes": 2,
+            "count": 0,
+            "id": "catalogue:components",
+            "kind": "components",
+            "release": null,
+            "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          }
+        ],
+        "refused_source": null,
+        "revision": null,
+        "rounds": [
+          {
+            "candidate_sha256": "032128e6e8b31f03d0edb19905aaae7e5abfc7090730ddb6aae649a2727321cc",
+            "changed": [],
+            "components": [],
+            "diagnostics": [],
+            "mode": "written",
+            "notes": {
+              "bytes": 8,
+              "reason": "document notes",
+              "sha256": "f4e1a209c1327917d06c4480845518078fe28345dde2a986ff4d1e5d43971c96",
+              "shape": {
+                "type": "not_json"
+              },
+              "withheld": true
+            },
+            "operations": 0,
+            "phase": "document",
+            "round": 0
+          }
+        ]
+      },
+      "retrieval": {
+        "by_intent": [
+          {
+            "id": "C11",
+            "kind": "family",
+            "score": 13.816
+          },
+          {
+            "id": "D16",
+            "kind": "family",
+            "score": 13.816
+          },
+          {
+            "id": "H05",
+            "kind": "family",
+            "score": 13.332
+          },
+          {
+            "id": "H12",
+            "kind": "family",
+            "score": 13.241
+          },
+          {
+            "id": "B18",
+            "kind": "family",
+            "score": 13.216
+          },
+          {
+            "id": "A07",
+            "kind": "family",
+            "score": 12.814
+          },
+          {
+            "id": "J15",
+            "kind": "family",
+            "score": 12.351
+          },
+          {
+            "id": "B16",
+            "kind": "family",
+            "score": 11.879
+          },
+          {
+            "id": "gate-and-act",
+            "kind": "skeleton",
+            "score": 11.874
+          },
+          {
+            "id": "human-gated-ship",
+            "kind": "skeleton",
+            "score": 11.466
+          }
+        ]
+      },
+      "route": [
+        "hot rejected: 6 unresolved clause(s); nothing recognized; 1 prose clause(s) the reader cannot parse; 3 constraint(s) with no operation to carry them",
+        "native: document",
+        "native: accepted",
+        "verify: judged (authoring_provider)"
+      ],
+      "semantic_verification": [
+        {
+          "attempt": 0,
+          "attempted": 1,
+          "candidate_sha256": "032128e6e8b31f03d0edb19905aaae7e5abfc7090730ddb6aae649a2727321cc",
+          "carried": false,
+          "consumed": 1,
+          "contested": [],
+          "context_sha256": "43ef41012679a6acff12b20e8bbaacb93cc105913c0ace8df05ebd8c93e10203",
+          "declined": false,
+          "defects": [],
+          "doubt": [],
+          "judge": {
+            "kind": "authoring_provider",
+            "seat": "mock/authoring"
+          },
+          "notes": [],
+          "questions": [
+            {
+              "choice": "faithful",
+              "confidence": null,
+              "input_tokens": 1,
+              "model": "mock/authoring",
+              "options": [
+                "faithful",
+                "unfaithful",
+                "none"
+              ],
+              "output_tokens": 1,
+              "probabilities": {},
+              "question": "verify-request",
+              "reasoning": {
+                "configured": null,
+                "reasoning_tokens": null,
+                "response_model": null,
+                "served": "unknown",
+                "transmitted": "unobserved"
+              },
+              "role": "judge_request"
+            }
+          ],
+          "read_back": 0,
+          "reference": {
+            "bytes": 9373,
+            "candidate": "parsed",
+            "identity": {
+              "card_sha256": "7c88a86714dd954795f01666f5c536bf51982d3e4420185557b27d9506bdac1b",
+              "conventions_sha256": "758b93f062817682977a8d632e56bede4d94b000df312619b1236d56a68242cb",
+              "engine": "0.122.0",
+              "pack": "0.2.0-draft",
+              "spec_pin": "41eab15111f7e3826d8fa525f4ac99052492e9bf"
+            },
+            "references": [
+              {
+                "bytes": 5332,
+                "id": "conventions",
+                "kind": "conventions",
+                "sha256": "758b93f062817682977a8d632e56bede4d94b000df312619b1236d56a68242cb"
+              },
+              {
+                "bytes": 1529,
+                "id": "card#language",
+                "kind": "language",
+                "sha256": "e3faae4b2d792dd4b8a25926fed381a2587ee78772bd1a3b15f503e6ae629ad5"
+              },
+              {
+                "bytes": 1751,
+                "id": "nika:jq",
+                "kind": "callable",
+                "sha256": "8428da51891358a9ac13278f6c3cc19867ec6c068d58a4e5580889d4058970b2"
+              },
+              {
+                "bytes": 350,
+                "id": "nika:log",
+                "kind": "callable",
+                "sha256": "2d5392ba1907304f943e6232fdacfcc2996a90208568c689d17889891c269816"
+              }
+            ],
+            "sha256": "25021764cf3e0d7a8c8540b80a40a75b070fe36c1b499f4b64707e542e5375b5",
+            "tools": [
+              "nika:jq",
+              "nika:log"
+            ],
+            "uncovered": []
+          },
+          "rejected": false,
+          "request": "A workflow named config-values. Declare team as a required string input defaulting to atelier, region as an optional string input defaulting to eu, and verbose as an optional bool input defaulting to false. Declare the author's fixed constant window_days as 7. A nika:jq task named report must return team, region and window_days and add the title \"<team> · <region> · last <window_days> days\". A separate debug_dump task must read the report and log the full report object at debug level only when inputs.verbose == true; that switch is a business condition, not a human approval. Expose the report output in the value/description form with description \"The shaped report · title carries team + region + window\". Keep this parameterized for later callers; do not replace inputs with fixed literals.\n",
+          "returned": 1,
+          "same_bytes_as": null,
+          "settled": true,
+          "settled_by": "verify-request",
+          "stopped": false,
+          "unknown": [],
+          "unsettled": [],
+          "usage": {
+            "calls": 1,
+            "complete": true,
+            "input_tokens": 1,
+            "output_tokens": 1
+          },
+          "whole_asked": true
+        }
+      ]
+    },
+    "plan": {
+      "bindings": [],
+      "document": {
+        "base_sha256": null,
+        "candidate_sha256": "032128e6e8b31f03d0edb19905aaae7e5abfc7090730ddb6aae649a2727321cc",
+        "components": [],
+        "mode": "written",
+        "request": "A workflow named config-values. Declare team as a required string input defaulting to atelier, region as an optional string input defaulting to eu, and verbose as an optional bool input defaulting to false. Declare the author's fixed constant window_days as 7. A nika:jq task named report must return team, region and window_days and add the title \"<team> · <region> · last <window_days> days\". A separate debug_dump task must read the report and log the full report object at debug level only when inputs.verbose == true; that switch is a business condition, not a human approval. Expose the report output in the value/description form with description \"The shaped report · title carries team + region + window\". Keep this parameterized for later callers; do not replace inputs with fixed literals.\n",
+        "version": 1
+      },
+      "document_create": {
+        "base_sha256": null,
+        "changed": [],
+        "components": [],
+        "mode": "written",
+        "operations": 0,
+        "preservation": "none claimed: the author wrote the whole document",
+        "resolved": "A workflow named config-values. Declare team as a required string input defaulting to atelier, region as an optional string input defaulting to eu, and verbose as an optional bool input defaulting to false. Declare the author's fixed constant window_days as 7. A nika:jq task named report must return team, region and window_days and add the title \"<team> · <region> · last <window_days> days\". A separate debug_dump task must read the report and log the full report object at debug level only when inputs.verbose == true; that switch is a business condition, not a human approval. Expose the report output in the value/description form with description \"The shaped report · title carries team + region + window\". Keep this parameterized for later callers; do not replace inputs with fixed literals.\n",
+        "route": "native: document"
+      },
+      "effects": [],
+      "gaps": [],
+      "intent_sha256": "33d5c32ffb75e6af3461057aa0eebbff4bd5fb531a8f75c40192b66550f9ea80",
+      "obligations": [],
+      "operations": [],
+      "operations_from": "candidate",
+      "questions": [],
+      "source": "# SPDX-License-Identifier: Apache-2.0\n# yaml-language-server: $schema=https://nika.sh/spec/v1/workflow.schema.json\n#\n# 08 · The deployment's knobs — one authority, two roles.\n#\n# THREE authorities can put a value in a workflow: `inputs:` (declared once,\n# supplied by the caller OR by its own `default:`) · `const:` (the author,\n# fixed in the file) · `secrets:` (a governed store reference, masked, and it\n# lives with the jobs · CONVENTIONS §3).\n#\n# A deployment knob — a region label, a verbosity switch — is an `inputs:`\n# entry with `required: false` and a `default:`. It used to have a block of\n# its own, `config:`, and that block is dead: it had zero usage in real work,\n# its `default:` was its only possible source, and under the taint lattice\n# `config.p` and `inputs.p` produced the SAME refusal by the same path. Two\n# authorities the checker cannot tell apart are one authority.\n#\n# Demonstrates ·\n#   - a knob · typed, `required: false`, `default:`-carrying\n#   - declared-only resolution · an undeclared `${{ inputs.x }}` is\n#     `NIKA-VAR-001` — the engine NEVER falls back to the OS environment\n#     (spec/01-envelope.md §inputs)\n#   - `when:` on a knob · a quiet run and a verbose run, one file\n#   - who supplies what · `--var` reaches every `inputs:` entry, knob or not\n#\n# Run · nika run examples/08-config-values.nika\n#   The verbose twin · flip `verbose.default` to true and run again.\n\nnika: config-values\n\npermits:\n  tools: [\"nika:jq\", \"nika:log\"]\n\ninputs:\n  team:\n    type: string\n    default: \"atelier\"\n    required: true\n    description: \"Whose report this is — the CALLER's value · --var team=…\"\n  # The deployment's knobs — `required: false` + a `default:` is what makes\n  # this file runnable everywhere with nobody supplying anything. Never a\n  # credential here: an input's value appears in logs and traces\n  # (spec/01-envelope.md §secrets) — a value that must stay masked belongs\n  # to `secrets:`.\n  region:\n    required: false\n    type: string\n    default: \"eu\"\n    description: \"Which region label the report carries\"\n  verbose:\n    required: false\n    type: bool\n    default: false\n    description: \"Emit the debug dump task when true\"\n\nconst:\n  # The author's number — fixed in the file, never supplied by anyone.\n  window_days: 7\n\ntasks:\n  report:\n    invoke:\n      tool: \"nika:jq\"\n      args:\n        input:\n          team: \"${{ inputs.team }}\"\n          region: \"${{ inputs.region }}\"\n          window_days: \"${{ const.window_days }}\"\n        expression: '. + {title: \"\\(.team) · \\(.region) · last \\(.window_days) days\"}'\n\n  debug_dump:\n    with:\n      report: ${{ tasks.report.output }}\n    # A knob routes WORK — it never stands in for a human decision\n    # (spec/10-authority.md · \"a `when:` on an input flag is not a gate\").\n    # False by default: this task settles `skipped`, and nothing downstream\n    # reads it, so the quiet run stays quiet. The shape rule (cel-subset)\n    # wants an explicit relation — `== true`, never the bare flag.\n    when: ${{ inputs.verbose == true }}\n    invoke:\n      tool: \"nika:log\"\n      args:\n        level: debug\n        message: \"full report object\"\n        data: \"${{ with.report }}\"\n\noutputs:\n  report:\n    value: ${{ tasks.report.output }}\n    description: \"The shaped report · title carries team + region + window\"\n",
+      "strategy": "native",
+      "trigger": null
+    },
+    "skeleton": null,
+    "spec_pin": "41eab15111f7e3826d8fa525f4ac99052492e9bf",
+    "strategy": "native",
+    "suggested_file": null
+  },
+  "questions": [],
+  "requested_boundary": {
+    "declared": {
+      "tools": [
+        "nika:jq",
+        "nika:log"
+      ]
+    },
+    "needed": {
+      "exec": false,
+      "tools": [
+        "nika:jq",
+        "nika:log"
+      ]
+    },
+    "notes": [],
+    "partial": {
+      "composed": false,
+      "exec": false,
+      "fs": false,
+      "net": false
+    },
+    "source": "declared"
+  },
+  "requested_trigger": null,
+  "status": "ready"
+}

@@ -105,6 +105,16 @@ jobs:
             echo "::error::candidate engine is missing the promised HTTP serve contract"
             exit 1
           fi
+          # The host merges its Session routes only into the document of a resident its operator
+          # starts with Sessions: a pin that declares them is compared with such a resident.
+          serve_sessions=()
+          if jq -e '.paths | keys | any(startswith("/v1/sessions"))' openapi.json >/dev/null; then
+            if [[ "$serve_help" != *"--sessions"* ]]; then
+              echo "::error::the pinned contract declares /v1/sessions; candidate nika serve has no --sessions"
+              exit 1
+            fi
+            serve_sessions=(--sessions)
+          fi
           probe_root=$(mktemp -d "${RUNNER_TEMP:-/tmp}/nika-client-candidate-type-drift.XXXXXX")
           project_dir="$probe_root/project"
           workflows_dir="$probe_root/workflows"
@@ -153,7 +163,8 @@ jobs:
               --workflows "$workflows_dir" \
               --token-file "$token_file" \
               --state-root "$state_dir" \
-              --plain
+              --plain \
+              "${serve_sessions[@]}"
           ) >"$probe_root/server.log" 2>&1 &
           server_pid=$!
           for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do

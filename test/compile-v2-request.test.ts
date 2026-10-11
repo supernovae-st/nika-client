@@ -66,7 +66,6 @@ describe('compile request vocabulary (no engine, no network)', () => {
     [{ intent: 'x', original_intent: 'y' }, /a create request carries its own intent/],
     [{ workflow: 'nika: w\n', change: { set_constant: { name: 'a', value: 1 } }, original_intent: 'y' }, /set_constant edit is applied without it/],
     [{ workflow: 'nika: w\n', change: 'c', workflow_id: 'w' }, /workflow_id belongs to a create request/],
-    [{ workflow: 'nika: w\n', change: 'c', decisionModel: 'typesafe/jev-1.13.0' }, /decisionModel belongs to a create request/],
     [{ workflow: 'nika: w\n', change: 'c', fresh: true }, /fresh belongs to a create request/],
     [{ intent: 'x', fresh: 'yes' }, /fresh must be a boolean/],
     [{ intent: 'x', workflow_id: '' }, /workflow_id must be a non-empty string/],

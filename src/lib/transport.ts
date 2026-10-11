@@ -15,11 +15,13 @@ import type {
   NikaScheduleApplyResult,
   NikaScheduleOptions,
   NikaScheduleStatus,
+  NikaSessionOptions,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
   NikaTransportKind,
   NikaWorkflowMetadata,
 } from '../types.js';
+import type { SessionChannel } from './session-host.js';
 
 export interface TransportRun {
   readonly id: NikaRunId;
@@ -45,4 +47,8 @@ export interface Transport {
     receipt: NikaReceipt,
     options: NikaTraceVerifyOptions,
   ): Promise<NikaTraceVerifyResult>;
+  /** Open the engine's authoring Session; `retention` bounds the events a native handle keeps. */
+  openSession(options: NikaSessionOptions, retention: number): Promise<SessionChannel>;
+  /** Attach to a live Session the door already holds (HTTP). */
+  attachSession(id: string, options: NikaSessionOptions): Promise<SessionChannel>;
 }

@@ -1,0 +1,61 @@
+{
+    "backend": null,
+    "calls": 2,
+    "elapsed_ms": 900,
+    "input_tokens": 1000,
+    "output_tokens": null,
+    "per_call": [
+        {
+            "call": "document",
+            "elapsed_ms": 700,
+            "failure_kind": null,
+            "input_tokens": 1000,
+            "instruction_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "max_output_tokens": 16384,
+            "message_bytes": 4096,
+            "output_tokens": 250,
+            "reasoning_effort": "high",
+            "reasoning_tokens": null,
+            "references": 2,
+            "schema_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "stop_reason": "EndTurn",
+            "timeout_ms": 600000,
+            "usage_reported": true
+        },
+        {
+            "call": "document-repair",
+            "elapsed_ms": 200,
+            "failure_kind": "timeout",
+            "input_tokens": null,
+            "instruction_sha256": null,
+            "max_output_tokens": 4096,
+            "message_bytes": 512,
+            "output_tokens": null,
+            "reasoning_effort": null,
+            "reasoning_tokens": null,
+            "references": null,
+            "schema_sha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+            "stop_reason": null,
+            "timeout_ms": 600000,
+            "usage_reported": null
+        },
+        {
+            "call": "revision",
+            "elapsed_ms": null,
+            "failure_kind": null,
+            "input_tokens": null,
+            "instruction_sha256": null,
+            "max_output_tokens": null,
+            "message_bytes": 128,
+            "output_tokens": null,
+            "reasoning_effort": null,
+            "reasoning_tokens": null,
+            "references": null,
+            "schema_sha256": null,
+            "stop_reason": "MaxTokens",
+            "timeout_ms": null,
+            "usage_reported": false
+        }
+    ],
+    "requested_model": "acme/author-model"
+}

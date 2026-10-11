@@ -81,6 +81,19 @@ describe.skipIf(!posix)('native compile generation 2 (local authoring seat)', ()
     expect(result).toMatchObject({ compile_version: 1, status: 'ready', ready: true });
   });
 
+  it('lets a revision seat a decision model beside its base, as the 0.123 engine takes it', async () => {
+    const { result, argvs } = await spawned(() => client().compile({
+      workflow: 'nika: w\n', change: 'Keep three days', original_intent: 'Keep two days',
+      authoringModel: MODEL, decisionModel: 'typesafe/jev-1.13.0',
+    }));
+    expect(argvs).toHaveLength(2);
+    const compile = argvs[1]!;
+    expect(compile.slice(0, 4)).toEqual(['compile', '--json', `--authoring-model=${MODEL}`,
+      '--decision-model=typesafe/jev-1.13.0']);
+    expect(compile.slice(compile.indexOf('--base') + 2)).toEqual(['--change=Keep three days', '--', 'Keep two days']);
+    expect(result).toMatchObject({ status: 'ready' });
+  });
+
   it('reads a provider round: generation 2 with its receipt, a choice question and the requested trigger', async () => {
     const outcome = await client().compile({ intent: 'native-intent', authoringModel: MODEL });
     expect(outcome.compile_version).toBe(2);

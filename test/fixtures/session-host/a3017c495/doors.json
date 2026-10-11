@@ -1,0 +1,3260 @@
+{
+  "native": {
+    "steer": {
+      "steps": [
+        {
+          "step": "steer_without_turn",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_e28d5bc5064f6309fa543d37a60c7213",
+            "event": 2,
+            "command": "s-0",
+            "op": "steer",
+            "replayed": false,
+            "receipt": "nothing_to_steer",
+            "target": null,
+            "snapshot": {
+              "snapshot": "snp_51f24ea18dafd78f195cf4b10f85e447",
+              "seq": 1,
+              "busy": null,
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": null,
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-native-steer-4HfJIm",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        },
+        {
+          "step": "steer",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_e28d5bc5064f6309fa543d37a60c7213",
+            "event": 6,
+            "command": "s-1",
+            "op": "steer",
+            "replayed": false,
+            "receipt": "queued",
+            "queued": {
+              "id": "l1",
+              "mode": "steer",
+              "line": "use b instead",
+              "state": "waiting"
+            },
+            "target": "c-1",
+            "snapshot": {
+              "snapshot": "snp_51f24ea18dafd78f195cf4b10f85e447",
+              "seq": 1,
+              "busy": {
+                "command": "c-1",
+                "phase": "preparing",
+                "stop_requested": false,
+                "queued": [
+                  {
+                    "id": "l1",
+                    "mode": "steer",
+                    "line": "use b instead",
+                    "state": "waiting"
+                  }
+                ]
+              },
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": null,
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-native-steer-4HfJIm",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        },
+        {
+          "step": "follow_up",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_e28d5bc5064f6309fa543d37a60c7213",
+            "event": 7,
+            "command": "f-1",
+            "op": "follow_up",
+            "replayed": false,
+            "receipt": "queued",
+            "queued": {
+              "id": "l2",
+              "mode": "follow_up",
+              "line": "and c",
+              "state": "waiting"
+            },
+            "target": "c-1",
+            "snapshot": {
+              "snapshot": "snp_51f24ea18dafd78f195cf4b10f85e447",
+              "seq": 1,
+              "busy": {
+                "command": "c-1",
+                "phase": "preparing",
+                "stop_requested": false,
+                "queued": [
+                  {
+                    "id": "l1",
+                    "mode": "steer",
+                    "line": "use b instead",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l2",
+                    "mode": "follow_up",
+                    "line": "and c",
+                    "state": "waiting"
+                  }
+                ]
+              },
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": null,
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-native-steer-4HfJIm",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        },
+        {
+          "step": "blank",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_e28d5bc5064f6309fa543d37a60c7213",
+            "event": 8,
+            "command": "s-2",
+            "op": "steer",
+            "replayed": false,
+            "receipt": "blank",
+            "target": "c-1",
+            "snapshot": {
+              "snapshot": "snp_51f24ea18dafd78f195cf4b10f85e447",
+              "seq": 1,
+              "busy": {
+                "command": "c-1",
+                "phase": "preparing",
+                "stop_requested": false,
+                "queued": [
+                  {
+                    "id": "l1",
+                    "mode": "steer",
+                    "line": "use b instead",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l2",
+                    "mode": "follow_up",
+                    "line": "and c",
+                    "state": "waiting"
+                  }
+                ]
+              },
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": null,
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-native-steer-4HfJIm",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        },
+        {
+          "step": "busy",
+          "snapshot": {
+            "snapshot": "snp_51f24ea18dafd78f195cf4b10f85e447",
+            "seq": 1,
+            "busy": {
+              "command": "c-1",
+              "phase": "preparing",
+              "stop_requested": false,
+              "queued": [
+                {
+                  "id": "l1",
+                  "mode": "steer",
+                  "line": "use b instead",
+                  "state": "waiting"
+                },
+                {
+                  "id": "l2",
+                  "mode": "follow_up",
+                  "line": "and c",
+                  "state": "waiting"
+                }
+              ]
+            },
+            "work": {
+              "authoring": null,
+              "candidate": null,
+              "contract": "nika/session-work@0",
+              "intelligence": {
+                "author": {
+                  "kind": "provider",
+                  "model": "vllm/agent-seat",
+                  "seat": null,
+                  "transport": null,
+                  "why": null
+                },
+                "decision": null,
+                "effort": null,
+                "selected": {
+                  "kind": "local",
+                  "locus": "local · private · project context stays on this machine",
+                  "model": "vllm/agent-seat",
+                  "ready": true,
+                  "refusal": null,
+                  "scope": "operator_default",
+                  "transport": null,
+                  "via": "vllm"
+                }
+              },
+              "knowledge": {
+                "by": "default",
+                "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                "source": "embedded",
+                "state": "admitted",
+                "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+              },
+              "rail": {
+                "active": "pending",
+                "checked": "pending",
+                "draft": "pending",
+                "run": "pending",
+                "saved": "pending"
+              },
+              "request": {
+                "decisions": [],
+                "goal": null,
+                "unresolved": []
+              },
+              "requested": null,
+              "root": "/private/tmp/nika-doors-native-steer-4HfJIm",
+              "run": null,
+              "saved": null,
+              "waiting": {
+                "kind": "free"
+              }
+            }
+          }
+        },
+        {
+          "step": "settled",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_e28d5bc5064f6309fa543d37a60c7213",
+            "event": 9,
+            "command": "c-1",
+            "op": "submit",
+            "replayed": false,
+            "outcomes": [
+              {
+                "kind": "reply",
+                "text": "Et la suite aussi."
+              }
+            ],
+            "snapshot": {
+              "snapshot": "snp_883916292236aed8194502370d4e8000",
+              "seq": 2,
+              "busy": null,
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "queued": [
+                  {
+                    "cite": "u2",
+                    "id": "l1",
+                    "line": "use b instead",
+                    "mode": "steer",
+                    "state": "entered"
+                  },
+                  {
+                    "cite": "u3",
+                    "id": "l2",
+                    "line": "and c",
+                    "mode": "follow_up",
+                    "state": "entered"
+                  }
+                ],
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": "fais moi un workflow tres simple qui recupere les news tech recentes, les resume et ecrit le resultat en markdown dans un dossier du projet",
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-native-steer-4HfJIm",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        },
+        {
+          "step": "steer_after_turn",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_e28d5bc5064f6309fa543d37a60c7213",
+            "event": 10,
+            "command": "s-3",
+            "op": "steer",
+            "replayed": false,
+            "receipt": "nothing_to_steer",
+            "target": null,
+            "snapshot": {
+              "snapshot": "snp_883916292236aed8194502370d4e8000",
+              "seq": 2,
+              "busy": null,
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "queued": [
+                  {
+                    "cite": "u2",
+                    "id": "l1",
+                    "line": "use b instead",
+                    "mode": "steer",
+                    "state": "entered"
+                  },
+                  {
+                    "cite": "u3",
+                    "id": "l2",
+                    "line": "and c",
+                    "mode": "follow_up",
+                    "state": "entered"
+                  }
+                ],
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": "fais moi un workflow tres simple qui recupere les news tech recentes, les resume et ecrit le resultat en markdown dans un dossier du projet",
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-native-steer-4HfJIm",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "activity": [
+        {
+          "contract": "nika/session-host@1",
+          "frame": "activity",
+          "session": "ses_e28d5bc5064f6309fa543d37a60c7213",
+          "event": 4,
+          "command": "c-1",
+          "phase": "knowledge",
+          "note": "models",
+          "done": false,
+          "tool": {
+            "call": "call_2",
+            "name": "models",
+            "state": "started"
+          },
+          "cursor": "ses_e28d5bc5064f6309fa543d37a60c7213:4"
+        },
+        {
+          "contract": "nika/session-host@1",
+          "frame": "activity",
+          "session": "ses_e28d5bc5064f6309fa543d37a60c7213",
+          "event": 5,
+          "command": "c-1",
+          "phase": "knowledge",
+          "note": "models failed · 0 ms",
+          "done": true,
+          "tool": {
+            "call": "call_2",
+            "name": "models",
+            "state": "failed",
+            "elapsed_ms": 0
+          },
+          "cursor": "ses_e28d5bc5064f6309fa543d37a60c7213:5"
+        }
+      ]
+    },
+    "models": {
+      "steps": [
+        {
+          "step": "settled",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_6b35a801c6fbdcf863ff7890e27a3551",
+            "event": 5,
+            "command": "c-1",
+            "op": "submit",
+            "replayed": false,
+            "outcomes": [
+              {
+                "kind": "question",
+                "key": "model",
+                "text": "Which model runs the workflow?"
+              }
+            ],
+            "snapshot": {
+              "snapshot": "snp_c13e7db58dedc495d324546ec9f2e54e",
+              "seq": 2,
+              "busy": null,
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "questions": [
+                  {
+                    "free_text": false,
+                    "id": "2d4ce174bffa931e36ff891d537f420c515bcab01a63ef876dfce04de476e83a",
+                    "key": "model",
+                    "multi_select": false,
+                    "options": [
+                      {
+                        "key": "catalogue",
+                        "label": "deepseek/deepseek-v4-pro",
+                        "recommended": true,
+                        "values": [
+                          {
+                            "choice": {
+                              "billing": "api_metered",
+                              "class": "api",
+                              "configured": false,
+                              "model": "deepseek/deepseek-v4-pro",
+                              "output_usd_per_million": 3.96,
+                              "role": "run",
+                              "via": "deepseek"
+                            },
+                            "role": "run_model",
+                            "value": "deepseek/deepseek-v4-pro"
+                          }
+                        ]
+                      },
+                      {
+                        "key": "loopback",
+                        "label": "vllm/agent-seat",
+                        "recommended": false,
+                        "values": [
+                          {
+                            "role": "run_model",
+                            "value": "vllm/agent-seat"
+                          }
+                        ]
+                      },
+                      {
+                        "key": "invented",
+                        "label": "acme/imaginary-1",
+                        "recommended": false,
+                        "values": [
+                          {
+                            "role": "run_model",
+                            "value": "acme/imaginary-1"
+                          }
+                        ]
+                      }
+                    ],
+                    "question": "Which model runs the workflow?",
+                    "role": "run_model",
+                    "state": "open"
+                  }
+                ],
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": "fais moi un workflow tres simple qui recupere les news tech recentes, les resume et ecrit le resultat en markdown dans un dossier du projet",
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-native-models-kTAW4F",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "id": "2d4ce174bffa931e36ff891d537f420c515bcab01a63ef876dfce04de476e83a",
+                  "key": "model",
+                  "kind": "question"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "activity": [
+        {
+          "contract": "nika/session-host@1",
+          "frame": "activity",
+          "session": "ses_6b35a801c6fbdcf863ff7890e27a3551",
+          "event": 3,
+          "command": "c-1",
+          "phase": "authoring",
+          "note": "ask",
+          "done": false,
+          "tool": {
+            "call": "call_2",
+            "name": "ask",
+            "state": "started"
+          },
+          "cursor": "ses_6b35a801c6fbdcf863ff7890e27a3551:3"
+        },
+        {
+          "contract": "nika/session-host@1",
+          "frame": "activity",
+          "session": "ses_6b35a801c6fbdcf863ff7890e27a3551",
+          "event": 4,
+          "command": "c-1",
+          "phase": "authoring",
+          "note": "ask · 357 ms",
+          "done": true,
+          "tool": {
+            "call": "call_2",
+            "name": "ask",
+            "state": "finished",
+            "elapsed_ms": 357
+          },
+          "cursor": "ses_6b35a801c6fbdcf863ff7890e27a3551:4"
+        }
+      ]
+    },
+    "stop": {
+      "steps": [
+        {
+          "step": "follow_up",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_63e3360c10966e96e28556047fbce57d",
+            "event": 3,
+            "command": "f-1",
+            "op": "follow_up",
+            "replayed": false,
+            "receipt": "queued",
+            "queued": {
+              "id": "l1",
+              "mode": "follow_up",
+              "line": "then stop",
+              "state": "waiting"
+            },
+            "target": "c-1",
+            "snapshot": {
+              "snapshot": "snp_7ddfa1499e6523ee809557b1ff46f9b4",
+              "seq": 1,
+              "busy": {
+                "command": "c-1",
+                "phase": "preparing",
+                "stop_requested": false,
+                "queued": [
+                  {
+                    "id": "l1",
+                    "mode": "follow_up",
+                    "line": "then stop",
+                    "state": "waiting"
+                  }
+                ]
+              },
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": null,
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-native-stop-qgw0Yl",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        },
+        {
+          "step": "stop",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_63e3360c10966e96e28556047fbce57d",
+            "event": 4,
+            "command": "x-1",
+            "op": "stop",
+            "replayed": false,
+            "receipt": "stop_requested",
+            "target": "c-1",
+            "snapshot": {
+              "snapshot": "snp_7ddfa1499e6523ee809557b1ff46f9b4",
+              "seq": 1,
+              "busy": {
+                "command": "c-1",
+                "phase": "preparing",
+                "stop_requested": true,
+                "queued": [
+                  {
+                    "id": "l1",
+                    "mode": "follow_up",
+                    "line": "then stop",
+                    "state": "waiting"
+                  }
+                ]
+              },
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": null,
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-native-stop-qgw0Yl",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        },
+        {
+          "step": "settled",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_63e3360c10966e96e28556047fbce57d",
+            "event": 5,
+            "command": "c-1",
+            "op": "submit",
+            "replayed": false,
+            "outcomes": [
+              {
+                "kind": "stopped",
+                "reach": "request_dropped",
+                "text": "stopped by you · the request under way was dropped; a request already sent may still be billed · the conversation and its draft are kept · not sent: « then stop »",
+                "unsent": [
+                  {
+                    "id": "l1",
+                    "mode": "follow_up",
+                    "line": "then stop",
+                    "state": "returned"
+                  }
+                ]
+              }
+            ],
+            "snapshot": {
+              "snapshot": "snp_3c2174aa476188adaf0b4677de7beb47",
+              "seq": 2,
+              "busy": null,
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "queued": [
+                  {
+                    "id": "l1",
+                    "line": "then stop",
+                    "mode": "follow_up",
+                    "state": "returned"
+                  }
+                ],
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": "fais moi un workflow tres simple qui recupere les news tech recentes, les resume et ecrit le resultat en markdown dans un dossier du projet",
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-native-stop-qgw0Yl",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "full": {
+      "steps": [
+        {
+          "step": "steer_32",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_28d216a83c4b96635078b3712936984c",
+            "event": 34,
+            "command": "s-32",
+            "op": "steer",
+            "replayed": false,
+            "receipt": "queued",
+            "queued": {
+              "id": "l32",
+              "mode": "steer",
+              "line": "line 32",
+              "state": "waiting"
+            },
+            "target": "c-1",
+            "snapshot": {
+              "snapshot": "snp_cbb55e49306c799a4d492f795cc39cbe",
+              "seq": 1,
+              "busy": {
+                "command": "c-1",
+                "phase": "preparing",
+                "stop_requested": false,
+                "queued": [
+                  {
+                    "id": "l1",
+                    "mode": "steer",
+                    "line": "line 1",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l2",
+                    "mode": "steer",
+                    "line": "line 2",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l3",
+                    "mode": "steer",
+                    "line": "line 3",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l4",
+                    "mode": "steer",
+                    "line": "line 4",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l5",
+                    "mode": "steer",
+                    "line": "line 5",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l6",
+                    "mode": "steer",
+                    "line": "line 6",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l7",
+                    "mode": "steer",
+                    "line": "line 7",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l8",
+                    "mode": "steer",
+                    "line": "line 8",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l9",
+                    "mode": "steer",
+                    "line": "line 9",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l10",
+                    "mode": "steer",
+                    "line": "line 10",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l11",
+                    "mode": "steer",
+                    "line": "line 11",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l12",
+                    "mode": "steer",
+                    "line": "line 12",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l13",
+                    "mode": "steer",
+                    "line": "line 13",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l14",
+                    "mode": "steer",
+                    "line": "line 14",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l15",
+                    "mode": "steer",
+                    "line": "line 15",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l16",
+                    "mode": "steer",
+                    "line": "line 16",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l17",
+                    "mode": "steer",
+                    "line": "line 17",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l18",
+                    "mode": "steer",
+                    "line": "line 18",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l19",
+                    "mode": "steer",
+                    "line": "line 19",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l20",
+                    "mode": "steer",
+                    "line": "line 20",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l21",
+                    "mode": "steer",
+                    "line": "line 21",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l22",
+                    "mode": "steer",
+                    "line": "line 22",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l23",
+                    "mode": "steer",
+                    "line": "line 23",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l24",
+                    "mode": "steer",
+                    "line": "line 24",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l25",
+                    "mode": "steer",
+                    "line": "line 25",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l26",
+                    "mode": "steer",
+                    "line": "line 26",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l27",
+                    "mode": "steer",
+                    "line": "line 27",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l28",
+                    "mode": "steer",
+                    "line": "line 28",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l29",
+                    "mode": "steer",
+                    "line": "line 29",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l30",
+                    "mode": "steer",
+                    "line": "line 30",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l31",
+                    "mode": "steer",
+                    "line": "line 31",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l32",
+                    "mode": "steer",
+                    "line": "line 32",
+                    "state": "waiting"
+                  }
+                ]
+              },
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": null,
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-native-full-lfJ3vS",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        },
+        {
+          "step": "steer_33",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_28d216a83c4b96635078b3712936984c",
+            "event": 35,
+            "command": "s-33",
+            "op": "steer",
+            "replayed": false,
+            "receipt": "full",
+            "target": "c-1",
+            "snapshot": {
+              "snapshot": "snp_cbb55e49306c799a4d492f795cc39cbe",
+              "seq": 1,
+              "busy": {
+                "command": "c-1",
+                "phase": "preparing",
+                "stop_requested": false,
+                "queued": [
+                  {
+                    "id": "l1",
+                    "mode": "steer",
+                    "line": "line 1",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l2",
+                    "mode": "steer",
+                    "line": "line 2",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l3",
+                    "mode": "steer",
+                    "line": "line 3",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l4",
+                    "mode": "steer",
+                    "line": "line 4",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l5",
+                    "mode": "steer",
+                    "line": "line 5",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l6",
+                    "mode": "steer",
+                    "line": "line 6",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l7",
+                    "mode": "steer",
+                    "line": "line 7",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l8",
+                    "mode": "steer",
+                    "line": "line 8",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l9",
+                    "mode": "steer",
+                    "line": "line 9",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l10",
+                    "mode": "steer",
+                    "line": "line 10",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l11",
+                    "mode": "steer",
+                    "line": "line 11",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l12",
+                    "mode": "steer",
+                    "line": "line 12",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l13",
+                    "mode": "steer",
+                    "line": "line 13",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l14",
+                    "mode": "steer",
+                    "line": "line 14",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l15",
+                    "mode": "steer",
+                    "line": "line 15",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l16",
+                    "mode": "steer",
+                    "line": "line 16",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l17",
+                    "mode": "steer",
+                    "line": "line 17",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l18",
+                    "mode": "steer",
+                    "line": "line 18",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l19",
+                    "mode": "steer",
+                    "line": "line 19",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l20",
+                    "mode": "steer",
+                    "line": "line 20",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l21",
+                    "mode": "steer",
+                    "line": "line 21",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l22",
+                    "mode": "steer",
+                    "line": "line 22",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l23",
+                    "mode": "steer",
+                    "line": "line 23",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l24",
+                    "mode": "steer",
+                    "line": "line 24",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l25",
+                    "mode": "steer",
+                    "line": "line 25",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l26",
+                    "mode": "steer",
+                    "line": "line 26",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l27",
+                    "mode": "steer",
+                    "line": "line 27",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l28",
+                    "mode": "steer",
+                    "line": "line 28",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l29",
+                    "mode": "steer",
+                    "line": "line 29",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l30",
+                    "mode": "steer",
+                    "line": "line 30",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l31",
+                    "mode": "steer",
+                    "line": "line 31",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l32",
+                    "mode": "steer",
+                    "line": "line 32",
+                    "state": "waiting"
+                  }
+                ]
+              },
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": null,
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-native-full-lfJ3vS",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "http": {
+    "steer": {
+      "steps": [
+        {
+          "step": "steer_without_turn",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_c32b2d2c423ea6d4bc2bbf9b9ac39eec",
+            "event": 2,
+            "command": "s-0",
+            "op": "steer",
+            "replayed": false,
+            "receipt": "nothing_to_steer",
+            "target": null,
+            "snapshot": {
+              "snapshot": "snp_5dc02a84d430c734c733fb06ef7cf8d1",
+              "seq": 1,
+              "busy": null,
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": null,
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-http-steer-YigfVN",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        },
+        {
+          "step": "steer",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_c32b2d2c423ea6d4bc2bbf9b9ac39eec",
+            "event": 6,
+            "command": "s-1",
+            "op": "steer",
+            "replayed": false,
+            "receipt": "queued",
+            "queued": {
+              "id": "l1",
+              "mode": "steer",
+              "line": "use b instead",
+              "state": "waiting"
+            },
+            "target": "c-1",
+            "snapshot": {
+              "snapshot": "snp_5dc02a84d430c734c733fb06ef7cf8d1",
+              "seq": 1,
+              "busy": {
+                "command": "c-1",
+                "phase": "preparing",
+                "stop_requested": false,
+                "queued": [
+                  {
+                    "id": "l1",
+                    "mode": "steer",
+                    "line": "use b instead",
+                    "state": "waiting"
+                  }
+                ]
+              },
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": null,
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-http-steer-YigfVN",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        },
+        {
+          "step": "follow_up",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_c32b2d2c423ea6d4bc2bbf9b9ac39eec",
+            "event": 7,
+            "command": "f-1",
+            "op": "follow_up",
+            "replayed": false,
+            "receipt": "queued",
+            "queued": {
+              "id": "l2",
+              "mode": "follow_up",
+              "line": "and c",
+              "state": "waiting"
+            },
+            "target": "c-1",
+            "snapshot": {
+              "snapshot": "snp_5dc02a84d430c734c733fb06ef7cf8d1",
+              "seq": 1,
+              "busy": {
+                "command": "c-1",
+                "phase": "preparing",
+                "stop_requested": false,
+                "queued": [
+                  {
+                    "id": "l1",
+                    "mode": "steer",
+                    "line": "use b instead",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l2",
+                    "mode": "follow_up",
+                    "line": "and c",
+                    "state": "waiting"
+                  }
+                ]
+              },
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": null,
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-http-steer-YigfVN",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        },
+        {
+          "step": "blank",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_c32b2d2c423ea6d4bc2bbf9b9ac39eec",
+            "event": 8,
+            "command": "s-2",
+            "op": "steer",
+            "replayed": false,
+            "receipt": "blank",
+            "target": "c-1",
+            "snapshot": {
+              "snapshot": "snp_5dc02a84d430c734c733fb06ef7cf8d1",
+              "seq": 1,
+              "busy": {
+                "command": "c-1",
+                "phase": "preparing",
+                "stop_requested": false,
+                "queued": [
+                  {
+                    "id": "l1",
+                    "mode": "steer",
+                    "line": "use b instead",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l2",
+                    "mode": "follow_up",
+                    "line": "and c",
+                    "state": "waiting"
+                  }
+                ]
+              },
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": null,
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-http-steer-YigfVN",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        },
+        {
+          "step": "busy",
+          "snapshot": {
+            "snapshot": "snp_5dc02a84d430c734c733fb06ef7cf8d1",
+            "seq": 1,
+            "busy": {
+              "command": "c-1",
+              "phase": "preparing",
+              "stop_requested": false,
+              "queued": [
+                {
+                  "id": "l1",
+                  "mode": "steer",
+                  "line": "use b instead",
+                  "state": "waiting"
+                },
+                {
+                  "id": "l2",
+                  "mode": "follow_up",
+                  "line": "and c",
+                  "state": "waiting"
+                }
+              ]
+            },
+            "work": {
+              "authoring": null,
+              "candidate": null,
+              "contract": "nika/session-work@0",
+              "intelligence": {
+                "author": {
+                  "kind": "provider",
+                  "model": "vllm/agent-seat",
+                  "seat": null,
+                  "transport": null,
+                  "why": null
+                },
+                "decision": null,
+                "effort": null,
+                "selected": {
+                  "kind": "local",
+                  "locus": "local · private · project context stays on this machine",
+                  "model": "vllm/agent-seat",
+                  "ready": true,
+                  "refusal": null,
+                  "scope": "operator_default",
+                  "transport": null,
+                  "via": "vllm"
+                }
+              },
+              "knowledge": {
+                "by": "default",
+                "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                "source": "embedded",
+                "state": "admitted",
+                "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+              },
+              "rail": {
+                "active": "pending",
+                "checked": "pending",
+                "draft": "pending",
+                "run": "pending",
+                "saved": "pending"
+              },
+              "request": {
+                "decisions": [],
+                "goal": null,
+                "unresolved": []
+              },
+              "requested": null,
+              "root": "/private/tmp/nika-doors-http-steer-YigfVN",
+              "run": null,
+              "saved": null,
+              "waiting": {
+                "kind": "free"
+              }
+            }
+          }
+        },
+        {
+          "step": "settled",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_c32b2d2c423ea6d4bc2bbf9b9ac39eec",
+            "event": 9,
+            "command": "c-1",
+            "op": "submit",
+            "replayed": false,
+            "outcomes": [
+              {
+                "kind": "reply",
+                "text": "Et la suite aussi."
+              }
+            ],
+            "snapshot": {
+              "snapshot": "snp_5c5c99f6f64aceba193e26646068d79a",
+              "seq": 2,
+              "busy": null,
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "queued": [
+                  {
+                    "cite": "u2",
+                    "id": "l1",
+                    "line": "use b instead",
+                    "mode": "steer",
+                    "state": "entered"
+                  },
+                  {
+                    "cite": "u3",
+                    "id": "l2",
+                    "line": "and c",
+                    "mode": "follow_up",
+                    "state": "entered"
+                  }
+                ],
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": "fais moi un workflow tres simple qui recupere les news tech recentes, les resume et ecrit le resultat en markdown dans un dossier du projet",
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-http-steer-YigfVN",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        },
+        {
+          "step": "steer_after_turn",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_c32b2d2c423ea6d4bc2bbf9b9ac39eec",
+            "event": 10,
+            "command": "s-3",
+            "op": "steer",
+            "replayed": false,
+            "receipt": "nothing_to_steer",
+            "target": null,
+            "snapshot": {
+              "snapshot": "snp_5c5c99f6f64aceba193e26646068d79a",
+              "seq": 2,
+              "busy": null,
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "queued": [
+                  {
+                    "cite": "u2",
+                    "id": "l1",
+                    "line": "use b instead",
+                    "mode": "steer",
+                    "state": "entered"
+                  },
+                  {
+                    "cite": "u3",
+                    "id": "l2",
+                    "line": "and c",
+                    "mode": "follow_up",
+                    "state": "entered"
+                  }
+                ],
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": "fais moi un workflow tres simple qui recupere les news tech recentes, les resume et ecrit le resultat en markdown dans un dossier du projet",
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-http-steer-YigfVN",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "activity": [
+        {
+          "contract": "nika/session-host@1",
+          "frame": "activity",
+          "session": "ses_c32b2d2c423ea6d4bc2bbf9b9ac39eec",
+          "event": 4,
+          "command": "c-1",
+          "phase": "knowledge",
+          "note": "models",
+          "done": false,
+          "tool": {
+            "call": "call_2",
+            "name": "models",
+            "state": "started"
+          },
+          "cursor": "ses_c32b2d2c423ea6d4bc2bbf9b9ac39eec:4"
+        },
+        {
+          "contract": "nika/session-host@1",
+          "frame": "activity",
+          "session": "ses_c32b2d2c423ea6d4bc2bbf9b9ac39eec",
+          "event": 5,
+          "command": "c-1",
+          "phase": "knowledge",
+          "note": "models failed · 0 ms",
+          "done": true,
+          "tool": {
+            "call": "call_2",
+            "name": "models",
+            "state": "failed",
+            "elapsed_ms": 0
+          },
+          "cursor": "ses_c32b2d2c423ea6d4bc2bbf9b9ac39eec:5"
+        }
+      ]
+    },
+    "models": {
+      "steps": [
+        {
+          "step": "settled",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_351ffe61fc04a30d7b51016bf71c6a38",
+            "event": 5,
+            "command": "c-1",
+            "op": "submit",
+            "replayed": false,
+            "outcomes": [
+              {
+                "kind": "question",
+                "key": "model",
+                "text": "Which model runs the workflow?"
+              }
+            ],
+            "snapshot": {
+              "snapshot": "snp_379beda4844f6d321dd20daf716b879e",
+              "seq": 2,
+              "busy": null,
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "questions": [
+                  {
+                    "free_text": false,
+                    "id": "2d4ce174bffa931e36ff891d537f420c515bcab01a63ef876dfce04de476e83a",
+                    "key": "model",
+                    "multi_select": false,
+                    "options": [
+                      {
+                        "key": "catalogue",
+                        "label": "deepseek/deepseek-v4-pro",
+                        "recommended": true,
+                        "values": [
+                          {
+                            "choice": {
+                              "billing": "api_metered",
+                              "class": "api",
+                              "configured": false,
+                              "model": "deepseek/deepseek-v4-pro",
+                              "output_usd_per_million": 3.96,
+                              "role": "run",
+                              "via": "deepseek"
+                            },
+                            "role": "run_model",
+                            "value": "deepseek/deepseek-v4-pro"
+                          }
+                        ]
+                      },
+                      {
+                        "key": "loopback",
+                        "label": "vllm/agent-seat",
+                        "recommended": false,
+                        "values": [
+                          {
+                            "role": "run_model",
+                            "value": "vllm/agent-seat"
+                          }
+                        ]
+                      },
+                      {
+                        "key": "invented",
+                        "label": "acme/imaginary-1",
+                        "recommended": false,
+                        "values": [
+                          {
+                            "role": "run_model",
+                            "value": "acme/imaginary-1"
+                          }
+                        ]
+                      }
+                    ],
+                    "question": "Which model runs the workflow?",
+                    "role": "run_model",
+                    "state": "open"
+                  }
+                ],
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": "fais moi un workflow tres simple qui recupere les news tech recentes, les resume et ecrit le resultat en markdown dans un dossier du projet",
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-http-models-URHniA",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "id": "2d4ce174bffa931e36ff891d537f420c515bcab01a63ef876dfce04de476e83a",
+                  "key": "model",
+                  "kind": "question"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "activity": [
+        {
+          "contract": "nika/session-host@1",
+          "frame": "activity",
+          "session": "ses_351ffe61fc04a30d7b51016bf71c6a38",
+          "event": 3,
+          "command": "c-1",
+          "phase": "authoring",
+          "note": "ask",
+          "done": false,
+          "tool": {
+            "call": "call_2",
+            "name": "ask",
+            "state": "started"
+          },
+          "cursor": "ses_351ffe61fc04a30d7b51016bf71c6a38:3"
+        },
+        {
+          "contract": "nika/session-host@1",
+          "frame": "activity",
+          "session": "ses_351ffe61fc04a30d7b51016bf71c6a38",
+          "event": 4,
+          "command": "c-1",
+          "phase": "authoring",
+          "note": "ask · 360 ms",
+          "done": true,
+          "tool": {
+            "call": "call_2",
+            "name": "ask",
+            "state": "finished",
+            "elapsed_ms": 360
+          },
+          "cursor": "ses_351ffe61fc04a30d7b51016bf71c6a38:4"
+        }
+      ]
+    },
+    "stop": {
+      "steps": [
+        {
+          "step": "follow_up",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_46ac93efdff24897b429ba8ffe3a3acc",
+            "event": 3,
+            "command": "f-1",
+            "op": "follow_up",
+            "replayed": false,
+            "receipt": "queued",
+            "queued": {
+              "id": "l1",
+              "mode": "follow_up",
+              "line": "then stop",
+              "state": "waiting"
+            },
+            "target": "c-1",
+            "snapshot": {
+              "snapshot": "snp_922132957c118bfc1159d809b38efb52",
+              "seq": 1,
+              "busy": {
+                "command": "c-1",
+                "phase": "preparing",
+                "stop_requested": false,
+                "queued": [
+                  {
+                    "id": "l1",
+                    "mode": "follow_up",
+                    "line": "then stop",
+                    "state": "waiting"
+                  }
+                ]
+              },
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": null,
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-http-stop-lU8V9g",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        },
+        {
+          "step": "stop",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_46ac93efdff24897b429ba8ffe3a3acc",
+            "event": 4,
+            "command": "x-1",
+            "op": "stop",
+            "replayed": false,
+            "receipt": "stop_requested",
+            "target": "c-1",
+            "snapshot": {
+              "snapshot": "snp_922132957c118bfc1159d809b38efb52",
+              "seq": 1,
+              "busy": {
+                "command": "c-1",
+                "phase": "preparing",
+                "stop_requested": true,
+                "queued": [
+                  {
+                    "id": "l1",
+                    "mode": "follow_up",
+                    "line": "then stop",
+                    "state": "waiting"
+                  }
+                ]
+              },
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": null,
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-http-stop-lU8V9g",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        },
+        {
+          "step": "settled",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_46ac93efdff24897b429ba8ffe3a3acc",
+            "event": 5,
+            "command": "c-1",
+            "op": "submit",
+            "replayed": false,
+            "outcomes": [
+              {
+                "kind": "stopped",
+                "reach": "request_dropped",
+                "text": "stopped by you · the request under way was dropped; a request already sent may still be billed · the conversation and its draft are kept · not sent: « then stop »",
+                "unsent": [
+                  {
+                    "id": "l1",
+                    "mode": "follow_up",
+                    "line": "then stop",
+                    "state": "returned"
+                  }
+                ]
+              }
+            ],
+            "snapshot": {
+              "snapshot": "snp_a1355ccf28a3be4b8f8b1d2ec5c6f16e",
+              "seq": 2,
+              "busy": null,
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "queued": [
+                  {
+                    "id": "l1",
+                    "line": "then stop",
+                    "mode": "follow_up",
+                    "state": "returned"
+                  }
+                ],
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": "fais moi un workflow tres simple qui recupere les news tech recentes, les resume et ecrit le resultat en markdown dans un dossier du projet",
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-http-stop-lU8V9g",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "full": {
+      "steps": [
+        {
+          "step": "steer_32",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_67a9daa47c0ad473fb96b9a9e21c8702",
+            "event": 34,
+            "command": "s-32",
+            "op": "steer",
+            "replayed": false,
+            "receipt": "queued",
+            "queued": {
+              "id": "l32",
+              "mode": "steer",
+              "line": "line 32",
+              "state": "waiting"
+            },
+            "target": "c-1",
+            "snapshot": {
+              "snapshot": "snp_63c573fe77034412a5f1ac31b73ad12a",
+              "seq": 1,
+              "busy": {
+                "command": "c-1",
+                "phase": "preparing",
+                "stop_requested": false,
+                "queued": [
+                  {
+                    "id": "l1",
+                    "mode": "steer",
+                    "line": "line 1",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l2",
+                    "mode": "steer",
+                    "line": "line 2",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l3",
+                    "mode": "steer",
+                    "line": "line 3",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l4",
+                    "mode": "steer",
+                    "line": "line 4",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l5",
+                    "mode": "steer",
+                    "line": "line 5",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l6",
+                    "mode": "steer",
+                    "line": "line 6",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l7",
+                    "mode": "steer",
+                    "line": "line 7",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l8",
+                    "mode": "steer",
+                    "line": "line 8",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l9",
+                    "mode": "steer",
+                    "line": "line 9",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l10",
+                    "mode": "steer",
+                    "line": "line 10",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l11",
+                    "mode": "steer",
+                    "line": "line 11",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l12",
+                    "mode": "steer",
+                    "line": "line 12",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l13",
+                    "mode": "steer",
+                    "line": "line 13",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l14",
+                    "mode": "steer",
+                    "line": "line 14",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l15",
+                    "mode": "steer",
+                    "line": "line 15",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l16",
+                    "mode": "steer",
+                    "line": "line 16",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l17",
+                    "mode": "steer",
+                    "line": "line 17",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l18",
+                    "mode": "steer",
+                    "line": "line 18",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l19",
+                    "mode": "steer",
+                    "line": "line 19",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l20",
+                    "mode": "steer",
+                    "line": "line 20",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l21",
+                    "mode": "steer",
+                    "line": "line 21",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l22",
+                    "mode": "steer",
+                    "line": "line 22",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l23",
+                    "mode": "steer",
+                    "line": "line 23",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l24",
+                    "mode": "steer",
+                    "line": "line 24",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l25",
+                    "mode": "steer",
+                    "line": "line 25",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l26",
+                    "mode": "steer",
+                    "line": "line 26",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l27",
+                    "mode": "steer",
+                    "line": "line 27",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l28",
+                    "mode": "steer",
+                    "line": "line 28",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l29",
+                    "mode": "steer",
+                    "line": "line 29",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l30",
+                    "mode": "steer",
+                    "line": "line 30",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l31",
+                    "mode": "steer",
+                    "line": "line 31",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l32",
+                    "mode": "steer",
+                    "line": "line 32",
+                    "state": "waiting"
+                  }
+                ]
+              },
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": null,
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-http-full-IleMI5",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        },
+        {
+          "step": "steer_33",
+          "frame": {
+            "contract": "nika/session-host@1",
+            "frame": "result",
+            "session": "ses_67a9daa47c0ad473fb96b9a9e21c8702",
+            "event": 35,
+            "command": "s-33",
+            "op": "steer",
+            "replayed": false,
+            "receipt": "full",
+            "target": "c-1",
+            "snapshot": {
+              "snapshot": "snp_63c573fe77034412a5f1ac31b73ad12a",
+              "seq": 1,
+              "busy": {
+                "command": "c-1",
+                "phase": "preparing",
+                "stop_requested": false,
+                "queued": [
+                  {
+                    "id": "l1",
+                    "mode": "steer",
+                    "line": "line 1",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l2",
+                    "mode": "steer",
+                    "line": "line 2",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l3",
+                    "mode": "steer",
+                    "line": "line 3",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l4",
+                    "mode": "steer",
+                    "line": "line 4",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l5",
+                    "mode": "steer",
+                    "line": "line 5",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l6",
+                    "mode": "steer",
+                    "line": "line 6",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l7",
+                    "mode": "steer",
+                    "line": "line 7",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l8",
+                    "mode": "steer",
+                    "line": "line 8",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l9",
+                    "mode": "steer",
+                    "line": "line 9",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l10",
+                    "mode": "steer",
+                    "line": "line 10",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l11",
+                    "mode": "steer",
+                    "line": "line 11",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l12",
+                    "mode": "steer",
+                    "line": "line 12",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l13",
+                    "mode": "steer",
+                    "line": "line 13",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l14",
+                    "mode": "steer",
+                    "line": "line 14",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l15",
+                    "mode": "steer",
+                    "line": "line 15",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l16",
+                    "mode": "steer",
+                    "line": "line 16",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l17",
+                    "mode": "steer",
+                    "line": "line 17",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l18",
+                    "mode": "steer",
+                    "line": "line 18",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l19",
+                    "mode": "steer",
+                    "line": "line 19",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l20",
+                    "mode": "steer",
+                    "line": "line 20",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l21",
+                    "mode": "steer",
+                    "line": "line 21",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l22",
+                    "mode": "steer",
+                    "line": "line 22",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l23",
+                    "mode": "steer",
+                    "line": "line 23",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l24",
+                    "mode": "steer",
+                    "line": "line 24",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l25",
+                    "mode": "steer",
+                    "line": "line 25",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l26",
+                    "mode": "steer",
+                    "line": "line 26",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l27",
+                    "mode": "steer",
+                    "line": "line 27",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l28",
+                    "mode": "steer",
+                    "line": "line 28",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l29",
+                    "mode": "steer",
+                    "line": "line 29",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l30",
+                    "mode": "steer",
+                    "line": "line 30",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l31",
+                    "mode": "steer",
+                    "line": "line 31",
+                    "state": "waiting"
+                  },
+                  {
+                    "id": "l32",
+                    "mode": "steer",
+                    "line": "line 32",
+                    "state": "waiting"
+                  }
+                ]
+              },
+              "work": {
+                "authoring": null,
+                "candidate": null,
+                "contract": "nika/session-work@0",
+                "intelligence": {
+                  "author": {
+                    "kind": "provider",
+                    "model": "vllm/agent-seat",
+                    "seat": null,
+                    "transport": null,
+                    "why": null
+                  },
+                  "decision": null,
+                  "effort": null,
+                  "selected": {
+                    "kind": "local",
+                    "locus": "local · private · project context stays on this machine",
+                    "model": "vllm/agent-seat",
+                    "ready": true,
+                    "refusal": null,
+                    "scope": "operator_default",
+                    "transport": null,
+                    "via": "vllm"
+                  }
+                },
+                "knowledge": {
+                  "by": "default",
+                  "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+                  "source": "embedded",
+                  "state": "admitted",
+                  "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+                },
+                "rail": {
+                  "active": "pending",
+                  "checked": "pending",
+                  "draft": "pending",
+                  "run": "pending",
+                  "saved": "pending"
+                },
+                "request": {
+                  "decisions": [],
+                  "goal": null,
+                  "unresolved": []
+                },
+                "requested": null,
+                "root": "/private/tmp/nika-doors-http-full-IleMI5",
+                "run": null,
+                "saved": null,
+                "waiting": {
+                  "kind": "free"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

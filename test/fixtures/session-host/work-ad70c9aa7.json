@@ -1,0 +1,143 @@
+{
+  "source": "The wire nika-session-change asserts at engine ad70c9aa7 (crates/nika-session-change/src/work/tests.rs): the_knowledge_is_one_typed_state_on_the_wire, the KnowledgeChoice line, the_stage_times_ride_the_snapshot_as_the_decision_record_states_them, a_conversation_reaches_hosts_with_provenance_delegations_and_identities, an_interrupted_run_that_sealed_its_journal_is_told_from_one_cut_mid_flight. Where a test asserts part of a value, the rest follows the struct field order and skip rules at that commit. Engine serializer examples, not a live call.",
+  "knowledge": {
+    "admitted": {
+      "state": "admitted",
+      "source": "embedded",
+      "version": "knowledge-r2",
+      "manifest_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "by": "conversation"
+    },
+    "refused": {
+      "state": "refused",
+      "source": "snapshot",
+      "by": "environment",
+      "code": "ADMISSION_UNTRUSTED",
+      "cause": "no trusted expected identity"
+    },
+    "unread": {
+      "state": "unread",
+      "why": "knowledge off (NIKA_KNOWLEDGE=off)"
+    }
+  },
+  "waiting": {
+    "knowledge_choice": {
+      "kind": "knowledge_choice",
+      "line": "  summarize « today's » news\n"
+    },
+    "questions": {
+      "kind": "questions",
+      "ids": [
+        "witness-plan"
+      ]
+    }
+  },
+  "stages": {
+    "qualification_ms": 41870,
+    "trials": [
+      {
+        "attempt": "completed",
+        "elapsed_ms": 1912,
+        "runtime_bound_ms": 30000
+      },
+      {
+        "attempt": "never_attempted",
+        "elapsed_ms": null,
+        "runtime_bound_ms": 30000
+      }
+    ]
+  },
+  "conversation": {
+    "bindings": [
+      {
+        "role": "output_path",
+        "value": "./news/digest.md",
+        "provenance": {
+          "kind": "offered",
+          "message": "u2",
+          "question": "plan",
+          "option": "recommended"
+        }
+      },
+      {
+        "role": "read_source",
+        "value": "https://www.lemonde.fr/",
+        "provenance": {
+          "kind": "delegated",
+          "message": "u1",
+          "excerpt": "tu les choisis"
+        }
+      }
+    ],
+    "delegations": [
+      {
+        "message": "u1",
+        "excerpt": "tu les choisis",
+        "scope": "read_source"
+      }
+    ],
+    "questions": [
+      {
+        "id": "witness-plan",
+        "key": "plan",
+        "question": "Ça te va ?",
+        "state": "open",
+        "options": [
+          {
+            "key": "recommended",
+            "label": "Oui",
+            "recommended": true,
+            "values": [
+              {
+                "role": "output_path",
+                "value": "./news/digest.md"
+              }
+            ]
+          }
+        ],
+        "free_text": true,
+        "multi_select": false
+      },
+      {
+        "id": "witness-token",
+        "key": "token",
+        "question": "Un jeton ?",
+        "state": "after",
+        "after": [
+          "plan"
+        ],
+        "options": [],
+        "free_text": true,
+        "multi_select": false
+      }
+    ]
+  },
+  "runs": {
+    "stopped": {
+      "current": true,
+      "workflow": "held.nika",
+      "end": {
+        "end": "interrupted"
+      },
+      "trace": null,
+      "execution": "01a0ef11-0212-70de-a8b3-99de9427fccc",
+      "workflow_sha256": null,
+      "chain_head": "c0ffee",
+      "chain_len": 7,
+      "sealed": true
+    },
+    "cut": {
+      "current": true,
+      "workflow": "held.nika",
+      "end": {
+        "end": "interrupted"
+      },
+      "trace": null,
+      "execution": "01a0ef11-0212-70de-a8b3-99de9427fccc",
+      "workflow_sha256": null,
+      "chain_head": null,
+      "chain_len": null,
+      "sealed": false
+    }
+  }
+}

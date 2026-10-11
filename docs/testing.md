@@ -207,6 +207,82 @@ Released engine 0.120.3 supports native compile and its Serve advertises HTTP
 compile; 0.120.2 and older predate the route. This is a foundation test, not general intent authoring
 or execution admission qualification.
 
+The live `/v1/openapi.json` must equal the package's `openapi.json`. A
+candidate engine ahead of that pin is compared with the document named by
+`NIKA_COMPILE_PARITY_OPENAPI` instead (its own live export, never a hand-edited
+copy), and the report's `openapi_pin` says which document held. A pin that
+declares the `/v1/sessions` routes is compared with a resident started with
+`--sessions`, the only one whose document carries them
+(`openapi_pin.resident_sessions`); the candidate type drift in CI follows the
+same rule.
+
+The revision evidence of a real provider round runs only when you name a seat
+and the one variable holding its key; the key reaches the engine processes and
+is never printed:
+
+```sh
+NIKA_COMPILE_PROVIDER_MODEL=deepseek/deepseek-flash \
+NIKA_COMPILE_PROVIDER_ENV=DEEPSEEK_API_KEY \
+NIKA_BIN=… NIKA_COMPILE_PARITY_REPORT=… node scripts/run-compile-parity-e2e.mjs
+```
+
+`NIKA_COMPILE_NATIVE_MODEL` and `NIKA_COMPILE_SERVE_MODEL` give each door its
+own seat (a native seat may be an ACP harness such as `claude-code/…` or
+`codex/…`; Serve seats a direct provider), `NIKA_COMPILE_DECISION_MODEL` seats
+a decision model beside both doors' authors (a local revision takes it from
+engine `ae6845939` on), and `NIKA_COMPILE_PROVIDER_ENV` takes several variable names,
+comma-separated (`HOME`, `USER` and `LOGNAME` when a harness must find its own
+login: Claude Code reads its keychain sign-in by the account's name, and a
+missing name surfaces as "the app's sign-in has expired or was revoked"). Each
+row also keeps the outcome's own receipts whole (`raw`: the diagnostics,
+questions and provenance as the engine wrote them, with the candidate it still
+shows when nothing is ready), so a held or failed leg stays diagnosable.
+`NIKA_COMPILE_SERVE_FLAGS` gives the seated resident operator flags in its own
+words (`--authoring-max-calls`, `--authoring-repairs`, `--authoring-deadline`,
+`--authoring-timeout`, space-separated); absent, the resident's own defaults
+hold, and the report names which. Read those defaults in the engine's code,
+not its help: at engine `563ab54e9` an unset grant imposes no request, repair
+or round limit (only the route's transport capacities), although the help
+names defaults of one call, three repairs and 300 seconds; an explicit flag
+sets a limit the engine would not otherwise impose.
+
+The provider phase is watched within `NIKA_COMPILE_PROVIDER_WAIT_MS` per module
+system (six hours unless set): a bound of the harness's observation, recorded
+in the report, never a limit on the authoring. Each finished leg is kept as it
+lands; when the window passes, the legs that landed are reported with the bound
+(`not_exercised`, never failed) and no further generation is asked. The
+deterministic resident is stopped before the provider phase starts.
+
+Before anything is seated, the EDIT base runs on the binary over pages below,
+at and above both windows, with no model: it must keep 1, the requested change
+(two days to three) must keep 2, and the undecoded base it replaced must still
+fail with `NIKA-BUILTIN-JQ-001`, so the witness discriminates. A base that does
+not run as its request says stops the phase before any generation; the report
+keeps the witness (`provider.fixture_witness`).
+
+Each packed module system then runs two separate legs once per door, through a
+native seat and a seated resident. The EDIT leg revises one rich base
+(comments, Unicode, every envelope section); the CREATE leg writes a new
+document from words alone. These are separate generations, never compared byte
+for byte. Each must satisfy the evidence law: every revision stated binds the
+exact base sent and the exact candidate received by sha256, a kept plan states
+the decision's revision, a ready round keeps its plan and states the revision
+there, an `operations` revision keeps the base's untouched lines, a ready
+creation settles `plan.document` (version 1, no program base) on the exact
+candidate received, and the backend's model identities stay apart. A revision
+round that stated no revision, or a creation that settled no record (a
+mandatory question still open, a held or refused round, or words the engine
+settled without its author), did not exercise what the phase targets: its row says `exercised: false`, the report's `result` is
+`not_exercised` and the runner exits 1. A held round whose revision only the
+decision keeps is valid EDIT evidence. The report records each round's status,
+digests, calls, tokens, component receipts, backend members and the verifier's
+own diagnostics and records.
+
+`NIKA_COMPILE_PROVIDER_LEGS` picks the legs (`edit`, `create`; both by default)
+and `NIKA_COMPILE_CREATE_INTENT_FILE` replaces the CREATE leg's words with a
+file's, such as a language owner's pinned intent; the report names the words'
+source and sha256.
+
 The [2026-09-19 source-build receipt](../evidence/compile-4334e58b-20260919.json)
 records 14 cases across both doors and both module systems at that producer,
 with exact outcome parity and no resident-state or project-file mutation. Its
@@ -216,3 +292,189 @@ tarball is the unreleased PR candidate. The hashes identify those tested bytes.
 Compile source-build receipts live outside the published package, so recording
 a tarball hash does not change the bytes it identifies. They do not participate
 in the released-engine behavioral ledgers.
+
+## Authoring Session parity
+
+`scripts/run-session-parity-e2e.mjs` walks the authoring Session through both
+real doors of one frozen binary, from the packed package's CommonJS and ESM
+faces: `nika session --json` in a project, and a served project's
+`/v1/sessions` (the resident started with `NIKA_SESSION_SERVE_FLAGS`,
+`--sessions` by default). No Cargo, no provider: each walk gets a fresh
+project world (its `nika.yaml`, which a resident needs before it arms and
+listens, and one `notes/brief.md`, alike on both doors), its own `HOME` and a
+minimal environment, so the engine's deterministic compiler answers and every
+walk must say the same thing. A resident that does not listen is reported in
+its own words, from its error or its output.
+
+```sh
+NIKA_BIN=/absolute/path/to/nika NIKA_SESSION_PARITY_REPORT=… node scripts/run-session-parity-e2e.mjs
+```
+
+Each walk (`scripts/packed-consumers/session-scenario.cjs`) opens a Session,
+proposes a copy, answers the opening snapshot late (`stale_snapshot`, line
+kept, nothing saved), repeats a command with the same bytes (the recorded
+result, `replayed: true`, same event) and with other bytes (refused, nothing
+changed: the local handle refuses before sending, a resident answers
+`command_conflict`), reads details, shows that another Session's snapshot
+answers nothing (natively a second project's Session; a resident refuses a
+second live Session with `session_live`), consents (the saved bytes are exactly
+the previewed file's `content`, and nothing ran; an engine that projects only
+the BLAKE3 witness leaves the bytes unverified), stops with nothing under way,
+requests the Run and requires the Session's own observation of it (the saved
+workflow, ended `succeeded`) before reading the same project world for its
+output: a missing, failed, paused or foreign Run, or a polling deadline, fails
+whatever the files show, and `run_not_started` or `run_unobserved` leave the
+Run unclaimed. That the Run ran the saved bytes is proven only by the source
+hash the Session names for it (`work.run.workflow_sha256`, equal to the saved
+file's sha256): another hash fails, and a Session that names none leaves the
+bytes unproven (`not_exercised`), never passed. It
+then sends a request with a Stop right behind it, closes, compares the full
+event view with one resumed after the proposal, and after a restart answers
+the old snapshot (`unknown_snapshot`; a closed served Session cannot be
+attached).
+
+The report judges every walk check by check (`passed`, `failed`, or
+`not_exercised` with the engine's reason: a door this binary does not host, a
+Run the Session did not start or observe, a turn that settled before its
+Stop), compares the two doors up to the Save and the two module systems on
+each door, and names the engine binary's sha256, the SDK commit (and whether
+the tree was dirty), the package's sha256 and the scenario's own sha256. Its
+`result` is `green` only when every walk and comparison passed.
+
+A real intelligence's journey runs only when `NIKA_SESSION_JOURNEY_CHOICE`
+gives the Session's first screen its answer, in the Session's own words
+(`2 deepseek/<model>`, `1 acp:claude-code/<model>`, …).
+`NIKA_SESSION_JOURNEY_ENV` names the variables the engine processes receive
+(keys, and `HOME` when an app seat must find its sign-in: the journey then
+uses the person's own `HOME`); their values are never printed. The Session
+keeps a first-screen answer in `~/.nika/session-intelligence.json`, so with
+the person's own `HOME` the persona never answers that screen: the Session
+opens on the choice the person already keeps, and a journey counts for the
+requested seat only when each leg's Session shows that seat as its own
+selection, from the journey's first-screen answer on (a choice kept from
+elsewhere is reported as such, never relabelled).
+`NIKA_SESSION_JOURNEY_INTELLIGENCE` (instead of the choice; naming both is
+refused) opens each Session with the conversation's own intelligence
+(`openSession({ intelligence })`, an engine with `sessionIntelligence`):
+the first screen is never asked, nothing is kept for the operator, and the
+person's own `HOME` is then safe for an app seat's sign-in. The journey then
+requires of each leg's Session, CREATE and EDIT, the requested seat with
+`scope: conversation` in every frame it shows (the opened frame, each turn's
+snapshot, the frame the leg reached): a frame showing another seat or scope
+fails the leg, and an opened or reached frame showing none leaves it
+`not_exercised`, never passed. The operator's kept choice must read the same
+(presence and sha256, never its content) before and after the journey.
+`NIKA_SESSION_DECISION_MODEL` and `NIKA_AUTHORING_REASONING`, when set, seat
+the decision model and the reasoning effort through the engine's own
+environment. When an effort is asked of a seat reached over ACP, the journey
+also requires every authoring call of each leg (each turn's compile, not only
+the last) to have carried it, by the engine's own receipts: each call's
+`invoking` record paired by position with its end, the call asked it
+(`requested_effort`), a returned call had it taken by the ACP session
+(`transmitted_effort`) and read back (`configured_effort`), and the Session's
+configured `intelligence.effort` names it. Another value fails the leg; an
+incomplete receipt (a call with no end, an end with no invocation before it, a
+record that is neither an invocation nor a documented end `returned`,
+`failed`, `cancelled` or `timed_out`, calls counted that the receipt does not
+hold), receipts naming no effort, or
+a leg with no returned call leave it `not_exercised`.
+
+```sh
+NIKA_SESSION_JOURNEY_CHOICE='2 deepseek/deepseek-v4-flash' NIKA_SESSION_JOURNEY_ENV=DEEPSEEK_API_KEY \
+NIKA_BIN=… NIKA_SESSION_PARITY_REPORT=… node scripts/run-session-parity-e2e.mjs
+```
+
+On each door (`NIKA_SESSION_JOURNEY_DOORS`: `native` and/or `http`, each
+once, both by default; an empty or unknown selection is refused before
+anything runs, and a requested journey that walked no door is never green),
+one ESM consumer creates from words (`NIKA_SESSION_JOURNEY_CREATE_FILE`, by default
+the stale-tickets request of `test/fixtures/compile-evidence/recorded-fcdd44292`),
+saves, runs; then a new Session over the same project world revises in words
+(`NIKA_SESSION_JOURNEY_EDIT`, by default « Raise the age threshold to 72
+hours. »), saves and runs again. The project world holds tickets at and around
+both thresholds, so each Run's `out/report.json` must name exactly the tickets
+strictly older than 48, then 72 hours. The persona answers only what it was
+told: the first screen with its choice, a one-time cost choice only under
+`NIKA_SESSION_JOURNEY_ACCEPT_COST=1`, an authoring question only from
+`NIKA_SESSION_JOURNEY_ANSWERS` (a JSON object by question key), a resident's
+Run cost review, a Run's declared input only from the same answers (keyed by
+the input's name), and the consent to the proposal a leg reached; anything
+else stops the leg as `not_exercised` with what the Session waits on, without
+waiting out the polling deadline, and keeps the compiler's own draft (shown,
+never offered, such as a candidate a judge held) with its sha256, the raw
+work snapshot as the Session showed it and the Session's own details card.
+Every turn, Save and Run it keeps carries the Session's outcomes verbatim
+(`raw.outcomes`: a refusal's reason, a fact's text) beside their kinds. Time
+is kept on a monotonic clock: each Session's `open_ms` (the open alone), each
+turn's `ms`, and each leg's `timing.submit_to_settled_ms`, from its first line
+to the frame it settled on (a proposal, or a held candidate), beside
+`timing.author_ms`, the engine's own sum of its authoring calls, a lower bound
+of that wait. `NIKA_SESSION_JOURNEY_KEEP` (an absolute directory) keeps each
+door's own files before its scratch goes: the project's `.nika/` (the
+Session's record, consents, compile plans, run traces), a resident's state,
+each leg's captured world and each held draft as a file; nothing under HOME
+is read, and the report never names the directory. The
+journey's own bounds are bounds of its observation, never product limits,
+and never a verdict: it answers at most 24 lines per leg, waits for one turn
+and watches one Run within `NIKA_SESSION_JOURNEY_WAIT_MS` (30 minutes unless
+set). Past one, the leg ends `not_exercised` with that bound named and what
+the Session showed then (a cut wait never stops the turn); a genuine fault
+still fails the journey. Each leg is judged by its own evidence: a
+model authored the proposal (the call receipt and the author seat, never the
+selection alone), the Save landed exactly the proposed `content` and ran
+nothing, the EDIT proposal revises the created bytes into the saved workflow
+(its revision's base is their sha256, its candidate digest the saved bytes'
+sha256, proposed under the saved path), the Session observed a successful Run
+of the saved workflow, and that Run ran the saved bytes when the Session names
+their source hash (unproven, never passed, when it names none). Separate
+generations are never compared byte for byte.
+
+Each door's report also summarizes its legs (`legs.create`, `legs.edit`) for a
+requalification table, from the leg's own checks and receipts: `attempted`
+(a submit of its words was accepted: a turn settled on it, or the harness
+stopped waiting while the Session showed itself busy on that very command) and
+one outcome, `passed`, `failed` (a check of the leg failed, or a fault stopped
+it; a leg settled before the fault keeps its own verdicts), `provider_failure`
+(no proposal, and complete receipts show every authoring call invoked ended
+without an answer), `semantic_hold` (no proposal, the Session free, and complete
+receipts show a call answered), `not_exercised` (anything else unproven:
+incomplete receipts, a declared call count other than the receipt held or a
+call with no documented end, prove no cause; a leg whose requested seat went
+unproven is never attributed that seat's hold), or `not_attempted` (an earlier
+leg stopped first, or a fault came before its words were accepted, the EDIT
+Session's opening included). A fault the journey charged to a leg rides as its
+`fault`, apart from what the leg proved; one that came while a leg's Session
+closed, after the leg settled, fails the journey and rides as that leg's
+`lifecycle_fault`, never changing its verdict. Beside it ride the calls' ends, the timing and
+the reuse its proposal witnesses: each component of the revision the Session
+states for the bytes, with the engine's witness (`expanded`, `revised`,
+`absent`, `unwitnessed`), `reused`, the components expanded in the very bytes
+the consent saved, and `present_in_run`, those of them in the bytes a succeeded
+Run ran (`ran_exact`): the whole byte chain. Neither claims that each of a
+component's nodes executed (a branch or a skip may leave one unrun); with no
+task or trace witness read, that stays unknown. A proposal whose Session states
+no revision witnesses nothing (`observable: false`), never "none". The
+journey's `denominators` count CREATE and EDIT apart over the exercised doors:
+an EDIT behind a stopped CREATE was never attempted and counts in no EDIT
+denominator. Business verdicts stay apart from the route's completion: a full
+route is a door whose CREATE and EDIT both passed and whose Sessions both closed
+without a fault.
+
+`NIKA_SESSION_JOURNEY_WORLD` (an absolute path to an ES module) replaces the
+built-in tickets world with another case, kept outside this repository when its
+data is private. Its `prepare({ door, project, scratch, binary })` seeds the
+door's project and starts any service the case needs, and returns the CREATE
+and EDIT words, the persona's answers (an object by question key, or rules
+`{ key, text, line, why }` whose regular expressions match the question's key
+or its asking words), extra engine variables, the paths to `capture`, the
+`expectations` it judges by (named with their sha256), `judge(transcript)` and
+`close()`. The journey copies the captured paths after each leg's Run, outside
+the project, so a later leg cannot change what an earlier one is judged on; it
+records the exact saved bytes, the engine's own `nika check` of them in the
+project world and each Run's time window. `judge` returns each leg's checks
+(`passed`, `failed` or `not_exercised`), which replace the tickets report
+check; the journey's own checks (a reached proposal, a model's call receipt,
+the exact Save, a revision bound to the saved workflow, an observed successful
+Run of the saved workflow and of its bytes) stay. A leg the world does not
+judge is not exercised, and a malformed check fails. The report names the
+module by its file name and sha256, never by its path.

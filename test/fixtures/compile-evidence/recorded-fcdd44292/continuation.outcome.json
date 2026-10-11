@@ -1,0 +1,588 @@
+{
+  "candidate": null,
+  "check_preview": null,
+  "compile_version": 2,
+  "diagnostics": [
+    {
+      "kind": "applied",
+      "message": "The authoring conversation recorded 1 round(s), including 1 candidate or sketch judgment(s): round 0: accepted.",
+      "target": "authoring_native"
+    }
+  ],
+  "provenance": {
+    "authoring": {
+      "backend": null,
+      "calls": 1,
+      "context": [
+        {
+          "call": "document",
+          "elapsed_ms": 0,
+          "instruction_sha256": "bc117a46be5a1192ccf3d833e1c15ca061aa07afd29faea3536ea94d089987bd",
+          "max_output_tokens": 8192,
+          "message_bytes": 78501,
+          "reasoning": {
+            "configured": null,
+            "reasoning_tokens": null,
+            "response_model": null,
+            "served": "unknown",
+            "transmitted": "unobserved"
+          },
+          "references": [
+            {
+              "bytes": 78,
+              "id": "family:I03",
+              "kind": "family",
+              "sha256": "008a62279b7ed368170ca0b9f70a2e83202f5c33ab22ae08b6ed76b0b16c442f"
+            },
+            {
+              "bytes": 89,
+              "id": "family:D03",
+              "kind": "family",
+              "sha256": "03543540d711790b990eb6283e6446f1cebabfe305907650d44f95249f1394fe"
+            },
+            {
+              "bytes": 98,
+              "id": "family:G17",
+              "kind": "family",
+              "sha256": "8214a293940534916d886e9f8c59963008e1429d80cd210abb6eba1aaf40e47b"
+            },
+            {
+              "bytes": 102,
+              "id": "family:F29",
+              "kind": "family",
+              "sha256": "17bc47d7d69c7e18a3934e07187b25d134a2a1b19cc73a1f8e3dad4ce27c0515"
+            },
+            {
+              "bytes": 1992,
+              "id": "skeleton:gate-and-act",
+              "kind": "skeleton",
+              "sha256": "aaa5113086eb855d3dde20f8a9fba170c3dbf0cf68ab9700934328cc9dc7a1da"
+            },
+            {
+              "bytes": 3444,
+              "id": "skeleton:website-brief",
+              "kind": "skeleton",
+              "sha256": "ed29f502201fd0941703657f7d7396be839f0020ffa8cd46d731119c157915eb"
+            },
+            {
+              "bytes": 103,
+              "id": "family:A01",
+              "kind": "family",
+              "sha256": "40e3ef48f9f7b69c542e0f7925d0e9ab48288c26aafbc02fff50943dfb0bcdca"
+            },
+            {
+              "bytes": 602,
+              "id": "nika:read",
+              "kind": "callable",
+              "sha256": "fff39e4ea07d3c4ae37554df32320f3542c27e15a1b293a37a9c5e760122116d"
+            },
+            {
+              "bytes": 3590,
+              "id": "nika:write",
+              "kind": "callable",
+              "sha256": "48206ce8d11614bb26afa73617a45746f4a517976930d180dafc054867735d57"
+            },
+            {
+              "bytes": 502,
+              "id": "nika:glob",
+              "kind": "callable",
+              "sha256": "95aa17cfe1ab03216099821a2eaeecca2c56c13e7d9e1d698e9921f93e589bdc"
+            },
+            {
+              "bytes": 1751,
+              "id": "nika:jq",
+              "kind": "callable",
+              "sha256": "8428da51891358a9ac13278f6c3cc19867ec6c068d58a4e5580889d4058970b2"
+            },
+            {
+              "bytes": 3570,
+              "id": "nika:convert",
+              "kind": "callable",
+              "sha256": "a5f950e3865f8dd37753c89d412d582f88fb9cf01979f26c2e148cc1ab0b63e5"
+            },
+            {
+              "bytes": 2007,
+              "id": "nika:prompt",
+              "kind": "callable",
+              "sha256": "3d3d85d621bb318d37173505b31880bf63cdc38d3b16db94fad6794d137c62f0"
+            },
+            {
+              "bytes": 8733,
+              "id": "nika:fetch",
+              "kind": "callable",
+              "sha256": "e5ff229470c56700025334f15fc7ba9071aa27ef738781d89339e85dfb9d4ae2"
+            },
+            {
+              "bytes": 1712,
+              "id": "nika:notify",
+              "kind": "callable",
+              "sha256": "cb41dd7856f2cbaa3de5c554dc94787fffbbfa5b0d649a7e8831694acf871bd2"
+            },
+            {
+              "bytes": 26574,
+              "id": "spec:workflow.schema.json",
+              "kind": "language",
+              "sha256": "2ee485310a02d13e97798e0985ba68a21c16c9ae046758f82a9771b360e630ce"
+            },
+            {
+              "bytes": 2,
+              "count": 0,
+              "id": "catalogue:components",
+              "kind": "components",
+              "release": null,
+              "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+            }
+          ],
+          "response": {
+            "blocks": 1,
+            "bytes": 858,
+            "sha256": "f3631bf15f41c33c2c922c1268a89c0311d1104be3360aaa6da8bb7dc6e41d60"
+          },
+          "result": {
+            "input_tokens": 300,
+            "output_tokens": 200,
+            "stop_reason": "EndTurn",
+            "usage_reported": true
+          },
+          "schema_sha256": "ea9a1facb84d7c6aa379aa2a055117db1702fef135a5347c59824f330df4aa85",
+          "timeout_ms": 5000
+        }
+      ],
+      "elapsed_ms": 0,
+      "input_tokens": 300,
+      "model": "mock/authoring",
+      "output_tokens": 200,
+      "sampling": {
+        "effective": "providerDefaultUnknown",
+        "seed": null,
+        "temperature": null
+      }
+    },
+    "cognition": "explicitProvider",
+    "compiler_version": "0.122.0",
+    "decision": {
+      "agenda": [
+        {
+          "action": "compose: document",
+          "missing": {
+            "open_readings": false,
+            "untyped_clauses": 5,
+            "whole_reading": true
+          }
+        }
+      ],
+      "cold": {
+        "diagnostics": [],
+        "questions": [],
+        "status": "incomplete"
+      },
+      "document_create": {
+        "base_sha256": null,
+        "candidate_sha256": null,
+        "changed": [],
+        "components": [],
+        "mode": "written",
+        "operations": 0,
+        "preservation": "none claimed: the author wrote the whole document",
+        "reuse": {
+          "absent": 0,
+          "consulted": 0,
+          "expanded": 0,
+          "invoked": 0,
+          "law": "reuse: a component is expanded (or invoked) when every node its receipt names is re-derived, digest for digest, from the candidate's own bytes, and every bound literal holds; a shown reference no receipt names is consulted; lexical overlap never decides",
+          "references": [],
+          "revised": 0
+        },
+        "route": "native: document"
+      },
+      "forensic": {
+        "attempts": [
+          {
+            "call": null,
+            "candidate_sha256": "cb2cbd0755e49012ac46b8eb6d45d78589bfda447994ed2b91163da2b9f875b6",
+            "diagnostics": 0,
+            "phase": "document",
+            "round": 0,
+            "sketch_sha256": null
+          }
+        ],
+        "calls": {
+          "decision_seat": {
+            "cold_choice": false,
+            "verification": [],
+            "warm_questions": 0
+          },
+          "generative": {
+            "by_role": {
+              "document": 1
+            },
+            "count": 1,
+            "delivery": {
+              "answered": 1
+            },
+            "failed": 0,
+            "input_tokens": 300,
+            "output_tokens": 200,
+            "usage": "complete"
+          }
+        },
+        "door": {
+          "name": "native_source",
+          "reason": "complete_document_door",
+          "source_owner": "model"
+        },
+        "doors_tried": {
+          "cold_plan": "not_tried",
+          "hot": {
+            "rejected": "4 unresolved clause(s); `send` target is not explicit: that report as a JSON POST to our team webhook with nika:fetch; 1 prose clause(s) the reader cannot parse; 1 constraint(s) with no operation to carry them; cue `fetch` produced no element; `send` names content no step produces: report (that report as a JSON POST to our team webhook with nika:fetch)"
+          },
+          "warm": "not_tried"
+        },
+        "evidence": {
+          "behavioral_judge": {
+            "state": "not_run",
+            "why": "rehearsal observes execution; no behavioral judge ran in this compile"
+          },
+          "candidate_sha256": null,
+          "check": "not_run",
+          "rehearsal": {
+            "state": "not_offered"
+          },
+          "satisfaction": "UNKNOWN",
+          "semantic_judge": {
+            "state": "not_run"
+          },
+          "status": "incomplete"
+        },
+        "foundry": {
+          "attached": [],
+          "attached_not_presented": [],
+          "delivery_unknown": [],
+          "prepared": [
+            "family:I03",
+            "family:D03",
+            "family:G17",
+            "family:F29",
+            "skeleton:gate-and-act",
+            "skeleton:website-brief",
+            "family:A01",
+            "nika:read",
+            "nika:write",
+            "nika:glob",
+            "nika:jq",
+            "nika:convert",
+            "nika:prompt",
+            "nika:fetch",
+            "nika:notify",
+            "spec:workflow.schema.json",
+            "catalogue:components"
+          ],
+          "presented": [
+            "family:I03",
+            "family:D03",
+            "family:G17",
+            "family:F29",
+            "skeleton:gate-and-act",
+            "skeleton:website-brief",
+            "family:A01",
+            "nika:read",
+            "nika:write",
+            "nika:glob",
+            "nika:jq",
+            "nika:convert",
+            "nika:prompt",
+            "nika:fetch",
+            "nika:notify",
+            "spec:workflow.schema.json",
+            "catalogue:components"
+          ]
+        },
+        "identity": {
+          "card_sha256": "7c88a86714dd954795f01666f5c536bf51982d3e4420185557b27d9506bdac1b",
+          "conventions_sha256": "758b93f062817682977a8d632e56bede4d94b000df312619b1236d56a68242cb",
+          "engine": "0.122.0",
+          "foundry": null,
+          "pack": "0.2.0-draft",
+          "spec_pin": "41eab15111f7e3826d8fa525f4ac99052492e9bf"
+        },
+        "intent": {
+          "effective_sha256": "ea8fd9f749d211999d3661ad44c8cb365200ec780f4d779b8b5d47837965bca6",
+          "kind": "create",
+          "original_sha256": "ea8fd9f749d211999d3661ad44c8cb365200ec780f4d779b8b5d47837965bca6",
+          "replaced_by_clarification": false
+        },
+        "not_captured": [
+          "transform_program_proposals: the verified-transform calls keep their journal entries, not their decoded programs",
+          "decision_seat_usage: a caller's seat reports usage in its own receipt, outside this compile",
+          "behavioral_satisfaction: no behavioral judge compares observations with the request's obligations"
+        ],
+        "proposal": {
+          "author": "model",
+          "kind": "source",
+          "payload": "decision.native.rounds[*].candidate",
+          "state": "NOT_CAPTURED",
+          "why": "source-direct generation: the model wrote the candidate itself and no private semantic plan exists"
+        },
+        "universe": {
+          "state": "not_applicable",
+          "why": "this route built no finite candidate universe"
+        },
+        "version": 1
+      },
+      "intent_sha256": "ea8fd9f749d211999d3661ad44c8cb365200ec780f4d779b8b5d47837965bca6",
+      "native": {
+        "accepted": true,
+        "identity": {
+          "card_sha256": "7c88a86714dd954795f01666f5c536bf51982d3e4420185557b27d9506bdac1b",
+          "conventions_sha256": "758b93f062817682977a8d632e56bede4d94b000df312619b1236d56a68242cb",
+          "engine": "0.122.0",
+          "pack": "0.2.0-draft",
+          "spec_pin": "41eab15111f7e3826d8fa525f4ac99052492e9bf"
+        },
+        "knowledge": null,
+        "references": [
+          {
+            "bytes": 78,
+            "id": "family:I03",
+            "kind": "family",
+            "sha256": "008a62279b7ed368170ca0b9f70a2e83202f5c33ab22ae08b6ed76b0b16c442f"
+          },
+          {
+            "bytes": 89,
+            "id": "family:D03",
+            "kind": "family",
+            "sha256": "03543540d711790b990eb6283e6446f1cebabfe305907650d44f95249f1394fe"
+          },
+          {
+            "bytes": 98,
+            "id": "family:G17",
+            "kind": "family",
+            "sha256": "8214a293940534916d886e9f8c59963008e1429d80cd210abb6eba1aaf40e47b"
+          },
+          {
+            "bytes": 102,
+            "id": "family:F29",
+            "kind": "family",
+            "sha256": "17bc47d7d69c7e18a3934e07187b25d134a2a1b19cc73a1f8e3dad4ce27c0515"
+          },
+          {
+            "bytes": 1992,
+            "id": "skeleton:gate-and-act",
+            "kind": "skeleton",
+            "sha256": "aaa5113086eb855d3dde20f8a9fba170c3dbf0cf68ab9700934328cc9dc7a1da"
+          },
+          {
+            "bytes": 3444,
+            "id": "skeleton:website-brief",
+            "kind": "skeleton",
+            "sha256": "ed29f502201fd0941703657f7d7396be839f0020ffa8cd46d731119c157915eb"
+          },
+          {
+            "bytes": 103,
+            "id": "family:A01",
+            "kind": "family",
+            "sha256": "40e3ef48f9f7b69c542e0f7925d0e9ab48288c26aafbc02fff50943dfb0bcdca"
+          },
+          {
+            "bytes": 602,
+            "id": "nika:read",
+            "kind": "callable",
+            "sha256": "fff39e4ea07d3c4ae37554df32320f3542c27e15a1b293a37a9c5e760122116d"
+          },
+          {
+            "bytes": 3590,
+            "id": "nika:write",
+            "kind": "callable",
+            "sha256": "48206ce8d11614bb26afa73617a45746f4a517976930d180dafc054867735d57"
+          },
+          {
+            "bytes": 502,
+            "id": "nika:glob",
+            "kind": "callable",
+            "sha256": "95aa17cfe1ab03216099821a2eaeecca2c56c13e7d9e1d698e9921f93e589bdc"
+          },
+          {
+            "bytes": 1751,
+            "id": "nika:jq",
+            "kind": "callable",
+            "sha256": "8428da51891358a9ac13278f6c3cc19867ec6c068d58a4e5580889d4058970b2"
+          },
+          {
+            "bytes": 3570,
+            "id": "nika:convert",
+            "kind": "callable",
+            "sha256": "a5f950e3865f8dd37753c89d412d582f88fb9cf01979f26c2e148cc1ab0b63e5"
+          },
+          {
+            "bytes": 2007,
+            "id": "nika:prompt",
+            "kind": "callable",
+            "sha256": "3d3d85d621bb318d37173505b31880bf63cdc38d3b16db94fad6794d137c62f0"
+          },
+          {
+            "bytes": 8733,
+            "id": "nika:fetch",
+            "kind": "callable",
+            "sha256": "e5ff229470c56700025334f15fc7ba9071aa27ef738781d89339e85dfb9d4ae2"
+          },
+          {
+            "bytes": 1712,
+            "id": "nika:notify",
+            "kind": "callable",
+            "sha256": "cb41dd7856f2cbaa3de5c554dc94787fffbbfa5b0d649a7e8831694acf871bd2"
+          },
+          {
+            "bytes": 26574,
+            "id": "spec:workflow.schema.json",
+            "kind": "language",
+            "sha256": "2ee485310a02d13e97798e0985ba68a21c16c9ae046758f82a9771b360e630ce"
+          },
+          {
+            "bytes": 2,
+            "count": 0,
+            "id": "catalogue:components",
+            "kind": "components",
+            "release": null,
+            "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+          }
+        ],
+        "refused_source": null,
+        "revision": null,
+        "rounds": [
+          {
+            "candidate_sha256": "cb2cbd0755e49012ac46b8eb6d45d78589bfda447994ed2b91163da2b9f875b6",
+            "changed": [],
+            "components": [],
+            "diagnostics": [],
+            "mode": "written",
+            "notes": {
+              "bytes": 8,
+              "reason": "document notes",
+              "sha256": "f4e1a209c1327917d06c4480845518078fe28345dde2a986ff4d1e5d43971c96",
+              "shape": {
+                "type": "not_json"
+              },
+              "withheld": true
+            },
+            "operations": 0,
+            "phase": "document",
+            "round": 0
+          }
+        ]
+      },
+      "retrieval": {
+        "by_intent": [
+          {
+            "id": "I03",
+            "kind": "family",
+            "score": 16.204
+          },
+          {
+            "id": "D03",
+            "kind": "family",
+            "score": 9.461
+          },
+          {
+            "id": "G17",
+            "kind": "family",
+            "score": 8.798
+          },
+          {
+            "id": "F29",
+            "kind": "family",
+            "score": 8.246
+          },
+          {
+            "id": "gate-and-act",
+            "kind": "skeleton",
+            "score": 7.876
+          },
+          {
+            "id": "A01",
+            "kind": "family",
+            "score": 7.373
+          },
+          {
+            "id": "api-upload-and-create",
+            "kind": "skeleton",
+            "score": 7.276
+          },
+          {
+            "id": "website-brief",
+            "kind": "skeleton",
+            "score": 7.084
+          },
+          {
+            "id": "I04",
+            "kind": "family",
+            "score": 6.524
+          },
+          {
+            "id": "E30",
+            "kind": "family",
+            "score": 6.361
+          }
+        ]
+      },
+      "route": [
+        "hot rejected: 4 unresolved clause(s); `send` target is not explicit: that report as a JSON POST to our team webhook with nika:fetch; 1 prose clause(s) the reader cannot parse; 1 constraint(s) with no operation to carry them; cue `fetch` produced no element; `send` names content no step produces: report (that report as a JSON POST to our team webhook with nika:fetch)",
+        "native: document",
+        "native: accepted"
+      ]
+    },
+    "plan": {
+      "bindings": [],
+      "document_create": {
+        "base_sha256": null,
+        "changed": [],
+        "components": [],
+        "mode": "written",
+        "operations": 0,
+        "preservation": "none claimed: the author wrote the whole document",
+        "resolved": "A workflow named digest-sender. Declare team as a required string input. Declare the author's constant window_days as 7. A nika:jq task named report returns team and window_days as one object. Then send that report as a JSON POST to our team webhook with nika:fetch; its address is not known yet.\n",
+        "route": "native: document"
+      },
+      "effects": [
+        {
+          "evidence": "tasks.send",
+          "policy": "automatic",
+          "policy_literal": null,
+          "target": "${{ const.webhook_endpoint }}",
+          "verb": "send"
+        }
+      ],
+      "gaps": [],
+      "intent_sha256": "ea8fd9f749d211999d3661ad44c8cb365200ec780f4d779b8b5d47837965bca6",
+      "obligations": [],
+      "operations": [],
+      "operations_from": "candidate",
+      "questions": [
+        {
+          "answer_type": "literal",
+          "key": "const.webhook_endpoint",
+          "label": "The team webhook's HTTPS address",
+          "why": "the request names the webhook without its address"
+        }
+      ],
+      "source": "nika: digest-sender\ninputs:\n  team: { type: string, required: true }\nconst:\n  window_days: 7\n  webhook_endpoint: \"\"\npermits:\n  tools: [\"nika:jq\", \"nika:fetch\"]\n  net: { http: [] }\ntasks:\n  report:\n    invoke: { tool: \"nika:jq\", args: { input: { team: \"${{ inputs.team }}\", window_days: \"${{ const.window_days }}\" }, expression: \".\" } }\n  send:\n    with: { payload: \"${{ tasks.report.output }}\" }\n    invoke: { tool: \"nika:fetch\", args: { url: \"${{ const.webhook_endpoint }}\", method: POST, headers: { content-type: application/json }, body: \"${{ with.payload }}\" } }\n",
+      "strategy": "native",
+      "trigger": null
+    },
+    "skeleton": null,
+    "spec_pin": "41eab15111f7e3826d8fa525f4ac99052492e9bf",
+    "strategy": "native",
+    "suggested_file": null
+  },
+  "questions": [
+    {
+      "key": "const.webhook_endpoint",
+      "label": "The team webhook's HTTPS address",
+      "mandatory": true,
+      "type": "literal",
+      "why": "the request names the webhook without its address"
+    }
+  ],
+  "requested_boundary": null,
+  "requested_trigger": null,
+  "status": "incomplete"
+}

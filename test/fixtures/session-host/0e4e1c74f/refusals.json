@@ -1,0 +1,522 @@
+{
+  "native": [
+    {
+      "step": "open",
+      "frame": {
+        "contract": "nika/session-host@1",
+        "frame": "opened",
+        "session": "ses_ab51a16b65a3cd596efe6ad18979868e",
+        "event": 1,
+        "snapshot": {
+          "snapshot": "snp_ed0b66b6ae6d8b9a280759763a229c4c",
+          "seq": 1,
+          "busy": null,
+          "work": {
+            "authoring": null,
+            "candidate": null,
+            "contract": "nika/session-work@0",
+            "intelligence": {
+              "author": {
+                "kind": "deterministic",
+                "model": null,
+                "seat": null,
+                "transport": null,
+                "why": "no conversational intelligence: free intents are read deterministically — `/intelligence` to choose a model that reads them"
+              },
+              "decision": null,
+              "effort": null,
+              "selected": null
+            },
+            "knowledge": {
+              "by": "default",
+              "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+              "source": "embedded",
+              "state": "admitted",
+              "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+            },
+            "rail": {
+              "active": "pending",
+              "checked": "pending",
+              "draft": "pending",
+              "run": "pending",
+              "saved": "pending"
+            },
+            "request": {
+              "decisions": [],
+              "goal": null,
+              "unresolved": []
+            },
+            "requested": null,
+            "root": "/private/tmp/nika-refusals-native-GMTler",
+            "run": null,
+            "saved": null,
+            "waiting": {
+              "kind": "free"
+            }
+          }
+        },
+        "notices": [
+          "Nika · nika-refusals-native-GMTler\n\nWhat do you want to automate?\n  describe the outcome · Nika asks only for what's missing · /help · /status"
+        ]
+      }
+    },
+    {
+      "step": "unknown_op_named",
+      "sent": "{\"contract\":\"nika/session-host@1\",\"op\":\"rewind\",\"command\":\"c-9\"}",
+      "frame": {
+        "contract": "nika/session-host@1",
+        "frame": "refused",
+        "session": "ses_ab51a16b65a3cd596efe6ad18979868e",
+        "command": "c-9",
+        "error": "malformed",
+        "message": "unknown op `rewind`"
+      }
+    },
+    {
+      "step": "steer_without_line",
+      "sent": "{\"contract\":\"nika/session-host@1\",\"op\":\"steer\",\"command\":\"c-8\"}",
+      "frame": {
+        "contract": "nika/session-host@1",
+        "frame": "refused",
+        "session": "ses_ab51a16b65a3cd596efe6ad18979868e",
+        "command": "c-8",
+        "error": "malformed",
+        "message": "`steer` takes command and line"
+      }
+    },
+    {
+      "step": "unknown_op_invalid_identity",
+      "sent": "{\"contract\":\"nika/session-host@1\",\"op\":\"rewind\",\"command\":\"not an identity\"}",
+      "frame": {
+        "contract": "nika/session-host@1",
+        "frame": "refused",
+        "session": "ses_ab51a16b65a3cd596efe6ad18979868e",
+        "error": "malformed",
+        "message": "unknown op `rewind`"
+      }
+    },
+    {
+      "step": "not_json",
+      "sent": "this is not json",
+      "frame": {
+        "contract": "nika/session-host@1",
+        "frame": "refused",
+        "session": "ses_ab51a16b65a3cd596efe6ad18979868e",
+        "error": "malformed",
+        "message": "not a command of nika/session-host@1: expected ident at line 1 column 2"
+      }
+    },
+    {
+      "step": "steer_no_turn",
+      "sent": "{\"contract\":\"nika/session-host@1\",\"op\":\"steer\",\"command\":\"s-1\",\"line\":\"use b instead\"}",
+      "frame": {
+        "contract": "nika/session-host@1",
+        "frame": "result",
+        "session": "ses_ab51a16b65a3cd596efe6ad18979868e",
+        "event": 2,
+        "command": "s-1",
+        "op": "steer",
+        "replayed": false,
+        "receipt": "nothing_to_steer",
+        "target": null,
+        "snapshot": {
+          "snapshot": "snp_ed0b66b6ae6d8b9a280759763a229c4c",
+          "seq": 1,
+          "busy": null,
+          "work": {
+            "authoring": null,
+            "candidate": null,
+            "contract": "nika/session-work@0",
+            "intelligence": {
+              "author": {
+                "kind": "deterministic",
+                "model": null,
+                "seat": null,
+                "transport": null,
+                "why": "no conversational intelligence: free intents are read deterministically — `/intelligence` to choose a model that reads them"
+              },
+              "decision": null,
+              "effort": null,
+              "selected": null
+            },
+            "knowledge": {
+              "by": "default",
+              "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+              "source": "embedded",
+              "state": "admitted",
+              "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+            },
+            "rail": {
+              "active": "pending",
+              "checked": "pending",
+              "draft": "pending",
+              "run": "pending",
+              "saved": "pending"
+            },
+            "request": {
+              "decisions": [],
+              "goal": null,
+              "unresolved": []
+            },
+            "requested": null,
+            "root": "/private/tmp/nika-refusals-native-GMTler",
+            "run": null,
+            "saved": null,
+            "waiting": {
+              "kind": "free"
+            }
+          }
+        }
+      }
+    },
+    {
+      "step": "read",
+      "sent": "{\"contract\":\"nika/session-host@1\",\"op\":\"snapshot\"}",
+      "frame": {
+        "contract": "nika/session-host@1",
+        "frame": "snapshot",
+        "session": "ses_ab51a16b65a3cd596efe6ad18979868e",
+        "snapshot": {
+          "snapshot": "snp_ed0b66b6ae6d8b9a280759763a229c4c",
+          "seq": 1,
+          "busy": null,
+          "work": {
+            "authoring": null,
+            "candidate": null,
+            "contract": "nika/session-work@0",
+            "intelligence": {
+              "author": {
+                "kind": "deterministic",
+                "model": null,
+                "seat": null,
+                "transport": null,
+                "why": "no conversational intelligence: free intents are read deterministically — `/intelligence` to choose a model that reads them"
+              },
+              "decision": null,
+              "effort": null,
+              "selected": null
+            },
+            "knowledge": {
+              "by": "default",
+              "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+              "source": "embedded",
+              "state": "admitted",
+              "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+            },
+            "rail": {
+              "active": "pending",
+              "checked": "pending",
+              "draft": "pending",
+              "run": "pending",
+              "saved": "pending"
+            },
+            "request": {
+              "decisions": [],
+              "goal": null,
+              "unresolved": []
+            },
+            "requested": null,
+            "root": "/private/tmp/nika-refusals-native-GMTler",
+            "run": null,
+            "saved": null,
+            "waiting": {
+              "kind": "free"
+            }
+          }
+        }
+      }
+    },
+    {
+      "step": "close",
+      "frame": {
+        "contract": "nika/session-host@1",
+        "frame": "closed",
+        "session": "ses_ab51a16b65a3cd596efe6ad18979868e",
+        "event": 3,
+        "snapshot": {
+          "snapshot": "snp_ed0b66b6ae6d8b9a280759763a229c4c",
+          "seq": 1,
+          "busy": null,
+          "work": {
+            "authoring": null,
+            "candidate": null,
+            "contract": "nika/session-work@0",
+            "intelligence": {
+              "author": {
+                "kind": "deterministic",
+                "model": null,
+                "seat": null,
+                "transport": null,
+                "why": "no conversational intelligence: free intents are read deterministically — `/intelligence` to choose a model that reads them"
+              },
+              "decision": null,
+              "effort": null,
+              "selected": null
+            },
+            "knowledge": {
+              "by": "default",
+              "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+              "source": "embedded",
+              "state": "admitted",
+              "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+            },
+            "rail": {
+              "active": "pending",
+              "checked": "pending",
+              "draft": "pending",
+              "run": "pending",
+              "saved": "pending"
+            },
+            "request": {
+              "decisions": [],
+              "goal": null,
+              "unresolved": []
+            },
+            "requested": null,
+            "root": "/private/tmp/nika-refusals-native-GMTler",
+            "run": null,
+            "saved": null,
+            "waiting": {
+              "kind": "free"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "http": [
+    {
+      "step": "open",
+      "status": 201,
+      "frame": {
+        "contract": "nika/session-host@1",
+        "frame": "opened",
+        "session": "ses_1ab3d79d74f3d2523372485fffc898d9",
+        "event": 1,
+        "snapshot": {
+          "snapshot": "snp_a90108c0bdc8ede72120d6af8588209d",
+          "seq": 1,
+          "busy": null,
+          "work": {
+            "authoring": null,
+            "candidate": null,
+            "contract": "nika/session-work@0",
+            "intelligence": {
+              "author": {
+                "kind": "deterministic",
+                "model": null,
+                "seat": null,
+                "transport": null,
+                "why": "no conversational intelligence: free intents are read deterministically — `/intelligence` to choose a model that reads them"
+              },
+              "decision": null,
+              "effort": null,
+              "selected": null
+            },
+            "knowledge": {
+              "by": "default",
+              "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+              "source": "embedded",
+              "state": "admitted",
+              "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+            },
+            "rail": {
+              "active": "pending",
+              "checked": "pending",
+              "draft": "pending",
+              "run": "pending",
+              "saved": "pending"
+            },
+            "request": {
+              "decisions": [],
+              "goal": null,
+              "unresolved": []
+            },
+            "requested": null,
+            "root": "/private/tmp/nika-refusals-http-EvjVHW",
+            "run": null,
+            "saved": null,
+            "waiting": {
+              "kind": "free"
+            }
+          }
+        },
+        "notices": [
+          "Nika · nika-refusals-http-EvjVHW\n\nWhat do you want to automate?\n  describe the outcome · Nika asks only for what's missing · /help · /status"
+        ]
+      }
+    },
+    {
+      "step": "unknown_op_named",
+      "sent": "{\"contract\":\"nika/session-host@1\",\"op\":\"rewind\",\"command\":\"c-9\"}",
+      "status": 400,
+      "frame": {
+        "contract": "nika/session-host@1",
+        "frame": "refused",
+        "session": "ses_1ab3d79d74f3d2523372485fffc898d9",
+        "command": "c-9",
+        "error": "malformed",
+        "message": "unknown op `rewind`"
+      }
+    },
+    {
+      "step": "steer_without_line",
+      "sent": "{\"contract\":\"nika/session-host@1\",\"op\":\"steer\",\"command\":\"c-8\"}",
+      "status": 400,
+      "frame": {
+        "contract": "nika/session-host@1",
+        "frame": "refused",
+        "session": "ses_1ab3d79d74f3d2523372485fffc898d9",
+        "command": "c-8",
+        "error": "malformed",
+        "message": "`steer` takes command and line"
+      }
+    },
+    {
+      "step": "unknown_op_invalid_identity",
+      "sent": "{\"contract\":\"nika/session-host@1\",\"op\":\"rewind\",\"command\":\"not an identity\"}",
+      "status": 400,
+      "frame": {
+        "contract": "nika/session-host@1",
+        "frame": "refused",
+        "session": "ses_1ab3d79d74f3d2523372485fffc898d9",
+        "error": "malformed",
+        "message": "unknown op `rewind`"
+      }
+    },
+    {
+      "step": "not_json",
+      "sent": "this is not json",
+      "status": 400,
+      "frame": {
+        "contract": "nika/session-host@1",
+        "frame": "refused",
+        "session": "ses_1ab3d79d74f3d2523372485fffc898d9",
+        "error": "malformed",
+        "message": "not a command of nika/session-host@1: expected ident at line 1 column 2"
+      }
+    },
+    {
+      "step": "steer_no_turn",
+      "sent": "{\"contract\":\"nika/session-host@1\",\"op\":\"steer\",\"command\":\"s-1\",\"line\":\"use b instead\"}",
+      "status": 200,
+      "frame": {
+        "contract": "nika/session-host@1",
+        "frame": "result",
+        "session": "ses_1ab3d79d74f3d2523372485fffc898d9",
+        "event": 2,
+        "command": "s-1",
+        "op": "steer",
+        "replayed": false,
+        "receipt": "nothing_to_steer",
+        "target": null,
+        "snapshot": {
+          "snapshot": "snp_a90108c0bdc8ede72120d6af8588209d",
+          "seq": 1,
+          "busy": null,
+          "work": {
+            "authoring": null,
+            "candidate": null,
+            "contract": "nika/session-work@0",
+            "intelligence": {
+              "author": {
+                "kind": "deterministic",
+                "model": null,
+                "seat": null,
+                "transport": null,
+                "why": "no conversational intelligence: free intents are read deterministically — `/intelligence` to choose a model that reads them"
+              },
+              "decision": null,
+              "effort": null,
+              "selected": null
+            },
+            "knowledge": {
+              "by": "default",
+              "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+              "source": "embedded",
+              "state": "admitted",
+              "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+            },
+            "rail": {
+              "active": "pending",
+              "checked": "pending",
+              "draft": "pending",
+              "run": "pending",
+              "saved": "pending"
+            },
+            "request": {
+              "decisions": [],
+              "goal": null,
+              "unresolved": []
+            },
+            "requested": null,
+            "root": "/private/tmp/nika-refusals-http-EvjVHW",
+            "run": null,
+            "saved": null,
+            "waiting": {
+              "kind": "free"
+            }
+          }
+        }
+      }
+    },
+    {
+      "step": "close",
+      "status": 200,
+      "frame": {
+        "contract": "nika/session-host@1",
+        "frame": "closed",
+        "session": "ses_1ab3d79d74f3d2523372485fffc898d9",
+        "event": 3,
+        "snapshot": {
+          "snapshot": "snp_a90108c0bdc8ede72120d6af8588209d",
+          "seq": 1,
+          "busy": null,
+          "work": {
+            "authoring": null,
+            "candidate": null,
+            "contract": "nika/session-work@0",
+            "intelligence": {
+              "author": {
+                "kind": "deterministic",
+                "model": null,
+                "seat": null,
+                "transport": null,
+                "why": "no conversational intelligence: free intents are read deterministically — `/intelligence` to choose a model that reads them"
+              },
+              "decision": null,
+              "effort": null,
+              "selected": null
+            },
+            "knowledge": {
+              "by": "default",
+              "manifest_sha256": "1be7d6101dab9eff54f35be07463f4e320607c4a837d04ef90519abaadf48166",
+              "source": "embedded",
+              "state": "admitted",
+              "version": "knowledge-0.123.0-r2-json-filter-records-20261009"
+            },
+            "rail": {
+              "active": "pending",
+              "checked": "pending",
+              "draft": "pending",
+              "run": "pending",
+              "saved": "pending"
+            },
+            "request": {
+              "decisions": [],
+              "goal": null,
+              "unresolved": []
+            },
+            "requested": null,
+            "root": "/private/tmp/nika-refusals-http-EvjVHW",
+            "run": null,
+            "saved": null,
+            "waiting": {
+              "kind": "free"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

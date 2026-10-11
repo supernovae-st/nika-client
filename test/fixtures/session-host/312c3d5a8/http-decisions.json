@@ -1,0 +1,688 @@
+[
+  {
+    "answered": {
+      "contract": "nika/session-host@1",
+      "event": 1,
+      "frame": "opened",
+      "notices": [],
+      "session": "ses_98aaecd08a9b878a48388ddff09aabcb",
+      "snapshot": {
+        "busy": null,
+        "seq": 1,
+        "snapshot": "snp_bac7d8f11e44850fa6a59dc2a12feaae",
+        "work": {
+          "authoring": null,
+          "candidate": null,
+          "contract": "nika/session-work@0",
+          "intelligence": {
+            "author": {
+              "kind": "deterministic",
+              "model": null,
+              "seat": null,
+              "transport": null,
+              "why": null
+            },
+            "decision": null,
+            "effort": null,
+            "selected": {
+              "kind": "local",
+              "locus": "local · private · project context stays on this machine",
+              "model": null,
+              "ready": true,
+              "refusal": null,
+              "scope": "operator_default",
+              "transport": null,
+              "via": "ollama"
+            }
+          },
+          "rail": {
+            "active": "pending",
+            "checked": "pending",
+            "draft": "pending",
+            "run": "pending",
+            "saved": "pending"
+          },
+          "request": {
+            "decisions": [],
+            "goal": null,
+            "unresolved": []
+          },
+          "requested": null,
+          "root": "/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpufPNWg",
+          "run": null,
+          "saved": null,
+          "waiting": {
+            "kind": "free"
+          }
+        }
+      }
+    },
+    "sent": null,
+    "step": "open"
+  },
+  {
+    "answered": {
+      "command": "c-2",
+      "contract": "nika/session-host@1",
+      "error": "busy",
+      "frame": "refused",
+      "line": "hello",
+      "message": "the command `c-1` is under way · this line was not taken",
+      "session": "ses_98aaecd08a9b878a48388ddff09aabcb",
+      "snapshot": {
+        "busy": {
+          "command": "c-1",
+          "phase": "preparing",
+          "stop_requested": false
+        },
+        "seq": 1,
+        "snapshot": "snp_bac7d8f11e44850fa6a59dc2a12feaae",
+        "work": {
+          "authoring": null,
+          "candidate": null,
+          "contract": "nika/session-work@0",
+          "intelligence": {
+            "author": {
+              "kind": "deterministic",
+              "model": null,
+              "seat": null,
+              "transport": null,
+              "why": null
+            },
+            "decision": null,
+            "effort": null,
+            "selected": {
+              "kind": "local",
+              "locus": "local · private · project context stays on this machine",
+              "model": null,
+              "ready": true,
+              "refusal": null,
+              "scope": "operator_default",
+              "transport": null,
+              "via": "ollama"
+            }
+          },
+          "rail": {
+            "active": "pending",
+            "checked": "pending",
+            "draft": "pending",
+            "run": "pending",
+            "saved": "pending"
+          },
+          "request": {
+            "decisions": [],
+            "goal": null,
+            "unresolved": []
+          },
+          "requested": null,
+          "root": "/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpufPNWg",
+          "run": null,
+          "saved": null,
+          "waiting": {
+            "kind": "free"
+          }
+        }
+      }
+    },
+    "sent": {
+      "command": "c-2",
+      "contract": "nika/session-host@1",
+      "line": "hello",
+      "op": "submit",
+      "snapshot": "snp_bac7d8f11e44850fa6a59dc2a12feaae"
+    },
+    "step": "busy"
+  },
+  {
+    "answered": {
+      "command": "c-1",
+      "contract": "nika/session-host@1",
+      "error": "command_conflict",
+      "frame": "refused",
+      "line": "other",
+      "message": "the command `c-1` is bound to other bytes · nothing was done",
+      "session": "ses_98aaecd08a9b878a48388ddff09aabcb",
+      "snapshot": {
+        "busy": {
+          "command": "c-1",
+          "phase": "preparing",
+          "stop_requested": false
+        },
+        "seq": 1,
+        "snapshot": "snp_bac7d8f11e44850fa6a59dc2a12feaae",
+        "work": {
+          "authoring": null,
+          "candidate": null,
+          "contract": "nika/session-work@0",
+          "intelligence": {
+            "author": {
+              "kind": "deterministic",
+              "model": null,
+              "seat": null,
+              "transport": null,
+              "why": null
+            },
+            "decision": null,
+            "effort": null,
+            "selected": {
+              "kind": "local",
+              "locus": "local · private · project context stays on this machine",
+              "model": null,
+              "ready": true,
+              "refusal": null,
+              "scope": "operator_default",
+              "transport": null,
+              "via": "ollama"
+            }
+          },
+          "rail": {
+            "active": "pending",
+            "checked": "pending",
+            "draft": "pending",
+            "run": "pending",
+            "saved": "pending"
+          },
+          "request": {
+            "decisions": [],
+            "goal": null,
+            "unresolved": []
+          },
+          "requested": null,
+          "root": "/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpufPNWg",
+          "run": null,
+          "saved": null,
+          "waiting": {
+            "kind": "free"
+          }
+        }
+      }
+    },
+    "sent": {
+      "command": "c-1",
+      "contract": "nika/session-host@1",
+      "line": "other",
+      "op": "submit",
+      "snapshot": "snp_bac7d8f11e44850fa6a59dc2a12feaae"
+    },
+    "step": "conflict"
+  },
+  {
+    "answered": {
+      "command": "s-1",
+      "contract": "nika/session-host@1",
+      "event": 4,
+      "frame": "result",
+      "op": "stop",
+      "receipt": "stop_requested",
+      "replayed": false,
+      "session": "ses_98aaecd08a9b878a48388ddff09aabcb",
+      "snapshot": {
+        "busy": {
+          "command": "c-1",
+          "phase": "preparing",
+          "stop_requested": true
+        },
+        "seq": 1,
+        "snapshot": "snp_bac7d8f11e44850fa6a59dc2a12feaae",
+        "work": {
+          "authoring": null,
+          "candidate": null,
+          "contract": "nika/session-work@0",
+          "intelligence": {
+            "author": {
+              "kind": "deterministic",
+              "model": null,
+              "seat": null,
+              "transport": null,
+              "why": null
+            },
+            "decision": null,
+            "effort": null,
+            "selected": {
+              "kind": "local",
+              "locus": "local · private · project context stays on this machine",
+              "model": null,
+              "ready": true,
+              "refusal": null,
+              "scope": "operator_default",
+              "transport": null,
+              "via": "ollama"
+            }
+          },
+          "rail": {
+            "active": "pending",
+            "checked": "pending",
+            "draft": "pending",
+            "run": "pending",
+            "saved": "pending"
+          },
+          "request": {
+            "decisions": [],
+            "goal": null,
+            "unresolved": []
+          },
+          "requested": null,
+          "root": "/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpufPNWg",
+          "run": null,
+          "saved": null,
+          "waiting": {
+            "kind": "free"
+          }
+        }
+      },
+      "target": "c-1"
+    },
+    "sent": {
+      "command": "s-1",
+      "contract": "nika/session-host@1",
+      "op": "stop"
+    },
+    "step": "stop"
+  },
+  {
+    "answered": {
+      "command": "c-1",
+      "contract": "nika/session-host@1",
+      "event": 5,
+      "frame": "result",
+      "op": "submit",
+      "outcomes": [
+        {
+          "kind": "cancelled",
+          "text": "preparation stopped; conversation kept; any sent request may still be billed",
+          "withdrawn": [
+            {
+              "kind": "proposal",
+              "proposal": "0bf7aa9d6449a0e567e68cb449423fbf63f1d5c3ebc0e591548d7d65746e3975",
+              "text": "Nika proposes `compiled-workflow.nika`:\nDoes\n  1. read_source · reads a file\n  2. write_output · writes a file\nRuns\n  when you ask (« run it ») · no schedule was asked\nCan touch\n  external effects · none\n  human approval at run · none\nChanges\n  + `compiled-workflow.nika` · 33 lines · new\nNeeds\n  nothing more from you\nNothing has run yet · `yes` saves these exact bytes and checks them · running is its own line (« run it »)\nproposed change · Read ./notes/brief.md and write it to ./out/copy.md\n  creates `compiled-workflow.nika` (33 lines)\n  ┌─ `compiled-workflow.nika`\n  │ const:\n  │   output_path: ./out/copy.md\n  │   source_path: ./notes/brief.md\n  │ nika: compiled-workflow\n  │ outputs:\n  │   write_status: ${{ tasks.write_output.status }}\n  │ permits:\n  │   fs:\n  │     read:\n  │     - ./notes/brief.md\n  │     write:\n  │     - ./out/copy.md\n  │   tools:\n  │   - nika:read\n  │   - nika:write\n  │ tasks: 2 (in run order above)\n  └─ `/show` prints the exact 33 lines\n  check of these bytes · `compiled-workflow.nika` · clean ✔\n  when it runs:\n    · reads ./notes/brief.md\n    · writes ./out/copy.md\n    · tools nika:read · nika:write\n    · model output estimate · $0 · no direct model task in these checked bytes\napply this? (yes applies · no discards · questions keep it pending · nothing is written until you say yes)  identity 0bf7aa9d6449 · `/show` the exact bytes · `/meaning` your request clause by clause · `yes` applies · `no` discards\nmoney: $0.25 USD · session default · proposal/Run ceiling · no project default · policy cap unknown · machine cap unknown · execution requires a separate Run and downstream admission\nSession inference: no Session budget; no aggregate inference allowance; qualified priced calls observed at catalog estimates, never capped; separate from the proposal/Run ceiling; catalog estimates are not invoices or a hard billing cap; billed cost unknown\n"
+            }
+          ]
+        }
+      ],
+      "replayed": false,
+      "session": "ses_98aaecd08a9b878a48388ddff09aabcb",
+      "snapshot": {
+        "busy": null,
+        "seq": 2,
+        "snapshot": "snp_b20b629fa19bcfb5b5542cc28101d2d5",
+        "work": {
+          "authoring": null,
+          "candidate": null,
+          "contract": "nika/session-work@0",
+          "intelligence": {
+            "author": {
+              "kind": "deterministic",
+              "model": null,
+              "seat": null,
+              "transport": null,
+              "why": null
+            },
+            "decision": null,
+            "effort": null,
+            "selected": {
+              "kind": "local",
+              "locus": "local · private · project context stays on this machine",
+              "model": null,
+              "ready": true,
+              "refusal": null,
+              "scope": "operator_default",
+              "transport": null,
+              "via": "ollama"
+            }
+          },
+          "rail": {
+            "active": "pending",
+            "checked": "pending",
+            "draft": "pending",
+            "run": "pending",
+            "saved": "pending"
+          },
+          "request": {
+            "decisions": [],
+            "goal": "Read ./notes/brief.md and write it to ./out/copy.md",
+            "unresolved": []
+          },
+          "requested": null,
+          "root": "/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpufPNWg",
+          "run": null,
+          "saved": null,
+          "waiting": {
+            "kind": "free"
+          }
+        }
+      }
+    },
+    "sent": {
+      "command": "c-1",
+      "contract": "nika/session-host@1",
+      "line": "Read ./notes/brief.md and write it to ./out/copy.md",
+      "op": "submit",
+      "snapshot": "snp_bac7d8f11e44850fa6a59dc2a12feaae"
+    },
+    "step": "stopped_settlement"
+  },
+  {
+    "answered": {
+      "command": "s-1",
+      "contract": "nika/session-host@1",
+      "event": 4,
+      "frame": "result",
+      "op": "stop",
+      "receipt": "stop_requested",
+      "replayed": true,
+      "session": "ses_98aaecd08a9b878a48388ddff09aabcb",
+      "snapshot": {
+        "busy": {
+          "command": "c-1",
+          "phase": "preparing",
+          "stop_requested": true
+        },
+        "seq": 1,
+        "snapshot": "snp_bac7d8f11e44850fa6a59dc2a12feaae",
+        "work": {
+          "authoring": null,
+          "candidate": null,
+          "contract": "nika/session-work@0",
+          "intelligence": {
+            "author": {
+              "kind": "deterministic",
+              "model": null,
+              "seat": null,
+              "transport": null,
+              "why": null
+            },
+            "decision": null,
+            "effort": null,
+            "selected": {
+              "kind": "local",
+              "locus": "local · private · project context stays on this machine",
+              "model": null,
+              "ready": true,
+              "refusal": null,
+              "scope": "operator_default",
+              "transport": null,
+              "via": "ollama"
+            }
+          },
+          "rail": {
+            "active": "pending",
+            "checked": "pending",
+            "draft": "pending",
+            "run": "pending",
+            "saved": "pending"
+          },
+          "request": {
+            "decisions": [],
+            "goal": null,
+            "unresolved": []
+          },
+          "requested": null,
+          "root": "/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpufPNWg",
+          "run": null,
+          "saved": null,
+          "waiting": {
+            "kind": "free"
+          }
+        }
+      },
+      "target": "c-1"
+    },
+    "sent": {
+      "command": "s-1",
+      "contract": "nika/session-host@1",
+      "op": "stop"
+    },
+    "step": "stop_replayed"
+  },
+  {
+    "answered": {
+      "command": "q-1",
+      "contract": "nika/session-host@1",
+      "event": 8,
+      "frame": "result",
+      "op": "submit",
+      "outcomes": [
+        {
+          "key": "model",
+          "kind": "question",
+          "text": "Which explicit runtime provider/model should run the language steps (extract, classify, draft)?\n  (The compiler cannot invent this authoring value.)\n  reply on the next line · `cancel` drops this · `why?` explains"
+        }
+      ],
+      "replayed": false,
+      "session": "ses_98aaecd08a9b878a48388ddff09aabcb",
+      "snapshot": {
+        "busy": null,
+        "seq": 3,
+        "snapshot": "snp_ca939878fd49aaa79d62c33dfbc14891",
+        "work": {
+          "authoring": {
+            "calls": null,
+            "candidate": null,
+            "diagnostics": [],
+            "draft": null,
+            "questions": [
+              "model"
+            ],
+            "status": "incomplete"
+          },
+          "candidate": null,
+          "contract": "nika/session-work@0",
+          "intelligence": {
+            "author": {
+              "kind": "deterministic",
+              "model": null,
+              "seat": null,
+              "transport": null,
+              "why": null
+            },
+            "decision": null,
+            "effort": null,
+            "selected": {
+              "kind": "local",
+              "locus": "local · private · project context stays on this machine",
+              "model": null,
+              "ready": true,
+              "refusal": null,
+              "scope": "operator_default",
+              "transport": null,
+              "via": "ollama"
+            }
+          },
+          "rail": {
+            "active": "pending",
+            "checked": "pending",
+            "draft": "working",
+            "run": "pending",
+            "saved": "pending"
+          },
+          "request": {
+            "decisions": [],
+            "goal": "Read ./notes/brief.md, draft a 3-bullet summary of it and write the summary to ./out/summary.md",
+            "unresolved": [
+              "Which explicit runtime provider/model should run the language steps (extract, classify, draft)?"
+            ]
+          },
+          "requested": null,
+          "root": "/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpufPNWg",
+          "run": null,
+          "saved": null,
+          "waiting": {
+            "id": "1a7d1a62615bf1c6d8493a3a4883f1082c13c61500fc2f5362ef6711b81af32e",
+            "key": "model",
+            "kind": "question"
+          }
+        }
+      }
+    },
+    "sent": {
+      "command": "q-1",
+      "contract": "nika/session-host@1",
+      "line": "Read ./notes/brief.md, draft a 3-bullet summary of it and write the summary to ./out/summary.md",
+      "op": "submit",
+      "snapshot": "snp_b20b629fa19bcfb5b5542cc28101d2d5"
+    },
+    "step": "question"
+  },
+  {
+    "answered": {
+      "command": "q-2",
+      "contract": "nika/session-host@1",
+      "event": 10,
+      "frame": "result",
+      "op": "submit",
+      "outcomes": [
+        {
+          "key": "model",
+          "kind": "question",
+          "text": "`mistral/mistral-small` is not priced in Nika's catalog: a run under a spending ceiling would refuse it (NIKA-1709 · unpriced cloud spend cannot be bounded).\n  priced for `mistral`: mistral/mistral-large-latest · mistral/mistral-small-latest — name one of them (the question still waits)"
+        }
+      ],
+      "replayed": false,
+      "session": "ses_98aaecd08a9b878a48388ddff09aabcb",
+      "snapshot": {
+        "busy": null,
+        "seq": 4,
+        "snapshot": "snp_010c1fdeb6ce50f6276c458f4b9b9b9b",
+        "work": {
+          "authoring": {
+            "calls": null,
+            "candidate": null,
+            "diagnostics": [],
+            "draft": null,
+            "questions": [
+              "model"
+            ],
+            "status": "incomplete"
+          },
+          "candidate": null,
+          "contract": "nika/session-work@0",
+          "intelligence": {
+            "author": {
+              "kind": "deterministic",
+              "model": null,
+              "seat": null,
+              "transport": null,
+              "why": null
+            },
+            "decision": null,
+            "effort": null,
+            "selected": {
+              "kind": "local",
+              "locus": "local · private · project context stays on this machine",
+              "model": null,
+              "ready": true,
+              "refusal": null,
+              "scope": "operator_default",
+              "transport": null,
+              "via": "ollama"
+            }
+          },
+          "rail": {
+            "active": "pending",
+            "checked": "pending",
+            "draft": "working",
+            "run": "pending",
+            "saved": "pending"
+          },
+          "request": {
+            "decisions": [],
+            "goal": "Read ./notes/brief.md, draft a 3-bullet summary of it and write the summary to ./out/summary.md",
+            "unresolved": [
+              "Which explicit runtime provider/model should run the language steps (extract, classify, draft)?"
+            ]
+          },
+          "requested": null,
+          "root": "/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpufPNWg",
+          "run": null,
+          "saved": null,
+          "waiting": {
+            "id": "1a7d1a62615bf1c6d8493a3a4883f1082c13c61500fc2f5362ef6711b81af32e",
+            "key": "model",
+            "kind": "question"
+          }
+        }
+      }
+    },
+    "sent": {
+      "command": "q-2",
+      "contract": "nika/session-host@1",
+      "line": "mistral/mistral-small",
+      "op": "submit",
+      "snapshot": "snp_ca939878fd49aaa79d62c33dfbc14891"
+    },
+    "step": "answer"
+  },
+  {
+    "answered": {
+      "contract": "nika/session-host@1",
+      "event": 11,
+      "frame": "closed",
+      "session": "ses_98aaecd08a9b878a48388ddff09aabcb",
+      "snapshot": {
+        "busy": null,
+        "seq": 4,
+        "snapshot": "snp_010c1fdeb6ce50f6276c458f4b9b9b9b",
+        "work": {
+          "authoring": {
+            "calls": null,
+            "candidate": null,
+            "diagnostics": [],
+            "draft": null,
+            "questions": [
+              "model"
+            ],
+            "status": "incomplete"
+          },
+          "candidate": null,
+          "contract": "nika/session-work@0",
+          "intelligence": {
+            "author": {
+              "kind": "deterministic",
+              "model": null,
+              "seat": null,
+              "transport": null,
+              "why": null
+            },
+            "decision": null,
+            "effort": null,
+            "selected": {
+              "kind": "local",
+              "locus": "local · private · project context stays on this machine",
+              "model": null,
+              "ready": true,
+              "refusal": null,
+              "scope": "operator_default",
+              "transport": null,
+              "via": "ollama"
+            }
+          },
+          "rail": {
+            "active": "pending",
+            "checked": "pending",
+            "draft": "working",
+            "run": "pending",
+            "saved": "pending"
+          },
+          "request": {
+            "decisions": [],
+            "goal": "Read ./notes/brief.md, draft a 3-bullet summary of it and write the summary to ./out/summary.md",
+            "unresolved": [
+              "Which explicit runtime provider/model should run the language steps (extract, classify, draft)?"
+            ]
+          },
+          "requested": null,
+          "root": "/var/folders/6t/h5rjb2gd54scnh70shc6nkq80000gn/T/.tmpufPNWg",
+          "run": null,
+          "saved": null,
+          "waiting": {
+            "id": "1a7d1a62615bf1c6d8493a3a4883f1082c13c61500fc2f5362ef6711b81af32e",
+            "key": "model",
+            "kind": "question"
+          }
+        }
+      }
+    },
+    "sent": null,
+    "step": "close"
+  }
+]

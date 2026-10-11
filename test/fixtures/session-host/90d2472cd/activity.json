@@ -1,0 +1,780 @@
+{
+  "native": {
+    "steer": [
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_c3cecd0de5efd6b50d557aa4df02c50d",
+        "event": 4,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request started · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 1,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "started",
+          "at_ms": 1791755649340
+        },
+        "cursor": "ses_c3cecd0de5efd6b50d557aa4df02c50d:4"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_c3cecd0de5efd6b50d557aa4df02c50d",
+        "event": 5,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request returned · conversation · requested vllm/agent-seat",
+        "done": true,
+        "call": {
+          "ordinal": 1,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "finished",
+          "at_ms": 1791755649340,
+          "elapsed_ms": 15,
+          "input_tokens": 1000,
+          "output_tokens": 100
+        },
+        "cursor": "ses_c3cecd0de5efd6b50d557aa4df02c50d:5"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_c3cecd0de5efd6b50d557aa4df02c50d",
+        "event": 6,
+        "command": "c-1",
+        "phase": "knowledge",
+        "note": "models",
+        "done": false,
+        "tool": {
+          "call": "call_2",
+          "name": "models",
+          "state": "started",
+          "at_ms": 1791755649355
+        },
+        "cursor": "ses_c3cecd0de5efd6b50d557aa4df02c50d:6"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_c3cecd0de5efd6b50d557aa4df02c50d",
+        "event": 7,
+        "command": "c-1",
+        "phase": "knowledge",
+        "note": "models failed · 0 ms",
+        "done": true,
+        "tool": {
+          "call": "call_2",
+          "name": "models",
+          "state": "failed",
+          "elapsed_ms": 0,
+          "at_ms": 1791755649355,
+          "reply_bytes": 41,
+          "reply": "no model role ``: run, author or decision"
+        },
+        "cursor": "ses_c3cecd0de5efd6b50d557aa4df02c50d:7"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_c3cecd0de5efd6b50d557aa4df02c50d",
+        "event": 8,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request started · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 2,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "started",
+          "at_ms": 1791755649359
+        },
+        "cursor": "ses_c3cecd0de5efd6b50d557aa4df02c50d:8"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_c3cecd0de5efd6b50d557aa4df02c50d",
+        "event": 12,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request returned · conversation · requested vllm/agent-seat",
+        "done": true,
+        "call": {
+          "ordinal": 2,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "finished",
+          "at_ms": 1791755649359,
+          "elapsed_ms": 27,
+          "input_tokens": 1000,
+          "output_tokens": 100
+        },
+        "cursor": "ses_c3cecd0de5efd6b50d557aa4df02c50d:12"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_c3cecd0de5efd6b50d557aa4df02c50d",
+        "event": 13,
+        "command": "c-1",
+        "phase": "knowledge",
+        "note": "language",
+        "done": false,
+        "tool": {
+          "call": "call_3",
+          "name": "language",
+          "state": "started",
+          "at_ms": 1791755649386
+        },
+        "cursor": "ses_c3cecd0de5efd6b50d557aa4df02c50d:13"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_c3cecd0de5efd6b50d557aa4df02c50d",
+        "event": 14,
+        "command": "c-1",
+        "phase": "knowledge",
+        "note": "language failed · 0 ms",
+        "done": true,
+        "tool": {
+          "call": "call_3",
+          "name": "language",
+          "state": "failed",
+          "elapsed_ms": 0,
+          "at_ms": 1791755649386,
+          "reply_bytes": 59,
+          "reply": "no language topic ``: schema, catalog, examples or template"
+        },
+        "cursor": "ses_c3cecd0de5efd6b50d557aa4df02c50d:14"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_c3cecd0de5efd6b50d557aa4df02c50d",
+        "event": 15,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request started · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 3,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "started",
+          "at_ms": 1791755649394
+        },
+        "cursor": "ses_c3cecd0de5efd6b50d557aa4df02c50d:15"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_c3cecd0de5efd6b50d557aa4df02c50d",
+        "event": 16,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request returned · conversation · requested vllm/agent-seat",
+        "done": true,
+        "call": {
+          "ordinal": 3,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "finished",
+          "at_ms": 1791755649394,
+          "elapsed_ms": 6,
+          "input_tokens": 1000,
+          "output_tokens": 100
+        },
+        "cursor": "ses_c3cecd0de5efd6b50d557aa4df02c50d:16"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_c3cecd0de5efd6b50d557aa4df02c50d",
+        "event": 17,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request started · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 4,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "started",
+          "at_ms": 1791755649405
+        },
+        "cursor": "ses_c3cecd0de5efd6b50d557aa4df02c50d:17"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_c3cecd0de5efd6b50d557aa4df02c50d",
+        "event": 18,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request returned · conversation · requested vllm/agent-seat",
+        "done": true,
+        "call": {
+          "ordinal": 4,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "finished",
+          "at_ms": 1791755649405,
+          "elapsed_ms": 7,
+          "input_tokens": 1000,
+          "output_tokens": 100
+        },
+        "cursor": "ses_c3cecd0de5efd6b50d557aa4df02c50d:18"
+      }
+    ],
+    "models": [
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_0391bf23fc710b6435a0dca3291cb00f",
+        "event": 3,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request started · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 1,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "started",
+          "at_ms": 1791755649771
+        },
+        "cursor": "ses_0391bf23fc710b6435a0dca3291cb00f:3"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_0391bf23fc710b6435a0dca3291cb00f",
+        "event": 4,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request returned · conversation · requested vllm/agent-seat",
+        "done": true,
+        "call": {
+          "ordinal": 1,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "finished",
+          "at_ms": 1791755649771,
+          "elapsed_ms": 9,
+          "input_tokens": 1000,
+          "output_tokens": 100
+        },
+        "cursor": "ses_0391bf23fc710b6435a0dca3291cb00f:4"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_0391bf23fc710b6435a0dca3291cb00f",
+        "event": 5,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "ask",
+        "done": false,
+        "tool": {
+          "call": "call_2",
+          "name": "ask",
+          "state": "started",
+          "at_ms": 1791755649780
+        },
+        "cursor": "ses_0391bf23fc710b6435a0dca3291cb00f:5"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_0391bf23fc710b6435a0dca3291cb00f",
+        "event": 6,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "ask · 385 ms",
+        "done": true,
+        "tool": {
+          "call": "call_2",
+          "name": "ask",
+          "state": "finished",
+          "elapsed_ms": 385,
+          "at_ms": 1791755649780,
+          "reply_bytes": 138
+        },
+        "cursor": "ses_0391bf23fc710b6435a0dca3291cb00f:6"
+      }
+    ],
+    "stop": [
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_d99c47490aaa75d2062706e4a84601d6",
+        "event": 3,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request started · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 1,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "started",
+          "at_ms": 1791755650513
+        },
+        "cursor": "ses_d99c47490aaa75d2062706e4a84601d6:3"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_d99c47490aaa75d2062706e4a84601d6",
+        "event": 6,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request stopped; charge may be unknown · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 1,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "cancelled",
+          "at_ms": 1791755650513,
+          "elapsed_ms": 32
+        },
+        "cursor": "ses_d99c47490aaa75d2062706e4a84601d6:6"
+      }
+    ],
+    "full": [
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_52bb6b223c390be20dc77769cd9e7405",
+        "event": 3,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request started · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 1,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "started",
+          "at_ms": 1791755650896
+        },
+        "cursor": "ses_52bb6b223c390be20dc77769cd9e7405:3"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_52bb6b223c390be20dc77769cd9e7405",
+        "event": 38,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request stopped; charge may be unknown · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 1,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "cancelled",
+          "at_ms": 1791755650896,
+          "elapsed_ms": 46
+        },
+        "cursor": "ses_52bb6b223c390be20dc77769cd9e7405:38"
+      }
+    ]
+  },
+  "http": {
+    "steer": [
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca",
+        "event": 4,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request started · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 1,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "started",
+          "at_ms": 1791755651413
+        },
+        "cursor": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca:4"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca",
+        "event": 5,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request returned · conversation · requested vllm/agent-seat",
+        "done": true,
+        "call": {
+          "ordinal": 1,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "finished",
+          "at_ms": 1791755651413,
+          "elapsed_ms": 8,
+          "input_tokens": 1000,
+          "output_tokens": 100
+        },
+        "cursor": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca:5"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca",
+        "event": 6,
+        "command": "c-1",
+        "phase": "knowledge",
+        "note": "models",
+        "done": false,
+        "tool": {
+          "call": "call_2",
+          "name": "models",
+          "state": "started",
+          "at_ms": 1791755651421
+        },
+        "cursor": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca:6"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca",
+        "event": 7,
+        "command": "c-1",
+        "phase": "knowledge",
+        "note": "models failed · 0 ms",
+        "done": true,
+        "tool": {
+          "call": "call_2",
+          "name": "models",
+          "state": "failed",
+          "elapsed_ms": 0,
+          "at_ms": 1791755651421,
+          "reply_bytes": 41,
+          "reply": "no model role ``: run, author or decision"
+        },
+        "cursor": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca:7"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca",
+        "event": 8,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request started · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 2,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "started",
+          "at_ms": 1791755651425
+        },
+        "cursor": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca:8"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca",
+        "event": 12,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request returned · conversation · requested vllm/agent-seat",
+        "done": true,
+        "call": {
+          "ordinal": 2,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "finished",
+          "at_ms": 1791755651425,
+          "elapsed_ms": 20,
+          "input_tokens": 1000,
+          "output_tokens": 100
+        },
+        "cursor": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca:12"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca",
+        "event": 13,
+        "command": "c-1",
+        "phase": "knowledge",
+        "note": "language",
+        "done": false,
+        "tool": {
+          "call": "call_3",
+          "name": "language",
+          "state": "started",
+          "at_ms": 1791755651445
+        },
+        "cursor": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca:13"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca",
+        "event": 14,
+        "command": "c-1",
+        "phase": "knowledge",
+        "note": "language failed · 0 ms",
+        "done": true,
+        "tool": {
+          "call": "call_3",
+          "name": "language",
+          "state": "failed",
+          "elapsed_ms": 0,
+          "at_ms": 1791755651445,
+          "reply_bytes": 59,
+          "reply": "no language topic ``: schema, catalog, examples or template"
+        },
+        "cursor": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca:14"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca",
+        "event": 15,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request started · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 3,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "started",
+          "at_ms": 1791755651454
+        },
+        "cursor": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca:15"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca",
+        "event": 16,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request returned · conversation · requested vllm/agent-seat",
+        "done": true,
+        "call": {
+          "ordinal": 3,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "finished",
+          "at_ms": 1791755651454,
+          "elapsed_ms": 6,
+          "input_tokens": 1000,
+          "output_tokens": 100
+        },
+        "cursor": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca:16"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca",
+        "event": 17,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request started · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 4,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "started",
+          "at_ms": 1791755651465
+        },
+        "cursor": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca:17"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca",
+        "event": 18,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request returned · conversation · requested vllm/agent-seat",
+        "done": true,
+        "call": {
+          "ordinal": 4,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "finished",
+          "at_ms": 1791755651465,
+          "elapsed_ms": 6,
+          "input_tokens": 1000,
+          "output_tokens": 100
+        },
+        "cursor": "ses_42b8cd36445e69d4c15b6c9eed6eb5ca:18"
+      }
+    ],
+    "models": [
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_bfffb94ce92ee0e3b4ed9dc9262decf3",
+        "event": 3,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request started · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 1,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "started",
+          "at_ms": 1791755651893
+        },
+        "cursor": "ses_bfffb94ce92ee0e3b4ed9dc9262decf3:3"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_bfffb94ce92ee0e3b4ed9dc9262decf3",
+        "event": 4,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request returned · conversation · requested vllm/agent-seat",
+        "done": true,
+        "call": {
+          "ordinal": 1,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "finished",
+          "at_ms": 1791755651893,
+          "elapsed_ms": 8,
+          "input_tokens": 1000,
+          "output_tokens": 100
+        },
+        "cursor": "ses_bfffb94ce92ee0e3b4ed9dc9262decf3:4"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_bfffb94ce92ee0e3b4ed9dc9262decf3",
+        "event": 5,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "ask",
+        "done": false,
+        "tool": {
+          "call": "call_2",
+          "name": "ask",
+          "state": "started",
+          "at_ms": 1791755651902
+        },
+        "cursor": "ses_bfffb94ce92ee0e3b4ed9dc9262decf3:5"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_bfffb94ce92ee0e3b4ed9dc9262decf3",
+        "event": 6,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "ask · 391 ms",
+        "done": true,
+        "tool": {
+          "call": "call_2",
+          "name": "ask",
+          "state": "finished",
+          "elapsed_ms": 391,
+          "at_ms": 1791755651902,
+          "reply_bytes": 138
+        },
+        "cursor": "ses_bfffb94ce92ee0e3b4ed9dc9262decf3:6"
+      }
+    ],
+    "stop": [
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_30ae5959044f78369176ccb955b5d533",
+        "event": 3,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request started · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 1,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "started",
+          "at_ms": 1791755652720
+        },
+        "cursor": "ses_30ae5959044f78369176ccb955b5d533:3"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_30ae5959044f78369176ccb955b5d533",
+        "event": 6,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request stopped; charge may be unknown · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 1,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "cancelled",
+          "at_ms": 1791755652720,
+          "elapsed_ms": 32
+        },
+        "cursor": "ses_30ae5959044f78369176ccb955b5d533:6"
+      }
+    ],
+    "full": [
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_a55cb88d090ed31474418e2e33a2248f",
+        "event": 3,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request started · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 1,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "started",
+          "at_ms": 1791755653181
+        },
+        "cursor": "ses_a55cb88d090ed31474418e2e33a2248f:3"
+      },
+      {
+        "contract": "nika/session-host@1",
+        "frame": "activity",
+        "session": "ses_a55cb88d090ed31474418e2e33a2248f",
+        "event": 38,
+        "command": "c-1",
+        "phase": "authoring",
+        "note": "request stopped; charge may be unknown · conversation · requested vllm/agent-seat",
+        "done": false,
+        "call": {
+          "ordinal": 1,
+          "role": "conversation",
+          "model": "vllm/agent-seat",
+          "state": "cancelled",
+          "at_ms": 1791755653181,
+          "elapsed_ms": 59
+        },
+        "cursor": "ses_a55cb88d090ed31474418e2e33a2248f:38"
+      }
+    ]
+  }
+}

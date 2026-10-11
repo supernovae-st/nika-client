@@ -1,0 +1,107 @@
+{
+  "note": "Recorded from the native Session door of engine f1dad1ef5 (no model seated, no provider key in the launch environment, by the recorder's observation): the deterministic compiler asked its own model question and one fresh Session answered it once per row. Each answered record is the engine's, verbatim; rows are named by the act it recorded.",
+  "words": "Summarize ./notes/brief.md in three bullet points and write the summary to ./out/summary.md",
+  "rows": [
+    {
+      "name": "refused_empty_answer",
+      "line": "",
+      "question": {
+        "key": "model",
+        "type": "text",
+        "mandatory": true
+      },
+      "asked_waiting": {
+        "kind": "question",
+        "key": "model",
+        "id": "a9d90491fe50b02a2fcbdad736b18a21d124dc3d865d308e953b289ff8ef1dd0"
+      },
+      "after_waiting": {
+        "kind": "question",
+        "key": "model",
+        "id": "a9d90491fe50b02a2fcbdad736b18a21d124dc3d865d308e953b289ff8ef1dd0"
+      },
+      "answered": {
+        "act": "refused",
+        "class": "empty_answer",
+        "question": "a9d90491fe50b02a2fcbdad736b18a21d124dc3d865d308e953b289ff8ef1dd0"
+      },
+      "reread_identical": true
+    },
+    {
+      "name": "dropped",
+      "line": "cancel",
+      "question": {
+        "key": "model",
+        "type": "text",
+        "mandatory": true
+      },
+      "asked_waiting": {
+        "kind": "question",
+        "key": "model",
+        "id": "a9d90491fe50b02a2fcbdad736b18a21d124dc3d865d308e953b289ff8ef1dd0"
+      },
+      "after_waiting": {
+        "kind": "free"
+      },
+      "answered": {
+        "act": "dropped",
+        "key": "model",
+        "question": "a9d90491fe50b02a2fcbdad736b18a21d124dc3d865d308e953b289ff8ef1dd0"
+      },
+      "reread_identical": true
+    },
+    {
+      "name": "waits_unpriced_model",
+      "line": "mistral/mistral-small",
+      "question": {
+        "key": "model",
+        "type": "text",
+        "mandatory": true
+      },
+      "asked_waiting": {
+        "kind": "question",
+        "key": "model",
+        "id": "a9d90491fe50b02a2fcbdad736b18a21d124dc3d865d308e953b289ff8ef1dd0"
+      },
+      "after_waiting": {
+        "kind": "question",
+        "key": "model",
+        "id": "a9d90491fe50b02a2fcbdad736b18a21d124dc3d865d308e953b289ff8ef1dd0"
+      },
+      "answered": {
+        "act": "waits",
+        "key": "model",
+        "question": "a9d90491fe50b02a2fcbdad736b18a21d124dc3d865d308e953b289ff8ef1dd0",
+        "why": "`mistral/mistral-small` is not priced in Nika's catalog: a run under a spending ceiling would refuse it (NIKA-1709 · unpriced cloud spend cannot be bounded).\n  priced for `mistral`: mistral/mistral-large-latest · mistral/mistral-small-latest — name one of them (the question still waits)"
+      },
+      "reread_identical": true
+    },
+    {
+      "name": "bound_as_typed_sentence",
+      "line": "write the summary to ./out/digest.md instead",
+      "question": {
+        "key": "model",
+        "type": "text",
+        "mandatory": true
+      },
+      "asked_waiting": {
+        "kind": "question",
+        "key": "model",
+        "id": "a9d90491fe50b02a2fcbdad736b18a21d124dc3d865d308e953b289ff8ef1dd0"
+      },
+      "after_waiting": {
+        "kind": "question",
+        "key": "model",
+        "id": "3e77fa90353789a022ff3204f7f7dedc561116d72f1ede7c40c5e5b262a30779"
+      },
+      "answered": {
+        "act": "bound",
+        "key": "model",
+        "question": "a9d90491fe50b02a2fcbdad736b18a21d124dc3d865d308e953b289ff8ef1dd0",
+        "reading": "as_typed",
+        "value": "write the summary to ./out/digest.md instead"
+      },
+      "reread_identical": true
+    }
+  ]
+}

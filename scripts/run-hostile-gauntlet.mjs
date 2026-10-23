@@ -130,7 +130,7 @@ tasks:
   writeFileSync(fakeBin, `#!/usr/bin/env node
 const identity = {
   engineVersion: '0.115.0',
-  machineProtocolVersion: 1,
+  machineProtocolVersion: 2,
   snapshotFormatVersion: 1,
   checkReportVersion: 4,
   eventFormatVersion: 1,

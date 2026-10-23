@@ -43,7 +43,7 @@ function healthResponse(overrides: Record<string, unknown> = {}): Response {
     status: 'ok',
     service: 'nika-serve',
     engineVersion: '0.114.0',
-    machineProtocolVersion: 1,
+    machineProtocolVersion: 2,
     snapshotFormatVersion: 1,
     checkReportVersion: 1,
     eventFormatVersion: 1,

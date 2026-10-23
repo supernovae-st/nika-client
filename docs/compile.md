@@ -178,7 +178,7 @@ Not exposed: `--authoring-samples`, `--authoring-strategy`,
 | `compile_version` | `2` when a provider call happened, else `1` |
 | `status`, `ready` | the engine's completeness word; `ready` is exactly `status === 'ready'` |
 | `candidate` | `.nika` source. Proposed only when ready; under `incomplete` a non-null candidate is a preview |
-| `questions[]` | `key`, `label`, `type` (`text`, `literal` or `choice` with `options[]`), `why`, `mandatory`. `mandatory: false` belongs to a binding outside the program (a schedule's timezone, missed-run and overlap policies, ceiling) and never blocks ready |
+| `questions[]` | `key`, `label`, `type` (`text`, `literal` or `choice` with `options[]`), `why`, `mandatory`. A `choice` (engine 0.123, machine protocol 2) carries at least one option and is answered with one option's `key`; no other question carries options. `mandatory: false` belongs to a binding outside the program (a schedule's timezone, missed-run and overlap policies, ceiling) and never blocks ready |
 | `diagnostics[]` | `kind`, `target`, `message`. Compiler targets include `semantic_verification`, `verify_held` and `verify_resume` |
 | `requested_boundary` | the permits the candidate requests; never a grant |
 | `requested_trigger` | the trigger the request names (`kind`, `status`, `cadence`, `cron`…), a requirement you bind through the schedule contract; absent on engines before the field |

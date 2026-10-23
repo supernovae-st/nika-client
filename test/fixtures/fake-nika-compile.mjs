@@ -35,7 +35,7 @@ function logInvocation() {
 
 const IDENTITY = {
   engineVersion: '0.120.0',
-  machineProtocolVersion: 1,
+  machineProtocolVersion: 2,
   snapshotFormatVersion: 1,
   checkReportVersion: 1,
   eventFormatVersion: 1,

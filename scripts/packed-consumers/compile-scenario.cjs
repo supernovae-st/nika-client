@@ -52,7 +52,7 @@ function resident(candidate) {
         status: 'ok',
         service: 'nika-serve',
         engineVersion: '0.120.0',
-        machineProtocolVersion: 1,
+        machineProtocolVersion: 2,
         snapshotFormatVersion: 1,
         checkReportVersion: 1,
         eventFormatVersion: 1,
@@ -202,7 +202,7 @@ module.exports = async function compileScenario(sdk, engines) {
       seatedRequests.push({ path: pathname, body: init.body ?? null });
       if (pathname === '/health') {
         return Response.json({ status: 'ok', service: 'nika-serve', engineVersion: '0.122.0',
-          machineProtocolVersion: 1, snapshotFormatVersion: 1, checkReportVersion: 1, eventFormatVersion: 1,
+          machineProtocolVersion: 2, snapshotFormatVersion: 1, checkReportVersion: 1, eventFormatVersion: 1,
           traceFormatVersion: 2, supportedCapabilities: ['check', 'executionSnapshot', 'eventStream', 'compile',
             'compileNativeV2', 'compileJudgedAnswerRound'] });
       }

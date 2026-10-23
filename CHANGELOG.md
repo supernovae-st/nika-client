@@ -75,6 +75,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default. The depth ledger, evidence gate and replay fixtures now count six
   projects; the new row records behavioral verdicts only, never a job id.
 
+### Changed
+
+- **Machine protocol 2, in lockstep with engine 0.123.** The SDK speaks
+  exactly the machine protocol of the engine it bundles, now 2
+  (`MACHINE_PROTOCOL_VERSION`), read from `nika --sdk-identity` and
+  `GET /health`. Engine 0.123 raised it (`nika-runtime-laws`
+  `MACHINE_PROTOCOL_VERSION`, nika#1808) because objects a published SDK
+  reads closed changed: a compile question may be `choice` with its
+  `options`, and a catch-up firing's receipt origin may name its silence.
+  The published 0.120.3 SDK therefore refuses that engine at identity,
+  before any job. Symmetrically, this SDK refuses an engine or a resident on
+  protocol 1 (0.122 and older) with `NikaCompatibilityError`
+  (`capability: 'engineIdentity'`) before any spawn or request; the message
+  names the engine version. One generation per release train is the
+  package's compatibility policy (each package bundles the engine it was
+  qualified against); pair an older engine with its own train's SDK.
+- A scheduled receipt origin may carry `missed_first` and `missed_count`:
+  a `catch-up-once` firing names the silence it answers for, its first
+  missed slot and how many slots it holds, `scheduled_for` being the last.
+  They are read as the resident writes them (`nika-serve`
+  `silence_holds`): both or neither, on a `catch_up` decision only, at least
+  one slot, the first never after `scheduled_for`; anything else is a
+  `NikaProtocolError`. Before, every catch-up-once job of an 0.123 resident
+  failed `attachRun()` and `result()` as a malformed origin (measured on
+  `5342f8a43`).
+- A compile `choice` question must carry at least one option and a `text`
+  or `literal` question none, as the engine's wire writes them; anything
+  else is a `NikaProtocolError` on both doors, instead of an unanswerable
+  question.
+- Contract pin: `openapi.json` is the live plain `nika serve` document of
+  engine main `5342f8a43` (`nika 0.123.0-preview.1`, nika#1814) and
+  `src/generated/openapi.d.ts` is regenerated from that resident. Since
+  0.120.3 the document adds the compile `choice` question and its `options`,
+  `requested_trigger`, the provenance `strategy`, `plan`, `decision` and
+  `suggested_file`, the receipt origin's `missed_first`/`missed_count`, the
+  settlement's `stopped_calls` (an additive member the SDK carries through
+  untyped on `result().settlement`), the
+  schedule's per-fire `inputs`, and drops the compile request's field-size
+  bounds. `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name that commit; the
+  release replaces it with the commit tag `v0.123.0` names.
+- Real 0.123 bytes are decoded by `test/engine-0123-wire.test.ts`
+  (identities, compile choices on both doors, a catch-up job and its
+  stream), and `test/engine-live.test.ts` drives an engine named by
+  `NIKA_BIN` on both doors (check, run and its events and result, a refused
+  run, cancellation, trace verification, a snapshot run, schedules and
+  compile), keyless and offline; candidate CI runs it against the pinned
+  engine.
+
 ### Fixed
 
 - An HTTP provider compile round with no deadline no longer fails after

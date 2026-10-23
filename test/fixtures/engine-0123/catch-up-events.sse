@@ -1,0 +1,8 @@
+retry: 1000
+
+id: 1
+data: {"sequence":1,"at":"2026-10-23T13:17:01.473423Z","kind":"execution.prepared","status":"running"}
+
+id: 2
+data: {"sequence":2,"at":"2026-10-23T13:17:01.602068Z","kind":"execution.settled","status":"succeeded","outputs":{"greeting":"mock(echo) · beat"},"receipt":{"job_id":"416be0cd-86b4-49fe-b8b6-a9aea4d324af","execution_id":"exe-01a168e8-5e9d-73b9-8985-b3629d41961a","trace_id":"01a168e85e9d73b98985b3629d41961a","snapshot_digest":"8d88cc8b96f081063ff3f9c75d055398f0b647450a80e92916418e75e13c0c35","origin":{"kind":"schedule","schedule_origin":"api","schedule_id":"silence","schedule_revision":"sha256:00d17a098aedaa6febc14af06cd1a6877349a752b1785f07b1a65097e266268b","slot_id":"a00e5e013757cb0499043544856ca83e0fb5acab66b4a6e4650077d0c908f052","decision":"catch_up","scheduled_for":"2026-10-23T13:17:00Z","fired_at":"2026-10-23T13:17:01.469254Z","arm_generation":"34aa8d93a8ec2feadc27fbf3876b431e265a7d298cefd5d2ce230bba6134bbcc","missed_first":"2026-10-23T13:16:00Z","missed_count":2},"chain_head":"5f2c6fcb8476b32306e77618108101fd97ce375b943d10264147a39056711664"},"settlement":{"cause":"normal","elapsed_ms":9,"spend":{"priced_calls":0,"qualifier":"unpriced","unpriced_calls":1},"status":"succeeded","tasks":{"cancelled":0,"failed":0,"never_started":0,"ok":1,"recovered":0,"skipped":0,"total":1}}}
+

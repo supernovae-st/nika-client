@@ -2039,7 +2039,7 @@ function validateReceiptOrigin(value: unknown, transport: 'http'): void {
   ];
   if (
     origin.kind !== 'schedule'
-    || Object.keys(origin).some((key) => !required.includes(key))
+    || Object.keys(origin).some((key) => !required.includes(key) && !SILENCE_KEYS.includes(key))
     || required.some((key) => !Object.hasOwn(origin, key))
     || !['project', 'api'].includes(String(origin.schedule_origin))
     || !['scheduled', 'catch_up'].includes(String(origin.decision))
@@ -2050,9 +2050,36 @@ function validateReceiptOrigin(value: unknown, transport: 'http'): void {
     || !/^[0-9a-f]{64}$/.test(String(origin.arm_generation))
     || !isCanonicalTimestamp(String(origin.scheduled_for))
     || !isCanonicalTimestamp(String(origin.fired_at))
+    || !silenceHolds(origin)
   ) {
     throw new NikaProtocolError(transport, 'Scheduled receipt origin was malformed');
   }
+}
+
+/** The silence a scheduled origin may name (machine protocol 2, engine 0.123). */
+const SILENCE_KEYS = ['missed_first', 'missed_count'];
+const U32_MAX = 4_294_967_295;
+
+/**
+ * A `catch-up-once` firing names the silence it answers for: `missed_first`,
+ * the first slot that passed unfired, and `missed_count`, how many slots the
+ * silence holds, `scheduled_for` being its last. Both or neither, on a
+ * `catch_up` decision only, at least one slot, the first never after the
+ * last: the resident's own law for the origin it writes (`nika-serve`
+ * `silence_holds`), so any other combination is a protocol fault.
+ */
+function silenceHolds(origin: Record<string, unknown>): boolean {
+  const first = origin.missed_first;
+  const count = origin.missed_count;
+  if (first === undefined && count === undefined) return true;
+  return origin.decision === 'catch_up'
+    && typeof first === 'string'
+    && isCanonicalTimestamp(first)
+    && typeof count === 'number'
+    && Number.isSafeInteger(count)
+    && count >= 1
+    && count <= U32_MAX
+    && Date.parse(first) <= Date.parse(String(origin.scheduled_for));
 }
 
 function isCanonicalTimestamp(value: string): boolean {

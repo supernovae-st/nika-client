@@ -67,7 +67,7 @@ function resident(capabilities) {
         status: 'ok',
         service: 'nika-serve',
         engineVersion: '0.120.3',
-        machineProtocolVersion: 1,
+        machineProtocolVersion: 2,
         snapshotFormatVersion: 1,
         checkReportVersion: 1,
         eventFormatVersion: 1,

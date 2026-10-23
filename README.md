@@ -884,6 +884,10 @@ await nika.schedule('hello.nika', {
   not runnable. The engine refuses a new active declaration it cannot plan
   before storing it. The planning facts in a status are the engine's, and new
   ones may appear.
+- **A catch-up's receipt.** After the server was down, a `catch-up-once`
+  run's `receipt.origin` names the silence it answers for: `missed_first`,
+  the first slot that passed unfired, and `missed_count`, how many slots it
+  holds; its `scheduled_for` is the last one.
 
 </details>
 
@@ -1217,7 +1221,11 @@ pin checks. It reports the installed package, not a moving registry tag.
 
 **Package and engine move together.** Each package version bundles the
 engine with the same number, the exact one it was qualified against: one
-*release train*. This source tree is **0.120.3**, in lockstep with engine
+*release train*. A package speaks the machine protocol of its engine and
+refuses an engine on another generation at its identity, before any spawn or
+job, with `NikaCompatibilityError`: this source speaks protocol 2 (engine
+0.123), and an engine on protocol 1 (0.122 and older) needs the package of
+its own train. This source tree is **0.120.3**, in lockstep with engine
 release `v0.120.3` (`578352a31`); a version in the source is not on npm until
 the release workflow publishes it. The standalone CLI (GitHub releases,
 Homebrew, the install script) releases on its own clock, so its newest tag can

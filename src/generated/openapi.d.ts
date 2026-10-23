@@ -984,7 +984,7 @@ export interface components {
         };
         /** @description The engine-owned machine document of one authoring result — the document `nika compile --json` prints, without the CLI-only `written`. No field grants authority, writes or executes source. */
         CompileOutcome: {
-            /** @description Ordinary `.nika` source; may still be incomplete */
+            /** @description Ordinary `.nika` source. It is proposed only when `status` is `ready`; under any other status it is never proposed. Under `incomplete` it is a preview: it may still carry unfilled holes, or, when an `applied` diagnostic targets `verify_held`, it is a candidate the verifier held: it answered on these bytes against the request and did not accept them. A preview is not to be run or saved as an accepted result. Null when no candidate is shown, a withdrawn one included. */
             candidate: string | null;
             /** @description The engine's pure Check report over the source only. No child file, skill, credential probe, access plan or admission was evaluated */
             check_preview: {
@@ -996,6 +996,7 @@ export interface components {
             } | null;
             /** @constant */
             compile_version: 1;
+            /** @description Findings, in order. `kind` and `target` are their machine-readable part; `message` is for a reader. `target` names what a finding concerns: a question key, a task, a source field, or one of the compiler's own targets, among them `semantic_verification`, a finding on the request against the candidate's bytes (a clause or the whole request that no admitted judgment of these bytes settled, a part a verifier judged missing with its reason, a part it left unsettled or contested, a verification stopped at a judge call that got no answer); `verify_held` (kind `applied`), the candidate is held: the verifier answered on these bytes against the request and did not accept them (it rejected them or abstained), so `candidate` is a preview only, no replayable round is kept, and that verifier is not asked about the same bytes again in this round; and `verify_resume` (kind `applied`), no admitted judgment of the candidate was made (the verifier's call failed or chose no offered answer): the candidate is withdrawn and the round's record kept, and a zero-call replay of that round asks no verifier. Each verification attempt is recorded in `provenance.decision.semantic_verification`. */
             diagnostics: {
                 /** @enum {string} */
                 kind: "applied" | "missed" | "unknown" | "requiresHuman" | "refused";
@@ -1008,20 +1009,45 @@ export interface components {
                 /** @constant */
                 cognition: "deterministicOnly";
                 compiler_version: string;
+                /** @description Bounded compiler decision evidence, including deterministic and replay outcomes; it grants no execution or spending authority. */
+                decision?: {
+                    [key: string]: unknown;
+                };
+                /** @description The compiler record retained in this outcome; a server replay uses its opaque token rather than accepting this object as authority. */
+                plan?: {
+                    [key: string]: unknown;
+                };
                 skeleton: string | null;
                 spec_pin: string;
+                /** @description The compiler strategy that produced this outcome. */
+                strategy?: string;
+                /** @description A suggested candidate file name, never a file written by compilation. */
+                suggested_file?: string | null;
             };
             questions: {
                 /** @description Stable semantic hole path such as `const.request`, never a session id */
                 key: string;
                 label: string;
+                /** @description false: the value belongs to a binding outside the program (a schedule's timezone, missed-run and overlap policies, per-run ceiling) and never blocks a ready candidate */
                 mandatory: boolean;
-                /** @enum {string} */
-                type: "text" | "literal";
+                /** @description Present on a choice question only: the admissible answers, keys spelled by the owning grammar */
+                options?: {
+                    key: string;
+                    label: string;
+                }[];
+                /**
+                 * @description text: a JSON string · literal: one JSON value · choice: a JSON string that is the `key` of one of `options`
+                 * @enum {string}
+                 */
+                type: "text" | "literal" | "choice";
                 why: string;
             }[];
             /** @description The candidate's requested permits, derived by Check. Requested, never granted */
             requested_boundary: {
+                [key: string]: unknown;
+            } | null;
+            /** @description The trigger the request names (kind · source_hint · event_hint · cadence · at · payload_input · status · timezone · missed · overlap · ceiling · cron), stated beside the candidate whose bytes carry no cadence, host or event. A requirement the operator binds through the schedule contract, never a grant or a schedule row. timezone, missed, overlap and ceiling are the answered binding values (null until answered). cron is the exact five-field schedule projection when supported and fully specified, otherwise null; older engines omit it. It never supplies a missing time or timezone. */
+            requested_trigger: {
                 [key: string]: unknown;
             } | null;
             /**
@@ -1030,9 +1056,9 @@ export interface components {
              */
             status: "ready" | "incomplete" | "refused";
         };
-        /** @description Generation 1 of the compile request. The encoded body is limited to 1048576 bytes (or the listener's lower ceiling). Byte bounds below are UTF-8 bytes. Unknown fields, a present null, duplicate keys (including inside `answers`) and positional arrays are refused. No field names a host path: an EDIT base travels inline in `source`. */
+        /** @description Generation 1 of the compile request. The encoded body is limited by the listener's configured HTTP body ceiling; no smaller field-size or answer-count quota is imposed. Unknown fields, a present null, duplicate keys (including inside `answers`) and positional arrays are refused. No field names a host path: an EDIT base travels inline in `source`. */
         CompileRequest: {
-            /** @description Question key → one JSON literal with its type preserved, judged exactly as sent (at most 65536 bytes each) */
+            /** @description Question key → one JSON literal with its type preserved, judged exactly as sent within the HTTP body envelope. */
             answers?: {
                 [key: string]: unknown;
             };
@@ -1040,7 +1066,7 @@ export interface components {
                 set_constant?: {
                     /** @description Bare constant name, not a path */
                     name: string;
-                    /** @description One JSON literal, judged exactly as sent (at most 65536 bytes) */
+                    /** @description One JSON literal, judged exactly as sent within the HTTP body envelope. */
                     value: unknown;
                 };
                 /** @description `Set const.NAME to JSON_LITERAL`, or `Set const.NAME` answered through `answers` */
@@ -1170,6 +1196,13 @@ export interface components {
             fired_at: string;
             /** @constant */
             kind: "schedule";
+            /** @description How many slots that silence holds */
+            missed_count?: number;
+            /**
+             * Format: date-time
+             * @description First slot of the silence a catch-up-once run answers for, on a catch_up firing only; scheduled_for is its last slot
+             */
+            missed_first?: string;
             /** @description Origin-local identifier, bounded to 255 UTF-8 bytes by the server */
             schedule_id: string;
             /** @enum {string} */
@@ -1230,6 +1263,15 @@ export interface components {
             };
             /** @enum {string} */
             status: "succeeded" | "failed" | "paused" | "cancelled";
+            /** @description Every MCP call the run stopped waiting for, on every path (a task's timeout, an operator Stop, a task that continued or recovered after it): the task, the tool as the workflow names it, the call's id, and whether the call left. `unknown`: the call reached the server, which may have acted, so an effect's outcome is unknown; `not_sent`: it was stopped before it was sent. Absent when the run stopped no MCP call. */
+            stopped_calls?: {
+                call_id: string;
+                /** @enum {string} */
+                outcome: "unknown" | "not_sent";
+                task: string;
+                /** @description `mcp:<server>/<tool>` */
+                tool: string;
+            }[];
             tasks?: {
                 cancelled: number;
                 failed: number;
@@ -1252,6 +1294,10 @@ export interface components {
             active?: boolean;
             /** @enum {string} */
             afterSkip?: "next_slot" | "on_completion";
+            /** @description Per-fire inputs bound on every resident fire (#1370): one scalar per key the workflow declares under `inputs:`, coerced by the declared type exactly as the CLI `--var` edge does, then judged by the same literal admission validator as POST /v1/jobs. Unknown keys, values the declared type refuses, missing required inputs and the `@env:` channel are refused at PUT and again at fire. */
+            inputs?: {
+                [key: string]: string | number | boolean;
+            };
             /** @enum {string} */
             jitter?: "hash";
             maxCostUsd: number;

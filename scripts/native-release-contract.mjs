@@ -106,13 +106,25 @@ export async function assertExecutableTarget(file, target) {
 export async function assertExecutableIdentity(file, version, commit) {
   if (!isCommit(commit)) throw new Error('engine commit must be 40 lowercase hex');
   const expected = `${version} (${commit.slice(0, 9)})`;
-  const matches = (await readFile(file)).toString('latin1')
-    .match(/\b\d+\.\d+\.\d+ \([0-9a-f]{9}\)/g) ?? [];
+  const matches = executableIdentities((await readFile(file)).toString('latin1'));
   if (matches.length !== 1 || matches[0] !== expected) {
     throw new Error(
       `${file} embeds engine identities [${matches.join(', ')}], expected exactly ${expected}`,
     );
   }
+}
+
+/**
+ * The engine identities an executable states as its own: every `X.Y.Z (<9 hex>)` it embeds,
+ * except a provenance record that names the binary it was measured on (`nika X.Y.Z (<9 hex>)`).
+ * Engine 0.123.0 embeds its knowledge release, whose records each carry such a pin (`"binary":
+ * "nika 0.122.0 (b9fd7a681)"`); the executable's own identity is the bare one its `--version`
+ * prints after `nika `.
+ */
+export function executableIdentities(text) {
+  return [...text.matchAll(/\b\d+\.\d+\.\d+ \([0-9a-f]{9}\)/g)]
+    .filter((match) => !text.slice(Math.max(0, match.index - 5), match.index).endsWith('nika '))
+    .map((match) => match[0]);
 }
 
 export function sha256File(file) {

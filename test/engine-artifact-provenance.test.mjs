@@ -101,3 +101,25 @@ test('both CI consumers and release packaging use the one strict archive verifie
   assert.equal(release.match(/scripts\/verify-engine-archive\.mjs/g)?.length, 1);
   assert(!`${ci}\n${release}`.includes('gh attestation verify "$asset" --repo supernovae-st/nika'));
 });
+
+test('an executable states one identity of its own; the provenance pins it embeds are data', async () => {
+  const { assertExecutableIdentity, executableIdentities } = await import('../scripts/native-release-contract.mjs');
+  const commit = '0bfde3765806cae256d65920b3a67c1cc68b9acd';
+  const own = 'nika: `permits` is not a command.\n0.123.0 (0bfde3765)\u0000';
+  const pins = '{"pin":{"binary":"nika 0.122.0 (b9fd7a681)"}}{"binary": "nika 0.122.0 (44472f352)"}\npin: "nika 0.120.3 (578352a31)"';
+  assert.deepEqual(executableIdentities(own + pins), ['0.123.0 (0bfde3765)']);
+  const dir = mkdtempSync(path.join(tmpdir(), 'nika-identity-'));
+  try {
+    const binary = path.join(dir, 'nika');
+    writeFileSync(binary, own + pins);
+    await assertExecutableIdentity(binary, '0.123.0', commit);
+    // Another bare identity is another engine's own, never data: the wrong binary is refused.
+    writeFileSync(binary, `${own}0.122.0 (b9fd7a681)\u0000${pins}`);
+    await assert.rejects(assertExecutableIdentity(binary, '0.123.0', commit), /expected exactly 0\.123\.0 \(0bfde3765\)/);
+    // Provenance alone is not an identity: an executable must state its own.
+    writeFileSync(binary, pins);
+    await assert.rejects(assertExecutableIdentity(binary, '0.123.0', commit), /embeds engine identities \[\]/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

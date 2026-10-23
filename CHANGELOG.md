@@ -77,6 +77,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Release train 0.123.0, prepared, not published.** `package.json` is
+  0.123.0 and `sync:native-versions` moved the four native payload manifests,
+  the `optionalDependencies` and the lockfile with it. Engine `v0.123.0` is
+  not tagged yet: `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name engine main
+  `5342f8a43` until the release pins the tag's commit. The committed gauntlet
+  ledgers still record engine 0.120.3, so the release-evidence gate
+  (`check:release-evidence`, and its root case in `npm test`) refuses this
+  tree until they are regenerated from the verified public `v0.123.0`
+  binary; npm's latest stays 0.120.3.
 - **Machine protocol 2, in lockstep with engine 0.123.** The SDK speaks
   exactly the machine protocol of the engine it bundles, now 2
   (`MACHINE_PROTOCOL_VERSION`), read from `nika --sdk-identity` and
@@ -90,7 +99,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`capability: 'engineIdentity'`) before any spawn or request; the message
   names the engine version. One generation per release train is the
   package's compatibility policy (each package bundles the engine it was
-  qualified against); pair an older engine with its own train's SDK.
+  qualified against); an older engine pairs with an SDK of its own
+  generation (0.120.3 on npm).
 - A scheduled receipt origin may carry `missed_first` and `missed_count`:
   a `catch-up-once` firing names the silence it answers for, its first
   missed slot and how many slots it holds, `scheduled_for` being the last.

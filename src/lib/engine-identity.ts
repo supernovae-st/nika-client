@@ -13,7 +13,7 @@ import { machineObject } from './machine.js';
  * `options`, and a catch-up firing's receipt origin may name the silence it
  * answers for (`missed_first`, `missed_count`). An engine on generation 1
  * (0.122 and older) is refused with `NikaCompatibilityError`; it pairs with
- * the SDK release of its own train.
+ * an SDK of its own generation.
  */
 export const MACHINE_PROTOCOL_VERSION = 2;
 

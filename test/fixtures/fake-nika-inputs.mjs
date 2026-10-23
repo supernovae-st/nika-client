@@ -152,7 +152,7 @@ async function run() {
 
 if (command === '--sdk-identity') {
   console.log(JSON.stringify({
-    engineVersion: '0.120.3',
+    engineVersion: '0.123.0',
     machineProtocolVersion: 2,
     snapshotFormatVersion: 1,
     checkReportVersion: 1,

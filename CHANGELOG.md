@@ -57,7 +57,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and one `requestTimeout`, and without that limit or `timeoutMs` gets no SDK
   deadline, as the engine sets none by default; its answer is read up to the
   8 MiB compile bound. The generation-2 types are hand-written from the engine
-  source, ahead of the pinned `openapi.json` (engine 0.120.3); see
+  source, ahead of the pinned `openapi.json` (its default document); see
   `docs/compile.md` and `examples/compile-then-run.ts`.
 - Packed depth project `signed-webhook-intake` — the app-owned webhook
   qualification (engine nika#1719 names it as the path that stays
@@ -91,16 +91,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`MACHINE_PROTOCOL_VERSION`), read from `nika --sdk-identity` and
   `GET /health`. Engine 0.123 raised it (`nika-runtime-laws`
   `MACHINE_PROTOCOL_VERSION`, nika#1808) because objects a published SDK
-  reads closed changed: a compile question may be `choice` with its
-  `options`, and a catch-up firing's receipt origin may name its silence.
-  The published 0.120.3 SDK therefore refuses that engine at identity,
-  before any job. Symmetrically, this SDK refuses an engine or a resident on
-  protocol 1 (0.122 and older) with `NikaCompatibilityError`
-  (`capability: 'engineIdentity'`) before any spawn or request; the message
-  names the engine version. One generation per release train is the
-  package's compatibility policy (each package bundles the engine it was
-  qualified against); an older engine pairs with an SDK of its own
-  generation (0.120.3 on npm).
+  reads closed changed: a catch-up firing's receipt origin may name its
+  silence, and compile questions of type `choice` with their `options`,
+  which engines 0.121 and 0.122 already sent while still announcing protocol
+  1, now come with the number that says so. The published 0.120.3 SDK
+  therefore refuses a 0.123 engine at identity, before any job, and already
+  refused a `choice` question from 0.121 and 0.122 as a protocol error.
+  Symmetrically, this SDK refuses an engine or a resident on protocol 1
+  (0.122 and older) with `NikaCompatibilityError`
+  (`capability: 'engineIdentity'`) before any job; only the identity probe
+  (`nika --sdk-identity`, `GET /health`) runs first, and the message names
+  the engine version. One generation per release train is the package's
+  compatibility policy (each package bundles the engine it was qualified
+  against): 0.120.3 on npm pairs with engine 0.120.x, and no published
+  package reads the compile choices of engines 0.121 and 0.122.
+- The package's own `nika` command checks its engine the same way for
+  every command: an engine on protocol 1, including one named by
+  `NIKA_BIN`, is refused (`NIKA_BIN=<a 0.122 binary> npx nika --version`
+  exits 1).
 - A scheduled receipt origin may carry `missed_first` and `missed_count`:
   a `catch-up-once` firing names the silence it answers for, its first
   missed slot and how many slots it holds, `scheduled_for` being the last.

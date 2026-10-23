@@ -12,8 +12,9 @@ import { machineObject } from './machine.js';
  * Generation 2 (engine 0.123): a compile question may be `choice` with its
  * `options`, and a catch-up firing's receipt origin may name the silence it
  * answers for (`missed_first`, `missed_count`). An engine on generation 1
- * (0.122 and older) is refused with `NikaCompatibilityError`; it pairs with
- * an SDK of its own generation.
+ * (0.122 and older) is refused with `NikaCompatibilityError`. Engines 0.121
+ * and 0.122 already sent `choice` questions under generation 1, so only
+ * engine 0.120.x pairs fully with the generation-1 SDK (0.120.3).
  */
 export const MACHINE_PROTOCOL_VERSION = 2;
 

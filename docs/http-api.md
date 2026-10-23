@@ -131,8 +131,8 @@ generation-2 answer is read up to 8 MiB. Refusals add 409 (`compile_replay_unava
 `compile_replay_capacity` or `stopping`.
 
 This contract is ahead of the pinned `openapi.json`, which describes the
-released 0.120.3 resident: the default document never carries it, and a
-seated resident merges it into its live document. Its types are written by
+default document of the engine 0.123 resident: the default document never
+carries it, and a seated resident merges it into its live document. Its types are written by
 hand from the engine source (`nika-serve/src/server/compile/v2.rs`,
 `author.rs`, `openapi-native.json`). Released engines 0.121.0 and later serve
 it; `limits.max_calls` needs 0.122.0. See [compile.md](compile.md).

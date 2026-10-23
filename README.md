@@ -1222,10 +1222,12 @@ pin checks. It reports the installed package, not a moving registry tag.
 **Package and engine move together.** Each package version bundles the engine
 with the same number, the exact one it was qualified against: one *release
 train*. A package speaks the machine protocol of its engine and refuses an
-engine on another generation at its identity, before any spawn or job, with
-`NikaCompatibilityError`: this source speaks protocol 2 (engine 0.123), and an
-engine on protocol 1 (0.122 and older) needs a package of that generation
-(0.120.3 on npm). This source tree is **0.123.0**, prepared for lockstep with
+engine on another generation at its identity, before any job, with
+`NikaCompatibilityError`: only the identity probe (`nika --sdk-identity`,
+`GET /health`) runs first. This source speaks protocol 2 (engine 0.123). The
+0.120.3 package on npm pairs with engine 0.120.x: engines 0.121 and 0.122
+still announce protocol 1 but already send compile questions of type
+`choice`, which no published package reads. This source tree is **0.123.0**, prepared for lockstep with
 engine release `v0.123.0`, which is not tagged yet: until then it is tested
 against engine main `5342f8a43` (`nika 0.123.0-preview.1`), and its release
 pins the commit the tag names. npm's latest is still 0.120.3; a version in the

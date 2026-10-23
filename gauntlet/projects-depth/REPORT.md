@@ -48,9 +48,19 @@ The historical paid-provider and three-pass trace ledgers remain useful prior
 evidence, but are explicitly labelled as historical 0.115 observations and are
 not release gates for the current candidate.
 
+## Public 0.123.0 replay
+
+The current replay uses public release engine `nika 0.123.0 (0bfde3765)`
+(the `nika-macos-arm64-0.123.0.tar.gz` archive of the v0.123.0 GitHub release,
+checked against its `SHA256SUMS`) with `supernovae-st-nika-0.123.0.tgz`, on
+2026-10-23. All six projects passed (6/6), the hostile suite 14/14 with 72
+real engine runs, and the local corpus, mini-SaaS and two-process recovery
+ledgers are green. The engine speaks machine protocol 2; the projects, their
+workflows and their verdicts are unchanged from the 0.120.3 replay.
+
 ## Public 0.120.3 replay
 
-The current replay uses public release engine `nika 0.120.3 (578352a31)`
+The previous public replay used engine `nika 0.120.3 (578352a31)`
 with `supernovae-st-nika-0.120.3.tgz`. All six projects passed with canonical
 `.nika` files, including the incident controller's HTTP check and run, sealed
 journal verification, substituted-trace refusal, controlled cancellation, and
@@ -62,7 +72,8 @@ typed input refusal, the durable job, SSE and the once schedule that starts
 the same program with its declared default. Its ledger row carries behavioral
 verdicts only, never a job id. Raw trace identifiers remain in the ledger; replay
 comparison validates their shape and compares the behavioral verdicts because
-each execution creates a fresh identity.
+each execution creates a fresh identity. That ledger is historical; it is not
+the current release gate.
 
 ## Public 0.120.2 replay
 

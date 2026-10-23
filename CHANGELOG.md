@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.123.0]
+
 ### Added
 
 - Over HTTP, a generation-2 compile request carries what the local engine
@@ -77,15 +79,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Release train 0.123.0, prepared, not published.** `package.json` is
-  0.123.0 and `sync:native-versions` moved the four native payload manifests,
-  the `optionalDependencies` and the lockfile with it. Engine `v0.123.0` is
-  not tagged yet: `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name engine main
-  `5342f8a43` until the release pins the tag's commit. The committed gauntlet
-  ledgers still record engine 0.120.3, so the release-evidence gate
-  (`check:release-evidence`, and its root case in `npm test`) refuses this
-  tree until they are regenerated from the verified public `v0.123.0`
-  binary; npm's latest stays 0.120.3.
+- **Release train 0.123.0.** `package.json` is 0.123.0 and
+  `sync:native-versions` moved the four native payload manifests, the
+  `optionalDependencies` and the lockfile with it. `ENGINE_QUAL_PIN` and
+  `ENGINE_CANDIDATE` name the commit engine tag `v0.123.0` names
+  (`nika 0.123.0 (0bfde3765)`), and the committed gauntlet ledgers were replayed
+  against that verified public binary.
 - **Machine protocol 2, in lockstep with engine 0.123.** The SDK speaks
   exactly the machine protocol of the engine it bundles, now 2
   (`MACHINE_PROTOCOL_VERSION`), read from `nika --sdk-identity` and

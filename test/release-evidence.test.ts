@@ -6,11 +6,9 @@ import { verifyReleaseEvidence } from '../scripts/verify-release-evidence.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const VERSION = '0.123.0';
-// The engine the 0.123.0 ledgers will record: the public v0.123.0 binary's
-// `nika --version`. Its commit is the tag's, unknown until the tag exists; the
-// candidate's stands in until the ledgers are regenerated from that binary.
-// Until then the first test below stays red: the committed ledgers record 0.120.3.
-const ENGINE = 'nika 0.123.0 (5342f8a43)';
+// The engine the 0.123.0 ledgers record: the public v0.123.0 binary's
+// `nika --version`, the commit tag v0.123.0 names.
+const ENGINE = 'nika 0.123.0 (0bfde3765)';
 const PACKAGE = 'supernovae-st-nika-0.123.0.tgz';
 const currentEvidence = [
   'gauntlet/projects-depth/results.json',

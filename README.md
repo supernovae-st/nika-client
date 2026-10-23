@@ -1227,11 +1227,10 @@ engine on another generation at its identity, before any job, with
 `GET /health`) runs first. This source speaks protocol 2 (engine 0.123). The
 0.120.3 package on npm pairs with engine 0.120.x: engines 0.121 and 0.122
 still announce protocol 1 but already send compile questions of type
-`choice`, which no published package reads. This source tree is **0.123.0**, prepared for lockstep with
-engine release `v0.123.0`, which is not tagged yet: until then it is tested
-against engine main `5342f8a43` (`nika 0.123.0-preview.1`), and its release
-pins the commit the tag names. npm's latest is still 0.120.3; a version in the
-source is not on npm until the release workflow publishes it. The standalone
+`choice`, which no published package reads. This source tree is **0.123.0**, in lockstep with
+engine release `v0.123.0` (`nika 0.123.0 (0bfde3765)`), the binary its release evidence
+was replayed against. A version in the source is not on npm until the release
+workflow publishes it. The standalone
 CLI (GitHub releases, Homebrew, the install script) releases on its own clock,
 so its newest tag can be ahead of or behind the engine in the latest npm
 package. The

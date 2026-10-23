@@ -1226,13 +1226,13 @@ engine on another generation at its identity, before any spawn or job, with
 `NikaCompatibilityError`: this source speaks protocol 2 (engine 0.123), and an
 engine on protocol 1 (0.122 and older) needs a package of that generation
 (0.120.3 on npm). This source tree is **0.123.0**, prepared for lockstep with
-engine release `v0.123.0`, which is not tagged yet: it is qualified against
-engine main `5342f8a43` (`nika 0.123.0-preview.1`), and its release pins the
-commit the tag names. npm's latest is still 0.120.3; a version in the source
-is not on npm until the release workflow publishes it. The standalone CLI
-(GitHub releases, Homebrew, the install script) releases on its own clock, so
-its newest tag can be ahead of or behind the engine in the latest npm package.
-The
+engine release `v0.123.0`, which is not tagged yet: until then it is tested
+against engine main `5342f8a43` (`nika 0.123.0-preview.1`), and its release
+pins the commit the tag names. npm's latest is still 0.120.3; a version in the
+source is not on npm until the release workflow publishes it. The standalone
+CLI (GitHub releases, Homebrew, the install script) releases on its own clock,
+so its newest tag can be ahead of or behind the engine in the latest npm
+package. The
 [npm registry](https://www.npmjs.com/package/@supernovae-st/nika?activeTab=versions)
 lists what is published.
 

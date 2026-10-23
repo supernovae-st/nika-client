@@ -74,7 +74,7 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
         status: 'ok',
         service: 'nika-serve',
         engineVersion: '0.114.0',
-        machineProtocolVersion: 1,
+        machineProtocolVersion: 2,
         snapshotFormatVersion: 1,
         checkReportVersion: 1,
         eventFormatVersion: 1,

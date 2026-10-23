@@ -1054,11 +1054,19 @@ function questionsFrom(
     ) {
       throw protocol('a question lacks its key/label/type/why/mandatory shape');
     }
-    if ('options' in question && (!Array.isArray(question.options)
-      || !question.options.every((option) => {
-        const choice = machineObject(option);
-        return choice !== undefined && typeof choice.key === 'string' && typeof choice.label === 'string';
-      }))) {
+    // A choice is answered by the key of one of its options, so it carries at
+    // least one; no other question carries any (`nika-compile` `wire.rs`).
+    const choice = question.type === 'choice';
+    if (!choice && 'options' in question) {
+      throw protocol(`a ${question.type} question carries options, which only a choice has`);
+    }
+    if (choice && (!Array.isArray(question.options) || question.options.length === 0)) {
+      throw protocol('a choice question carries no options to choose from');
+    }
+    if (choice && !(question.options as unknown[]).every((option) => {
+      const offer = machineObject(option);
+      return offer !== undefined && typeof offer.key === 'string' && typeof offer.label === 'string';
+    })) {
       throw protocol('a question\'s options lack their key/label shape');
     }
     return question as unknown as NikaCompileQuestion;

@@ -10,6 +10,7 @@ npm test
 npm run build
 npm run check:coverage
 npm run check:release-evidence
+NIKA_BIN=/path/to/nika npx vitest run test/engine-live.test.ts
 NIKA_BIN=/path/to/nika npm run gauntlet:check
 NIKA_BIN=/path/to/nika npm run gauntlet:run
 NIKA_BIN=/path/to/nika npm run gauntlet:projects
@@ -82,6 +83,13 @@ was originally written.
 6. Public Personas use only the README, exported types, packed package, public
    binary/help, loopback HTTP, and public documentation. They are synthetic
    users, never substitutes for human usability evidence.
+7. `test/engine-live.test.ts` drives the engine `NIKA_BIN` names through the
+   public API on both doors (check, run with its events and result, a refused
+   run, cancellation, trace verification, a snapshot run, schedules and
+   compile choices), keyless and offline; it is skipped without `NIKA_BIN`,
+   and candidate CI runs it against `ENGINE_QUAL_PIN`.
+   `test/engine-0123-wire.test.ts` decodes bytes recorded from a real 0.123
+   engine and the released 0.122.0 identity, hermetically, in `npm test`.
 
 The latest public-only first-contact wave and its convergent debt are recorded
 in [`gauntlet/personas/REPORT.md`](../gauntlet/personas/REPORT.md).

@@ -22,7 +22,7 @@ export function healthResponse(
     status: 'ok',
     service: 'nika-serve',
     engineVersion: '0.114.0',
-    machineProtocolVersion: 1,
+    machineProtocolVersion: 2,
     snapshotFormatVersion: 1,
     checkReportVersion: 1,
     eventFormatVersion: 1,
@@ -177,11 +177,11 @@ export function makeSnapshotFixture(fill: string): { bin: string; cleanup(): voi
   const script = `#!/usr/bin/env node
 const argv = process.argv.slice(2);
 if (argv[0] === '--sdk-identity') {
-  console.log(JSON.stringify({engineVersion:'0.114.0',machineProtocolVersion:1,snapshotFormatVersion:1,checkReportVersion:1,eventFormatVersion:1,traceFormatVersion:1,supportedCapabilities:['check','executionSnapshot','eventStream','trace']}));
+  console.log(JSON.stringify({engineVersion:'0.114.0',machineProtocolVersion:2,snapshotFormatVersion:1,checkReportVersion:1,eventFormatVersion:1,traceFormatVersion:1,supportedCapabilities:['check','executionSnapshot','eventStream','trace']}));
   process.exit(0);
 }
 if (argv[0] === 'check' && argv.includes('--sdk-snapshot')) {
-  console.log(JSON.stringify({report_version:1,clean:true,engineVersion:'0.114.0',machineProtocolVersion:1,snapshotFormatVersion:1,checkReportVersion:1,eventFormatVersion:1,traceFormatVersion:1,supportedCapabilities:['check','executionSnapshot','eventStream','trace'],execution_snapshot:${JSON.stringify(snapshot)}}));
+  console.log(JSON.stringify({report_version:1,clean:true,engineVersion:'0.114.0',machineProtocolVersion:2,snapshotFormatVersion:1,checkReportVersion:1,eventFormatVersion:1,traceFormatVersion:1,supportedCapabilities:['check','executionSnapshot','eventStream','trace'],execution_snapshot:${JSON.stringify(snapshot)}}));
   process.exit(0);
 }
 process.exit(3);

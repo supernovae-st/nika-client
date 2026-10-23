@@ -2,7 +2,21 @@ import { NikaCompatibilityError } from '../errors.js';
 import type { NikaTransportKind } from '../types.js';
 import { machineObject } from './machine.js';
 
-export const MACHINE_PROTOCOL_VERSION = 1;
+/**
+ * The one machine-protocol generation this SDK speaks, in lockstep with the
+ * engine it bundles. The engine raises it in the commit that changes an
+ * object a published SDK reads closed (a key, an enum value), so that SDK
+ * refuses the engine here, at identity (`nika --sdk-identity`, `GET /health`),
+ * before any spawn or job, never in the middle of a run.
+ *
+ * Generation 2 (engine 0.123): a compile question may be `choice` with its
+ * `options`, and a catch-up firing's receipt origin may name the silence it
+ * answers for (`missed_first`, `missed_count`). An engine on generation 1
+ * (0.122 and older) is refused with `NikaCompatibilityError`. Engines 0.121
+ * and 0.122 already sent `choice` questions under generation 1, so only
+ * engine 0.120.x pairs fully with the generation-1 SDK (0.120.3).
+ */
+export const MACHINE_PROTOCOL_VERSION = 2;
 
 export interface NikaEngineIdentity {
   engineVersion: string;
@@ -42,7 +56,9 @@ export function compatibleEngineIdentity(
   if (identity.machineProtocolVersion !== MACHINE_PROTOCOL_VERSION) {
     throw incompatible(
       transport,
-      `Engine machine protocol ${String(identity.machineProtocolVersion)} is incompatible with SDK protocol ${MACHINE_PROTOCOL_VERSION}`,
+      `Engine ${identity.engineVersion} machine protocol ${String(identity.machineProtocolVersion)} `
+      + `is incompatible with SDK protocol ${MACHINE_PROTOCOL_VERSION}; each SDK release speaks `
+      + 'the protocol of the engine it bundles',
     );
   }
   if (

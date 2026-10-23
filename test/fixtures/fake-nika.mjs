@@ -66,7 +66,7 @@ if (process.env.NIKA_FAKE_PID_FILE && command === 'run') {
 if (command === '--sdk-identity') {
   console.log(JSON.stringify({
     engineVersion: '0.114.0',
-    machineProtocolVersion: 1,
+    machineProtocolVersion: 2,
     snapshotFormatVersion: 1,
     checkReportVersion: 1,
     eventFormatVersion: 1,
@@ -155,7 +155,7 @@ if (command === 'check') {
   if (sdkSnapshot) {
     Object.assign(report, {
       engineVersion: '0.114.0',
-      machineProtocolVersion: workflow.includes('tampered') ? 99 : 1,
+      machineProtocolVersion: workflow.includes('tampered') ? 99 : 2,
       snapshotFormatVersion: 1,
       checkReportVersion: 1,
       eventFormatVersion: 1,

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.123.0]
+
 ### Added
 
 - Over HTTP, a generation-2 compile request carries what the local engine
@@ -57,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and one `requestTimeout`, and without that limit or `timeoutMs` gets no SDK
   deadline, as the engine sets none by default; its answer is read up to the
   8 MiB compile bound. The generation-2 types are hand-written from the engine
-  source, ahead of the pinned `openapi.json` (engine 0.120.3); see
+  source, ahead of the pinned `openapi.json` (its default document); see
   `docs/compile.md` and `examples/compile-then-run.ts`.
 - Packed depth project `signed-webhook-intake` — the app-owned webhook
   qualification (engine nika#1719 names it as the path that stays
@@ -74,6 +76,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   webhook, a manual `run()` and a `once` schedule that fires the declared
   default. The depth ledger, evidence gate and replay fixtures now count six
   projects; the new row records behavioral verdicts only, never a job id.
+
+### Changed
+
+- **Release train 0.123.0.** `package.json` is 0.123.0 and
+  `sync:native-versions` moved the four native payload manifests, the
+  `optionalDependencies` and the lockfile with it. `ENGINE_QUAL_PIN` and
+  `ENGINE_CANDIDATE` name the commit engine tag `v0.123.0` names
+  (`nika 0.123.0 (0bfde3765)`), and the committed gauntlet ledgers were replayed
+  against that verified public binary.
+- **Machine protocol 2, in lockstep with engine 0.123.** The SDK speaks
+  exactly the machine protocol of the engine it bundles, now 2
+  (`MACHINE_PROTOCOL_VERSION`), read from `nika --sdk-identity` and
+  `GET /health`. Engine 0.123 raised it (`nika-runtime-laws`
+  `MACHINE_PROTOCOL_VERSION`, nika#1808) because objects a published SDK
+  reads closed changed: a catch-up firing's receipt origin may name its
+  silence, and compile questions of type `choice` with their `options`,
+  which engines 0.121 and 0.122 already sent while still announcing protocol
+  1, now come with the number that says so. The published 0.120.3 SDK
+  therefore refuses a 0.123 engine at identity, before any job, and already
+  refused a `choice` question from 0.121 and 0.122 as a protocol error.
+  Symmetrically, this SDK refuses an engine or a resident on protocol 1
+  (0.122 and older) with `NikaCompatibilityError`
+  (`capability: 'engineIdentity'`) before any job; only the identity probe
+  (`nika --sdk-identity`, `GET /health`) runs first, and the message names
+  the engine version. One generation per release train is the package's
+  compatibility policy (each package bundles the engine it was qualified
+  against): 0.120.3 on npm pairs with engine 0.120.x, and no published
+  package reads the compile choices of engines 0.121 and 0.122.
+- The package's own `nika` command checks its engine the same way for
+  every command: an engine on protocol 1, including one named by
+  `NIKA_BIN`, is refused (`NIKA_BIN=<a 0.122 binary> npx nika --version`
+  exits 1).
+- A scheduled receipt origin may carry `missed_first` and `missed_count`:
+  a `catch-up-once` firing names the silence it answers for, its first
+  missed slot and how many slots it holds, `scheduled_for` being the last.
+  They are read as the resident writes them (`nika-serve`
+  `silence_holds`): both or neither, on a `catch_up` decision only, at least
+  one slot, the first never after `scheduled_for`; anything else is a
+  `NikaProtocolError`. Before, every catch-up-once job of an 0.123 resident
+  failed `attachRun()` and `result()` as a malformed origin (measured on
+  `5342f8a43`).
+- A compile `choice` question must carry at least one option and a `text`
+  or `literal` question none, as the engine's wire writes them; anything
+  else is a `NikaProtocolError` on both doors, instead of an unanswerable
+  question.
+- Contract pin: `openapi.json` is the live plain `nika serve` document of
+  engine main `5342f8a43` (`nika 0.123.0-preview.1`, nika#1814) and
+  `src/generated/openapi.d.ts` is regenerated from that resident. Since
+  0.120.3 the document adds the compile `choice` question and its `options`,
+  `requested_trigger`, the provenance `strategy`, `plan`, `decision` and
+  `suggested_file`, the receipt origin's `missed_first`/`missed_count`, the
+  settlement's `stopped_calls` (an additive member the SDK carries through
+  untyped on `result().settlement`), the
+  schedule's per-fire `inputs`, and drops the compile request's field-size
+  bounds. `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name that commit; the
+  release replaces it with the commit tag `v0.123.0` names.
+- Real 0.123 bytes are decoded by `test/engine-0123-wire.test.ts`
+  (identities, compile choices on both doors, a catch-up job and its
+  stream), and `test/engine-live.test.ts` drives an engine named by
+  `NIKA_BIN` on both doors (check, run and its events and result, a refused
+  run, cancellation, trace verification, a snapshot run, schedules and
+  compile), keyless and offline; candidate CI runs it against the pinned
+  engine.
 
 ### Fixed
 

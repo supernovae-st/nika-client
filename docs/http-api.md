@@ -33,6 +33,12 @@ Any other non-2xx body is discarded and reported as a redacted
 - URLs containing credentials, a query, or a fragment are rejected.
 - Tokens must contain 32–512 visible ASCII bytes and are never sent to
   `/health`.
+- `GET /health` must name machine protocol 2, the generation of engine 0.123
+  and of the engine this package bundles. A resident on another generation
+  (0.122 and older speak 1) is refused with `NikaCompatibilityError`
+  (`capability: 'engineIdentity'`) before any other request. A local engine
+  that captures a snapshot or observes a compile must report the same
+  machine protocol, snapshot, check-report and event clocks as the resident.
 - Each request has a bounded timeout, except a compile provider round
   without `timeoutMs` or `limits.deadline_ms` (see [compile.md](compile.md)),
   and each JSON/SSE machine frame has a byte ceiling.
@@ -125,8 +131,8 @@ generation-2 answer is read up to 8 MiB. Refusals add 409 (`compile_replay_unava
 `compile_replay_capacity` or `stopping`.
 
 This contract is ahead of the pinned `openapi.json`, which describes the
-released 0.120.3 resident: the default document never carries it, and a
-seated resident merges it into its live document. Its types are written by
+default document of the engine 0.123 resident: the default document never
+carries it, and a seated resident merges it into its live document. Its types are written by
 hand from the engine source (`nika-serve/src/server/compile/v2.rs`,
 `author.rs`, `openapi-native.json`). Released engines 0.121.0 and later serve
 it; `limits.max_calls` needs 0.122.0. See [compile.md](compile.md).
@@ -231,3 +237,13 @@ names.
 Schedules use compare-and-swap semantics. Create omits `revision`; update must
 carry the exact previous `sha256:...` revision. The SDK never fabricates or
 normalizes schedule facts.
+
+A scheduled job's `receipt.origin` is closed: the firing's `kind`,
+`schedule_origin`, `schedule_id`, `schedule_revision`, `slot_id`, `decision`,
+`scheduled_for`, `fired_at` and `arm_generation`, and, from engine 0.123
+(machine protocol 2), the silence a `catch-up-once` firing answers for:
+`missed_first` (its first missed slot) and `missed_count` (how many slots it
+holds), `scheduled_for` being its last. The SDK reads them as the resident
+writes them: both or neither, on a `catch_up` decision only, at least one
+slot, the first never after `scheduled_for`. Any other member or combination
+is a `NikaProtocolError`.

@@ -148,16 +148,24 @@ describe('media the pages embed', () => {
       .filter((file) => file.endsWith('.md'))
       .map((file): [string, string] => [`docs/${file}`, page(file)]),
   ]);
-  // Every relative reference a page makes into media/: src, srcset, href, markdown links.
+  // npmjs.com rewrites a README's relative `img src` to this raw prefix but leaves a
+  // relative `srcset` as it is (measured on its page for execa), so the README names
+  // its reduced-motion stills by this absolute URL; docs pages, read on GitHub, stay relative.
+  const OWN_RAW = 'https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/';
+  // Every reference a page makes into media/: src, srcset, href, markdown links.
   const references = [...pages].flatMap(([file, text]) =>
     [...text.matchAll(/(?:src|srcset|href)="([^"]+)"|\]\(([^)\s]+)\)/g)]
       .map((match) => match[1] ?? match[2] ?? '')
-      .filter((target) => target !== '' && !/^[a-z]+:/i.test(target) && !target.startsWith('#'))
-      .map((target) => ({
-        file,
-        target,
-        path: posix.normalize(posix.join(posix.dirname(file), target.split('#')[0] ?? '')),
-      }))
+      .filter((target) => target !== '' && !target.startsWith('#'))
+      .filter((target) => target.startsWith(OWN_RAW) || !/^[a-z]+:/i.test(target))
+      .map((target) => {
+        // `?raw=true` makes GitHub serve an MP4 itself rather than its file page.
+        const bare = target.split(/[?#]/)[0] ?? '';
+        const path = bare.startsWith(OWN_RAW)
+          ? bare.slice(OWN_RAW.length)
+          : posix.normalize(posix.join(posix.dirname(file), bare));
+        return { file, target, path };
+      })
       .filter(({ path }) => path.startsWith('media/')),
   );
   const assets = references.filter(({ path }) => /^media\/(?:gifs|videos|stills|transcripts)\//.test(path));
@@ -209,8 +217,12 @@ describe('media the pages embed', () => {
           /<source media="\(prefers-reduced-motion: reduce\)" srcset="[^"]+\.png">/,
         );
         if (/<img\b[^>]*src="(?![a-z]+:)[^"]*media\/gifs\//.test(block)) {
-          expect(block, `${file}: our GIF without its own still`).toMatch(
-            /srcset="(?![a-z]+:)[^"]*media\/stills\/[^"]+\.png"/,
+          const ownStill =
+            file === 'README.md'
+              ? /srcset="https:\/\/raw\.githubusercontent\.com\/supernovae-st\/nika-client\/HEAD\/media\/stills\/[^"]+\.png"/
+              : /srcset="(?![a-z]+:)[^"]*media\/stills\/[^"]+\.png"/;
+          expect(block, `${file}: our GIF without its own still, in the form its renderer resolves`).toMatch(
+            ownStill,
           );
         }
       }

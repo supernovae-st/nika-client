@@ -37,12 +37,12 @@ what the illustration draws.
 
 | Watch | What it shows | Where it is explained |
 |---|---|---|
-| [The quick start](../media/gifs/sdk-quickstart.gif) · [MP4](../media/videos/sdk-quickstart.mp4) · [transcript](../media/transcripts/sdk-quickstart.txt) | The install, the signing key, `run()`, a typed result, a verified receipt | [README](../README.md#quick-start) |
-| [Two doors](../media/gifs/sdk-doors.gif) · [MP4](../media/videos/sdk-doors.mp4) (illustration) | One call through the package to the bundled engine or to `nika serve`: check, run, events, seal, verify | [README](../README.md#what-happens-underneath) |
-| [Three facts](../media/gifs/sdk-admitted-executed-sealed.gif) · [MP4](../media/videos/sdk-admitted-executed-sealed.mp4) · [transcript](../media/transcripts/sdk-admitted-executed-sealed.txt) | A refused file that never runs, an unsealed run, a sealed one, one changed byte | [receipts.md](receipts.md#admitted-executed-sealed-three-different-facts) |
-| [Events](../media/gifs/sdk-events.gif) · [MP4](../media/videos/sdk-events.mp4) · [transcript](../media/transcripts/sdk-events.txt) | `run.events()` for a four-task run, then `result()` | [runs.md](runs.md#watch-a-run-runevents) |
-| [Compile](../media/gifs/sdk-compile.gif) · [MP4](../media/videos/sdk-compile.mp4) · [transcript](../media/transcripts/sdk-compile.txt) | A sentence to a ready candidate in two rounds, with no model call | [compile.md](compile.md#start-here-no-model-no-key) |
-| [Your server](../media/gifs/sdk-remote.gif) · [MP4](../media/videos/sdk-remote.mp4) · [transcript](../media/transcripts/sdk-remote.txt) | `nika serve` set up as the README says, one job, a retry, a wrong token | [server.md](server.md#set-it-up) |
+| [The quick start](../media/gifs/sdk-quickstart.gif) · [MP4](../media/videos/sdk-quickstart.mp4?raw=true) · [transcript](../media/transcripts/sdk-quickstart.txt) | The install, the signing key, `run()`, a typed result, a verified receipt | [README](../README.md#quick-start) |
+| [Two doors](../media/gifs/sdk-doors.gif) · [MP4](../media/videos/sdk-doors.mp4?raw=true) (illustration) | One call through the package to the bundled engine or to `nika serve`: check, run, events, seal, verify | [README](../README.md#what-happens-underneath) |
+| [Three facts](../media/gifs/sdk-admitted-executed-sealed.gif) · [MP4](../media/videos/sdk-admitted-executed-sealed.mp4?raw=true) · [transcript](../media/transcripts/sdk-admitted-executed-sealed.txt) | A refused file that never runs, an unsealed run, a sealed one, one changed byte | [receipts.md](receipts.md#admitted-executed-sealed-three-different-facts) |
+| [Events](../media/gifs/sdk-events.gif) · [MP4](../media/videos/sdk-events.mp4?raw=true) · [transcript](../media/transcripts/sdk-events.txt) | `run.events()` for a four-task run, then `result()` | [runs.md](runs.md#watch-a-run-runevents) |
+| [Compile](../media/gifs/sdk-compile.gif) · [MP4](../media/videos/sdk-compile.mp4?raw=true) · [transcript](../media/transcripts/sdk-compile.txt) | A sentence to a ready candidate in two rounds, with no model call | [compile.md](compile.md#start-here-no-model-no-key) |
+| [Your server](../media/gifs/sdk-remote.gif) · [MP4](../media/videos/sdk-remote.mp4?raw=true) · [transcript](../media/transcripts/sdk-remote.txt) | `nika serve` set up as the README says, one job, a retry, a wrong token | [server.md](server.md#set-it-up) |
 
 ## Runnable examples
 

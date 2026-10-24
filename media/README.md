@@ -17,11 +17,11 @@ offline rehearsal model: no model key and no model call over the network.
 
 | Recording | What it shows | Tape and programs | Shown in |
 |---|---|---|---|
-| [`sdk-quickstart`](gifs/sdk-quickstart.gif) · [MP4](videos/sdk-quickstart.mp4) · [transcript](transcripts/sdk-quickstart.txt) | The README quick start as written: the install, step 1's signing key, `hello.nika`, `demo.mts`, `receipt verified` | [tape](../scripts/media/sdk-quickstart.tape); the programs are the README's | README, top |
-| [`sdk-admitted-executed-sealed`](gifs/sdk-admitted-executed-sealed.gif) · [MP4](videos/sdk-admitted-executed-sealed.mp4) · [transcript](transcripts/sdk-admitted-executed-sealed.txt) | A refused file that never runs, an unsealed run, a sealed one, one changed byte | [tape](../scripts/media/sdk-admitted-executed-sealed.tape) · [programs](../scripts/media/scenes/sdk-admitted-executed-sealed) | README, `receipts.md`, `errors.md` |
-| [`sdk-remote`](gifs/sdk-remote.gif) · [MP4](videos/sdk-remote.mp4) · [transcript](transcripts/sdk-remote.txt) | The README's `nika serve` setup as written, one job, a retry, a wrong token | [tape](../scripts/media/sdk-remote.tape) · [client](../scripts/media/scenes/sdk-remote/remote.mts) | README, `server.md` |
-| [`sdk-events`](gifs/sdk-events.gif) · [MP4](videos/sdk-events.mp4) · [transcript](transcripts/sdk-events.txt) | `run.events()` for a four-task run, then `result()` | [tape](../scripts/media/sdk-events.tape) · [workflow and program](../scripts/media/scenes/sdk-events) | `runs.md` |
-| [`sdk-compile`](gifs/sdk-compile.gif) · [MP4](videos/sdk-compile.mp4) · [transcript](transcripts/sdk-compile.txt) | A sentence to a ready candidate in two rounds, with no model call; the candidate is never run | [tape](../scripts/media/sdk-compile.tape) · [program](../scripts/media/scenes/sdk-compile/author.mts) | `compile.md` |
+| [`sdk-quickstart`](gifs/sdk-quickstart.gif) · [MP4](videos/sdk-quickstart.mp4?raw=true) · [transcript](transcripts/sdk-quickstart.txt) | The README quick start as written: the install, step 1's signing key, `hello.nika`, `demo.mts`, `receipt verified` | [tape](../scripts/media/sdk-quickstart.tape); the programs are the README's | README, top |
+| [`sdk-admitted-executed-sealed`](gifs/sdk-admitted-executed-sealed.gif) · [MP4](videos/sdk-admitted-executed-sealed.mp4?raw=true) · [transcript](transcripts/sdk-admitted-executed-sealed.txt) | A refused file that never runs, an unsealed run, a sealed one, one changed byte | [tape](../scripts/media/sdk-admitted-executed-sealed.tape) · [programs](../scripts/media/scenes/sdk-admitted-executed-sealed) | README, `receipts.md`, `errors.md` |
+| [`sdk-remote`](gifs/sdk-remote.gif) · [MP4](videos/sdk-remote.mp4?raw=true) · [transcript](transcripts/sdk-remote.txt) | The README's `nika serve` setup as written, one job, a retry, a wrong token | [tape](../scripts/media/sdk-remote.tape) · [client](../scripts/media/scenes/sdk-remote/remote.mts) | README, `server.md` |
+| [`sdk-events`](gifs/sdk-events.gif) · [MP4](videos/sdk-events.mp4?raw=true) · [transcript](transcripts/sdk-events.txt) | `run.events()` for a four-task run, then `result()` | [tape](../scripts/media/sdk-events.tape) · [workflow and program](../scripts/media/scenes/sdk-events) | `runs.md` |
+| [`sdk-compile`](gifs/sdk-compile.gif) · [MP4](videos/sdk-compile.mp4?raw=true) · [transcript](transcripts/sdk-compile.txt) | A sentence to a ready candidate in two rounds, with no model call; the candidate is never run | [tape](../scripts/media/sdk-compile.tape) · [program](../scripts/media/scenes/sdk-compile/author.mts) | `compile.md` |
 
 Each recording comes as a GIF to embed (1600×900, lossless `gifsicle -O3`),
 an H.264 MP4 to pause and scrub, a 1600×900 still that the pages show to a
@@ -62,7 +62,7 @@ recordings were made on macOS arm64, so the engine payload on screen is
 
 ## sdk-doors: an illustration
 
-[`sdk-doors`](gifs/sdk-doors.gif) · [MP4](videos/sdk-doors.mp4) · [last frame](stills/sdk-doors.png)
+[`sdk-doors`](gifs/sdk-doors.gif) · [MP4](videos/sdk-doors.mp4?raw=true) · [last frame](stills/sdk-doors.png)
 is an animated diagram of how the package runs a workflow through either door
 (README, "What happens underneath").
 

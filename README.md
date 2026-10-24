@@ -31,11 +31,11 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-reduced-motion: reduce)" srcset="media/stills/sdk-quickstart.png">
+    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/media/stills/sdk-quickstart.png">
     <img src="media/gifs/sdk-quickstart.gif" alt="A terminal runs npm install @supernovae-st/nika@0.123.0, which adds 2 packages: nika and nika-darwin-arm64. ./node_modules/.bin/nika --version prints nika 0.123.0 (0bfde3765), and NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init mints a run-signing key. The screen shows hello.nika and demo.mts from this README, then node demo.mts prints mock(echo) · Say hello from the Nika SDK. and receipt verified" width="960">
   </picture>
 </p>
-<p align="center"><sub><code>npm install</code> brings the client and its native engine (two packages; the version is pinned on camera), step 1's <code>nika key init</code> mints the signing key, and <code>node demo.mts</code> prints the greeting and <code>receipt verified</code>. <code>hello.nika</code> and <code>demo.mts</code> are this page's, byte for byte. Recorded in a terminal from <code>@supernovae-st/nika</code> 0.123.0 and its bundled engine <code>nika 0.123.0 (0bfde3765)</code>; the run is a <code>mock/echo</code> rehearsal.<br>▶ <a href="media/videos/sdk-quickstart.mp4">MP4</a> · <a href="media/transcripts/sdk-quickstart.txt">transcript</a> · <a href="media/README.md">how these recordings are made</a></sub></p>
+<p align="center"><sub><code>npm install</code> brings the client and its native engine (two packages; the version is pinned on camera), step 1's <code>nika key init</code> mints the signing key, and <code>node demo.mts</code> prints the greeting and <code>receipt verified</code>. <code>hello.nika</code> and <code>demo.mts</code> are this page's, byte for byte. Recorded in a terminal from <code>@supernovae-st/nika</code> 0.123.0 and its bundled engine <code>nika 0.123.0 (0bfde3765)</code>; the run is a <code>mock/echo</code> rehearsal.<br>▶ <a href="media/videos/sdk-quickstart.mp4?raw=true">MP4</a> · <a href="media/transcripts/sdk-quickstart.txt">transcript</a> · <a href="media/README.md">how these recordings are made</a></sub></p>
 
 ## What is Nika?
 
@@ -220,11 +220,11 @@ next to examples that watch, cancel and recover runs.
 
 <p align="center">
   <picture>
-    <source media="(prefers-reduced-motion: reduce)" srcset="media/stills/sdk-doors.png">
+    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/media/stills/sdk-doors.png">
     <img src="media/gifs/sdk-doors.gif" alt="Animated diagram. The README's demo.mts on the left; the @supernovae-st/nika package in the middle; two doors on the right: new Nika() leads to the bundled engine nika 0.123.0 as a child process, new Nika({ url, token }) to nika serve, and line 3 of demo.mts switches between them. A refused list-files.nika gets NIKA-SEC-004 and no run exists; hello.nika runs; six local events or two server events reach the app; six hash-chained journal lines end with run_sealed; traceVerify() answers verified locally and sealed on the server; one changed byte gives BROKEN at line 5" width="960">
   </picture>
 </p>
-<p align="center"><sub>An illustration with captured content: every code line, event, verdict, hash and version on screen comes from <code>@supernovae-st/nika</code> 0.123.0, its bundled engine and <code>nika serve</code> 0.123.0 in a <code>mock/echo</code> rehearsal. The cards, lanes, packets and pacing are drawn; a real run takes milliseconds. The code is readable in the 1600 px MP4.<br>▶ <a href="media/videos/sdk-doors.mp4">MP4</a> · <a href="media/README.md#sdk-doors-an-illustration">what is captured and what is drawn</a></sub></p>
+<p align="center"><sub>An illustration with captured content: every code line, event, verdict, hash and version on screen comes from <code>@supernovae-st/nika</code> 0.123.0, its bundled engine and <code>nika serve</code> 0.123.0 in a <code>mock/echo</code> rehearsal. The cards, lanes, packets and pacing are drawn; a real run takes milliseconds. The code is readable in the 1600 px MP4.<br>▶ <a href="media/videos/sdk-doors.mp4?raw=true">MP4</a> · <a href="media/README.md#sdk-doors-an-illustration">what is captured and what is drawn</a></sub></p>
 
 `new Nika()` starts nothing. On the first call it asks the bundled engine who
 it is; then each call runs the engine as a child process, without a shell, in
@@ -273,11 +273,11 @@ A run gives you three different facts, and each has its own evidence:
 
 <p align="center">
   <picture>
-    <source media="(prefers-reduced-motion: reduce)" srcset="media/stills/sdk-admitted-executed-sealed.png">
+    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/media/stills/sdk-admitted-executed-sealed.png">
     <img src="media/gifs/sdk-admitted-executed-sealed.gif" alt="node gate.mts on a workflow that runs ls under permits: {} prints check refused · exit 2, NIKA-SEC-004 and its fix, then run not started: no run, no events, no trace. A one-line permits fix checks clean and runs. node prove.mts with no signing key prints sealed false and not verified · receipt_mismatch; after NIKA_KEYCHAIN=off nika key init it prints sealed true and verified. node tamper.mts changes one byte of the trace, and node verify.mts prints not verified and the engine's BROKEN at line 5" width="960">
   </picture>
 </p>
-<p align="center"><sub><code>check()</code> refuses a file that runs <code>ls</code> under <code>permits: {}</code> (<code>NIKA-SEC-004</code>) and <code>run()</code> never starts it; one permits line fixes it. On a machine with no signing key the run succeeds unsealed and <code>traceVerify()</code> answers <code>receipt_mismatch</code>; after step 1's <code>nika key init</code> the next run of the same file is sealed and verified. One changed byte in the trace, and the engine answers <code>BROKEN at line 5</code>. Recorded from <code>@supernovae-st/nika</code> 0.123.0 and its bundled engine; the runs are <code>mock/echo</code> rehearsals.<br>▶ <a href="media/videos/sdk-admitted-executed-sealed.mp4">MP4</a> · <a href="media/transcripts/sdk-admitted-executed-sealed.txt">transcript</a> · <a href="scripts/media/scenes/sdk-admitted-executed-sealed">the programs it runs</a></sub></p>
+<p align="center"><sub><code>check()</code> refuses a file that runs <code>ls</code> under <code>permits: {}</code> (<code>NIKA-SEC-004</code>) and <code>run()</code> never starts it; one permits line fixes it. On a machine with no signing key the run succeeds unsealed and <code>traceVerify()</code> answers <code>receipt_mismatch</code>; after step 1's <code>nika key init</code> the next run of the same file is sealed and verified. One changed byte in the trace, and the engine answers <code>BROKEN at line 5</code>. Recorded from <code>@supernovae-st/nika</code> 0.123.0 and its bundled engine; the runs are <code>mock/echo</code> rehearsals.<br>▶ <a href="media/videos/sdk-admitted-executed-sealed.mp4?raw=true">MP4</a> · <a href="media/transcripts/sdk-admitted-executed-sealed.txt">transcript</a> · <a href="scripts/media/scenes/sdk-admitted-executed-sealed">the programs it runs</a></sub></p>
 
 - **The file is the boundary.** A workflow lists what it may reach in
   `permits:`, and the check catches the task that reaches past it before any
@@ -350,11 +350,11 @@ recovers a job across two processes.
 
 <p align="center">
   <picture>
-    <source media="(prefers-reduced-motion: reduce)" srcset="media/stills/sdk-remote.png">
+    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/media/stills/sdk-remote.png">
     <img src="media/gifs/sdk-remote.gif" alt="The terminal types this README's server setup: a one-line nika.yaml, a token minted into .nika/serve.token with umask 077, .nika/ appended to .gitignore, NIKA_KEYCHAIN=off nika key init, and nika serve --bind 127.0.0.1:8787 --workflows . --token-file .nika/serve.token in the background; curl /health shows engineVersion 0.123.0 and machine protocol 2. node remote.mts prints served hello.nika, check clean, a job id, #1 run.started running, #2 run.settled succeeded, the greeting, verify verified · sealed, retry the same job: it did not run twice, and bad token 401 unauthorized" width="960">
   </picture>
 </p>
-<p align="center"><sub>The setup lines above, typed as written (the server goes to the background of the same terminal), then a client built with <code>new Nika({ url, token, allowInsecureHttp: true })</code>: it lists and checks the served <code>hello.nika</code>, runs it with an idempotency key, receives the two sequenced events, reads <code>verified · sealed</code>, gets the same job back for the same key and a typed 401 for a wrong token. The token is never printed. Recorded from <code>@supernovae-st/nika</code> 0.123.0 and <code>nika serve</code> 0.123.0 on loopback; the run is a <code>mock/echo</code> rehearsal.<br>▶ <a href="media/videos/sdk-remote.mp4">MP4</a> · <a href="media/transcripts/sdk-remote.txt">transcript</a> · <a href="scripts/media/scenes/sdk-remote/remote.mts">the client it runs</a></sub></p>
+<p align="center"><sub>The setup lines above, typed as written (the server goes to the background of the same terminal), then a client built with <code>new Nika({ url, token, allowInsecureHttp: true })</code>: it lists and checks the served <code>hello.nika</code>, runs it with an idempotency key, receives the two sequenced events, reads <code>verified · sealed</code>, gets the same job back for the same key and a typed 401 for a wrong token. The token is never printed. Recorded from <code>@supernovae-st/nika</code> 0.123.0 and <code>nika serve</code> 0.123.0 on loopback; the run is a <code>mock/echo</code> rehearsal.<br>▶ <a href="media/videos/sdk-remote.mp4?raw=true">MP4</a> · <a href="media/transcripts/sdk-remote.txt">transcript</a> · <a href="scripts/media/scenes/sdk-remote/remote.mts">the client it runs</a></sub></p>
 
 ## Use a real model
 

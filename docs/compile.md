@@ -20,6 +20,43 @@ The SDK holds no compiler. Both doors print the engine's one machine document
 engine's fields verbatim and adds only `ready`, the replay token of a kept
 round (HTTP) and the CLI's own facts (local engine).
 
+## Start here: no model, no key
+
+Without a provider, compile resolves the exact skeleton names
+`nika compile --list` shows (`hello` and `classify-and-route` among them) and
+edits the constants of an existing workflow; other free text comes back
+`incomplete` with its questions.
+
+```ts
+import { Nika } from '@supernovae-st/nika';
+
+const nika = new Nika();
+const candidate = await nika.compile({
+  intent: 'classify-and-route',
+  answers: { 'const.request': 'An outage affects support customers.' },
+}, { timeoutMs: 15_000 });
+
+// Every outcome is data: ready, incomplete and refused alike.
+console.log(candidate.status, candidate.questions, candidate.diagnostics);
+if (candidate.ready && candidate.candidate !== null) {
+  const edited = await nika.compile({
+    workflow: candidate.candidate,
+    change: { set_constant: { name: 'request', value: 'One customer is affected.' } },
+  });
+  console.log(edited.candidate);
+}
+```
+
+Measured on engine 0.123.0: the first call is `ready` at `compile_version` 1
+with an `applied` diagnostic on `const.request`, and the edit is `ready` with
+the new constant. An edit also accepts text, such as
+`Set const.request to "One customer"`. A free intent such as
+`'Every Monday at 9am summarize the support queue into ./digest.md'` comes
+back `incomplete`, asking `model` (text), `trigger.timezone` (text),
+`trigger.missed` and `trigger.overlap` (choices) and `trigger.ceiling`
+(literal). The candidate is `.nika` source, never a run: write it to a file,
+then `run(path)` admits it again like any other workflow.
+
 ## Two doors
 
 | | `new Nika({ url, token })` | `new Nika()` (local engine) |
@@ -269,10 +306,12 @@ for (let round = 0; !outcome.ready && round < 4; round += 1) {
 ### Servers without the judged answer round
 
 The judged answer round needs a server that serves it, which `/health` says
-with the capability `compileJudgedAnswerRound`, listed beside
-`compileNativeV2` by every native server of engine integration commits
-`158a961cd` (the round) and `b7dace1e5` (its capability). No released engine
-carries them yet. The SDK gates the round the way it gates generation 2: on a
+with the capability `compileJudgedAnswerRound`. Engine 0.123.0 lists it beside
+`compileNativeV2` on every native server, that is whenever the operator seats
+a model with `nika serve --authoring-model` (measured with `mock/echo`: the
+seated `/health` lists `compileNativeV2`, `compileJudgedAnswerRound`,
+`compileObservedWorld` and `compileTrialInputs`, the unseated one none of
+them). The SDK gates the round the way it gates generation 2: on a
 server without the capability it refuses a judged answer round with
 `NikaCompatibilityError` (`capability: 'compileJudgedAnswerRound'`) after
 `/health` alone, before anything is posted, and the kept round stays
@@ -280,12 +319,13 @@ untouched. Beside every kept round it also sets
 `outcome.judged_answer_round_available`, so `nextCompileRequest()` chooses a
 round the server serves.
 
-A server from before the round, released 0.121.0 and 0.122.0 included, parses
+A server from before the round (the released 0.121.0 and 0.122.0) parsed
 `explicitProvider` with a `replay_token` as `422 malformed_compile_request`,
-before any slot or call. The gate keeps that request from it. The SDK still
-reports that refusal to a judged answer round as the same
-`NikaCompatibilityError`, defensively, for a server replaced since this client
-read its `/health` (once per client).
+before any slot or call; this package refuses those servers at their identity
+anyway, since they speak machine protocol 1. The SDK still reports that
+refusal to a judged answer round as the same `NikaCompatibilityError`,
+defensively, for a server replaced since this client read its `/health` (once
+per client).
 
 ## Held candidates
 
@@ -393,19 +433,21 @@ answers with a usage error; a server without a field answers
 `422 malformed_compile_request`. Point `NIKA_BIN` (or `bin`) at the engine you
 mean to use.
 
-The pinned `openapi.json` and `src/generated/openapi.d.ts` describe the
-default document of the engine 0.123 resident; the release regenerates them
-from the released `nika serve`. The generation-2 types are
-written by hand from the engine source: `nika-serve/src/server/compile/v2.rs`,
-`author.rs` and `openapi-native.json` (at `158a961cd` for the judged answer
-round), `nika-serve/src/server/model.rs` (at `b7dace1e5` for its capability),
-`nika-compile/src/wire.rs` and `nika-cli-host/src/compile.rs` with
-`compile/render.rs`.
+The pinned `openapi.json` and `src/generated/openapi.d.ts` are the default
+document of the released engine 0.123.0 resident, regenerated from the
+released `nika serve`. The generation-2 types are written by hand from the
+engine source at tag `v0.123.0`: `crates/nika-serve/src/server/compile/v2.rs`,
+`author.rs` and `openapi-native.json` (the rounds, the judged answer round
+included), `crates/nika-serve/src/server/model.rs` (its capabilities),
+`crates/nika-compile/src/wire.rs` and `crates/nika-cli-host/src/compile.rs`
+with `compile/render.rs`.
 
 ## Example
 
-[`examples/compile-then-run.ts`](../examples/compile-then-run.ts) compiles an
-intention, answers its questions from a JSON file (over HTTP by the judged
-answer round), writes the ready candidate and runs it through `run()`, on
-either door. It reads the server URL and token
-or the engine binary from the environment and embeds no key.
+[`examples/compile-then-run.ts`](https://github.com/supernovae-st/nika-client/blob/main/examples/compile-then-run.ts)
+compiles an intention, answers its questions from a JSON file (over HTTP by
+the judged answer round), writes the ready candidate and runs it through
+`run()`, on either door. It reads the server URL and token or the engine
+binary from the environment and embeds no key. On engine 0.123.0 without a
+seat, `classify-and-route` asks `const.request`, the file answers it, the
+next round is `ready`, and the run settles `succeeded`.

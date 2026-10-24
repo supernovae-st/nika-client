@@ -57,6 +57,16 @@ back `incomplete`, asking `model` (text), `trigger.timezone` (text),
 (literal). The candidate is `.nika` source, never a run: write it to a file,
 then `run(path)` admits it again like any other workflow.
 
+**Watch a free intent become a ready candidate in two rounds, with no model call.**
+
+<p align="center">
+  <picture>
+    <source media="(prefers-reduced-motion: reduce)" srcset="../media/stills/sdk-compile.png">
+    <img src="../media/gifs/sdk-compile.gif" alt="node author.mts with the intent Every morning, summarize ./inbox/*.md into ./digest.md prints round 1 incomplete · 1 required, 4 optional question(s), the required question model, and every morning is a trigger, not a task; answer model = mock/echo; round 2 ready · provider calls: none; trigger schedule · daily · requires_binding; check clean · exit 0 · kept as digest.nika. Then the candidate's permits: read ./inbox/**, write ./digest.md, five nika: tools; then nika check plans it in 9 waves from glob_source to write_output" width="860">
+  </picture>
+</p>
+<p align="center"><sub>No provider is seated, so no model is called. Round 1 is <code>incomplete</code>: one required question, the runtime <code>model</code>, four optional ones, and <code>every morning</code> recorded as a trigger, not a task. Answering <code>model = mock/echo</code> through <code>nextCompileRequest()</code> makes round 2 <code>ready</code>; the schedule still <code>requires_binding</code>. The candidate asks to read <code>./inbox/**</code>, write <code>./digest.md</code> and call five <code>nika:</code> tools, and <code>nika check</code> plans it in 9 waves; nothing runs. Recorded from <code>@supernovae-st/nika</code> 0.123.0 and its bundled engine.<br>▶ <a href="../media/videos/sdk-compile.mp4">MP4</a> · <a href="../media/transcripts/sdk-compile.txt">transcript</a> · <a href="../scripts/media/scenes/sdk-compile/author.mts">the program</a></sub></p>
+
 ## Two doors
 
 | | `new Nika({ url, token })` | `new Nika()` (local engine) |

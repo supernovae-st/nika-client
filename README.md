@@ -27,15 +27,15 @@
   <a href="https://archive.softwareheritage.org/browse/origin/?origin_url=https://github.com/supernovae-st/nika-client"><img src="https://archive.softwareheritage.org/badge/origin/https://github.com/supernovae-st/nika-client/" alt="Archived by Software Heritage"></a>
 </p>
 
-**Watch a Node app run this README's quick start: checked, run, typed, verified.**
+**Watch this README's quick start run as written: install, one signing key, `run()`, a typed result, a verified receipt.**
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/typescript-client.optimized.gif">
-    <img src="https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/typescript-client.optimized.gif"
-         alt="A TypeScript app calls run() on hello.nika through @supernovae-st/nika: the bundled engine checks the file (run ready), runs it as a mock/echo rehearsal and records it as hash-chained events, the typed result comes back, and traceVerify() checks the receipt and the terminal prints receipt verified" width="960">
-  </a>
+  <picture>
+    <source media="(prefers-reduced-motion: reduce)" srcset="media/stills/sdk-quickstart.png">
+    <img src="media/gifs/sdk-quickstart.gif" alt="A terminal runs npm install @supernovae-st/nika@0.123.0, which adds 2 packages: nika and nika-darwin-arm64. ./node_modules/.bin/nika --version prints nika 0.123.0 (0bfde3765), and NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init mints a run-signing key. The screen shows hello.nika and demo.mts from this README, then node demo.mts prints mock(echo) · Say hello from the Nika SDK. and receipt verified" width="960">
+  </picture>
 </p>
-<p align="center"><sub><code>demo.mts</code> from the quick start calls <code>run()</code>. The engine the package bundles checks <code>hello.nika</code>, runs it and records it; the result comes back typed, and <code>traceVerify()</code> prints <code>receipt verified</code>. Captured with <code>@supernovae-st/nika</code> 0.120.3 and its bundled engine; 0.123.0 prints the same two lines. The run is a <code>mock/echo</code> rehearsal, and the editor, the lanes and the motion are illustration.</sub></p>
+<p align="center"><sub><code>npm install</code> brings the client and its native engine (two packages; the version is pinned on camera), step 1's <code>nika key init</code> mints the signing key, and <code>node demo.mts</code> prints the greeting and <code>receipt verified</code>. <code>hello.nika</code> and <code>demo.mts</code> are this page's, byte for byte. Recorded in a terminal from <code>@supernovae-st/nika</code> 0.123.0 and its bundled engine <code>nika 0.123.0 (0bfde3765)</code>; the run is a <code>mock/echo</code> rehearsal.<br>▶ <a href="media/videos/sdk-quickstart.mp4">MP4</a> · <a href="media/transcripts/sdk-quickstart.txt">transcript</a> · <a href="media/README.md">how these recordings are made</a></sub></p>
 
 ## What is Nika?
 
@@ -216,6 +216,16 @@ next to examples that watch, cancel and recover runs.
 
 ## What happens underneath
 
+**Watch a call travel from your code through the package to the engine, through either door.**
+
+<p align="center">
+  <picture>
+    <source media="(prefers-reduced-motion: reduce)" srcset="media/stills/sdk-doors.png">
+    <img src="media/gifs/sdk-doors.gif" alt="Animated diagram. The README's demo.mts on the left; the @supernovae-st/nika package in the middle; two doors on the right: new Nika() leads to the bundled engine nika 0.123.0 as a child process, new Nika({ url, token }) to nika serve, and line 3 of demo.mts switches between them. A refused list-files.nika gets NIKA-SEC-004 and no run exists; hello.nika runs; six local events or two server events reach the app; six hash-chained journal lines end with run_sealed; traceVerify() answers verified locally and sealed on the server; one changed byte gives BROKEN at line 5" width="960">
+  </picture>
+</p>
+<p align="center"><sub>An illustration with captured content: every code line, event, verdict, hash and version on screen comes from <code>@supernovae-st/nika</code> 0.123.0, its bundled engine and <code>nika serve</code> 0.123.0 in a <code>mock/echo</code> rehearsal. The cards, lanes, packets and pacing are drawn; a real run takes milliseconds. The code is readable in the 1600 px MP4.<br>▶ <a href="media/videos/sdk-doors.mp4">MP4</a> · <a href="media/README.md#sdk-doors-an-illustration">what is captured and what is drawn</a></sub></p>
+
 `new Nika()` starts nothing. On the first call it asks the bundled engine who
 it is; then each call runs the engine as a child process, without a shell, in
 your working directory:
@@ -259,22 +269,23 @@ A run gives you three different facts, and each has its own evidence:
 | **Executed** | `run.result()` and `isNikaRunSucceeded(result)`. An admitted failure is data (`status: "failed"`). A human gate is `paused` (a `run.waiting` event), not success. | Not proof that the record is sealed. |
 | **Sealed** | `result.receipt.sealed` and `traceVerify(receipt)`. Tamper-evident, not tamper-proof. | Not "the workflow was correct", and not "a person read the output". |
 
-**Watch the check catch two mistakes before anything runs.**
+**Watch the three facts from TypeScript: a refused file never runs, a run without a key is not sealed, and one changed byte breaks the proof.**
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/static-check-fix.optimized.gif">
-    <img src="https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/static-check-fix.optimized.gif"
-         alt="nika check finds two defects in a pull-request review workflow, the real fix is applied, and the re-check comes back clean; nothing runs and no token is spent" width="860">
-  </a>
+  <picture>
+    <source media="(prefers-reduced-motion: reduce)" srcset="media/stills/sdk-admitted-executed-sealed.png">
+    <img src="media/gifs/sdk-admitted-executed-sealed.gif" alt="node gate.mts on a workflow that runs ls under permits: {} prints check refused · exit 2, NIKA-SEC-004 and its fix, then run not started: no run, no events, no trace. A one-line permits fix checks clean and runs. node prove.mts with no signing key prints sealed false and not verified · receipt_mismatch; after NIKA_KEYCHAIN=off nika key init it prints sealed true and verified. node tamper.mts changes one byte of the trace, and node verify.mts prints not verified and the engine's BROKEN at line 5" width="960">
+  </picture>
 </p>
-<p align="center"><sub><code>nika check</code> finds two defects, the fix lands, the re-check is clean, and no model is called. Your code gets the same verdict from <code>check()</code> and <code>run()</code>. Every line is captured from the real CLI on engine 0.121.0.</sub></p>
+<p align="center"><sub><code>check()</code> refuses a file that runs <code>ls</code> under <code>permits: {}</code> (<code>NIKA-SEC-004</code>) and <code>run()</code> never starts it; one permits line fixes it. On a machine with no signing key the run succeeds unsealed and <code>traceVerify()</code> answers <code>receipt_mismatch</code>; after step 1's <code>nika key init</code> the next run of the same file is sealed and verified. One changed byte in the trace, and the engine answers <code>BROKEN at line 5</code>. Recorded from <code>@supernovae-st/nika</code> 0.123.0 and its bundled engine; the runs are <code>mock/echo</code> rehearsals.<br>▶ <a href="media/videos/sdk-admitted-executed-sealed.mp4">MP4</a> · <a href="media/transcripts/sdk-admitted-executed-sealed.txt">transcript</a> · <a href="scripts/media/scenes/sdk-admitted-executed-sealed">the programs it runs</a></sub></p>
 
 - **The file is the boundary.** A workflow lists what it may reach in
-  `permits:`. The check catches the task that reaches past it.
-  ▶ [Watch the check catch an escape](https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/permits-audit.optimized.gif)
+  `permits:`, and the check catches the task that reaches past it before any
+  model is called.
+  ▶ [The same audit on the command line](https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/permits-audit.optimized.gif) (captured on engine 0.121.0)
 - **Failures you planned for.** `on_error: recover` absorbs a missing live
   feed: the run finishes, the output says stale, the trace records the
-  failure. ▶ [Watch a missing feed absorbed](https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/on-error-recover.optimized.gif)
+  failure. ▶ [Watch a missing feed absorbed](https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/on-error-recover.optimized.gif) (the CLI, captured on engine 0.121.0)
 
 ## Two doors: your machine or your server
 
@@ -335,6 +346,16 @@ covers setup, retries, recovery, restarts, connection rules and schedules,
 and [`examples/server-recovery.ts`](https://github.com/supernovae-st/nika-client/blob/main/examples/server-recovery.ts)
 recovers a job across two processes.
 
+**Watch the server lines above run, then one job, a retry and a wrong token.**
+
+<p align="center">
+  <picture>
+    <source media="(prefers-reduced-motion: reduce)" srcset="media/stills/sdk-remote.png">
+    <img src="media/gifs/sdk-remote.gif" alt="The terminal types this README's server setup: a one-line nika.yaml, a token minted into .nika/serve.token with umask 077, .nika/ appended to .gitignore, NIKA_KEYCHAIN=off nika key init, and nika serve --bind 127.0.0.1:8787 --workflows . --token-file .nika/serve.token in the background; curl /health shows engineVersion 0.123.0 and machine protocol 2. node remote.mts prints served hello.nika, check clean, a job id, #1 run.started running, #2 run.settled succeeded, the greeting, verify verified · sealed, retry the same job: it did not run twice, and bad token 401 unauthorized" width="960">
+  </picture>
+</p>
+<p align="center"><sub>The setup lines above, typed as written (the server goes to the background of the same terminal), then a client built with <code>new Nika({ url, token, allowInsecureHttp: true })</code>: it lists and checks the served <code>hello.nika</code>, runs it with an idempotency key, receives the two sequenced events, reads <code>verified · sealed</code>, gets the same job back for the same key and a typed 401 for a wrong token. The token is never printed. Recorded from <code>@supernovae-st/nika</code> 0.123.0 and <code>nika serve</code> 0.123.0 on loopback; the run is a <code>mock/echo</code> rehearsal.<br>▶ <a href="media/videos/sdk-remote.mp4">MP4</a> · <a href="media/transcripts/sdk-remote.txt">transcript</a> · <a href="scripts/media/scenes/sdk-remote/remote.mts">the client it runs</a></sub></p>
+
 ## Use a real model
 
 `mock/echo` rehearses the mechanics. For a real answer, change `model:` in
@@ -365,10 +386,10 @@ server run takes no per-run model: the workflow names it.
 **Watch the same engine audit a real job, then run it on a local model.**
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/nika-hero.optimized.gif">
-    <img src="https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/nika-hero.optimized.gif"
-         alt="nika check audits a meeting-actions workflow, then nika run executes it on a local model through Ollama and writes the meeting's action items to a typed JSON file" width="860">
-  </a>
+  <picture>
+    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/posters/nika-hero.png">
+    <img src="https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/nika-hero.optimized.gif" alt="nika check audits a meeting-actions workflow, then nika run executes it on a local model through Ollama and writes the meeting's action items to a typed JSON file" width="860">
+  </picture>
 </p>
 <p align="center"><sub>The same engine from the command line, on a real job: the audit first, then a run on a local model that writes a meeting's action items as typed JSON. Captured from the real CLI on engine 0.121.0; the run uses a real local model (<code>ollama/llama3.2:3b</code>).</sub></p>
 
@@ -402,15 +423,12 @@ All four rows were measured with the quick-start file on engine 0.123.0.
 > `receipt_mismatch` is also the engine's answer for a tampered or edited
 > receipt: do not read every one as "just unsigned".
 
-**Watch the engine verify a run's record, then catch one changed byte.**
+**What the local answers look like: unsealed, sealed and verified, then tampered.**
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/trace-proof.optimized.gif">
-    <img src="https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/trace-proof.optimized.gif"
-         alt="A run's trace drawn as five hash-linked blocks: nika trace verify reports the chain intact, then one byte of line 4 changes in a copy and verify stops at line 5: BROKEN, exit 2" width="860">
-  </a>
+  <img src="media/stills/sdk-admitted-executed-sealed.png" alt="node prove.mts with no signing key prints run succeeded, receipt sealed false · 5 events and verify not verified · invalid · receipt_mismatch. NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init mints a key, and node prove.mts prints receipt sealed true · 6 events and verify verified. node tamper.mts changes one byte on line 4 of the trace, and node verify.mts prints not verified · invalid and engine BROKEN at line 5" width="860">
 </p>
-<p align="center"><sub>The chain reads back intact; in a copy with one changed byte, verify stops at the next line (BROKEN, exit 2). <code>traceVerify()</code> asks the engine for this same check on your run's trace, then checks your receipt against the engine's evidence. An unsigned <code>mock/echo</code> rehearsal captured from the real CLI on engine 0.121.0; the scan is an illustration.</sub></p>
+<p align="center"><sub>The last screen of the recording above. With no signing key the run succeeds with <code>sealed false</code> and <code>receipt_mismatch</code>; step 1's <code>nika key init</code> seals the next run, and <code>traceVerify()</code> answers <code>verified</code>; after one changed byte on line 4 of its trace, the stored receipt no longer verifies and the engine names the line: <code>BROKEN at line 5</code>. Captured from <code>@supernovae-st/nika</code> 0.123.0 and its bundled engine; the runs are <code>mock/echo</code> rehearsals.<br>▶ <a href="https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/trace-proof.optimized.gif">The chain check on the command line</a>: an illustration over a real <code>nika trace verify</code>, captured on engine 0.121.0</sub></p>
 
 **Signing keys.** The engine your app starts and `nika serve` sign with
 `~/.nika/keys/` or the explicit `NIKA_RUN_KEY_FILE` and `NIKA_RUN_PUB_FILE`
@@ -668,6 +686,12 @@ explains every test layer. The HTTP types mirror the pinned
 [`openapi.json`](https://github.com/supernovae-st/nika-client/blob/main/openapi.json)
 of `nika serve`: never add a field the engine does not send.
 
+The recordings on this page are rendered, never edited:
+`node scripts/media/render.mjs` records them from the published package and
+`node scripts/media/validate.mjs --typecheck` checks them; `npm test` holds
+every embed to the committed files. [media/README.md](media/README.md) has
+the tools and the rules.
+
 <!-- city:map -->
 ## 🦋 The Nika family
 
@@ -676,7 +700,7 @@ of `nika serve`: never add a field the engine does not send.
 | 🦋 | [nika](https://github.com/supernovae-st/nika) | The engine and CLI: write, check, run and verify AI workflows |
 | 📖 | [nika-docs](https://github.com/supernovae-st/nika-docs) | The documentation, live at [docs.nika.sh](https://docs.nika.sh) |
 | 📜 | [nika-spec](https://github.com/supernovae-st/nika-spec) | The language specification and the suite that proves an engine follows it |
-| 🧩 | [nika-vscode](https://github.com/supernovae-st/nika-vscode) | The editor extension: frozen at 0.120.0 and not qualified with engine 0.123; its diagnostics come from the `nika lsp` you point it at |
+| 🧩 | [nika-vscode](https://github.com/supernovae-st/nika-vscode) | The editor extension, frozen at 0.120 and not qualified with 0.123: use `nika lsp` and the JSON Schema |
 | 🟦 | **[nika-client](https://github.com/supernovae-st/nika-client)** | **Run and verify workflows from TypeScript** |
 | ✅ | [nika-action](https://github.com/supernovae-st/nika-action) | A GitHub Action that posts a `nika check` verdict on your pull requests |
 | 🚀 | [nika-actions-starter](https://github.com/supernovae-st/nika-actions-starter) | A ready template: workflows, editor setup and CI from the first push |

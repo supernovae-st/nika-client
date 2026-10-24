@@ -66,6 +66,16 @@ the engine's own `nika trace verify` still calls the journal chain OK and
 unsealed. The event count that command prints counts journal entries; it is
 not the number of `run.events()`.
 
+**Watch the three facts from TypeScript, then one changed byte.**
+
+<p align="center">
+  <picture>
+    <source media="(prefers-reduced-motion: reduce)" srcset="../media/stills/sdk-admitted-executed-sealed.png">
+    <img src="../media/gifs/sdk-admitted-executed-sealed.gif" alt="node gate.mts on a workflow that runs ls under permits: {} prints check refused · exit 2 and NIKA-SEC-004, then run not started: no run, no events, no trace; a one-line permits fix checks clean and runs. node prove.mts with no signing key prints receipt sealed false · 5 events and not verified · invalid · receipt_mismatch; after NIKA_KEYCHAIN=off nika key init it prints sealed true · 6 events and verified. node tamper.mts changes one byte on line 4 of the trace, and node verify.mts prints not verified · invalid and engine BROKEN at line 5" width="860">
+  </picture>
+</p>
+<p align="center"><sub>Admitted: <code>check()</code> and <code>run()</code> refuse the file and no run exists. Executed, not sealed: with no key the run succeeds and the receipt reads <code>sealed false</code> over 5 journal entries. Sealed: after <code>NIKA_KEYCHAIN=off nika key init</code> the next run of the same file has 6, the last one <code>run_sealed</code>, and verifies. Then one changed byte, and the stored receipt fails: <code>BROKEN at line 5</code>. Recorded from <code>@supernovae-st/nika</code> 0.123.0 and its bundled engine; the runs are <code>mock/echo</code> rehearsals.<br>▶ <a href="../media/videos/sdk-admitted-executed-sealed.mp4">MP4</a> · <a href="../media/transcripts/sdk-admitted-executed-sealed.txt">transcript</a> · <a href="../scripts/media/scenes/sdk-admitted-executed-sealed">the programs it runs</a></sub></p>
+
 ## What a receipt carries
 
 Pass a receipt back unchanged, and store it with what it proves.

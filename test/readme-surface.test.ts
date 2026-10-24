@@ -1,4 +1,6 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { posix } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const repo = (path: string) => new URL(`../${path}`, import.meta.url);
@@ -103,7 +105,10 @@ describe('packed public documentation', () => {
     }
     // Engine media is pinned to the release tag that carries it, never to a moving branch.
     expect(readme).not.toContain('supernovae-st/nika/main/media/');
-    expect(readme).toContain('supernovae-st/nika/v0.123.0/media/gifs/typescript-client.optimized.gif');
+    // The hero is this repository's recording of the quick start on 0.123.0, not
+    // the engine's typescript-client clip captured with 0.120.3.
+    expect(readme).not.toContain('typescript-client.optimized.gif');
+    expect(readme).toContain('src="media/gifs/sdk-quickstart.gif"');
   });
 
   it('runs the quick start that examples/quick-start.ts holds, byte for byte', () => {
@@ -124,5 +129,110 @@ describe('packed public documentation', () => {
     }
     expect(readme).not.toContain('nika.jobs.');
     expect(readme).toContain('does not export a webhook-signature verifier');
+  });
+});
+
+describe('media the pages embed', () => {
+  type Outputs = Record<string, { sha256: string }>;
+  const media = JSON.parse(readFileSync(repo('media/media-sources.json'), 'utf8')) as {
+    tapes: Record<string, { outputs: Outputs }>;
+    motion?: Record<string, { kind: string; outputs: Outputs }>;
+  };
+  const captions = JSON.parse(readFileSync(repo('media/captions.json'), 'utf8')) as Record<
+    string,
+    { caption?: string; alt?: string }
+  >;
+  const pages = new Map<string, string>([
+    ['README.md', readme],
+    ...readdirSync(repo('docs'))
+      .filter((file) => file.endsWith('.md'))
+      .map((file): [string, string] => [`docs/${file}`, page(file)]),
+  ]);
+  // Every relative reference a page makes into media/: src, srcset, href, markdown links.
+  const references = [...pages].flatMap(([file, text]) =>
+    [...text.matchAll(/(?:src|srcset|href)="([^"]+)"|\]\(([^)\s]+)\)/g)]
+      .map((match) => match[1] ?? match[2] ?? '')
+      .filter((target) => target !== '' && !/^[a-z]+:/i.test(target) && !target.startsWith('#'))
+      .map((target) => ({
+        file,
+        target,
+        path: posix.normalize(posix.join(posix.dirname(file), target.split('#')[0] ?? '')),
+      }))
+      .filter(({ path }) => path.startsWith('media/')),
+  );
+  const assets = references.filter(({ path }) => /^media\/(?:gifs|videos|stills|transcripts)\//.test(path));
+  const recorded = new Map<string, string>();
+  for (const entry of [...Object.values(media.tapes), ...Object.values(media.motion ?? {})]) {
+    for (const [file, output] of Object.entries(entry.outputs)) recorded.set(file, output.sha256);
+  }
+  const committed = ['gifs', 'videos', 'stills', 'transcripts'].flatMap((dir) =>
+    existsSync(repo(`media/${dir}`))
+      ? readdirSync(repo(`media/${dir}`)).map((file) => `media/${dir}/${file}`)
+      : [],
+  );
+
+  it('resolves every page reference to a committed file the render recorded', () => {
+    expect(assets.length).toBeGreaterThan(0);
+    for (const { file, target, path } of references) {
+      expect(existsSync(repo(path)), `${file} → ${target}`).toBe(true);
+    }
+    for (const { file, target, path } of assets) {
+      expect(recorded.has(path), `${file} → ${target} is not in media/media-sources.json`).toBe(true);
+    }
+  });
+
+  it('commits each recorded file byte for byte, and only files a page uses', () => {
+    const used = new Set(assets.map(({ path }) => path));
+    expect([...committed].sort()).toEqual([...recorded.keys()].sort());
+    for (const file of committed) {
+      const digest = createHash('sha256').update(readFileSync(repo(file))).digest('hex');
+      expect(digest, `${file} is not the file the render recorded`).toBe(recorded.get(file));
+      expect(used.has(file), `${file} is used by no page`).toBe(true);
+    }
+  });
+
+  it('gives every image alt text and a caption, and every GIF a still for reduced motion', () => {
+    for (const [file, text] of pages) {
+      for (const [tag] of text.matchAll(/<img\b[^>]*>/g)) {
+        if (/src="(?![a-z]+:)[^"]*media\//.test(tag)) {
+          expect(tag, `${file}: an image without descriptive alt text`).toMatch(/\balt="[^"]{40,}"/);
+        }
+      }
+      // Every animated image, ours or the engine's, has a still for reduced motion;
+      // this repository's GIFs fall back to their own still under media/stills/.
+      const gifs = [...text.matchAll(/<img\b[^>]*src="[^"]+\.gif"/g)].length;
+      const pictures = [...text.matchAll(/<picture>[\s\S]*?<\/picture>/g)]
+        .map(([block]) => block)
+        .filter((block) => /<img\b[^>]*src="[^"]+\.gif"/.test(block));
+      for (const block of pictures) {
+        expect(block, `${file}: a GIF without a reduced-motion still`).toMatch(
+          /<source media="\(prefers-reduced-motion: reduce\)" srcset="[^"]+\.png">/,
+        );
+        if (/<img\b[^>]*src="(?![a-z]+:)[^"]*media\/gifs\//.test(block)) {
+          expect(block, `${file}: our GIF without its own still`).toMatch(
+            /srcset="(?![a-z]+:)[^"]*media\/stills\/[^"]+\.png"/,
+          );
+        }
+      }
+      expect(pictures.length, `${file}: a GIF outside a <picture>`).toBe(gifs);
+    }
+    for (const file of committed.filter((name) => !name.endsWith('.txt'))) {
+      expect(captions[file]?.caption, `${file} has no caption`).toBeTruthy();
+      expect(captions[file]?.alt, `${file} has no alt text`).toBeTruthy();
+    }
+  });
+
+  it('labels the illustration as one, and every recording with the release it ran', () => {
+    for (const [name, clip] of Object.entries(media.motion ?? {})) {
+      expect(clip.kind, name).toBe('illustration');
+      for (const file of Object.keys(clip.outputs)) {
+        expect(captions[file]?.caption, file).toMatch(/illustration/i);
+      }
+    }
+    for (const entry of Object.values(media.tapes)) {
+      for (const file of Object.keys(entry.outputs).filter((name) => !name.endsWith('.txt'))) {
+        expect(captions[file]?.caption, file).toContain('0.123.0');
+      }
+    }
   });
 });

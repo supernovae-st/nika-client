@@ -15,7 +15,8 @@ protocol (2 for 0.123). 0.123 is the open-source reference release, in
 maintenance: security fixes, bug fixes and compatibility.
 
 User documentation: `README.md` (the entry) and `docs/*.md` (shipped in the
-npm package); runnable programs in `examples/`.
+npm package); runnable programs in `examples/`; recordings and one labelled
+illustration in `media/` (see `media/README.md`; not shipped).
 
 ## Editing rules
 
@@ -26,3 +27,7 @@ npm package); runnable programs in `examples/`.
    or 202 (the request accepted on a running job, engine 0.118).
 2. 4 verbs only: `infer` · `exec` · `invoke` · `agent`.
 3. Commit trailer: `Co-Authored-By: Nika 🦋 <nika@supernovae.studio>`.
+4. Media are rendered, never edited: change a tape or scene under
+   `scripts/media/`, run `node scripts/media/render.mjs` then
+   `node scripts/media/validate.mjs --typecheck`, and update
+   `media/captions.json`. An illustration says so in its caption.

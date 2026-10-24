@@ -45,6 +45,11 @@ For a workflow whose `exec:` task runs `ls` under `permits: {}`, engine
 0.123.0 answers `NIKA-SEC-004` (exit status 2) with the finding
 ``exec task under a boundary that forbids shells (task `list`) — fix: add "ls" to permits.exec``.
 
+<p align="center">
+  <img src="../media/stills/sdk-check-refused.png" alt="list-files.nika runs ls -1 under permits: {}. node gate.mts list-files.nika prints check refused · exit 2, NIKA-SEC-004 and the finding exec task under a boundary that forbids shells (task list) — fix: add ls to permits.exec, then run not started · NIKA-SEC-004 · no run, no events, no trace" width="860">
+</p>
+<p align="center"><sub>That file from TypeScript: <code>check()</code> returns the refusal and its fix, and <code>run()</code> rejects with <code>NikaOperationError</code> before any run exists. Captured from <code>@supernovae-st/nika</code> 0.123.0 and its bundled engine; <a href="../scripts/media/scenes/sdk-admitted-executed-sealed/gate.mts"><code>gate.mts</code></a> is the program. The whole story, through the seal, is in the <a href="../media/videos/sdk-admitted-executed-sealed.mp4">recording</a>.</sub></p>
+
 - `code` is the engine's own: the first check finding that names one
   (`NIKA-SEC-004`, `NIKA-PARSE-005`, `NIKA-AUTH-006`…) or the refusal's code
   (`NIKA-1709`, `NIKA-1708`). `machineCode` repeats it. When the engine named

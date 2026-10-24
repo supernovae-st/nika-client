@@ -35,6 +35,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are gone. Engine media is pinned to the `v0.123.0` tag, and each caption
   names the version it was captured on. `SECURITY.md` names the maintained
   0.123.x line.
+- The README and `docs/` show the SDK itself: five terminal recordings of the
+  published 0.123.0 package and its bundled engine (the quick start as
+  written, the three facts of a run, events, compile, and `nika serve` set up
+  as the README says) and one illustration of the two doors, labelled as one,
+  whose content was captured from the same release. Each recording comes as a
+  GIF, an MP4, a reduced-motion still and a transcript. They replace the
+  engine's `typescript-client` clip captured with 0.120.3, and the CLI clips
+  that stay are labelled with the engine version they were captured on.
+  `scripts/media/render.mjs` records from the npm registry and refuses a
+  story that no longer holds; `scripts/media/validate.mjs` and
+  `test/readme-surface.test.ts` hold the pages to the committed files. The
+  unused `media/local-driver.gif`, its tape and `render.sh` are removed.
 - New runnable examples: `quick-start.ts` (the README's, byte for byte, held
   by `test/readme-surface.test.ts`), `watch-and-cancel.ts` and
   `server-recovery.ts`, with `hello.nika`, `wait.nika`, a project file and an

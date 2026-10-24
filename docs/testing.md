@@ -200,7 +200,13 @@ checks both packed module faces and their public TypeScript contracts, runs
 `examples/compile-then-run.ts` from the tarball against a fixture engine, and
 typechecks every program under `examples/` against the packed types.
 `test/readme-surface.test.ts` holds the README's quick start byte for byte to
-`examples/quick-start.ts`.
+`examples/quick-start.ts`. It also holds every media path the README and
+`docs/` use to a file committed under `media/` and recorded byte for byte in
+`media/media-sources.json`, requires every committed media file to be used,
+and requires alt text on every image and a reduced-motion still for every GIF.
+`node scripts/media/validate.mjs --typecheck` checks the recordings themselves
+against their tapes, budgets and transcripts; it needs the render tools listed
+in [media/README.md](../media/README.md).
 
 For a frozen engine that advertises `compile` on both native and Serve doors:
 

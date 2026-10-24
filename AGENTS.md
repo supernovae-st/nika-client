@@ -4,11 +4,18 @@ Vendor-neutral agent entry per the AGENTS.md convention (agents.md).
 
 ## What this repo is
 
-The TypeScript client SDK for Nika — the open workflow language for AI.
-Its local module drives the released engine (`supernovae-st/nika`, AGPL).
-Its root module talks to live `nika serve` HTTP (`--bind` + `--workflows` +
-`--token-file`). The language spec is `supernovae-st/nika-spec`
-(Apache-2.0).
+The TypeScript client SDK for Nika — the open workflow language for AI —
+published as `@supernovae-st/nika`. One `Nika` class: without `url` it starts
+the bundled engine (or `bin`/`NIKA_BIN`) as a child process; with
+`{ url, token }` it talks to a live `nika serve --bind` over HTTP
+(`--workflows` + `--token-file`). The engine is `supernovae-st/nika` (AGPL);
+the language spec is `supernovae-st/nika-spec` (Apache-2.0). Each package
+version bundles the engine with the same number and speaks its machine
+protocol (2 for 0.123). 0.123 is the open-source reference release, in
+maintenance: security fixes, bug fixes and compatibility.
+
+User documentation: `README.md` (the entry) and `docs/*.md` (shipped in the
+npm package); runnable programs in `examples/`.
 
 ## Editing rules
 

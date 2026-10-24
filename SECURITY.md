@@ -1,13 +1,18 @@
 # Security Policy
 
-This repository carries the **Nika client SDK**. Security-relevant
-surface here · the SDK runs inside consumer applications and talks to a
-local Nika engine — input handling, transport, and dependency supply
-chain matter.
+This repository carries the **Nika client SDK** (`@supernovae-st/nika`).
+Security-relevant surface here · the SDK runs inside consumer applications
+and talks to a local Nika engine or to a `nika serve` over HTTP(S) — input
+handling, transport, and dependency supply chain matter.
 
 ## Supported Versions
 
-Only the latest published package version and `main` receive fixes.
+0.123 is Nika's open-source reference release. It is maintained with
+security fixes, bug fixes and compatibility updates: the **0.123.x** line
+(the latest published package version) and `main` receive fixes. Older
+versions, including the retired `@supernovae-st/nika-client` package name,
+receive none. See the
+[known limits](https://docs.nika.sh/changelog/known-limits) of 0.123.
 
 ## Reporting a Vulnerability
 

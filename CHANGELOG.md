@@ -7,7 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.123.0]
+### Documentation
+
+- The README is rebuilt as the entry for a TypeScript developer: install, a
+  fifteen-line first run, what happens underneath (a sequence diagram of a
+  local run), the two doors side by side with a server in ten lines, a real
+  model, proof, troubleshooting, and the maintenance status of 0.123. The
+  reference it carried moves to pages shipped under `docs/`: `runs.md`,
+  `server.md` (with a sequence diagram of a server job), `receipts.md` and
+  `errors.md`, plus the new `upgrading-to-0.123.md`, `glossary.md` and an
+  index, `docs/README.md`.
+- The quick start creates the signing key as files
+  (`NIKA_KEYCHAIN=off nika key init`) and names `nika key align`. On macOS a
+  `nika key init` run from a terminal stores the key in the keychain only,
+  which the engine an app starts (it has no terminal) and `nika serve` never
+  open, so the quick start's run stayed unsealed and printed
+  `not verified: receipt_mismatch`.
+- `traceVerify()` over HTTP is documented as the 0.123.0 server answers:
+  lower-case verdicts with a reason beside each (`sealed`/`sealed`,
+  `ok`/`unsealed`), and `verified` read first, since a receipt that does not
+  match the job keeps the server's verdict while `verified` is `false`.
+- Every measurement is taken again on engine 0.123.0: the check report, the
+  six local events, keyless and sealed receipts, server verdicts,
+  cancellation, input refusals, frame counts and sizes. The 0.120.3 labels,
+  the sentences that called 0.123.0 unpublished or the judged answer round
+  unreleased, and the pointer to a tracker issue for the deprecation window
+  are gone. Engine media is pinned to the `v0.123.0` tag, and each caption
+  names the version it was captured on. `SECURITY.md` names the maintained
+  0.123.x line.
+- New runnable examples: `quick-start.ts` (the README's, byte for byte, held
+  by `test/readme-surface.test.ts`), `watch-and-cancel.ts` and
+  `server-recovery.ts`, with `hello.nika`, `wait.nika`, a project file and an
+  index. `check:package-surface` typechecks every example against the packed
+  types.
+
+### Changed
+
+- `NikaTraceVerifyResult` names the verdicts the 0.123.0 resident writes, in
+  lower case (`ok`, `sealed`, `anchored`, `replayed`, `incomplete`,
+  `tampered`, `broken` and the CLI's refusal classes), and the `sealed` and
+  `unsealed` reasons. Both stay open strings, so no caller code changes. The
+  JSDoc of `NikaJournalEvidence`, the resident frame fields and the compile
+  cognition describe the released 0.123.0 contract.
+- `NikaEngineUnavailable` names a Node.js older than 22 and omitted optional
+  dependencies among the reasons npm leaves the engine payload uninstalled.
+
+## [0.123.0] - 2026-10-23
 
 ### Added
 
@@ -35,8 +80,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the answers and its seat only judges it, no authoring call; held, it
   forgets the token) and `cognition: 'deterministicOnly'` its zero-call
   replay. The judged answer round is gated on the `/health` capability
-  `compileJudgedAnswerRound` (engine integration commits `158a961cd` and
-  `b7dace1e5`, in no release yet): a server without it gets a
+  `compileJudgedAnswerRound`, which engine 0.123.0 lists whenever its operator
+  seats a model (`nika serve --authoring-model`): a server without it gets a
   `NikaCompatibilityError` before anything is posted, and an older server's
   `422 malformed_compile_request` to the round maps to the same error,
   defensively. `outcome.judged_answer_round_available` says, beside a kept
@@ -121,17 +166,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or `literal` question none, as the engine's wire writes them; anything
   else is a `NikaProtocolError` on both doors, instead of an unanswerable
   question.
-- Contract pin: `openapi.json` is the live plain `nika serve` document of
-  engine main `5342f8a43` (`nika 0.123.0-preview.1`, nika#1814) and
-  `src/generated/openapi.d.ts` is regenerated from that resident. Since
+- Contract pin: `openapi.json` is the live plain `nika serve` document of the
+  released engine 0.123.0 (first taken from engine main `5342f8a43`, nika#1814,
+  and equal to the released resident's) and `src/generated/openapi.d.ts` is
+  regenerated from that resident. Since
   0.120.3 the document adds the compile `choice` question and its `options`,
   `requested_trigger`, the provenance `strategy`, `plan`, `decision` and
   `suggested_file`, the receipt origin's `missed_first`/`missed_count`, the
   settlement's `stopped_calls` (an additive member the SDK carries through
   untyped on `result().settlement`), the
   schedule's per-fire `inputs`, and drops the compile request's field-size
-  bounds. `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name that commit; the
-  release replaces it with the commit tag `v0.123.0` names.
+  bounds. `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name the commit tag
+  `v0.123.0` names.
 - Real 0.123 bytes are decoded by `test/engine-0123-wire.test.ts`
   (identities, compile choices on both doors, a catch-up job and its
   stream), and `test/engine-live.test.ts` drives an engine named by
@@ -151,7 +197,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deadline; the caller's `signal` still stops the wait. A `fetch` passed in
   the configuration keeps its own timeouts.
 
-## [0.120.3]
+## [0.120.3] - 2026-09-20
 
 ### Added
 
@@ -194,7 +240,7 @@ HTTP compile. This SDK feature first publishes with 0.120.3.
   verified public macOS arm64 archive; the historical paid-provider and trace
   ledgers are untouched.
 
-## [0.120.2]
+## [0.120.2] - 2026-09-19
 
 ### Changed
 
@@ -218,7 +264,10 @@ HTTP compile. This SDK feature first publishes with 0.120.3.
   match the tarball beside the ledger, and documentation-only README pack
   changes may retarget it. Behavioral verdicts still compare exactly.
 
-## [0.120.1]
+## [0.120.1] - not published
+
+Prepared in this repository but never published to npm or tagged; 0.120.2
+carries its changes.
 
 ### Changed
 
@@ -229,7 +278,7 @@ HTTP compile. This SDK feature first publishes with 0.120.3.
   workflow references in project-arm schemas (engine #1692). This is not
   issue 1684 closure; the broader file-identity migration remains open.
 
-## [0.120.0]
+## [0.120.0] - 2026-09-18
 
 ### Known engine limitation
 
@@ -913,3 +962,10 @@ Initial public release. Full rewrite from v0.1.0.
 - API changed from flat to namespace pattern
 - Error hierarchy completely redesigned
 - License changed from MIT to AGPL-3.0-or-later
+
+[Unreleased]: https://github.com/supernovae-st/nika-client/compare/v0.123.0...HEAD
+[0.123.0]: https://github.com/supernovae-st/nika-client/compare/v0.120.3...v0.123.0
+[0.120.3]: https://github.com/supernovae-st/nika-client/compare/v0.120.2...v0.120.3
+[0.120.2]: https://github.com/supernovae-st/nika-client/compare/v0.120.0...v0.120.2
+[0.120.0]: https://github.com/supernovae-st/nika-client/compare/v0.118.7...v0.120.0
+[0.118.7]: https://github.com/supernovae-st/nika-client/compare/v0.115.0...v0.118.7

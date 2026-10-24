@@ -1,0 +1,667 @@
+{
+  "tapes": {
+    "sdk-quickstart": {
+      "name": "sdk-quickstart",
+      "sources": {
+        "scripts/media/theme.tape": "cbd76c8daaae01d5de1700b876f11275093cc714573042f5014d8a75217db06e",
+        "scripts/media/sdk-quickstart.tape": "c071c590aaadf61ec8302cd4b5251c16d850c12ece9b9eec070994dfb266f9a3",
+        "scripts/media/render.mjs": "8aca349a5337781ec9a0cb0be077863c8033279ef2c16cf8b385bca7a41fc36d",
+        "scripts/media/scenes/sdk-quickstart/package.json": "a2ce14262d6613f4d0c36b0d92d0a8fae9bb14197a7e063b91611b5b0b903ca3"
+      },
+      "readmeFiles": {
+        "hello.nika": "00489ec5d64d0152863d9ed622022c77bf20e81a2c5f302492f0ee0bef63453b",
+        "demo.mts": "9b6a8dc9ae95bed793577abd227f7414d705c82d44f4b0049c04d08049aa9aed"
+      },
+      "preflight": {
+        "readmeStepOne": [
+          "npm install @supernovae-st/nika",
+          "NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init   # once per machine: a key that signs each run's record"
+        ],
+        "install": "added 2 packages in 1s",
+        "installed": [
+          "nika",
+          "nika-darwin-arm64"
+        ],
+        "demo": [
+          "mock(echo) · Say hello from the Nika SDK.",
+          "receipt verified"
+        ]
+      },
+      "renderSeconds": 68.1,
+      "leftoverServersStopped": [],
+      "terminal": {
+        "rows": 23,
+        "screens": 3,
+        "fullestScreenRows": 23
+      },
+      "screenshots": [
+        "sdk-quickstart.png"
+      ],
+      "outputs": {
+        "media/gifs/sdk-quickstart.gif": {
+          "bytes": 348406,
+          "sha256": "a8c1892f654ef6a606737c15eb2868266d1b8a68025c57c219a43b57a1bd8bbf",
+          "codec": "gif",
+          "pixFmt": "bgra",
+          "width": 1600,
+          "height": 900,
+          "frames": 239,
+          "frameRate": "100/11",
+          "durationSeconds": 27.2,
+          "audioStreams": 0
+        },
+        "media/videos/sdk-quickstart.mp4": {
+          "bytes": 273175,
+          "sha256": "86921a2fddb32b5341ffb0409d88e5ae758b5feadc9fa264161a62276699e1da",
+          "codec": "h264",
+          "pixFmt": "yuv420p",
+          "width": 1600,
+          "height": 900,
+          "frames": 680,
+          "frameRate": "25/1",
+          "durationSeconds": 27.2,
+          "audioStreams": 0,
+          "faststart": true
+        },
+        "media/stills/sdk-quickstart.png": {
+          "bytes": 73279,
+          "sha256": "d79e3104c117a75a312efa2a7398fb7e74871cfa5b1a0be515c286d330e2a07d",
+          "width": 1600,
+          "height": 900,
+          "quantized": true
+        },
+        "media/transcripts/sdk-quickstart.txt": {
+          "bytes": 1622,
+          "sha256": "d3e340f4da248812114963b895e8a2575b90d257e1da3252c3d487923848d84c"
+        }
+      },
+      "renderedAt": "2026-10-24T15:01:18.053Z"
+    },
+    "sdk-events": {
+      "name": "sdk-events",
+      "sources": {
+        "scripts/media/theme.tape": "cbd76c8daaae01d5de1700b876f11275093cc714573042f5014d8a75217db06e",
+        "scripts/media/sdk-events.tape": "c13910c5d7cde58719ddf97c0a4c5af361170ad6de52e72db6bc10149fe26567",
+        "scripts/media/render.mjs": "8aca349a5337781ec9a0cb0be077863c8033279ef2c16cf8b385bca7a41fc36d",
+        "scripts/media/scenes/sdk-events/brief.nika": "7fab820a81c35dae00d9aa2fcc3dbc22c415bacd380c6f513c0ef1116c2fb231",
+        "scripts/media/scenes/sdk-events/watch.mts": "6d6981866d90c3045996603bc06f6f5bab6fbcc63bd751d84b515a749dce1591",
+        "scripts/media/scenes/sdk-quickstart/package.json": "a2ce14262d6613f4d0c36b0d92d0a8fae9bb14197a7e063b91611b5b0b903ca3"
+      },
+      "readmeFiles": {},
+      "preflight": {
+        "events": [
+          "0.0s  run.started",
+          "0.0s  task.scheduled  audience",
+          "0.0s  task.scheduled  risks",
+          "0.0s  task.scheduled  review",
+          "0.0s  task.scheduled  brief",
+          "0.0s  task.started    audience",
+          "0.0s  task.completed  audience",
+          "0.0s  task.started    risks",
+          "0.0s  task.completed  risks",
+          "2.0s  task.started    review",
+          "2.0s  engine.event    (permit_checked)",
+          "2.0s  task.completed  review",
+          "2.0s  task.started    brief",
+          "2.0s  task.completed  brief",
+          "2.0s  engine.event    (workflow_completed)",
+          "2.0s  run.settled     succeeded"
+        ],
+        "reviewStartedAt": 2
+      },
+      "renderSeconds": 41.3,
+      "leftoverServersStopped": [],
+      "terminal": {
+        "rows": 23,
+        "screens": 3,
+        "fullestScreenRows": 20
+      },
+      "screenshots": [
+        "sdk-events.png"
+      ],
+      "outputs": {
+        "media/gifs/sdk-events.gif": {
+          "bytes": 303283,
+          "sha256": "024b3f409605eec685bf90a9e2eb4f7b272b0101aaee6d66b225459420eef7f9",
+          "codec": "gif",
+          "pixFmt": "bgra",
+          "width": 1600,
+          "height": 900,
+          "frames": 87,
+          "frameRate": "100/19",
+          "durationSeconds": 16.8,
+          "audioStreams": 0
+        },
+        "media/videos/sdk-events.mp4": {
+          "bytes": 219790,
+          "sha256": "8c479a8e2fdea3eb7f2abdea1888f6dde20673aeeed583966d5d0ff9ec146c59",
+          "codec": "h264",
+          "pixFmt": "yuv420p",
+          "width": 1600,
+          "height": 900,
+          "frames": 420,
+          "frameRate": "25/1",
+          "durationSeconds": 16.8,
+          "audioStreams": 0,
+          "faststart": true
+        },
+        "media/stills/sdk-events.png": {
+          "bytes": 49609,
+          "sha256": "6cb29266a3d79ef988ed953ea078f40b52a3ed3858222e616187edaf76a6b6ed",
+          "width": 1600,
+          "height": 900,
+          "quantized": true
+        },
+        "media/transcripts/sdk-events.txt": {
+          "bytes": 1755,
+          "sha256": "1f8eeb7f976459490c8d049caf7cc851ddf96a923ad0e5778c0d2415906acd05"
+        }
+      },
+      "renderedAt": "2026-10-24T15:02:06.215Z"
+    },
+    "sdk-admitted-executed-sealed": {
+      "name": "sdk-admitted-executed-sealed",
+      "sources": {
+        "scripts/media/theme.tape": "cbd76c8daaae01d5de1700b876f11275093cc714573042f5014d8a75217db06e",
+        "scripts/media/sdk-admitted-executed-sealed.tape": "12d56994a854c68718c90302e6de1292e2ebc853d12e353cc37b508c40b664a4",
+        "scripts/media/render.mjs": "8aca349a5337781ec9a0cb0be077863c8033279ef2c16cf8b385bca7a41fc36d",
+        "scripts/media/scenes/sdk-admitted-executed-sealed/fixed/list-files.nika": "88219c073cd2ff99a582a17c0be5a93a9605c7e7d998fee9a71323d2532d8d5d",
+        "scripts/media/scenes/sdk-admitted-executed-sealed/gate.mts": "fef6ff53dbbd0b2d279a24b19d56e2210b75efe5d901d492137ab9f8c7ce53a2",
+        "scripts/media/scenes/sdk-admitted-executed-sealed/list-files.nika": "04424095f94e26fc6a1af98ebc52f5be75b9fff82c29a6777406ed7d5b89bf7e",
+        "scripts/media/scenes/sdk-admitted-executed-sealed/prove.mts": "773826538125231666083fc1a4f67b7381595dd78240c8c2bf81f052c58d01ba",
+        "scripts/media/scenes/sdk-admitted-executed-sealed/tamper.mts": "3dbc688ffd8de323240445e3a46b3ba5730317eefe00518cbc9d5fc62176ff53",
+        "scripts/media/scenes/sdk-admitted-executed-sealed/verify.mts": "033d9c82ca52e43d1145e6170f876ba4fb4050fb96e1b1bbffed6a5e60c5394b",
+        "scripts/media/scenes/sdk-quickstart/package.json": "a2ce14262d6613f4d0c36b0d92d0a8fae9bb14197a7e063b91611b5b0b903ca3"
+      },
+      "readmeFiles": {
+        "hello.nika": "00489ec5d64d0152863d9ed622022c77bf20e81a2c5f302492f0ee0bef63453b"
+      },
+      "preflight": {
+        "refused": [
+          "check  refused · exit 2",
+          "       NIKA-SEC-004",
+          "       exec task under a boundary that forbids shells (task `list`) — fix: add \"ls\" to permits.exec",
+          "run    not started · NIKA-SEC-004 · no run, no events, no trace"
+        ],
+        "clean": [
+          "check  clean · exit 0",
+          "run    succeeded · 10 entries listed"
+        ],
+        "unsealed": [
+          "run      succeeded · mock(echo) · Say hello from the Nika SDK.",
+          "receipt  sealed false · 5 events · head 1ed37a6ade71…",
+          "verify   not verified · invalid · receipt_mismatch"
+        ],
+        "sealed": [
+          "run      succeeded · mock(echo) · Say hello from the Nika SDK.",
+          "receipt  sealed true · 6 events · head a2030fd58ff2…",
+          "verify   verified"
+        ],
+        "broken": [
+          "verify   not verified · invalid",
+          "engine   BROKEN at line 5 — recorded chain af475316dc1a9ec7 · computed 1cd6e3d3dc440ce6"
+        ]
+      },
+      "renderSeconds": 91.9,
+      "leftoverServersStopped": [],
+      "terminal": {
+        "rows": 23,
+        "screens": 3,
+        "fullestScreenRows": 17
+      },
+      "screenshots": [
+        "sdk-check-refused.png",
+        "sdk-admitted-executed-sealed.png"
+      ],
+      "outputs": {
+        "media/gifs/sdk-admitted-executed-sealed.gif": {
+          "bytes": 412554,
+          "sha256": "2f060e92d2120079ecb8e5bb82d7bf343d152719d985cb6fe71405ee2729b9bb",
+          "codec": "gif",
+          "pixFmt": "bgra",
+          "width": 1600,
+          "height": 900,
+          "frames": 361,
+          "frameRate": "10/1",
+          "durationSeconds": 38.88,
+          "audioStreams": 0
+        },
+        "media/videos/sdk-admitted-executed-sealed.mp4": {
+          "bytes": 353654,
+          "sha256": "827ab3bf65f51dfc8b501864d748943156b24202070258f33675292f60da28bc",
+          "codec": "h264",
+          "pixFmt": "yuv420p",
+          "width": 1600,
+          "height": 900,
+          "frames": 972,
+          "frameRate": "25/1",
+          "durationSeconds": 38.88,
+          "audioStreams": 0,
+          "faststart": true
+        },
+        "media/stills/sdk-check-refused.png": {
+          "bytes": 37563,
+          "sha256": "12f693160f91796991d69ec5e31f81b8fcf1359e2ee749f7091a19c7bd54daed",
+          "width": 1600,
+          "height": 900,
+          "quantized": true
+        },
+        "media/stills/sdk-admitted-executed-sealed.png": {
+          "bytes": 76589,
+          "sha256": "835a2be6aac698c77fbd084b18d93d96ae1c0b2472f20d020aa4958b2008ed32",
+          "width": 1600,
+          "height": 900,
+          "quantized": true
+        },
+        "media/transcripts/sdk-admitted-executed-sealed.txt": {
+          "bytes": 1835,
+          "sha256": "9f6951bc8ed7ec67e335052e00ac128c554f17248a47f7393f91ef4adf98fa50"
+        }
+      },
+      "renderedAt": "2026-10-24T15:03:42.579Z"
+    },
+    "sdk-compile": {
+      "name": "sdk-compile",
+      "sources": {
+        "scripts/media/theme.tape": "cbd76c8daaae01d5de1700b876f11275093cc714573042f5014d8a75217db06e",
+        "scripts/media/sdk-compile.tape": "5eae2ab6710bf2381c7e270d9a1fb013e12203d9d0c5318238ab33e65c0e9bcb",
+        "scripts/media/render.mjs": "8aca349a5337781ec9a0cb0be077863c8033279ef2c16cf8b385bca7a41fc36d",
+        "scripts/media/scenes/sdk-compile/author.mts": "d1648ec66a3ca0a119f20f5ae9b55f02bfe34ee24fa4f78d3d5608c3bfe0fb6a",
+        "scripts/media/scenes/sdk-compile/inbox/retro.md": "eee62a420f4b6ae3344f605b54850cde65983243dd6d46adc5844d516c2fa743",
+        "scripts/media/scenes/sdk-compile/inbox/standup.md": "aa16598a402828161aa9f4d3e88e5a7985ae32da8a293d6375eb36e35a3dcbb5",
+        "scripts/media/scenes/sdk-quickstart/package.json": "a2ce14262d6613f4d0c36b0d92d0a8fae9bb14197a7e063b91611b5b0b903ca3"
+      },
+      "readmeFiles": {},
+      "preflight": {
+        "author": [
+          "round 1  incomplete · 1 required, 4 optional question(s)",
+          "         ? model",
+          "           Which explicit runtime provider/model should run the language steps (extract, classify, draft)?",
+          "         · `every morning` is a trigger, not a task",
+          "answer   model = mock/echo (the offline rehearsal model)",
+          "round 2  ready · provider calls: none",
+          "         trigger schedule · daily · requires_binding",
+          "check    clean · exit 0 · kept as digest.nika"
+        ],
+        "rounds": [
+          {
+            "v": 1,
+            "cognition": "deterministicOnly",
+            "authoring": null
+          },
+          {
+            "v": 1,
+            "cognition": "deterministicOnly",
+            "authoring": null
+          }
+        ],
+        "boundary": [
+          "permits:",
+          "  fs:",
+          "    read:",
+          "    - ./inbox/**",
+          "    write:",
+          "    - ./digest.md",
+          "  tools:",
+          "  - nika:assert",
+          "  - nika:glob",
+          "  - nika:jq",
+          "  - nika:read",
+          "  - nika:write",
+          "tasks:"
+        ]
+      },
+      "renderSeconds": 44.9,
+      "leftoverServersStopped": [],
+      "terminal": {
+        "rows": 23,
+        "screens": 3,
+        "fullestScreenRows": 15
+      },
+      "screenshots": [
+        "sdk-compile.png"
+      ],
+      "outputs": {
+        "media/gifs/sdk-compile.gif": {
+          "bytes": 259252,
+          "sha256": "a62e85d7d6be613eacb1381ae881b5d4abc595ef7359061276aceb3e4204f4e2",
+          "codec": "gif",
+          "pixFmt": "bgra",
+          "width": 1600,
+          "height": 900,
+          "frames": 168,
+          "frameRate": "100/11",
+          "durationSeconds": 19.28,
+          "audioStreams": 0
+        },
+        "media/videos/sdk-compile.mp4": {
+          "bytes": 204129,
+          "sha256": "30b3d780803a40b8a276a182f7fc3d4768f519b89949531ab226c55d06beb61b",
+          "codec": "h264",
+          "pixFmt": "yuv420p",
+          "width": 1600,
+          "height": 900,
+          "frames": 482,
+          "frameRate": "25/1",
+          "durationSeconds": 19.28,
+          "audioStreams": 0,
+          "faststart": true
+        },
+        "media/stills/sdk-compile.png": {
+          "bytes": 40016,
+          "sha256": "20a9da9c6197efcb35dd4f0aac137fc3375a3377e2e76267fd807298fa5f8e79",
+          "width": 1600,
+          "height": 900,
+          "quantized": true
+        },
+        "media/transcripts/sdk-compile.txt": {
+          "bytes": 1376,
+          "sha256": "1b57cf34d16b9478146acac8d3cf5f91b8788bd4ff14197f240d6f78ff97c971"
+        }
+      },
+      "renderedAt": "2026-10-24T15:04:33.275Z"
+    },
+    "sdk-remote": {
+      "name": "sdk-remote",
+      "sources": {
+        "scripts/media/theme.tape": "cbd76c8daaae01d5de1700b876f11275093cc714573042f5014d8a75217db06e",
+        "scripts/media/sdk-remote.tape": "d513fdacda80e485db492ddf477e7bf4ac413b508f159532d519ef09737ee535",
+        "scripts/media/render.mjs": "8aca349a5337781ec9a0cb0be077863c8033279ef2c16cf8b385bca7a41fc36d",
+        "scripts/media/scenes/sdk-remote/remote.mts": "926876e91b6386c093009b651e66db7993a0487bf3b997b968679d1b69b00ce3",
+        "scripts/media/scenes/sdk-quickstart/package.json": "a2ce14262d6613f4d0c36b0d92d0a8fae9bb14197a7e063b91611b5b0b903ca3"
+      },
+      "readmeFiles": {
+        "hello.nika": "00489ec5d64d0152863d9ed622022c77bf20e81a2c5f302492f0ee0bef63453b"
+      },
+      "preflight": {
+        "healthAfterMs": 228,
+        "health": {
+          "engineVersion": "0.123.0",
+          "machineProtocolVersion": 2,
+          "supportedCapabilities": [
+            "check",
+            "executionSnapshot",
+            "eventStream",
+            "cancel",
+            "jobInputs",
+            "compile",
+            "schedule"
+          ]
+        },
+        "remote": [
+          "served   hello.nika",
+          "check    clean",
+          "job      <job uuid>",
+          "  #1 run.started running",
+          "  #2 run.settled succeeded",
+          "result   succeeded · mock(echo) · Say hello from the Nika SDK.",
+          "verify   verified · sealed (the server's verdict on its own journal)",
+          "retry    the same job: it did not run twice",
+          "bad token 401 unauthorized"
+        ]
+      },
+      "renderSeconds": 80.8,
+      "leftoverServersStopped": [],
+      "terminal": {
+        "rows": 23,
+        "screens": 2,
+        "fullestScreenRows": 14
+      },
+      "screenshots": [
+        "sdk-remote.png"
+      ],
+      "outputs": {
+        "media/gifs/sdk-remote.gif": {
+          "bytes": 351998,
+          "sha256": "497527a6c8daae4e2d39cf568660f6a21e26e3d0aa3bf9a36f91d3d6c87b8f11",
+          "codec": "gif",
+          "pixFmt": "bgra",
+          "width": 1600,
+          "height": 900,
+          "frames": 386,
+          "frameRate": "100/7",
+          "durationSeconds": 28.68,
+          "audioStreams": 0
+        },
+        "media/videos/sdk-remote.mp4": {
+          "bytes": 326289,
+          "sha256": "8989fe33f5edfd742d01c01b96375d70878713a609ef796ddefd43099c0b59d6",
+          "codec": "h264",
+          "pixFmt": "yuv420p",
+          "width": 1600,
+          "height": 900,
+          "frames": 717,
+          "frameRate": "25/1",
+          "durationSeconds": 28.68,
+          "audioStreams": 0,
+          "faststart": true
+        },
+        "media/stills/sdk-remote.png": {
+          "bytes": 31411,
+          "sha256": "37336dcfb5acd896b9f3d26a9a0d0dad8eb3605328415a20625ac64d7bb40b83",
+          "width": 1600,
+          "height": 900,
+          "quantized": true
+        },
+        "media/transcripts/sdk-remote.txt": {
+          "bytes": 1228,
+          "sha256": "a505b5b3c122a45508611fbd1dcea99a4803f7fe037216fefc658f0b8a084c5e"
+        }
+      },
+      "renderedAt": "2026-10-24T15:05:59.192Z"
+    }
+  },
+  "package": {
+    "name": "@supernovae-st/nika",
+    "version": "0.123.0",
+    "registry": "https://registry.npmjs.org/",
+    "resolved": "https://registry.npmjs.org/@supernovae-st/nika/-/nika-0.123.0.tgz",
+    "integrity": "sha512-YZNowuZM9hH6fZEoh6wXq0ishKd8shSqm4jJdYhA3koO5T6Ima3ErRE/MgbK/e97vYK0GZQIvsWVE6d8cjePtg==",
+    "readme": {
+      "file": "@supernovae-st/nika@0.123.0/README.md",
+      "sha256": "6a4df294efa1ad6fe2eddbf3690da3d4a8ddce48f4441615f96805b4edf4af7b",
+      "sameQuickStartPrograms": true
+    },
+    "payload": {
+      "name": "@supernovae-st/nika-darwin-arm64",
+      "version": "0.123.0",
+      "integrity": "sha512-373nxmq70T8N4eA+6bNDLToABpbWr0jynPzegwTvCqf+MkH+N25honP1HX4SJ1RCO/LvH7Yz1ytuKvFwm1tL7g==",
+      "executableSha256": "8332b5b94943285adf25c4951e06cc072aef84cf93e7487276a189726dbe07e8",
+      "matchesIntegrityJson": true,
+      "releaseAsset": {
+        "file": "nika-macos-arm64-0.123.0.tar.gz",
+        "sha256": "237edf76adb71cb787e4908ebd9c545b39071c7968543a09332094aefe0bfc4e"
+      },
+      "source": {
+        "repository": "https://github.com/supernovae-st/nika",
+        "tag": "v0.123.0",
+        "commit": "0bfde3765806cae256d65920b3a67c1cc68b9acd",
+        "releaseAsset": "nika-macos-arm64-0.123.0.tar.gz",
+        "sourceArchive": "https://github.com/supernovae-st/nika/archive/refs/tags/v0.123.0.tar.gz"
+      }
+    },
+    "engine": {
+      "engineVersion": "0.123.0",
+      "buildSha": "0bfde3765",
+      "specSha": "6390b08eb9791ce49c63ee17f8466fab118cadb8",
+      "machineProtocolVersion": 2,
+      "supportedCapabilities": [
+        "check",
+        "executionSnapshot",
+        "eventStream",
+        "trace",
+        "inputsLiteral",
+        "compile",
+        "sessionHost",
+        "sessionIntelligence",
+        "sessionSteering",
+        "sessionQuestion"
+      ]
+    }
+  },
+  "tools": {
+    "vhs": "vhs version 0.11.0",
+    "ttyd": "ttyd version 1.7.7-unknown",
+    "ffmpeg": "ffmpeg version 8.1.1 Copyright (c) 2000-2026 the FFmpeg developers",
+    "gifsicle": "LCDF Gifsicle 1.96",
+    "pngquant": "3.0.3",
+    "node": "v22.22.2",
+    "npm": "10.9.7",
+    "zsh": "zsh 5.9 (arm64-apple-darwin24.0)"
+  },
+  "runner": {
+    "os": "darwin",
+    "arch": "arm64",
+    "release": "24.6.0"
+  },
+  "environment": {
+    "vars": [
+      "HOME",
+      "PATH",
+      "LANG",
+      "TERM",
+      "NIKA_KEYCHAIN",
+      "NPM_CONFIG_UPDATE_NOTIFIER",
+      "NPM_CONFIG_FUND",
+      "NPM_CONFIG_AUDIT"
+    ],
+    "HOME": "a fresh scratch home per render: no key, no config, no npm cache",
+    "PATH": "node, npm, npx, ttyd and ffmpeg links + /usr/bin:/bin:/usr/sbin:/sbin",
+    "stderr": {
+      "route": "exec 2> >(cat), the hidden first line of every tape",
+      "why": "on a terminal, and only when HOME differs from the account home, the engine prints a home-isolation notice that names the scratch HOME",
+      "checked": "on a pseudo-terminal, in fresh homes: with stderr on the terminal, removing that notice leaves exactly what a pipe shows",
+      "commands": [
+        {
+          "command": "nika --version",
+          "noticeLinesHidden": 0,
+          "linesShown": 2
+        },
+        {
+          "command": "nika key init",
+          "noticeLinesHidden": 1,
+          "linesShown": 3
+        },
+        {
+          "command": "nika check hello.nika",
+          "noticeLinesHidden": 1,
+          "linesShown": 26
+        }
+      ]
+    },
+    "model": "mock/echo (offline rehearsal, no key, no network)"
+  },
+  "generatedAt": "2026-10-24T15:05:59.446Z",
+  "motion": {
+    "sdk-doors": {
+      "kind": "illustration",
+      "title": "How the TypeScript SDK runs a workflow: one client, two doors",
+      "captured": "the code lines (this README's quick start, which the capture ran, and its lines 3 and 6 as the capture's remote driver ran them on nika serve), and every event kind, verdict, hash, refusal code and version on screen",
+      "drawn": "the cards, the package column, the lanes, the packets that travel them and the pacing: a run of hello.nika takes milliseconds, the clip 25 seconds",
+      "pipeline": {
+        "repository": "https://github.com/supernovae-st/nika",
+        "path": "scripts/media/motion/intent-to-proof",
+        "commit": "c68e60a5456f7bce57561bd5b3aa66146ff5e575",
+        "clip": {
+          "file": "scripts/media/motion/intent-to-proof/clips/sdk-doors.mjs",
+          "sha256": "54d28bcc8ca0081fdf7561f8d2b62b4e5c17d1798656c03d0da73fc2c91e413f"
+        },
+        "capture": {
+          "file": "scripts/media/capture/sdk-doors.mjs",
+          "sha256": "82d894812d7e888918dc6d7d3fec68ad3abeb71387a9fdbb9ffed96abb02e26c"
+        },
+        "note": "the commit is on the branch of supernovae-st/nika#1824, which adds the sdk-doors clip, its capture scripts, its raw capture and its exports",
+        "checks": "the clip refuses to render when a captured fact changes; strict readability audit passed (29 must-read lines)"
+      },
+      "capture": {
+        "date": "2026-10-24",
+        "package": {
+          "name": "@supernovae-st/nika",
+          "version": "0.123.0",
+          "registry": "https://registry.npmjs.org/",
+          "added": [
+            "nika",
+            "nika-darwin-arm64"
+          ]
+        },
+        "engine": {
+          "versionLine": "nika 0.123.0 (0bfde3765)",
+          "machineProtocolVersion": 2,
+          "specSha": "6390b08eb9791ce49c63ee17f8466fab118cadb8",
+          "payload": "@supernovae-st/nika-darwin-arm64@0.123.0",
+          "payloadSha256": "8332b5b94943285adf25c4951e06cc072aef84cf93e7487276a189726dbe07e8",
+          "payloadMatchesIntegrityJson": true,
+          "release": {
+            "tag": "v0.123.0",
+            "commit": "0bfde3765806cae256d65920b3a67c1cc68b9acd"
+          }
+        },
+        "serve": "nika serve 0.123.0 on a free loopback port, with a 0600 token file that was never printed and the scratch home's signing key",
+        "serverDoor": {
+          "driver": "https://github.com/supernovae-st/nika/blob/c68e60a5456f7bce57561bd5b3aa66146ff5e575/scripts/media/capture/sdk-doors/remote.mts",
+          "lines": [
+            "const nika = new Nika({ url, token, allowInsecureHttp: true });",
+            "const run = await nika.run<{ greeting: string }>('hello.nika', { idempotencyKey });"
+          ],
+          "refusedOverHttp": {
+            "plainHttpWithoutAllowInsecureHttp": "NikaConfigurationError",
+            "maxCostUsd": "NikaCompatibilityError",
+            "runWithoutIdempotencyKey": "NikaConfigurationError"
+          }
+        },
+        "environment": "a scratch HOME, NIKA_KEYCHAIN=off, no *_API_KEY, *_TOKEN or *SECRET* variable",
+        "model": "mock/echo (offline rehearsal, no key, no network)",
+        "readmePrograms": {
+          "hello.nika": "00489ec5d64d0152863d9ed622022c77bf20e81a2c5f302492f0ee0bef63453b",
+          "demo.mts": "9b6a8dc9ae95bed793577abd227f7414d705c82d44f4b0049c04d08049aa9aed",
+          "sameAsThisReadme": true
+        },
+        "raw": {
+          "media/raw/sdk-doors-versions.json": "f22f5c64e40590f201c3f37114245f39cfe5b4d25159a31c97355df84cda4c4c",
+          "media/raw/sdk-doors-local.json": "c1ee256cebbee9915f3e0a9f425fecff3eb60ee83906a80c28b9b04a41bfe252",
+          "media/raw/sdk-doors-remote.json": "8e461007e883cf91c0af7c8fd5e554f1f9d4bde933f1163212b79441b1c02a63",
+          "media/raw/sdk-doors-check.txt": "5048ad5d76312e2db64b5a720350219cdf0e0e1b2fb853b8abd6c81feb32220d",
+          "media/raw/sdk-doors-check-red.txt": "c1ef0b711f4ecf7d9f22090016057be429a40c4c344642835daa4d986cd2a16c",
+          "media/raw/sdk-doors-list-files.nika": "04424095f94e26fc6a1af98ebc52f5be75b9fff82c29a6777406ed7d5b89bf7e"
+        }
+      },
+      "outputs": {
+        "media/gifs/sdk-doors.gif": {
+          "bytes": 2830731,
+          "sha256": "61b66faac7ddf772acf305e563134c5a7b061f5e94e2f7d32fb0df1542336687",
+          "engineRepositoryName": "media/gifs/sdk-doors.optimized.gif",
+          "codec": "gif",
+          "pixFmt": "bgra",
+          "width": 960,
+          "height": 540,
+          "frames": 300,
+          "frameRate": "25/2",
+          "durationSeconds": 25,
+          "audioStreams": 0
+        },
+        "media/videos/sdk-doors.mp4": {
+          "bytes": 2175129,
+          "sha256": "02e47ca7d8ecc4fdc35c919516a4051d2c5606c530479abf29424a96ef8d8147",
+          "engineRepositoryName": "media/videos/sdk-doors.mp4",
+          "codec": "h264",
+          "pixFmt": "yuv420p",
+          "width": 1600,
+          "height": 900,
+          "frames": 750,
+          "frameRate": "30/1",
+          "durationSeconds": 25,
+          "audioStreams": 0,
+          "faststart": true
+        },
+        "media/stills/sdk-doors.png": {
+          "bytes": 586416,
+          "sha256": "6ceb9326210496858a982fe2ffa38264f94f3c881b792559bf52eff7fb8ad18e",
+          "engineRepositoryName": "media/posters/sdk-doors.png",
+          "width": 1600,
+          "height": 900,
+          "frame": "the settled last frame, at 24.3 s"
+        }
+      }
+    }
+  }
+}

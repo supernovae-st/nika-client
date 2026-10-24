@@ -11,7 +11,9 @@ export class NikaEngineUnavailable extends NikaError {
     const target = `${platform}-${arch}`;
     const detail = packageName
       ? `the optional payload ${packageName} is not installed `
-        + '(npm leaves it UNMET OPTIONAL when the registry has no version matching this client)'
+        + '(npm leaves it UNMET OPTIONAL when this Node.js is older than its engines '
+        + 'range, >=22, when optional dependencies were omitted, or when the registry '
+        + 'has no version matching this client)'
       : 'there is no packaged payload for this host';
     super(
       `Nika engine unavailable for ${target}: ${detail}. `

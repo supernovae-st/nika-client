@@ -1,5 +1,9 @@
 # Migrating to 0.116
 
+> This guide is history: it maps the 0.115 clients onto the one `Nika` class
+> that 0.116 introduced. Moving from 0.120.x to the current 0.123.0 is
+> [upgrading-to-0.123.md](upgrading-to-0.123.md).
+
 Version 0.116 is an intentional breaking consolidation of the two published
 0.115 clients into one `Nika` facade. This is a 0.x minor release, but existing
 0.115 imports and method calls do not all remain source-compatible. Migrate in
@@ -70,19 +74,17 @@ with `run.done` kept as the alias of `run.result()`. The `nika.events(run)`,
 `nika.cancel(run)` and `nika.status(run)` forms this guide shows still work
 unchanged as deprecated wrappers, and `nika.events(run)` still yields the
 protocol vocabulary; `run.events()` yields one lifecycle vocabulary on both
-transports with that frame on `event.raw`. The wrappers stay for one release
-train counted from the first published train that carries the new API, with
-no version or date fixed; "Migrating to the Run-owned lifecycle" in the
-README defines that window.
+transports with that frame on `event.raw`. The wrappers stay through the 0.123
+maintenance line; "Migrating to the Run-owned lifecycle" in
+[runs.md](runs.md#migrating-to-the-run-owned-lifecycle) describes them.
 
 The client-level methods reject a look-alike object and a run from another
 client, so persist the job id and reattach after a process restart instead of
 rebuilding a handle by hand.
 
-`LocalNika.version()`, `dryRunPlan()`, and `test()` have no One SDK method in
-0.116. Keep those CLI-facing probes in deployment/CI (`nika --version`,
-`nika run --dry-run --json`, and `nika test`) until a future typed authority is
-explicitly admitted. This release does not silently emulate them.
+`LocalNika.version()`, `dryRunPlan()`, and `test()` have no One SDK method.
+Keep those CLI-facing probes in deployment/CI (`nika --version`,
+`nika run --dry-run --json`, and `nika test`); the SDK does not emulate them.
 
 ## The check report changed shape
 

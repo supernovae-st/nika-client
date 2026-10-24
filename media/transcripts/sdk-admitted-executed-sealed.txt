@@ -1,0 +1,55 @@
+$ cat list-files.nika                          # a teammate's file: runs ls, permits nothing
+nika: list-files
+model: mock/echo
+permits: {}
+tasks:
+  list:
+    exec:
+      command: ["ls", "-1"]
+outputs:
+  files: ${{ tasks.list.output }}
+$ node gate.mts list-files.nika
+check  refused · exit 2
+       NIKA-SEC-004
+       exec task under a boundary that forbids shells (task `list`) — fix: add "ls" to permits.exec
+run    not started · NIKA-SEC-004 · no run, no events, no trace
+$
+
+── screen cleared ──
+
+$ diff -u list-files.nika fixed/list-files.nika
+--- list-files.nika     2026-10-24 19:02:08
++++ fixed/list-files.nika       2026-10-24 19:02:08
+@@ -1,6 +1,7 @@
+ nika: list-files
+ model: mock/echo
+-permits: {}
++permits:
++  exec: [ls]
+ tasks:
+   list:
+     exec:
+$ node gate.mts fixed/list-files.nika
+check  clean · exit 0
+run    succeeded · 10 entries listed
+$
+
+── screen cleared ──
+
+$ node prove.mts                     # this machine has no signing key yet
+run      succeeded · mock(echo) · Say hello from the Nika SDK.
+receipt  sealed false · 5 events · head 0135b1202a1d…
+verify   not verified · invalid · receipt_mismatch
+$ NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init   # quick start, step 1
+run-signing key minted · fingerprint 847bf18789d52318
+  every run on this machine now seals its journal (verify: nika trace verify <file>)
+$ node prove.mts
+run      succeeded · mock(echo) · Say hello from the Nika SDK.
+receipt  sealed true · 6 events · head b69360abfef1…
+verify   verified
+$ node tamper.mts
+changed one byte on line 4 of .nika/traces/2026-10-24T15-02-41Z-7b95.ndjson
+$ node verify.mts                             # later, from the receipt you stored
+verify   not verified · invalid
+engine   BROKEN at line 5 — recorded chain bb6c5faae667604f · computed fe7aa85e4fead3cc
+$

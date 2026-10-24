@@ -1,0 +1,29 @@
+$ test -f nika.yaml || printf 'nika: my-project\n' > nika.yaml
+$ mkdir -p .nika && (umask 077 && openssl rand -hex 24 > .nika/serve.token)
+$ printf '.nika/\n' >> .gitignore        # traces, job state and the token stay out of git
+$ NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init   # the server signs each job's record
+run-signing key minted · fingerprint 9d7d19293f10bb9a
+  every run on this machine now seals its journal (verify: nika trace verify <file>)
+$ ./node_modules/.bin/nika serve --bind 127.0.0.1:8787 --workflows . --token-file .nika/serve.token > serve.log
+2>&1 &
+[1] 77688
+$ curl -s 127.0.0.1:8787/health | jq -c '{engineVersion, machineProtocolVersion}'
+{"engineVersion":"0.123.0","machineProtocolVersion":2}
+$
+
+── screen cleared ──
+
+$ node remote.mts
+served   hello.nika
+check    clean
+job      67da7ec9-eba2-4a2f-ad8c-62faab9166d5
+  #1 run.started running
+  #2 run.settled succeeded
+result   succeeded · mock(echo) · Say hello from the Nika SDK.
+verify   verified · sealed (the server's verdict on its own journal)
+retry    the same job: it did not run twice
+bad token 401 unauthorized
+$ kill %1
+$
+[1]  + done       ./node_modules/.bin/nika serve --bind 127.0.0.1:8787 --workflows .   >  2>&1
+$

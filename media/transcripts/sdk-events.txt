@@ -1,0 +1,52 @@
+$ ./node_modules/.bin/nika check brief.nika | head -n 5
+nika check · brief.nika
+ ✔ PLAN     3 waves · 4 tasks · max parallelism 2
+      wave 1 audience (infer · mock/echo) · risks (infer · mock/echo)
+      wave 2 review (invoke · nika:wait)
+      wave 3 brief (infer · mock/echo)
+$
+
+── screen cleared ──
+
+$ cat watch.mts
+import { Nika } from '@supernovae-st/nika';
+
+const nika = new Nika({ cwd: process.cwd() });
+const run = await nika.run<{ brief: string }>('brief.nika', { maxCostUsd: 0 });
+
+// One lifecycle vocabulary; the engine's own frame stays on event.raw.
+const t0 = performance.now();
+for await (const event of run.events()) {
+  const at = ((performance.now() - t0) / 1000).toFixed(1).padStart(4);
+  const frame = event.kind === 'engine.event' ? `(${event.raw.kind})` : '';
+  console.log(`${at}s  ${event.kind.padEnd(15)} ${event.task ?? ''}${event.status ?? ''}${frame}`);
+}
+
+// Events are observation; result() is the terminal truth.
+const { status, settlement } = await run.result();
+const tasks = settlement?.tasks;
+console.log(`\nresult  ${status} · cause ${settlement?.cause} · ${tasks?.ok}/${tasks?.total} tasks ok`);
+$
+
+── screen cleared ──
+
+$ node watch.mts
+ 0.0s  run.started
+ 0.0s  task.scheduled  audience
+ 0.0s  task.scheduled  risks
+ 0.0s  task.scheduled  review
+ 0.0s  task.scheduled  brief
+ 0.0s  task.started    audience
+ 0.0s  task.completed  audience
+ 0.0s  task.started    risks
+ 0.0s  task.completed  risks
+ 2.0s  task.started    review
+ 2.0s  engine.event    (permit_checked)
+ 2.0s  task.completed  review
+ 2.0s  task.started    brief
+ 2.0s  task.completed  brief
+ 2.0s  engine.event    (workflow_completed)
+ 2.1s  run.settled     succeeded
+
+result  succeeded · cause normal · 4/4 tasks ok
+$

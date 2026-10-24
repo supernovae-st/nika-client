@@ -216,6 +216,13 @@ try {
   // engine (compile, answer from a JSON file, materialize, run).
   const COMPILE_EXAMPLE = 'compile-then-run.mts';
   await copyFile(path.join(root, 'examples', 'compile-then-run.ts'), path.join(consumer, COMPILE_EXAMPLE));
+  // The other documented programs, verbatim from examples/ (the README quick
+  // start among them): typechecked below against the packed types. They need a
+  // real engine or a server to run, which the gauntlets and docs/testing.md own.
+  const TYPED_EXAMPLES = ['quick-start', 'watch-and-cancel', 'server-recovery'].map((name) => `${name}.mts`);
+  for (const example of TYPED_EXAMPLES) {
+    await copyFile(path.join(root, 'examples', example.replace(/\.mts$/, '.ts')), path.join(consumer, example));
+  }
   if (process.platform !== 'win32') {
     const exampleLog = path.join(scratch, 'example.argv');
     await writeFile(path.join(consumer, 'answers.json'), '{"const.request":"An outage affects support customers."}\n');
@@ -376,6 +383,7 @@ try {
     'lifecycle-app.mts',
     'lifecycle-app.cts',
     COMPILE_EXAMPLE,
+    ...TYPED_EXAMPLES,
   ], { cwd: consumer });
 
   process.stdout.write(

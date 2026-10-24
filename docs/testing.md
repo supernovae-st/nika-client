@@ -43,7 +43,8 @@ and sealed-trace claims are exercised against the public binary. The
 cancellation fixtures cancel an execution that is observably inside its 10 s
 `nika:wait` (the durable status reads `running`, no longer `queued`, and a
 further delay has passed) and record both the cancel reply and the terminal it
-leads to. On engine 0.118 the resident answers 202 `cancellation_requested`;
+leads to. Since engine 0.118, and in the 0.123.0 replay, the resident answers
+202 `cancellation_requested`;
 its execution owner then records `execution.interrupted` with
 `status=interrupted` once the grace expires inside a task, or, when the request
 lands at a task boundary, `execution.cancelled` (the `cancel_job` writer) or
@@ -91,8 +92,10 @@ was originally written.
    `test/engine-0123-wire.test.ts` decodes bytes recorded from a real 0.123
    engine and the released 0.122.0 identity, hermetically, in `npm test`.
 
-The latest public-only first-contact wave and its convergent debt are recorded
-in [`gauntlet/personas/REPORT.md`](../gauntlet/personas/REPORT.md).
+The last public-only first-contact wave (2026-09-01, on the 0.115 client and
+engine 0.116.2) and its convergent debt are recorded in
+[`gauntlet/personas/REPORT.md`](https://github.com/supernovae-st/nika-client/blob/main/gauntlet/personas/REPORT.md); it predates
+the current API, and no persona wave has run on 0.123.0.
 
 ## Socratic risk matrix
 
@@ -193,7 +196,17 @@ them. Never relabel an old binary or weaken the replay comparison.
 Hermetic compile cases run with `npm test`, including strict request literals,
 capability/version refusal, native exit and signal laws, temporary-file failure
 cleanup, authenticated HTTP responses and cancellation. `npm run check:package-surface`
-checks both packed module faces and their public TypeScript contracts.
+checks both packed module faces and their public TypeScript contracts, runs
+`examples/compile-then-run.ts` from the tarball against a fixture engine, and
+typechecks every program under `examples/` against the packed types.
+`test/readme-surface.test.ts` holds the README's quick start byte for byte to
+`examples/quick-start.ts`. It also holds every media path the README and
+`docs/` use to a file committed under `media/` and recorded byte for byte in
+`media/media-sources.json`, requires every committed media file to be used,
+and requires alt text on every image and a reduced-motion still for every GIF.
+`node scripts/media/validate.mjs --typecheck` checks the recordings themselves
+against their tapes, budgets and transcripts; it needs the render tools listed
+in [media/README.md](https://github.com/supernovae-st/nika-client/blob/main/media/README.md).
 
 For a frozen engine that advertises `compile` on both native and Serve doors:
 
@@ -209,13 +222,14 @@ round trips, incomplete questions, refused expression islands, invalid bases,
 authentication, no project-file changes and no created jobs. HTTP is given a
 nonexistent local engine path, proving that it cannot use a fallback. The report
 records binary and package hashes and is green only after owned-process cleanup.
-A source binary containing engine commit
-`4334e58bddf539a6253f448eb05d562b6919f2b7` is required for both doors.
-Released engine 0.120.3 supports native compile and its Serve advertises HTTP
-compile; 0.120.2 and older predate the route. This is a foundation test, not general intent authoring
-or execution admission qualification.
+The script needs a 0.123 engine (machine protocol 2), which advertises
+`compile` on both doors; this package refuses older engines at identity. The
+route itself first shipped with engine commit
+`4334e58bddf539a6253f448eb05d562b6919f2b7`, in release 0.120.3. This is a
+foundation test, not general intent authoring or execution admission
+qualification.
 
-The [2026-09-19 source-build receipt](../evidence/compile-4334e58b-20260919.json)
+The [2026-09-19 source-build receipt](https://github.com/supernovae-st/nika-client/blob/main/evidence/compile-4334e58b-20260919.json)
 records 14 cases across both doors and both module systems at that producer,
 with exact outcome parity and no resident-state or project-file mutation. Its
 engine is a clean source build predating the published v0.120.3 binary; its SDK

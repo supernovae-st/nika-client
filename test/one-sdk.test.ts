@@ -830,16 +830,25 @@ describe('HTTP transport', () => {
       verdict: 'unavailable',
       reason: 'trace_journal_unavailable',
     });
+    // The words the 0.123.0 resident and the native verifier write, lower case,
+    // and still open to additive vocabulary.
     expectTypeOf(verdict.verdict).toEqualTypeOf<
       | 'verified'
       | 'invalid'
       | 'unavailable'
-      | 'OK'
-      | 'SEALED'
-      | 'ANCHORED'
-      | 'REPLAYED'
-      | 'INCOMPLETE'
-      | 'TAMPERED'
+      | 'ok'
+      | 'sealed'
+      | 'anchored'
+      | 'replayed'
+      | 'incomplete'
+      | 'tampered'
+      | 'broken'
+      | 'unchained'
+      | 'empty'
+      | 'unreadable'
+      | 'refused'
+      | 'line-over-long'
+      | 'unknown'
       | (string & {})
       | undefined
     >();
@@ -848,6 +857,8 @@ describe('HTTP transport', () => {
       | 'receipt_mismatch'
       | 'run_not_terminal'
       | 'trace_journal_unavailable'
+      | 'sealed'
+      | 'unsealed'
       | (string & {})
       | undefined
     >();

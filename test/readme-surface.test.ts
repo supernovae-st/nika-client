@@ -1,8 +1,15 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
+const repo = (path: string) => new URL(`../${path}`, import.meta.url);
 const readme = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
-const mediaScript = readFileSync(new URL('../scripts/media/render.sh', import.meta.url), 'utf8');
+// The programs the recordings run and the script that renders them are public surfaces too.
+const mediaScripts = [
+  'scripts/media/render.mjs',
+  ...readdirSync(repo('scripts/media/scenes'), { recursive: true, encoding: 'utf8' })
+    .filter((file) => file.endsWith('.mts'))
+    .map((file) => `scripts/media/scenes/${file}`),
+].map((file) => readFileSync(repo(file), 'utf8'));
 const manifest = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
 ) as { exports?: Record<string, unknown> };
@@ -110,7 +117,7 @@ describe('packed public documentation', () => {
   });
 
   it('does not regress to removed APIs or claim a webhook verifier', () => {
-    for (const publicSurface of [...shipped, mediaScript]) {
+    for (const publicSurface of [...shipped, ...mediaScripts]) {
       expect(publicSurface).not.toContain("from '@supernovae-st/nika/local'");
       expect(publicSurface).not.toContain('new LocalNika');
       expect(publicSurface).not.toContain('runToEnd(');

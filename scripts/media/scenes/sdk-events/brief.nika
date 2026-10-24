@@ -1,0 +1,31 @@
+nika: launch-brief
+model: mock/echo
+permits:
+  tools: [nika:wait]
+tasks:
+  audience:
+    infer:
+      prompt: "Who is this launch for?"
+      max_tokens: 32
+  risks:
+    infer:
+      prompt: "What could go wrong on launch day?"
+      max_tokens: 32
+  review:
+    with:
+      audience: ${{ tasks.audience.output }}
+      risks: ${{ tasks.risks.output }}
+    invoke:
+      tool: nika:wait
+      args:
+        duration: "2s"
+  brief:
+    with:
+      audience: ${{ tasks.audience.output }}
+      risks: ${{ tasks.risks.output }}
+      reviewed: ${{ tasks.review.output }}
+    infer:
+      prompt: "Write a one-line brief for ${{ with.audience }} that names ${{ with.risks }}"
+      max_tokens: 64
+outputs:
+  brief: ${{ tasks.brief.output }}

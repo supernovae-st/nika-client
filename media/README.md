@@ -72,21 +72,21 @@ is an animated diagram of how the package runs a workflow through either door
   engine `nika 0.123.0 (0bfde3765)`, and `nika serve` 0.123.0 on a loopback
   port with a `0600` token file that was never printed, in a scratch `HOME`
   with `NIKA_KEYCHAIN=off`, running `mock/echo`. `demo.mts` and `hello.nika`
-  on screen are this README's, byte for byte, and line 3 is edited to the
-  remote constructor and back.
+  on screen are the repository README's quick start, byte for byte, and
+  line 3 is edited to the remote constructor and back.
 - **Drawn:** the cards, the package column, the lanes, the packets that travel
   them and the pacing. A run of `hello.nika` takes milliseconds; the clip
   takes 25 seconds and shows the two doors side by side, where the capture
   ran them one after the other.
 - **Rendered by** the engine repository's motion pipeline
   ([`scripts/media/motion/intent-to-proof`](https://github.com/supernovae-st/nika/tree/752d4446fb0701c888e0468e17b5191666c2e76f/scripts/media/motion/intent-to-proof),
-  at `752d4446`), which refuses to render when a captured fact changes, and
-  passed its strict readability audit. The clip and its capture script were
-  added to that checkout for the render; `media-sources.json` records their
-  hashes and the capture's. This repository keeps the outputs only:
-  the GIF is 960×540 at 12.5 frames per second (its code is texture at that
-  size), the MP4 is 1600×900 at 30, with readable code, and the still is the
-  settled last frame.
+  at `752d4446`), which refuses to render when a captured fact changes; the
+  render passed the pipeline's strict readability audit. The clip and its
+  capture script were added to that checkout for the render, and
+  `media-sources.json` records their hashes and the capture's. This
+  repository keeps the outputs only: the GIF is 960×540 at 12.5 frames per
+  second (its code is texture at that size), the MP4 is 1600×900 at 30, with
+  readable code, and the still is the settled last frame.
 
 ## Render and check
 

@@ -26,7 +26,6 @@ interface Checkpoint {
 }
 
 const STATE = 'recovery.json';
-const SEALED_VERDICTS = ['sealed', 'anchored', 'replayed'];
 
 const [command, workflow = 'wait.nika'] = process.argv.slice(2);
 const url = process.env.NIKA_URL;
@@ -84,6 +83,7 @@ if (result.receipt) {
   // Over HTTP, read `verified` first: `verdict` is the server's word on the job's
   // journal and does not say that this receipt matches it.
   const proof = await nika.traceVerify(result.receipt);
-  const sealed = proof.verified && SEALED_VERDICTS.includes(String(proof.verdict));
+  // The sealed check the README and docs/receipts.md teach (`verdict` is optional).
+  const sealed = proof.verified && ['sealed', 'anchored', 'replayed'].includes(proof.verdict ?? '');
   console.log(`trace · verified ${proof.verified} · ${proof.verdict} (${proof.reason}) · sealed ${sealed}`);
 }

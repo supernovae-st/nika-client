@@ -76,7 +76,7 @@ package refuses as a protocol error.
   posts a provider round without a deadline through `node:http`, so Node's
   built-in `fetch` header timeout no longer cuts it short.
 
-The full list is in the [changelog](../CHANGELOG.md). The engine's own
+The full list is in the [changelog](https://github.com/supernovae-st/nika-client/blob/main/CHANGELOG.md). The engine's own
 changes are in its [release notes](https://github.com/supernovae-st/nika/releases/tag/v0.123.0),
 and what 0.123 does not do yet is on the
 [known limits](https://docs.nika.sh/changelog/known-limits) page.

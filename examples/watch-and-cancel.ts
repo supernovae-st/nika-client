@@ -4,10 +4,12 @@
  *   npm run build                       # the example imports the package by name
  *   cd examples && node watch-and-cancel.ts [workflow] [cancel-after-ms]
  *
- * Runs `wait.nika` (a five-second `nika:wait`) on the bundled engine, prints
- * each lifecycle event with the time it arrived, asks the engine to cancel
- * after 1000 ms (or when you press Ctrl+C), then prints the result the engine
- * settled. Node 22.18+ runs this file as is.
+ * Runs `wait.nika` (two three-second `nika:wait` tasks, one after the other)
+ * on the bundled engine, prints each lifecycle event with the time it arrived,
+ * asks the engine to cancel after 1000 ms (or when you press Ctrl+C), then
+ * prints the result the engine settled: the first task finishes, the second
+ * never starts, and the run settles `cancelled`. Node 22.18+ runs this file
+ * as is.
  *
  * The same code drives a `nika serve` when NIKA_URL and NIKA_TOKEN are set
  * (the workflow is then a name the server serves, and the run needs an

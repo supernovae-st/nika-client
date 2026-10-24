@@ -40,7 +40,7 @@ Measured on engine 0.123.0 with the quick-start file:
 > receipt you passed does not match that journal, and then `verified` is
 > `false` (measured on 0.123.0 with a receipt whose `trace_id` was changed).
 > Treat a job as sealed only when
-> `proof.verified && ['sealed', 'anchored', 'replayed'].includes(proof.verdict)`;
+> `proof.verified && ['sealed', 'anchored', 'replayed'].includes(proof.verdict ?? '')`;
 > `verified: true` with `verdict: 'ok'` means intact but unsigned.
 
 > [!IMPORTANT]
@@ -70,11 +70,11 @@ not the number of `run.events()`.
 
 <p align="center">
   <picture>
-    <source media="(prefers-reduced-motion: reduce)" srcset="../media/stills/sdk-admitted-executed-sealed.png">
-    <img src="../media/gifs/sdk-admitted-executed-sealed.gif" alt="node gate.mts on a workflow that runs ls under permits: {} prints check refused · exit 2 and NIKA-SEC-004, then run not started: no run, no events, no trace; a one-line permits fix checks clean and runs. node prove.mts with no signing key prints receipt sealed false · 5 events and not verified · invalid · receipt_mismatch; after NIKA_KEYCHAIN=off nika key init it prints sealed true · 6 events and verified. node tamper.mts changes one byte on line 4 of the trace, and node verify.mts prints not verified · invalid and engine BROKEN at line 5" width="860">
+    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/media/stills/sdk-admitted-executed-sealed.png">
+    <img src="https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/media/gifs/sdk-admitted-executed-sealed.gif" alt="node gate.mts on a workflow that runs ls under permits: {} prints check refused · exit 2 and NIKA-SEC-004, then run not started: no run, no events, no trace; a one-line permits fix checks clean and runs. node prove.mts with no signing key prints receipt sealed false · 5 events and not verified · invalid · receipt_mismatch; after NIKA_KEYCHAIN=off nika key init it prints sealed true · 6 events and verified. node tamper.mts changes one byte on line 4 of the trace, and node verify.mts prints not verified · invalid and engine BROKEN at line 5" width="860">
   </picture>
 </p>
-<p align="center"><sub>Admitted: <code>check()</code> and <code>run()</code> refuse the file and no run exists. Executed, not sealed: with no key the run succeeds and the receipt reads <code>sealed false</code> over 5 journal entries. Sealed: after <code>NIKA_KEYCHAIN=off nika key init</code> the next run of the same file has 6, the last one <code>run_sealed</code>, and verifies. Then one changed byte, and the stored receipt fails: <code>BROKEN at line 5</code>. Recorded from <code>@supernovae-st/nika</code> 0.123.0 and its bundled engine; the runs are <code>mock/echo</code> rehearsals.<br>▶ <a href="../media/videos/sdk-admitted-executed-sealed.mp4?raw=true">MP4</a> · <a href="../media/transcripts/sdk-admitted-executed-sealed.txt">transcript</a> · <a href="../scripts/media/scenes/sdk-admitted-executed-sealed">the programs it runs</a></sub></p>
+<p align="center"><sub>Admitted: <code>check()</code> and <code>run()</code> refuse the file and no run exists. Executed, not sealed: with no key the run succeeds and the receipt reads <code>sealed false</code> over 5 journal entries. Sealed: after <code>NIKA_KEYCHAIN=off nika key init</code> the next run of the same file has 6, the last one <code>run_sealed</code>, and verifies. Then one changed byte, and the stored receipt fails: <code>BROKEN at line 5</code>. Recorded from <code>@supernovae-st/nika</code> 0.123.0 and its bundled engine; the runs are <code>mock/echo</code> rehearsals.<br>▶ <a href="https://github.com/supernovae-st/nika-client/blob/main/media/videos/sdk-admitted-executed-sealed.mp4?raw=true">MP4</a> · <a href="https://github.com/supernovae-st/nika-client/blob/main/media/transcripts/sdk-admitted-executed-sealed.txt">transcript</a> · <a href="https://github.com/supernovae-st/nika-client/tree/main/scripts/media/scenes/sdk-admitted-executed-sealed">the programs it runs</a></sub></p>
 
 ## What a receipt carries
 
@@ -96,36 +96,52 @@ git and treat traces as application data.
 Run-signing keys belong to the engine. `nika key init` mints one,
 `nika key trust` prints its public key and fingerprint to enroll on other
 machines, `nika key rotate` retires it and mints a new one (records signed
-with a retired key stay verifiable), and `nika key align` copies a keychain
-key to the files the other processes read.
+with a retired key stay verifiable), and, on Linux, `nika key align` copies a
+Secret Service key to the files the other processes read.
 
-Which key a process signs with depends on the process:
+Which key a process signs with depends on the process and, for `nika` run
+from a terminal, on the platform. Engine 0.123.0:
 
 | Process | Opens an OS keychain? | Signs with, in this order |
 |---|---|---|
-| `nika` run from a terminal | yes, when one is available: the macOS keychain (for a Developer ID signed release, which the npm payload is) or a Secret Service keyring on a Linux desktop | `NIKA_RUN_KEY_FILE` + `NIKA_RUN_PUB_FILE`, the keychain, then `~/.nika/keys/` |
+| `nika` run from a terminal, on macOS | no: 0.123.0 does not open the keychain on macOS, even from a terminal (`nika doctor` says `the keychain is not opened by this ad-hoc build`) | `NIKA_RUN_KEY_FILE` + `NIKA_RUN_PUB_FILE`, then `~/.nika/keys/` |
+| `nika` run from a terminal, on Linux | yes: the desktop's Secret Service, when one answers | `NIKA_RUN_KEY_FILE` + `NIKA_RUN_PUB_FILE`, the Secret Service, then `~/.nika/keys/` |
 | the engine your app starts (`new Nika()`) | never: it has no terminal | `NIKA_RUN_KEY_FILE` + `NIKA_RUN_PUB_FILE`, then `~/.nika/keys/` |
 | `nika serve` | never | `NIKA_RUN_KEY_FILE` + `NIKA_RUN_PUB_FILE`, then `~/.nika/keys/` |
 
-So the key your app's runs use must be a file:
+So the key your app's runs use must be a file, and `NIKA_KEYCHAIN=off` makes
+one on every platform:
 
 - **A new machine.** `NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init`
   writes the key to `~/.nika/keys/` (mode `0600`), where every process reads
   it.
-- **A key already in the keychain.** `nika key init` run from a terminal
-  stores the key in the keychain when one is available, and nowhere else; a
-  second `nika key init` refuses to replace it. Run
+- **Without the variable, on Linux.** From a terminal, `nika key init`
+  refuses with `run-signing key material already exists`, even on a new
+  machine: off macOS the engine cannot see whether the keychain already holds
+  a run-key, so it never risks replacing one. On a desktop,
+  `nika key init --force` then stores the key in the Secret Service only,
+  where your app's engine and `nika serve` never look. To repair that, run
   `./node_modules/.bin/nika key align` once from a terminal: it copies the
-  keychain key to `~/.nika/keys/`, retiring any other file key it replaces, so
-  the CLI, your app and `nika serve` sign with one key.
+  Secret Service key to `~/.nika/keys/`, retiring any other file key it
+  replaces, so the CLI, your app and `nika serve` sign with one key.
+- **Without the variable, on macOS.** `nika key init` from a terminal writes
+  the files too, unless the keychain holds a run-key that Nika 0.122 or older
+  stored there. Then it refuses, and the repair it names, `nika key align`,
+  cannot succeed with 0.123.0, which can neither read nor copy that key: it
+  exits with `this process does not open the keychain`. The variable skips
+  the keychain check and mints a new key as files, a new signing identity
+  beside the old keychain key.
 - **CI and servers.** Give the engine an explicit pair through
   `NIKA_RUN_KEY_FILE` and `NIKA_RUN_PUB_FILE`; `nika key init` with those two
   variables set writes the pair there.
+- **Rotation.** `NIKA_KEYCHAIN=off nika key rotate` retires the file key to
+  `~/.nika/keys/retired.pub` and writes the next one as files. Without the
+  variable, on a Linux desktop terminal, the new key would go to the Secret
+  Service, and your app would keep signing with the old file key.
 - **Check it.** `nika doctor` prints a `run-key` line for the process that
-  runs it. From a terminal that is the keychain's view; to see what the
-  engine your app starts sees, take the terminal away:
-  `./node_modules/.bin/nika doctor 2>&1 | cat` names the key file it signs
-  with, or says `none · runs stay unsigned`.
+  runs it. To see what the engine your app starts sees, take the terminal
+  away: `./node_modules/.bin/nika doctor 2>&1 | cat` names the key file it
+  signs with, or says `none · runs stay unsigned`.
 
 `NIKA_KEYCHAIN=off` skips only the keychain; the file and explicit-pair paths
 stay. Store receipts and public trust material in your app. Never copy a

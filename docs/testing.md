@@ -94,7 +94,7 @@ was originally written.
 
 The last public-only first-contact wave (2026-09-01, on the 0.115 client and
 engine 0.116.2) and its convergent debt are recorded in
-[`gauntlet/personas/REPORT.md`](../gauntlet/personas/REPORT.md); it predates
+[`gauntlet/personas/REPORT.md`](https://github.com/supernovae-st/nika-client/blob/main/gauntlet/personas/REPORT.md); it predates
 the current API, and no persona wave has run on 0.123.0.
 
 ## Socratic risk matrix
@@ -206,7 +206,7 @@ typechecks every program under `examples/` against the packed types.
 and requires alt text on every image and a reduced-motion still for every GIF.
 `node scripts/media/validate.mjs --typecheck` checks the recordings themselves
 against their tapes, budgets and transcripts; it needs the render tools listed
-in [media/README.md](../media/README.md).
+in [media/README.md](https://github.com/supernovae-st/nika-client/blob/main/media/README.md).
 
 For a frozen engine that advertises `compile` on both native and Serve doors:
 
@@ -229,7 +229,7 @@ route itself first shipped with engine commit
 foundation test, not general intent authoring or execution admission
 qualification.
 
-The [2026-09-19 source-build receipt](../evidence/compile-4334e58b-20260919.json)
+The [2026-09-19 source-build receipt](https://github.com/supernovae-st/nika-client/blob/main/evidence/compile-4334e58b-20260919.json)
 records 14 cases across both doors and both module systems at that producer,
 with exact outcome parity and no resident-state or project-file mutation. Its
 engine is a clean source build predating the published v0.120.3 binary; its SDK

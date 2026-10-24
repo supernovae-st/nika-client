@@ -1,7 +1,9 @@
 # @supernovae-st/nika documentation
 
 These pages ship inside the npm package (`node_modules/@supernovae-st/nika/docs/`)
-and describe the version you installed. Start with the
+and describe the version you installed. Their links to files the package does
+not ship (recordings, examples, scripts, the changelog) open the repository on
+GitHub. Start with the
 [README](../README.md): install, a first run, what happens underneath and the
 two doors. Then read the page for what you are building.
 
@@ -32,21 +34,21 @@ Five terminal recordings of the published 0.123.0 package and the engine it
 bundles, each run in a fresh project with `mock/echo` (no model key), and one
 illustration. Each comes as a GIF, an MP4 you can pause, and a text
 transcript. They live in the GitHub repository, not in the npm package.
-[media/README.md](../media/README.md) says how they are made and checked, and
+[media/README.md](https://github.com/supernovae-st/nika-client/blob/main/media/README.md) says how they are made and checked, and
 what the illustration draws.
 
 | Watch | What it shows | Where it is explained |
 |---|---|---|
-| [The quick start](../media/gifs/sdk-quickstart.gif) · [MP4](../media/videos/sdk-quickstart.mp4?raw=true) · [transcript](../media/transcripts/sdk-quickstart.txt) | The install, the signing key, `run()`, a typed result, a verified receipt | [README](../README.md#quick-start) |
-| [Two doors](../media/gifs/sdk-doors.gif) · [MP4](../media/videos/sdk-doors.mp4?raw=true) (illustration) | One call through the package to the bundled engine or to `nika serve`: check, run, events, seal, verify | [README](../README.md#what-happens-underneath) |
-| [Three facts](../media/gifs/sdk-admitted-executed-sealed.gif) · [MP4](../media/videos/sdk-admitted-executed-sealed.mp4?raw=true) · [transcript](../media/transcripts/sdk-admitted-executed-sealed.txt) | A refused file that never runs, an unsealed run, a sealed one, one changed byte | [receipts.md](receipts.md#admitted-executed-sealed-three-different-facts) |
-| [Events](../media/gifs/sdk-events.gif) · [MP4](../media/videos/sdk-events.mp4?raw=true) · [transcript](../media/transcripts/sdk-events.txt) | `run.events()` for a four-task run, then `result()` | [runs.md](runs.md#watch-a-run-runevents) |
-| [Compile](../media/gifs/sdk-compile.gif) · [MP4](../media/videos/sdk-compile.mp4?raw=true) · [transcript](../media/transcripts/sdk-compile.txt) | A sentence to a ready candidate in two rounds, with no model call | [compile.md](compile.md#start-here-no-model-no-key) |
-| [Your server](../media/gifs/sdk-remote.gif) · [MP4](../media/videos/sdk-remote.mp4?raw=true) · [transcript](../media/transcripts/sdk-remote.txt) | `nika serve` set up as the README says, one job, a retry, a wrong token | [server.md](server.md#set-it-up) |
+| [The quick start](https://github.com/supernovae-st/nika-client/blob/main/media/gifs/sdk-quickstart.gif) · [MP4](https://github.com/supernovae-st/nika-client/blob/main/media/videos/sdk-quickstart.mp4?raw=true) · [transcript](https://github.com/supernovae-st/nika-client/blob/main/media/transcripts/sdk-quickstart.txt) | The install, the signing key, `run()`, a typed result, a verified receipt | [README](../README.md#quick-start) |
+| [Two doors](https://github.com/supernovae-st/nika-client/blob/main/media/gifs/sdk-doors.gif) · [MP4](https://github.com/supernovae-st/nika-client/blob/main/media/videos/sdk-doors.mp4?raw=true) (illustration) | One call through the package to the bundled engine or to `nika serve`: check, run, events, seal, verify | [README](../README.md#what-happens-underneath) |
+| [Three facts](https://github.com/supernovae-st/nika-client/blob/main/media/gifs/sdk-admitted-executed-sealed.gif) · [MP4](https://github.com/supernovae-st/nika-client/blob/main/media/videos/sdk-admitted-executed-sealed.mp4?raw=true) · [transcript](https://github.com/supernovae-st/nika-client/blob/main/media/transcripts/sdk-admitted-executed-sealed.txt) | A refused file that never runs, an unsealed run, a sealed one, one changed byte | [receipts.md](receipts.md#admitted-executed-sealed-three-different-facts) |
+| [Events](https://github.com/supernovae-st/nika-client/blob/main/media/gifs/sdk-events.gif) · [MP4](https://github.com/supernovae-st/nika-client/blob/main/media/videos/sdk-events.mp4?raw=true) · [transcript](https://github.com/supernovae-st/nika-client/blob/main/media/transcripts/sdk-events.txt) | `run.events()` for a four-task run, then `result()` | [runs.md](runs.md#watch-a-run-runevents) |
+| [Compile](https://github.com/supernovae-st/nika-client/blob/main/media/gifs/sdk-compile.gif) · [MP4](https://github.com/supernovae-st/nika-client/blob/main/media/videos/sdk-compile.mp4?raw=true) · [transcript](https://github.com/supernovae-st/nika-client/blob/main/media/transcripts/sdk-compile.txt) | A sentence to a ready candidate in two rounds, with no model call | [compile.md](compile.md#start-here-no-model-no-key) |
+| [Your server](https://github.com/supernovae-st/nika-client/blob/main/media/gifs/sdk-remote.gif) · [MP4](https://github.com/supernovae-st/nika-client/blob/main/media/videos/sdk-remote.mp4?raw=true) · [transcript](https://github.com/supernovae-st/nika-client/blob/main/media/transcripts/sdk-remote.txt) | `nika serve` set up as the README says, one job, a retry, a wrong token | [server.md](server.md#set-it-up) |
 
 ## Runnable examples
 
-[`examples/`](../examples/README.md) in the repository holds programs you can
+[`examples/`](https://github.com/supernovae-st/nika-client/blob/main/examples/README.md) in the repository holds programs you can
 run against the bundled engine or a local `nika serve`: the quick start, a
 watched and cancelled run, a server job recovered across two processes, and
 compile then run.

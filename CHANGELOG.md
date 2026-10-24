@@ -18,11 +18,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `errors.md`, plus the new `upgrading-to-0.123.md`, `glossary.md` and an
   index, `docs/README.md`.
 - The quick start creates the signing key as files
-  (`NIKA_KEYCHAIN=off nika key init`) and names `nika key align`. On macOS a
-  `nika key init` run from a terminal stores the key in the keychain only,
-  which the engine an app starts (it has no terminal) and `nika serve` never
-  open, so the quick start's run stayed unsealed and printed
-  `not verified: receipt_mismatch`.
+  (`NIKA_KEYCHAIN=off nika key init`): `~/.nika/keys/` is where the engine an
+  app starts and `nika serve` read it, on every platform. Without the
+  variable, engine 0.123.0's `nika key init` refuses on a Linux terminal
+  (`run-signing key material already exists`), and its `--force` stores the
+  key in the desktop's Secret Service, which neither reads; it also refuses on
+  a Mac whose keychain holds a key from Nika 0.122 or older. `receipts.md`
+  gives the custody of each process per platform: on macOS 0.123.0 opens no
+  keychain, so a keychain key from an older release can be neither read nor
+  copied, and `nika key align` is a Linux repair.
+- The pages shipped under `docs/` link the repository's media, examples,
+  scripts and changelog by their GitHub URL, so those links also work in the
+  installed package.
 - `traceVerify()` over HTTP is documented as the 0.123.0 server answers:
   lower-case verdicts with a reason beside each (`sealed`/`sealed`,
   `ok`/`unsealed`), and `verified` read first, since a receipt that does not

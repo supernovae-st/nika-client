@@ -14,12 +14,13 @@ const mediaScripts = [
 ].map((file) => readFileSync(repo(file), 'utf8'));
 const manifest = JSON.parse(
   readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
-) as { exports?: Record<string, unknown> };
+) as { exports?: Record<string, unknown>; files?: string[] };
 const page = (name: string) => readFileSync(new URL(`../docs/${name}`, import.meta.url), 'utf8');
 const httpApi = page('http-api.md');
 const runs = page('runs.md');
 const server = page('server.md');
 const receipts = page('receipts.md');
+const errors = page('errors.md');
 // The pages the package ships under docs/ (package.json `files`), the README with them.
 const shipped = [
   readme,
@@ -80,19 +81,45 @@ describe('packed public documentation', () => {
     expect(httpApi).toContain('absence claims nothing');
   });
 
-  it('teaches a signing key the engine an app starts can read', () => {
-    // That engine has no terminal and never opens an OS keychain: the quick
-    // start mints file custody and names the repair for a keychain-only key.
+  it('teaches a signing key the engine an app starts can read, on macOS and on Linux', () => {
+    // That engine and `nika serve` read ~/.nika/keys/ (or the explicit pair), never a
+    // keychain. Measured on the released 0.123.0 npm payload from a terminal, on macOS:
+    // `nika` opens no keychain either (`nika doctor`: "not opened by this ad-hoc build"),
+    // plain `nika key init` writes the files or refuses over an older release's keychain
+    // key, and `nika key align` exits 2. From its source, on a Linux terminal: plain
+    // `nika key init` refuses and `--force` stores the key in the Secret Service.
+    // NIKA_KEYCHAIN=off writes the files on both, so the quick start keeps it.
     expect(readme).toContain('NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init');
-    expect(readme).toContain('./node_modules/.bin/nika key align');
-    expect(receipts).toContain('`nika key align`');
+    expect(readme).toContain('refuses on a Linux terminal');
+    expect(receipts).toContain('the keychain is not opened by this ad-hoc build');
+    expect(receipts).toContain('run-signing key material already exists');
     expect(receipts).toContain('NIKA_RUN_KEY_FILE');
+    // `nika key align` is a Linux repair, and no released binary completes it on macOS:
+    // each paragraph, item or row that names it says Linux (or that it cannot succeed),
+    // and no clause in it sends a Mac there.
+    for (const [name, surface] of [['README.md', readme], ['docs/receipts.md', receipts], ['docs/errors.md', errors]]) {
+      for (const block of surface.split(/\n\s*\n|\n>\s*\n|\n(?=\s*(?:- |\|))/)) {
+        if (!block.includes('key align')) continue;
+        expect(block, `${name}: ${block}`).toMatch(/Linux|cannot succeed/);
+        for (const clause of block.split(/(?<=[.;])\s+/)) {
+          if (clause.includes('key align') && /\bmac(?:os)?\b/i.test(clause)) {
+            expect(clause, `${name}: ${clause}`).toMatch(/cannot/);
+          }
+        }
+      }
+    }
   });
 
   it('reads an HTTP proof by `verified` first, in the server words', () => {
+    // The sealed check the pages teach is the one examples/server-recovery.ts runs, which
+    // check:package-surface compiles with --strict against the packed types: `verdict` is
+    // optional, so a bare `.includes(proof.verdict)` does not compile.
+    const sealedCheck = "proof.verified && ['sealed', 'anchored', 'replayed'].includes(proof.verdict ?? '')";
+    expect(readFileSync(repo('examples/server-recovery.ts'), 'utf8')).toContain(sealedCheck);
     for (const surface of [readme, receipts]) {
       expect(surface).toContain('check `proof.verified` first');
-      expect(surface).toContain("['sealed', 'anchored', 'replayed'].includes(proof.verdict)");
+      expect(surface).toContain(sealedCheck);
+      expect(surface).not.toContain('.includes(proof.verdict)');
       expect(surface).toContain("verdict: 'ok', reason: 'unsealed'");
     }
   });
@@ -109,6 +136,9 @@ describe('packed public documentation', () => {
     // the engine's typescript-client clip captured with 0.120.3.
     expect(readme).not.toContain('typescript-client.optimized.gif');
     expect(readme).toContain('src="media/gifs/sdk-quickstart.gif"');
+    // The engine's nika-hero clip joins two captures: its check from 0.121.0 and the
+    // committed run-meeting capture from 0.109.2 (engine 247ffad20, 2026-08-19).
+    expect(readme).toContain('The audit was captured on engine 0.121.0; the run was captured on engine 0.109.2');
   });
 
   it('runs the quick start that examples/quick-start.ts holds, byte for byte', () => {
@@ -148,26 +178,34 @@ describe('media the pages embed', () => {
       .filter((file) => file.endsWith('.md'))
       .map((file): [string, string] => [`docs/${file}`, page(file)]),
   ]);
-  // npmjs.com rewrites a README's relative `img src` to this raw prefix but leaves a
-  // relative `srcset` as it is (measured on its page for execa), so the README names
-  // its reduced-motion stills by this absolute URL; docs pages, read on GitHub, stay relative.
-  const OWN_RAW = 'https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/';
-  // Every reference a page makes into media/: src, srcset, href, markdown links.
-  const references = [...pages].flatMap(([file, text]) =>
+  // This repository by absolute URL: its raw files at HEAD (image embeds), and its file
+  // and folder pages on main (links). npmjs.com rewrites a README's relative `img src`
+  // to the raw prefix but leaves a relative `srcset` as it is (measured on its page for
+  // execa), so every page names its reduced-motion stills by their raw URL. The docs
+  // pages ship in the package and are read in node_modules too, where media/,
+  // examples/ and scripts/ do not exist, so they name those files by their URL.
+  const OWN = [
+    'https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/',
+    'https://github.com/supernovae-st/nika-client/blob/main/',
+    'https://github.com/supernovae-st/nika-client/tree/main/',
+  ];
+  // A src naming one of our media files: relative, or by its raw HEAD URL.
+  const OWN_MEDIA = String.raw`(?:(?![a-z]+:)[^"]*|https://raw\.githubusercontent\.com/supernovae-st/nika-client/HEAD/)media/`;
+  // Every reference a page makes into this repository: src, srcset, href, markdown links.
+  const ownReferences = [...pages].flatMap(([file, text]) =>
     [...text.matchAll(/(?:src|srcset|href)="([^"]+)"|\]\(([^)\s]+)\)/g)]
       .map((match) => match[1] ?? match[2] ?? '')
       .filter((target) => target !== '' && !target.startsWith('#'))
-      .filter((target) => target.startsWith(OWN_RAW) || !/^[a-z]+:/i.test(target))
-      .map((target) => {
+      .flatMap((target) => {
         // `?raw=true` makes GitHub serve an MP4 itself rather than its file page.
         const bare = target.split(/[?#]/)[0] ?? '';
-        const path = bare.startsWith(OWN_RAW)
-          ? bare.slice(OWN_RAW.length)
-          : posix.normalize(posix.join(posix.dirname(file), bare));
-        return { file, target, path };
-      })
-      .filter(({ path }) => path.startsWith('media/')),
+        const own = OWN.find((prefix) => bare.startsWith(prefix));
+        if (own) return [{ file, target, path: bare.slice(own.length), relative: false }];
+        if (/^[a-z]+:/i.test(target)) return [];
+        return [{ file, target, path: posix.normalize(posix.join(posix.dirname(file), bare)), relative: true }];
+      }),
   );
+  const references = ownReferences.filter(({ path }) => path.startsWith('media/'));
   const assets = references.filter(({ path }) => /^media\/(?:gifs|videos|stills|transcripts)\//.test(path));
   const recorded = new Map<string, string>();
   for (const entry of [...Object.values(media.tapes), ...Object.values(media.motion ?? {})]) {
@@ -189,6 +227,27 @@ describe('media the pages embed', () => {
     }
   });
 
+  it('resolves every link a page makes into this repository, relative or by URL', () => {
+    expect(ownReferences.some(({ relative }) => !relative)).toBe(true);
+    for (const { file, target, path } of ownReferences) {
+      expect(existsSync(repo(path)), `${file} → ${target}`).toBe(true);
+    }
+  });
+
+  it('keeps a shipped page relative only to files the package ships', () => {
+    // npm packs package.json `files` (docs, dist…) plus package.json, README and LICENSE.
+    const files = manifest.files ?? [];
+    expect(files).toContain('docs');
+    const shipped = (path: string) =>
+      ['package.json', 'README.md', 'LICENSE'].includes(path) ||
+      files.some((entry) => path === entry || path.startsWith(`${entry}/`));
+    for (const { file, target, path, relative } of ownReferences) {
+      if (file.startsWith('docs/') && relative) {
+        expect(shipped(path), `${file} → ${target} is not in the package: link it by its GitHub URL`).toBe(true);
+      }
+    }
+  });
+
   it('commits each recorded file byte for byte, and only files a page uses', () => {
     const used = new Set(assets.map(({ path }) => path));
     expect([...committed].sort()).toEqual([...recorded.keys()].sort());
@@ -202,7 +261,7 @@ describe('media the pages embed', () => {
   it('gives every image alt text and a caption, and every GIF a still for reduced motion', () => {
     for (const [file, text] of pages) {
       for (const [tag] of text.matchAll(/<img\b[^>]*>/g)) {
-        if (/src="(?![a-z]+:)[^"]*media\//.test(tag)) {
+        if (new RegExp(`src="${OWN_MEDIA}`).test(tag)) {
           expect(tag, `${file}: an image without descriptive alt text`).toMatch(/\balt="[^"]{40,}"/);
         }
       }
@@ -216,13 +275,9 @@ describe('media the pages embed', () => {
         expect(block, `${file}: a GIF without a reduced-motion still`).toMatch(
           /<source media="\(prefers-reduced-motion: reduce\)" srcset="[^"]+\.png">/,
         );
-        if (/<img\b[^>]*src="(?![a-z]+:)[^"]*media\/gifs\//.test(block)) {
-          const ownStill =
-            file === 'README.md'
-              ? /srcset="https:\/\/raw\.githubusercontent\.com\/supernovae-st\/nika-client\/HEAD\/media\/stills\/[^"]+\.png"/
-              : /srcset="(?![a-z]+:)[^"]*media\/stills\/[^"]+\.png"/;
+        if (new RegExp(`<img\\b[^>]*src="${OWN_MEDIA}gifs/`).test(block)) {
           expect(block, `${file}: our GIF without its own still, in the form its renderer resolves`).toMatch(
-            ownStill,
+            /srcset="https:\/\/raw\.githubusercontent\.com\/supernovae-st\/nika-client\/HEAD\/media\/stills\/[^"]+\.png"/,
           );
         }
       }

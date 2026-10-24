@@ -88,12 +88,14 @@ const run = await nika.run('hello.nika', {
 for await (const event of run.events()) {
   console.log(event.sequence, event.kind, event.status);
 }
-console.log(report.clean, await run.result());
+const result = await run.result();
+console.log(report.clean, result.status);
 ```
 
 ```text
 1 run.started running
 2 run.settled succeeded
+true succeeded
 ```
 
 After `new Nika(...)`, the code is the same as for a local engine.
@@ -116,11 +118,11 @@ After `new Nika(...)`, the code is the same as for a local engine.
 
 <p align="center">
   <picture>
-    <source media="(prefers-reduced-motion: reduce)" srcset="../media/stills/sdk-remote.png">
-    <img src="../media/gifs/sdk-remote.gif" alt="The terminal creates a one-line nika.yaml, mints a token into .nika/serve.token with umask 077, appends .nika/ to .gitignore, runs NIKA_KEYCHAIN=off nika key init and starts nika serve --bind 127.0.0.1:8787 --workflows . --token-file .nika/serve.token in the background; curl /health shows engineVersion 0.123.0 and machine protocol 2. node remote.mts prints served hello.nika, check clean, a job id, #1 run.started running, #2 run.settled succeeded, the greeting, verify verified · sealed, retry the same job: it did not run twice, and bad token 401 unauthorized" width="860">
+    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/media/stills/sdk-remote.png">
+    <img src="https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/media/gifs/sdk-remote.gif" alt="The terminal creates a one-line nika.yaml, mints a token into .nika/serve.token with umask 077, appends .nika/ to .gitignore, runs NIKA_KEYCHAIN=off nika key init and starts nika serve --bind 127.0.0.1:8787 --workflows . --token-file .nika/serve.token in the background; curl /health shows engineVersion 0.123.0 and machine protocol 2. node remote.mts prints served hello.nika, check clean, a job id, #1 run.started running, #2 run.settled succeeded, the greeting, verify verified · sealed, retry the same job: it did not run twice, and bad token 401 unauthorized" width="860">
   </picture>
 </p>
-<p align="center"><sub>The README's version of these steps, typed as written (it leaves <code>--state-root</code> at its default, <code>.nika/serve</code>, and sends the server to the background of the same terminal). The client lists and checks the served <code>hello.nika</code> by name, runs it with an idempotency key, receives two sequenced events, reads <code>verified · sealed</code>, gets the same job back for the same key and a typed 401 for a wrong token. The token is never printed. Recorded from <code>@supernovae-st/nika</code> 0.123.0 and <code>nika serve</code> 0.123.0 on loopback; the run is a <code>mock/echo</code> rehearsal.<br>▶ <a href="../media/videos/sdk-remote.mp4?raw=true">MP4</a> · <a href="../media/transcripts/sdk-remote.txt">transcript</a> · <a href="../scripts/media/scenes/sdk-remote/remote.mts">the client it runs</a></sub></p>
+<p align="center"><sub>The README's version of these steps, typed as written (it leaves <code>--state-root</code> at its default, <code>.nika/serve</code>, and sends the server to the background of the same terminal). The client lists and checks the served <code>hello.nika</code> by name, runs it with an idempotency key, receives two sequenced events, reads <code>verified · sealed</code>, gets the same job back for the same key and a typed 401 for a wrong token. The token is never printed. Recorded from <code>@supernovae-st/nika</code> 0.123.0 and <code>nika serve</code> 0.123.0 on loopback; the run is a <code>mock/echo</code> rehearsal.<br>▶ <a href="https://github.com/supernovae-st/nika-client/blob/main/media/videos/sdk-remote.mp4?raw=true">MP4</a> · <a href="https://github.com/supernovae-st/nika-client/blob/main/media/transcripts/sdk-remote.txt">transcript</a> · <a href="https://github.com/supernovae-st/nika-client/blob/main/scripts/media/scenes/sdk-remote/remote.mts">the client it runs</a></sub></p>
 
 ## Retries without duplicates
 
@@ -168,7 +170,7 @@ still be running. The engine's own `interrupted` state is different: a server
 that lost an execution reports a `run.interrupted` event and
 `result.status === 'interrupted'`, as data.
 
-[`examples/server-recovery.ts`](../examples/server-recovery.ts) does this
+[`examples/server-recovery.ts`](https://github.com/supernovae-st/nika-client/blob/main/examples/server-recovery.ts) does this
 across two processes: `start` stores the key, submits, shows that a retry
 returns the same job and exits after the first event; `resume` reattaches
 from the saved cursor and verifies the job's record.

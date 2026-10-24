@@ -103,9 +103,12 @@ npm install @supernovae-st/nika
 NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init   # once per machine: a key that signs each run's record
 ```
 
-The key goes to `~/.nika/keys/`, where the engine your app starts reads it.
-That engine runs without a terminal and never opens an OS keychain, so a key
-kept only in the macOS keychain would not reach it (see the note below).
+`NIKA_KEYCHAIN=off` makes `nika key init` write the key as files, to
+`~/.nika/keys/` (mode `0600`). That is where the engine your app starts and
+`nika serve` read it, on macOS and on Linux. Without the variable,
+`nika key init` refuses on a Linux terminal (its `--force` puts the key in the
+desktop's Secret Service, where neither looks) and on a Mac whose keychain
+holds a key from Nika 0.122 or older.
 
 **2 · Write a workflow.** Save this as `hello.nika`:
 
@@ -205,11 +208,12 @@ a model's answer. [Use a real model](#use-a-real-model) when you are ready.
 > engine your app started found no signing key it can read, so the run's
 > record is unsealed. That engine reads `~/.nika/keys/` (or the
 > `NIKA_RUN_KEY_FILE` and `NIKA_RUN_PUB_FILE` pair), never an OS keychain.
-> Run step 1's `NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init`. If an
-> earlier `nika key init` from a terminal already stored your key in the macOS
-> keychain, run `./node_modules/.bin/nika key align` once from that terminal
-> instead: it copies the keychain key to `~/.nika/keys/`. Then run the demo
-> again.
+> Run step 1's `NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init`, then
+> run the demo again. A key that Nika 0.122 or older kept in the macOS
+> keychain cannot be read or copied by 0.123.0: on such a Mac, this command
+> mints a new key as files. On Linux, a key that `nika key init --force` put
+> in the Secret Service can be copied instead, from a terminal:
+> `./node_modules/.bin/nika key align`.
 
 The same file is [`examples/quick-start.ts`](https://github.com/supernovae-st/nika-client/blob/main/examples/quick-start.ts),
 next to examples that watch, cancel and recover runs.
@@ -391,7 +395,7 @@ server run takes no per-run model: the workflow names it.
     <img src="https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/nika-hero.optimized.gif" alt="nika check audits a meeting-actions workflow, then nika run executes it on a local model through Ollama and writes the meeting's action items to a typed JSON file" width="860">
   </picture>
 </p>
-<p align="center"><sub>The same engine from the command line, on a real job: the audit first, then a run on a local model that writes a meeting's action items as typed JSON. Captured from the real CLI on engine 0.121.0; the run uses a real local model (<code>ollama/llama3.2:3b</code>).</sub></p>
+<p align="center"><sub>The same engine from the command line, on a real job: the audit first, then a run on a local model that writes a meeting's action items as typed JSON. The audit was captured on engine 0.121.0; the run was captured on engine 0.109.2 (August 2026) with a real local model (<code>ollama/llama3.2:3b</code>).</sub></p>
 
 ## Prove what ran
 
@@ -414,7 +418,7 @@ All four rows were measured with the quick-start file on engine 0.123.0.
 > server's words about the job's journal and stay `sealed` even when the
 > receipt you passed does not match it; then `verified` is `false`. Treat a
 > job as sealed only when
-> `proof.verified && ['sealed', 'anchored', 'replayed'].includes(proof.verdict)`.
+> `proof.verified && ['sealed', 'anchored', 'replayed'].includes(proof.verdict ?? '')`.
 
 > [!IMPORTANT]
 > A verified receipt proves that the run's record is intact and matches the
@@ -432,13 +436,15 @@ All four rows were measured with the quick-start file on engine 0.123.0.
 
 **Signing keys.** The engine your app starts and `nika serve` sign with
 `~/.nika/keys/` or the explicit `NIKA_RUN_KEY_FILE` and `NIKA_RUN_PUB_FILE`
-pair; only `nika` run from a terminal opens an OS keychain.
-`NIKA_KEYCHAIN=off nika key init` creates the key as files, `nika key align`
-copies a keychain key there, `nika key trust` prints the public key to enroll
-elsewhere, and `nika key rotate` retires it (records it signed stay
-verifiable). In CI, give the engine the explicit pair. Never copy a private
-run key into SDK configuration, source control, workflow inputs or an HTTP
-request.
+pair, never with an OS keychain. On macOS, 0.123.0 opens no keychain even from
+a terminal; on Linux, `nika` run from a terminal also uses the desktop's
+Secret Service. `NIKA_KEYCHAIN=off nika key init` creates the key as files on
+both, and with the same variable `nika key rotate` retires it and writes the
+next one there (records it signed stay verifiable). `nika key trust` prints
+the public key to enroll elsewhere; on Linux, `nika key align` copies a Secret
+Service key to the files. In CI, give the engine the explicit pair. Never copy
+a private run key into SDK configuration, source control, workflow inputs or
+an HTTP request.
 [docs/receipts.md](https://github.com/supernovae-st/nika-client/blob/main/docs/receipts.md)
 covers what a receipt carries, every server verdict and key custody.
 
@@ -536,7 +542,7 @@ passing them to a local client throws `NikaConfigurationError`.
 
 | You see | What to do |
 |---|---|
-| `not verified: receipt_mismatch` after a successful run | Create a key the engine your app starts can read: `NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init`, or `./node_modules/.bin/nika key align` from a terminal if `nika key init` stored it in the macOS keychain. |
+| `not verified: receipt_mismatch` after a successful run | Create a key the engine your app starts can read: `NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init`. On a Mac whose keychain holds a key from Nika 0.122 or older, that mints a new key as files; on Linux, `./node_modules/.bin/nika key align` from a terminal copies a key that `nika key init --force` stored in the Secret Service instead. |
 | `NikaEngineUnavailable` from `new Nika()` | No engine payload for this machine: use Node.js 22 or newer on macOS or glibc Linux, keep optional dependencies (no `--omit=optional`); on Windows or musl (Alpine), set an absolute `bin`/`NIKA_BIN` or connect to a `nika serve` by URL. |
 | `NikaCompatibilityError` with `capability: 'engineIdentity'` | The engine or server is not 0.123 (machine protocol 2). Upgrade it with the package: [docs/upgrading-to-0.123.md](https://github.com/supernovae-st/nika-client/blob/main/docs/upgrading-to-0.123.md). |
 | `NikaConfigurationError` about `bin` or `NIKA_BIN` | Give an absolute path; a bare name or a relative path is refused. |

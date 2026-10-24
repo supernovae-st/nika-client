@@ -87,10 +87,10 @@ export const COMPILE_REPLAY_HEADER = 'Nika-Compile-Replay';
  * The capability a resident lists in `/health` once it serves a kept round's
  * judged answer round (`explicitProvider` with the round's `replay_token`):
  * engine `nika-serve/src/server/model.rs` `JUDGED_ANSWER_CAPABILITY`, beside
- * `compileNativeV2` on every native server (integration commits 158a961cd and
- * b7dace1e5, not yet released). A server from before it parses the request as
- * `422 malformed_compile_request`; the SDK gates the round on the capability
- * and keeps that refusal's mapping as a defensive path only.
+ * `compileNativeV2` on every native server (a server seated with
+ * `--authoring-model`) since engine 0.123.0. A server from before it parses
+ * the request as `422 malformed_compile_request`; the SDK gates the round on
+ * the capability and keeps that refusal's mapping as a defensive path only.
  */
 export const COMPILE_JUDGED_ROUND = 'compileJudgedAnswerRound';
 

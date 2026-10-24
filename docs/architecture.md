@@ -32,10 +32,12 @@ local nika process         authenticated nika serve
   check report carrying `clean: false`, or its `{ error }` envelope) and turns
   it into the typed `NikaOperationError`. It judges nothing: a shape the
   engine was not measured to write is a protocol fault, never a refusal.
-- `src/lib/legacy-run-refusals.ts` is temporary. It recovers the three refusal
-  dialects of engines up to 0.119.0, which predate the one `run --json`
-  grammar, and is deleted with its call sites once no supported engine writes
-  them.
+- `src/lib/legacy-run-refusals.ts` is unreachable since 0.123 and scheduled
+  for removal. It recovers the three refusal dialects of engines up to
+  0.119.0, which predate the one `run --json` grammar; those engines speak
+  machine protocol 1, which the identity probe refuses before any run, so a
+  maintenance patch can delete it with its call sites (keeping the 0.123 wire
+  fixtures).
 - `src/lib/http-transport.ts` is the remote Adapter. It verifies the remote
   server identity once per client, resolves and verifies a local engine only
   for caller-owned snapshot capture, then uses the authenticated HTTP
@@ -70,8 +72,10 @@ Some operations deliberately have one authority:
   bytes are sent;
 - HTTP observation (attach, durable status, events, cancel, workflow catalog,
   schedule status, trace verdicts) needs no local engine;
-- remote trace verification currently returns the engine's typed unavailable
-  verdict because the server has no path-free journal authority.
+- remote trace verification returns the server's verdict on the journal it
+  wrote for the job (`ok`, `sealed`, `broken`…, in the CLI's words), and
+  `unavailable` only when no journal exists for it; the adapter adds only
+  `verified`, true when that verdict holds and names the receipt's trace.
 
 ## Lifecycle invariants
 
@@ -129,11 +133,10 @@ Some operations deliberately have one authority:
    `nika.cancel(run)` and `nika.status(run)` wrappers resolve through it, so a
    foreign, reconstructed, serialized, or other-client handle still throws
    `NikaRunOwnershipError`. `nika.events(run)` keeps yielding the protocol
-   vocabulary unchanged. The wrappers stay for one release train counted from
-   publication: they ship unchanged in the first published train that carries
-   the Run-owned lifecycle, the earliest train that may remove them is the one
-   after it, and the removal is the One SDK baseline owner's decision (#114),
-   announced in that train's release notes. No version or date is fixed.
+   vocabulary unchanged. The wrappers shipped unchanged next to the Run-owned
+   lifecycle from 0.120.0, the first published version that carries it, and
+   stay through the 0.123 maintenance line; a later version that removes them
+   says so in its release notes.
 9. An interrupted observation is a typed transport error carrying its cursor
    (`NikaObservationInterrupted`), never an engine failure: the run may still
    be running. The engine's own `interrupted` evidence state is data instead:

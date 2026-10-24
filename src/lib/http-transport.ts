@@ -153,12 +153,13 @@ const JOB_STATUSES = new Set([
 ]);
 const MAX_OBSERVATION_RETRIES = 5;
 /**
- * The trace verdicts that say the evidence holds. The resident's contract
- * (engine 0.118) still answers only `unavailable`; the CLI's tiers (`nika
- * trace verify`: OK → SEALED → ANCHORED → REPLAYED hold, INCOMPLETE and
- * TAMPERED do not) are the vocabulary a door with journal authority will
- * speak, so they are read here rather than refused. The comparison ignores
- * case: the CLI prints its tiers in upper case, the door's enum is lower case.
+ * The trace verdicts that say the evidence holds. The 0.123.0 resident answers
+ * the CLI's tiers in lower case (`ok` → `sealed` → `anchored` → `replayed`
+ * hold; `incomplete`, `tampered`, `broken` and the refusal classes do not),
+ * and `unavailable` when it has no journal for the job. The comparison
+ * ignores case: the CLI prints its tiers in upper case, the door's enum is
+ * lower case. `ok` holds, so over HTTP `verified` includes an unsigned
+ * journal; the verdict word says which tier.
  */
 const POSITIVE_TRACE_VERDICTS = new Set(['VERIFIED', 'OK', 'SEALED', 'ANCHORED', 'REPLAYED']);
 const RETRY_BASE_MILLISECONDS = 100;
@@ -541,8 +542,8 @@ export class HttpTransport implements Transport {
       [200],
       'traceVerify',
     );
-    // A verdict that holds carries no reason; `unavailable` and the negative
-    // tiers name theirs. Either is typed when present, neither is demanded.
+    // The 0.123.0 resident names a reason beside every verdict (the seal tier
+    // beside one that holds); both are typed when present, neither is demanded.
     if (
       typeof object.verdict !== 'string'
       || (object.reason !== undefined && typeof object.reason !== 'string')
@@ -863,8 +864,8 @@ export class HttpTransport implements Transport {
     if (!event) throw new NikaProtocolError(this.kind, 'SSE data was not an object');
     // The resident's projection (`JobEvent`, closed): the frame identity, the
     // terminal outputs and receipt, and the settlement it nests whole on the
-    // terminal frame (engine 0.118 · ADR-128). Engine main adds two optional
-    // fields ahead of the pinned contract: `at`, when the resident admitted the
+    // terminal frame (engine 0.118 · ADR-128), and the two optional fields the
+    // pinned 0.123.0 contract declares: `at`, when the resident admitted the
     // event, and `evidence`, a reported journal loss. Anything else still refuses.
     const allowed = new Set([
       'sequence', 'at', 'kind', 'status', 'code', 'message', 'outputs', 'receipt', 'settlement',
@@ -1813,8 +1814,8 @@ function durableJob(
   transport: 'http',
 ): DurableJob {
   // The resident's durable projection (`Job`, closed), the nested settlement
-  // included (engine 0.118 · ADR-128), and the journal `evidence` engine main
-  // adds ahead of the pinned contract. `Job` declares no `at`.
+  // included (engine 0.118 · ADR-128), and the journal `evidence` the pinned
+  // 0.123.0 contract declares. `Job` declares no `at`.
   const allowed = new Set([
     'id', 'status', 'execution_id', 'trace_id', 'outputs', 'receipt', 'error', 'settlement',
     'evidence',

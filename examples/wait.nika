@@ -1,0 +1,12 @@
+nika: wait
+permits: {tools: ["nika:wait"]}
+tasks:
+  first:
+    invoke:
+      tool: nika:wait
+      args: {duration: "3s"}
+  second:
+    after: { first: success }
+    invoke:
+      tool: nika:wait
+      args: {duration: "3s"}

@@ -3,7 +3,7 @@
 `openapi.json` is the checked-in contract pin. The SDK authenticates every
 route except public `GET /health`; bearer tokens are redacted from failures.
 A non-2xx answer typed as `{ error: { code, message } }` becomes a
-`NikaOperationError` carrying `status`, `code`, and the refused `operation`;
+`NikaOperationError` carrying `status`, `code`, and the refused `operation`.
 For a check by served name, a typed 404 or 422 instead returns
 `{ clean: false, error }`; authentication and transport failures still throw.
 Any other non-2xx body is discarded and reported as a redacted
@@ -22,7 +22,7 @@ Any other non-2xx body is discarded and reported as a redacted
 | `GET /v1/jobs/{id}/status` | `run.status()` | current status only |
 | `GET /v1/jobs/{id}/events` | `run.events()` / `attachRun()` | bounded, sequenced SSE with replay |
 | `POST /v1/jobs/{id}/cancel` | `run.cancel()` | 200 a settled job or its terminal replay; 202 the request accepted on a running job, settled later by observation |
-| `GET /v1/jobs/{id}/trace/verify` | `traceVerify(receipt)` | engine-owned typed trace verdict; `reason` only on a verdict that does not hold |
+| `GET /v1/jobs/{id}/trace/verify` | `traceVerify(receipt)` | the server's engine-owned verdict on the journal it wrote for the job, in the CLI's lower-case words, and its `reason` (the seal tier beside a verdict that holds); see [Trace verification](#trace-verification) |
 | `GET/PUT /v1/schedules/{id}` | `scheduleStatus()` / `schedule()` | resident schedule projection and CAS mutation |
 
 ## Connection rules
@@ -43,15 +43,16 @@ Any other non-2xx body is discarded and reported as a redacted
   without `timeoutMs` or `limits.deadline_ms` (see [compile.md](compile.md)),
   and each JSON/SSE machine frame has a byte ceiling.
 - Remote `check()` refuses `model` and `nativeStrict`; remote `run()` refuses
-  `model`, `maxCostUsd` and the deprecated `vars` until a request envelope
-  owns them.
+  `model`, `maxCostUsd` and the deprecated `vars`. The server applies its own
+  per-run ceiling to manual jobs (`nika serve --run-cost-ceiling`, 1 USD by
+  default).
 - Remote `run()` sends `inputs` as `JobByName.inputs` only for a served name
   and only when `GET /health` advertises `jobInputs`. That capability, not a
   202, is the negotiation: a resident from before the envelope accepts the
   extra field and ignores its values, so the SDK refuses it after `/health`
   alone with `NikaCompatibilityError` (`capability: 'jobInputs'`). The
-  `inputs` envelope is engine-owned (nika#1642) and lands in the pinned
-  `openapi.json` when the engine pin reaches a release that serves it.
+  `inputs` envelope is engine-owned (nika#1642); `JobByName.inputs` is in the
+  pinned `openapi.json` of engine 0.123.
 - A snapshot body takes no `inputs` overlay, an empty map included: `run()` of
   a local path with `inputs` is refused before any capture or request.
 - The serialized `inputs` map is bounded at 1 MiB by the SDK, the bound the
@@ -115,9 +116,9 @@ stays `incomplete`. The judged answer round replays the kept plan with the
 answers and asks the seat only to judge it (judge calls, generation 2, no
 authoring call): `ready`, or held with its token forgotten (a later request
 with it answers 409 `compile_replay_unavailable`). A server that serves it
-lists `compileJudgedAnswerRound` in `/health` (engine integration commits
-`158a961cd` and `b7dace1e5`, in no release yet); the SDK posts the round only
-there, refuses it elsewhere after `/health` alone with a
+lists `compileJudgedAnswerRound` in `/health` (engine 0.123.0 does whenever
+its operator seats a model with `--authoring-model`); the SDK posts the round
+only there, refuses it elsewhere after `/health` alone with a
 `NikaCompatibilityError` (`compileJudgedAnswerRound`), and sets
 `outcome.judged_answer_round_available` beside every kept round. An older
 server's `422 malformed_compile_request` to the round maps to the same error,
@@ -132,10 +133,35 @@ generation-2 answer is read up to 8 MiB. Refusals add 409 (`compile_replay_unava
 
 This contract is ahead of the pinned `openapi.json`, which describes the
 default document of the engine 0.123 resident: the default document never
-carries it, and a seated resident merges it into its live document. Its types are written by
-hand from the engine source (`nika-serve/src/server/compile/v2.rs`,
-`author.rs`, `openapi-native.json`). Released engines 0.121.0 and later serve
-it; `limits.max_calls` needs 0.122.0. See [compile.md](compile.md).
+carries it, and a seated resident merges it into its live document. Its types
+are written by hand from the engine source at tag `v0.123.0`
+(`crates/nika-serve/src/server/compile/v2.rs`, `author.rs`,
+`openapi-native.json`). This package speaks only to engine 0.123 (machine
+protocol 2), which serves it when seated. See [compile.md](compile.md).
+
+## Trace verification
+
+`traceVerify(receipt)` over HTTP needs the receipt's `job_id` and asks
+`GET /v1/jobs/{id}/trace/verify`. The answer (`TraceVerification`, closed)
+carries the server's `verdict` and `reason`, both required by the pinned
+contract, beside the CLI's own document (`exit`, `chain`, `seal`, `anchor`,
+`replay`, `lines`) and never a filesystem path. The verdict is the CLI's
+headline word for the journal the server wrote for the job: `ok`, `sealed`,
+`anchored` and `replayed` hold; `incomplete` (no terminal frame, the writer's
+liveness in `reason`), `tampered` (a buried seal) and `broken` (an edited
+chain) do not; `unchained`, `empty`, `unreadable`, `refused`, `line-over-long`
+and `unknown` are the CLI's refusal classes; `unavailable` means no journal
+exists for the job (refused before its first event, queued, or a backend
+keeping none). Beside a verdict that holds, `reason` is the seal tier:
+`sealed` or `unsealed`.
+
+The SDK sets `verified: true` only when the verdict holds (compared without
+case) **and** the answer's `trace_id` equals the receipt's. The verdict
+describes the job's journal, not the receipt: a receipt whose `trace_id` does
+not match keeps the server's `sealed` and reads `verified: false`. Measured on
+engine 0.123.0: a server with a signing key answers `sealed`/`sealed`, one
+without answers `ok`/`unsealed`, and both read `verified: true` for the
+matching receipt.
 
 ## Settlement
 
@@ -147,14 +173,12 @@ whose `status` contradicts the record carrying it, keeps fields it does not
 know, and never derives a settlement from an exit code; a job the resident
 lost (`interrupted`) carries none.
 
-## Frame time and journal evidence (engine main)
+## Frame time and journal evidence (engine 0.123)
 
 Both resident projections are closed, and the SDK refuses any field it does
-not know. Engine main adds two optional fields that are
-ahead of the pinned `openapi.json`: no released engine writes them yet, and a
-resident that predates them never sends them, so nothing changes against a
-released resident. They are read so that a resident built from engine main can
-be observed at all; the pin itself moves only with a release.
+not know. Engine 0.123 adds two optional resident fields,
+declared in the pinned `openapi.json`: a 0.123.0 resident writes `at` on
+every frame, and `evidence` only when it reports a journal loss.
 
 - `JobEvent.at` is when the resident admitted the event: an RFC 3339 timestamp
   in UTC, outside the event's hash chain. It rides `event.raw.at` untouched.

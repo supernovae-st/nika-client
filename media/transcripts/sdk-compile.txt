@@ -1,0 +1,44 @@
+$ node author.mts "Every morning, summarize ./inbox/*.md into ./digest.md"
+round 1  incomplete · 1 required, 4 optional question(s)
+         ? model
+           Which explicit runtime provider/model should run the language steps (extract, classify, draft)?
+         · `every morning` is a trigger, not a task
+answer   model = mock/echo (the offline rehearsal model)
+round 2  ready · provider calls: none
+         trigger schedule · daily · requires_binding
+check    clean · exit 0 · kept as digest.nika
+$
+
+── screen cleared ──
+
+$ sed -n '/^permits:/,/^tasks:/p' digest.nika      # the boundary the candidate asks for
+permits:
+  fs:
+    read:
+    - ./inbox/**
+    write:
+    - ./digest.md
+  tools:
+  - nika:assert
+  - nika:glob
+  - nika:jq
+  - nika:read
+  - nika:write
+tasks:
+$
+
+── screen cleared ──
+
+$ ./node_modules/.bin/nika check digest.nika | head -n 11
+nika check · digest.nika
+ ✔ PLAN     9 waves · 9 tasks · max parallelism 1
+      wave 1 glob_source (invoke · nika:glob)
+      wave 2 glob_found (invoke · nika:jq)
+      wave 3 glob_admit (invoke · nika:assert)
+      wave 4 read_source (invoke · nika:read)
+      wave 5 documents (invoke · nika:jq)
+      wave 6 draft (infer · mock/echo)
+      wave 7 draft_anchors (invoke · nika:jq)
+      wave 8 draft_admit (invoke · nika:assert)
+      wave 9 write_output (invoke · nika:write)
+$

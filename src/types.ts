@@ -188,8 +188,9 @@ export interface NikaRunSealedEvent extends NikaEventFields {
  * before `traceVerify` is trusted. Its absence is only absence: it never
  * claims that a journal exists.
  *
- * Engine main, ahead of the contract this package pins: no released engine
- * writes it yet, and a resident that predates it simply never sends it.
+ * Defined by the `nika serve` 0.123.0 contract this package pins
+ * (`JournalEvidence` on `Job` and `JobEvent`); absent when the resident
+ * reported no loss.
  */
 export interface NikaJournalEvidence {
   status: 'mirror_lost';
@@ -198,9 +199,10 @@ export interface NikaJournalEvidence {
 }
 
 /**
- * Fields only the resident's frames carry, both from engine main, ahead of the
- * contract this package pins. Both are optional on the wire and absent on a
- * resident that predates them.
+ * Fields only the resident's frames carry, both declared by the `nika serve`
+ * 0.123.0 contract this package pins (`JobEvent.at`, `JobEvent.evidence`).
+ * Both are optional on the wire: a 0.123.0 resident writes `at` on every
+ * frame and `evidence` only when it reports a journal loss.
  */
 interface NikaResidentEventFields extends NikaEventFields {
   /** When the resident admitted the event: RFC 3339, UTC. Outside the event's hash chain. */
@@ -565,31 +567,57 @@ export interface NikaWorkflowMetadata {
 }
 
 export interface NikaTraceVerifyResult {
+  /**
+   * The package's own binding. Locally: the engine's verifier held and the
+   * receipt matches its evidence (a keyless run's receipt does not). Over
+   * HTTP: the server's verdict holds and names this receipt's `trace_id`;
+   * `ok` holds too, so over HTTP `verified: true` includes an intact but
+   * unsigned journal. Read it before `verdict`.
+   */
   verified: boolean;
   /**
    * Engine-owned trace verdict. The native path answers `verified` or
-   * `invalid`; the resident's door answers `unavailable` while it has no
-   * trace-journal authority (engine 0.118), and will speak the CLI's tiers
-   * (`OK` · `SEALED` · `ANCHORED` · `REPLAYED` hold · `INCOMPLETE` ·
-   * `TAMPERED` do not) once it does. Open to additive future vocabulary.
+   * `invalid`. Over HTTP it is the server's verdict on the journal it wrote
+   * for the job, in the CLI's words: `ok` (intact, unsigned) · `sealed` ·
+   * `anchored` · `replayed` hold; `incomplete` · `tampered` · `broken` do not;
+   * `unchained` · `empty` · `unreadable` · `refused` · `line-over-long` ·
+   * `unknown` are the CLI's refusal classes; `unavailable` means the server
+   * has no journal for the job. Over HTTP it describes the job's journal, not
+   * this receipt: a receipt that does not match keeps the server's `sealed`
+   * while `verified` is `false`. Open to additive future vocabulary.
    */
   verdict?:
     | 'verified'
     | 'invalid'
     | 'unavailable'
-    | 'OK'
-    | 'SEALED'
-    | 'ANCHORED'
-    | 'REPLAYED'
-    | 'INCOMPLETE'
-    | 'TAMPERED'
+    | 'ok'
+    | 'sealed'
+    | 'anchored'
+    | 'replayed'
+    | 'incomplete'
+    | 'tampered'
+    | 'broken'
+    | 'unchained'
+    | 'empty'
+    | 'unreadable'
+    | 'refused'
+    | 'line-over-long'
+    | 'unknown'
     | (string & {});
-  /** Engine-owned explanation for a negative or unavailable verdict; a verdict that holds carries none. */
+  /**
+   * Engine-owned machine class beside the verdict. Locally it is
+   * `receipt_mismatch` when the receipt does not match the engine's evidence;
+   * a verifier that failed (`verdict: 'invalid'` with its `exitCode`) and a
+   * verdict that holds carry none. Over HTTP the server always sends one:
+   * beside a verdict that holds it is the seal tier (`sealed`, `unsealed`).
+   */
   reason?:
     | 'trace_invalid'
     | 'receipt_mismatch'
     | 'run_not_terminal'
     | 'trace_journal_unavailable'
+    | 'sealed'
+    | 'unsealed'
     | (string & {});
   trace_id?: string;
   exitCode?: number;
@@ -868,9 +896,9 @@ export type NikaCompileRequest = NikaCompileCreateRequest | NikaCompileEditReque
  *   seated authoring model (it may spend). Needs `compileNativeV2`. With a
  *   kept round's `replay_token` it is that round's judged answer round: the
  *   kept plan replayed with the answers, the seat asked only to judge the
- *   replayed bytes (judge calls, never an authoring call); needs an engine
- *   with the judged answer round (integration commit 158a961cd, not yet
- *   released).
+ *   replayed bytes (judge calls, never an authoring call); needs a server
+ *   whose `/health` lists `compileJudgedAnswerRound` (engine 0.123.0 when
+ *   its operator seats a model with `nika serve --authoring-model`).
  * - `deterministicOnly`: with `replay_token`, a zero-call generation-2 replay
  *   of a round the server kept (no judge); without it, the generation-1 door
  *   with its explicit (and only) cognition word.

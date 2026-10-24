@@ -33,9 +33,9 @@
  * round's judged answer round: the server replays the kept plan with them and
  * its seat only judges the result (judge calls, never a second authoring call).
  * That needs a server whose /health lists compileJudgedAnswerRound (engine
- * integration commits 158a961cd and b7dace1e5, in no release yet). On a server
- * without it the next round is a fresh one carrying the answers, which authors
- * again and may spend.
+ * 0.123.0 does when its operator seats a model with `--authoring-model`). On a
+ * server without it the next round is a fresh one carrying the answers, which
+ * authors again and may spend.
  *
  * Over HTTP a provider round also carries what the LOCAL engine observes of
  * the files the intent names (`nika compile --observe-only`, in this process's

@@ -225,10 +225,10 @@ next to examples that watch, cancel and recover runs.
 <p align="center">
   <picture>
     <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/media/stills/sdk-doors.png">
-    <img src="media/gifs/sdk-doors.gif" alt="Animated diagram. The README's demo.mts on the left; the @supernovae-st/nika package in the middle; two doors on the right: new Nika() leads to the bundled engine nika 0.123.0 as a child process, new Nika({ url, token }) to nika serve, and line 3 of demo.mts switches between them. A refused list-files.nika gets NIKA-SEC-004 and no run exists; hello.nika runs; six local events or two server events reach the app; six hash-chained journal lines end with run_sealed; traceVerify() answers verified locally and sealed on the server; one changed byte gives BROKEN at line 5" width="960">
+    <img src="media/gifs/sdk-doors.gif" alt="Animated diagram. The README's demo.mts on the left; the @supernovae-st/nika package in the middle; two doors on the right: new Nika() leads to the bundled engine nika 0.123.0 as a child process, new Nika({ url, token }) to nika serve, and lines 3 and 6 of demo.mts switch between them: the constructor takes url, token and allowInsecureHttp, and run() takes an idempotencyKey in place of maxCostUsd. A refused list-files.nika gets NIKA-SEC-004 and no run exists; hello.nika runs; six local events or two server events reach the app; six hash-chained journal lines end with run_sealed; traceVerify() answers verified locally and sealed on the server; one changed byte gives BROKEN at line 5" width="960">
   </picture>
 </p>
-<p align="center"><sub>An illustration with captured content: every code line, event, verdict, hash and version on screen comes from <code>@supernovae-st/nika</code> 0.123.0, its bundled engine and <code>nika serve</code> 0.123.0 in a <code>mock/echo</code> rehearsal. The cards, lanes, packets and pacing are drawn; a real run takes milliseconds. The code is readable in the 1600 px MP4.<br>▶ <a href="media/videos/sdk-doors.mp4?raw=true">MP4</a> · <a href="media/README.md#sdk-doors-an-illustration">what is captured and what is drawn</a></sub></p>
+<p align="center"><sub>An illustration with captured content: the code is this README's quick start, which the capture ran, with lines 3 and 6 also as the capture's server driver ran them against <code>nika serve</code>, and every event, verdict, hash and version on screen comes from <code>@supernovae-st/nika</code> 0.123.0, its bundled engine and <code>nika serve</code> 0.123.0 in a <code>mock/echo</code> rehearsal. The cards, lanes, packets and pacing are drawn; a real run takes milliseconds. The code is readable in the 1600 px MP4.<br>▶ <a href="media/videos/sdk-doors.mp4?raw=true">MP4</a> · <a href="media/README.md#sdk-doors-an-illustration">what is captured and what is drawn</a></sub></p>
 
 `new Nika()` starts nothing. On the first call it asks the bundled engine who
 it is; then each call runs the engine as a child process, without a shell, in
@@ -293,10 +293,13 @@ A run gives you three different facts, and each has its own evidence:
 
 ## Two doors: your machine or your server
 
-The same `Nika` class reaches an engine through one of two doors. Only the
-constructor changes: `check`, `run`, `events`, `cancel` and `traceVerify`
-keep their names and meaning on both. `schedule` and `scheduleStatus` need a
-server, because a short-lived local process cannot honestly own a schedule.
+The same `Nika` class reaches an engine through one of two doors, and the
+constructor chooses it: `check`, `run`, `events`, `cancel` and `traceVerify`
+keep their names and meaning on both. Some options change with the door: on a
+server, `run()` needs an `idempotencyKey` and refuses `maxCostUsd`, and plain
+`http://` needs `allowInsecureHttp: true` (the table says what each door
+takes). `schedule` and `scheduleStatus` need a server, because a short-lived
+local process cannot honestly own a schedule.
 
 | | `new Nika()` | `new Nika({ url, token })` |
 |---|---|---|

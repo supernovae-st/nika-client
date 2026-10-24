@@ -72,18 +72,24 @@ is an animated diagram of how the package runs a workflow through either door
   engine `nika 0.123.0 (0bfde3765)`, and `nika serve` 0.123.0 on a loopback
   port with a `0600` token file that was never printed, in a scratch `HOME`
   with `NIKA_KEYCHAIN=off`, running `mock/echo`. `demo.mts` and `hello.nika`
-  on screen are the repository README's quick start, byte for byte, and
-  line 3 is edited to the remote constructor and back.
+  on screen are the repository README's quick start, byte for byte, and the
+  capture ran `node demo.mts`. Lines 3 and 6 are edited to the server door's
+  options and back, as the capture's remote driver ran them:
+  `allowInsecureHttp` for plain HTTP to loopback, and an `idempotencyKey` in
+  place of `maxCostUsd`. Over HTTP the package refused the quick start's own
+  options, and the capture recorded those refusals.
 - **Drawn:** the cards, the package column, the lanes, the packets that travel
   them and the pacing. A run of `hello.nika` takes milliseconds; the clip
   takes 25 seconds and shows the two doors side by side, where the capture
   ran them one after the other.
 - **Rendered by** the engine repository's motion pipeline
-  ([`scripts/media/motion/intent-to-proof`](https://github.com/supernovae-st/nika/tree/752d4446fb0701c888e0468e17b5191666c2e76f/scripts/media/motion/intent-to-proof),
-  at `752d4446`), which refuses to render when a captured fact changes; the
-  render passed the pipeline's strict readability audit. The clip and its
-  capture script were added to that checkout for the render, and
-  `media-sources.json` records their hashes and the capture's. This
+  ([`scripts/media/motion/intent-to-proof`](https://github.com/supernovae-st/nika/tree/c68e60a5456f7bce57561bd5b3aa66146ff5e575/scripts/media/motion/intent-to-proof),
+  at `c68e60a54`, on the branch of
+  [supernovae-st/nika#1824](https://github.com/supernovae-st/nika/pull/1824),
+  which holds the clip, its capture and its exports), which refuses to render
+  when a captured fact changes; the render passed the pipeline's strict
+  readability audit. `media-sources.json` records the hashes of the clip, its
+  capture script and the capture. This
   repository keeps the outputs only: the GIF is 960×540 at 12.5 frames per
   second (its code is texture at that size), the MP4 is 1600×900 at 30, with
   readable code, and the still is the settled last frame.

@@ -2,10 +2,11 @@
 
 `nika serve --bind` is the same engine running as an HTTP server you operate.
 It holds durable jobs and schedules, so a run outlives the process that
-started it. Your code talks to it through the same `Nika` class: only the
-constructor changes. This page covers setup, the job lifecycle, recovery,
-retries and schedules. The wire contract, route by route, is
-[http-api.md](http-api.md).
+started it. Your code talks to it through the same `Nika` class and the same
+methods; the constructor names the server, and a few options change (a run
+needs an `idempotencyKey` and takes no `maxCostUsd`). This page covers setup,
+the job lifecycle, recovery, retries and schedules. The wire contract, route by
+route, is [http-api.md](http-api.md).
 
 ```mermaid
 sequenceDiagram
@@ -98,7 +99,10 @@ console.log(report.clean, result.status);
 true succeeded
 ```
 
-After `new Nika(...)`, the code is the same as for a local engine.
+After `new Nika(...)`, the methods are the same as for a local engine; some
+options are not. `run()` needs an `idempotencyKey` ([Retries without
+duplicates](#retries-without-duplicates)) and takes no `maxCostUsd`
+([What a server run does not take](#what-a-server-run-does-not-take)).
 
 - **Workflows by name.** `hello.nika` or `daily/report.nika` is a name the
   server resolves in its `--workflows` folder: `check()` and `run()` send the

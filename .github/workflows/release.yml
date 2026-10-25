@@ -96,10 +96,10 @@ jobs:
           ref: "v${{ env.VERSION }}"
           token: ${{ secrets.NIKA_REPO_TOKEN || github.token }}
 
-      - name: Test the tagged engine OpenAPI source
+      - name: Test the tagged engine OpenAPI source and its published-SDK guard
         run: |
           cargo test --manifest-path nika-source/Cargo.toml \
-            -p nika-serve --lib server::openapi::tests
+            -p nika-serve --lib server::openapi::
 
       - name: Enforce SDK coverage against the pinned contract
         run: npm run check:coverage

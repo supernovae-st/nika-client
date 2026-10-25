@@ -113,10 +113,18 @@ duplicates](#retries-without-duplicates)) and takes no `maxCostUsd`
   package sends its exact bytes and checks the server's acknowledgement. Only
   this needs a local engine (`bin`, `NIKA_BIN` or the platform package).
 - **Events.** A server run yields `run.started` then `run.settled`, in the
-  same words as a local run, but no per-task events. `event.sequence` is the
-  server's replay cursor.
+  same words as a local run, but no per-task events. A job admitted with
+  `inputs` first yields an `engine.event`: the server's `execution.queued`
+  frame, sequence 1. `event.sequence` is the server's replay cursor.
 - **Model keys.** The server reads provider keys from its own environment.
   Your app sends none, and a server run takes no per-run model.
+- **Access pins.** `run()` and `check()` take `access` with a served name:
+  the job takes that path, as `nika run --access` does on the server's
+  machine (see [runs.md](runs.md#pin-the-access-path-access)).
+- **Large results.** The default `machineBufferBytes`, 16 MiB, is the bound
+  of the server's own job store, so every result the server settles reaches
+  `run.result()` and `attachRun()` (see
+  [runs.md](runs.md#large-results-machinebufferbytes)).
 
 **Watch the setup and one job: a retry that does not run twice, and a wrong token.**
 
@@ -179,6 +187,30 @@ across two processes: `start` stores the key, submits, shows that a retry
 returns the same job and exits after the first event; `resume` reattaches
 from the saved cursor and verifies the job's record.
 
+## Cancel a running job: the 5-second grace
+
+`run.cancel()` on a running job answers 202:
+`{ accepted: true, status: 'cancellation_requested' }`, the one request every
+later `cancel()` on that handle returns. The server signals the run and waits
+a **fixed 5 seconds**, which no option changes, for it to reach its next wave
+boundary and settle. What the client sees depends on that grace:
+
+| The run | Events end with | `result.status` | `result.settlement` |
+|---|---|---|---|
+| reaches a wave boundary within 5 s | `run.settled` | `cancelled` (cause `operator`), or `succeeded`/`failed` if that raced the request | present |
+| is still inside a task 5 s later (a `nika:wait`, a model call, a command) | `run.interrupted` | `interrupted`, never `cancelled` | absent: the server dropped the execution, so its task tally and spend are unknown |
+
+`run.status()` then reads the same word, and a `cancel()` from another handle
+(after `attachRun`) answers `accepted: false`, `status: 'already_settled'`. A
+job cancelled while still queued settles on the reply itself (200,
+`status: 'cancelled'`). Measured on engine 0.123.1: a job inside a 20-second
+`nika:wait` settled `interrupted` about 5 seconds after its cancel, with the
+events `run.started` and `run.interrupted`. `run.interrupted` is the server's
+word about the run; it is unrelated to `NikaObservationInterrupted`, which
+means this client lost its view. A local engine has no such grace: it lets
+work in flight settle, however long it takes (see
+[runs.md](runs.md#cancel-a-run)).
+
 **When the server restarts.** Ctrl-C or SIGTERM stops new admissions, then
 drains running and queued jobs for up to 30 seconds. Past that grace, running
 jobs become `interrupted` and queued jobs stay queued; a restart with the same
@@ -199,13 +231,18 @@ with `https://`.
 ## What a server run does not take
 
 `inputs` work by served name when the server advertises `jobInputs` (see
-[runs.md](runs.md#pass-your-apps-data-inputs)). There is no per-run `model`,
-`vars` or `maxCostUsd` over HTTP: the package refuses them with a typed error
-instead of dropping them. The server applies its own per-run ceiling to
-manual jobs (`nika serve --run-cost-ceiling`, 1 USD by default; `none` turns
-it off). Bound a server run through its workflow too: its model and
-`max_tokens`. A server `check()` refuses `model` and `nativeStrict` the same
-way.
+[runs.md](runs.md#pass-your-apps-data-inputs)), and so does `access`, which
+every 0.123 server reads (see
+[runs.md](runs.md#pin-the-access-path-access)). A local file's snapshot takes
+neither: the package refuses them beside one (`snapshotInputs`,
+`snapshotAccess`). There is no per-run `model`, `vars` or `maxCostUsd` over
+HTTP: the package refuses them with a typed error instead of dropping them.
+The server applies its own per-run ceiling to manual jobs
+(`nika serve --run-cost-ceiling`, 1 USD by default; `none` turns it off).
+Bound a server run through its workflow too: its model and `max_tokens`. A
+server `check()` refuses `model` and `nativeStrict` the same way; its
+`access` is acknowledged, not judged, since the server's check evaluates no
+access plan (an empty pin is refused, `NIKA-1802`).
 
 ## Schedules
 
@@ -243,8 +280,11 @@ await nika.schedule('hello.nika', {
 - **Revisions.** A create is sent with `If-None-Match: *`; an update needs
   the exact prior revision (`If-Match`). Revisions are the engine's opaque
   `sha256:<64 lowercase hex>` values: never make one up. A writer holding a
-  stale revision gets a typed `NikaOperationError` (`schedule_conflict`,
-  HTTP 412) that carries the current revision.
+  stale revision gets a typed `NikaOperationError` with HTTP `status` 412,
+  `code: 'schedule_conflict'` (the package's name for it), `machineCode:
+  'schedule_precondition_failed'` (the server's own code) and
+  `currentRevision`: the revision to retry from beside a stale `If-Match`,
+  `null` when the server names none (a missing or malformed precondition).
 - **Expressions.** A cron expression carries its time zone:
   `TZ=<IANA zone> …`. `tolerance` uses `m/k`. Timed hash jitter is not
   supported and is refused.
@@ -276,13 +316,15 @@ not see the keys you export in your shell, so pass them with
 | Operation | Local engine | `nika serve` |
 |---|---|---|
 | `check` | yes; `model` and `nativeStrict` allowed | yes; those two refused |
+| `check` `access` | `--access=<pin>`; the report judges the access plan (`verdicts`) | by served name; acknowledged, not judged; an empty pin refused |
 | `run` | yes; `model` and `maxCostUsd` allowed | yes; `idempotencyKey` required; `model` and `maxCostUsd` refused |
+| `run` `access` | `--access=<pin>`; a pin the engine refuses settles the run `failed`, cause `refused` | by served name (`JobByName.access`); a pin the execution refuses settles the job `failed`; an empty pin refused at admission (422); a snapshot refuses it |
 | `run` `inputs` | literal JSON over stdin; the engine must advertise `inputsLiteral` | literal JSON by served name; the server must advertise `jobInputs`; a snapshot refuses them |
 | `run` `vars` (deprecated) | the `--var` operator channel, unchanged | refused |
 | `attachRun` | refused: a local run belongs to its process | reattaches to a durable job, from an optional event cursor |
 | `run.status()` | refused; await `run.result()` | the durable status |
 | `run.events()` | lifecycle words over the engine's task and run frames | the same words over sequenced SSE with bounded replay; no per-task events |
-| `run.cancel()` | signals the process; idempotent | 200 settles the job; 202 accepts the request, and `run.result()` settles on the server's ending |
+| `run.cancel()` | signals the process; idempotent; in-flight work settles, however long | 200 settles the job; 202 accepts the request, and `run.result()` settles on the server's ending: `interrupted` once the fixed 5-second grace expires |
 | `run.id` | a throwaway correlation id, never durable | the server's durable job id: the one to store |
 | `traceVerify` | the engine's verifier plus the signed receipt binding | the server's verdict on the journal it wrote (`ok`, `sealed`…), or `unavailable` without one |
 | `schedule` / `scheduleStatus` | refused | the server's schedules |

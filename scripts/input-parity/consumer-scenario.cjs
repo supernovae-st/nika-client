@@ -7,7 +7,7 @@
 
 const { createHash } = require('node:crypto');
 
-/** One frame may echo a 1 MiB input back: the default 64 KiB bound is for ordinary runs. */
+/** One frame may echo a 1 MiB input back: 4 MiB holds it, an explicit bound below the 16 MiB default. */
 const MACHINE_BUFFER_BYTES = 4 * 1024 * 1024;
 const DIGEST_ABOVE_BYTES = 1024;
 

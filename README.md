@@ -305,7 +305,7 @@ local process cannot honestly own a schedule.
 |---|---|---|
 | **The engine** | the bundled engine, as a child process for each call | your `nika serve`, over HTTPS (plain HTTP to loopback only) |
 | **A run is** | a handle that lives in your process | a durable job on the server, which a new process can reattach to |
-| **Events** | each task, then the settlement (six for the quick start) | `run.started` and `run.settled`, each with a replay cursor |
+| **Events** | each task, then the settlement (six for the quick start) | `run.started` and `run.settled`, each with a replay cursor; a job with inputs opens with `execution.queued`, an `engine.event` |
 | **Retries** | not applicable | an `idempotencyKey` you own: the same key returns the same job |
 | **Recovery** | none: a local run belongs to its process | `attachRun(jobId, { lastEventId })` |
 | **Schedules** | refused (the CLI's `nika arm` can hand them to the OS) | `schedule()` and `scheduleStatus()` |
@@ -503,6 +503,25 @@ operator channel and has no HTTP form. Keep secrets out of `inputs`.
 [docs/runs.md](https://github.com/supernovae-st/nika-client/blob/main/docs/runs.md#pass-your-apps-data-inputs)
 lists what the engine and the package refuse.
 
+**Pin the access path with `access`.** The workflow's `model:` picks the
+intelligence; `access` picks the path the engine takes to it, as
+`nika run --access` does: an access class (`local`, `mock`, `harness`,
+`oauth`, `api`) or a harness seat (`codex`, `claude-code`…). Both doors take
+it, a server with a workflow named by its served name:
+
+```ts
+const run = await nika.run('support-triage.nika', { access: 'codex' });
+const report = await nika.check('support-triage.nika', { access: 'codex' });
+```
+
+A pin is a pin: the engine refuses one it does not know (`NIKA-1802`) or that
+the workflow's model cannot use (`NIKA-1801`), never taking another path, and
+`run.result()` settles `failed` with that code. A server refuses an empty pin
+at admission (`NikaOperationError`, `status` 422), and a local file's
+snapshot takes none.
+[docs/runs.md](https://github.com/supernovae-st/nika-client/blob/main/docs/runs.md#pin-the-access-path-access)
+gives each door's answers.
+
 <details>
 <summary><b>Constructor options</b></summary>
 
@@ -516,7 +535,7 @@ const remote = new Nika({ url: 'https://nika.example.com', token });
 | `cwd` | the current working directory | Where the local engine runs and resolves workflow paths; for a server client, where a local file is captured |
 | `bin` | `NIKA_BIN`, then the bundled engine | An absolute path to the engine to use |
 | `eventBufferSize` | 4096 | How many of a run's most recent events a late view can be given |
-| `machineBufferBytes` | 64 KiB | The size limit for one engine frame or diagnostic; keep it at 64 KiB or more, since a 0.123.0 run's first frame is about 32 KiB |
+| `machineBufferBytes` | 16 MiB | The size limit for one engine frame (a local line, a server event) or document; the default holds any result a `nika serve` settles, whose job store is capped at 16 MiB, and a refusal past it names the size to set |
 | `url` | none | A `nika serve` base URL; setting it switches to HTTP |
 | `token` | required with `url` | The bearer token from the server's `--token-file` |
 | `allowInsecureHttp` | `false` | Allows plain `http://`, and only to a loopback host |
@@ -552,6 +571,7 @@ passing them to a local client throws `NikaConfigurationError`.
 | `nika serve` exits: `token file must be mode 0600` | `chmod 600 .nika/serve.token`; the token must be 32–512 visible ASCII bytes. |
 | `nika serve` exits: `nothing armed — this project has no nika.yaml` | Add a one-line `nika.yaml` in the folder you serve: `nika: my-project`. |
 | `run()` rejects with `NikaOperationError` | The engine refused the workflow before it ran: read `error.code` and `error.findings`, or run `./node_modules/.bin/nika check <file>`. |
+| `NikaProtocolError: … exceeded … bytes (machineBufferBytes)` | A frame or record was larger than the bound: set `machineBufferBytes` to the size the message names, or remove a lowered value (the 16 MiB default holds any server result); `attachRun(jobId)` reads a server job again. |
 
 More causes, and every error class, are in
 [docs/errors.md](https://github.com/supernovae-st/nika-client/blob/main/docs/errors.md).

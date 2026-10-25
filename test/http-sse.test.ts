@@ -9,7 +9,12 @@ import {
 } from '../src/index.js';
 import { NikaEngineUnavailable, resolveNikaEngine } from '../src/lib/binary/index.js';
 import { HttpTransport } from '../src/lib/http-transport.js';
-import { SseParseError, SseParser } from '../src/lib/sse/parser.js';
+import {
+  SseFrameOverflowError,
+  SseParseError,
+  SseParser,
+  type SseLimits,
+} from '../src/lib/sse/parser.js';
 import type { NikaEvent } from '../src/types.js';
 
 const FIXTURE = path.join(
@@ -155,23 +160,74 @@ describe('bounded incremental SSE parser', () => {
     await expect(source.done).resolves.toMatchObject({ status: 'succeeded' });
   });
 
-  it('enforces independent line, frame and pending-buffer ceilings', () => {
+  it('enforces independent line, frame and pending-buffer ceilings, measuring the frame', () => {
     const encoder = new TextEncoder();
-    expect(() => new SseParser({
-      maxLineBytes: 3,
-      maxFrameBytes: 100,
-      maxBufferBytes: 100,
-    }).push(encoder.encode('data'))).toThrow(/line exceeded/);
-    expect(() => new SseParser({
-      maxLineBytes: 100,
-      maxFrameBytes: 6,
-      maxBufferBytes: 100,
-    }).push(encoder.encode('id: 1\n\n'))).toThrow(/frame exceeded/);
-    expect(() => new SseParser({
-      maxLineBytes: 100,
-      maxFrameBytes: 100,
-      maxBufferBytes: 3,
-    }).push(encoder.encode('data'))).toThrow(/buffer exceeded/);
+    const refused = (limits: SseLimits, text: string): SseFrameOverflowError => {
+      const parser = new SseParser(limits);
+      // The frame is counted to its blank line; push returns, the refusal waits.
+      expect(parser.push(encoder.encode(text))).toEqual([]);
+      try {
+        parser.throwIfFailed();
+      } catch (cause) {
+        expect(cause).toBeInstanceOf(SseFrameOverflowError);
+        expect(cause).toBeInstanceOf(SseParseError);
+        return cause as SseFrameOverflowError;
+      }
+      throw new Error('expected a refusal');
+    };
+    // `data` (4 bytes) + LF, then the blank line: 6 raw bytes in the frame.
+    expect(refused({ maxLineBytes: 3, maxFrameBytes: 100, maxBufferBytes: 100 }, 'data\n\n'))
+      .toMatchObject({ bound: 'line', limit: 3, size: { bytes: 6, exact: true },
+        message: 'SSE line exceeded 3 bytes: the frame is 6 bytes' });
+    // `id: 1` + LF (6) fits; the blank line's LF makes 7.
+    expect(refused({ maxLineBytes: 100, maxFrameBytes: 6, maxBufferBytes: 100 }, 'id: 1\n\n'))
+      .toMatchObject({ bound: 'frame', limit: 6, size: { bytes: 7, exact: true },
+        message: 'SSE frame exceeded 6 bytes: the frame is 7 bytes' });
+    expect(refused({ maxLineBytes: 100, maxFrameBytes: 100, maxBufferBytes: 3 }, 'data\n\n'))
+      .toMatchObject({ bound: 'buffer', limit: 3, size: { bytes: 6, exact: true },
+        message: 'SSE buffer exceeded 3 bytes: the frame is 6 bytes' });
+  });
+
+  it('measures an oversized frame across chunks and CRLF lines, and keeps the frames before it', () => {
+    const encoder = new TextEncoder();
+    const limits = { maxLineBytes: 16, maxFrameBytes: 16, maxBufferBytes: 16 };
+    const before = 'id: 1\ndata: {}\n\n';
+    const big = `id: 2\r\ndata: ${'x'.repeat(40)}\r\n: note\r\n\r\n`;
+    const parser = new SseParser(limits);
+    const chunks = [before + big.slice(0, 9), big.slice(9, 30), big.slice(30)];
+    const frames = chunks.flatMap((chunk) => parser.push(encoder.encode(chunk)));
+    // The frame that completed before the refusal is still delivered.
+    expect(frames).toEqual([{ id: '1', data: '{}' }]);
+    expect(() => parser.throwIfFailed()).toThrow(SseFrameOverflowError);
+    let failure: SseFrameOverflowError | undefined;
+    try {
+      parser.throwIfFailed();
+    } catch (cause) {
+      failure = cause as SseFrameOverflowError;
+    }
+    // Every byte of the frame, CR and LF included, the blank CRLF line too.
+    expect(failure?.size).toEqual({ bytes: Buffer.byteLength(big), exact: true });
+    // A later push and finish raise the same refusal, never a later frame.
+    expect(() => parser.push(encoder.encode(before))).toThrow(failure!.message);
+    expect(() => parser.finish()).toThrow(failure!.message);
+  });
+
+  it('fits a frame exactly at the size its refusal measured, and refuses it one byte lower', () => {
+    const encoder = new TextEncoder();
+    const text = `id: 7\ndata: ${JSON.stringify({ sequence: 7, pad: 'y'.repeat(300) })}\n\n`;
+    const size = Buffer.byteLength(text);
+    const at = (bound: number) => new SseParser({ maxLineBytes: bound, maxFrameBytes: bound, maxBufferBytes: bound });
+    const fits = at(size);
+    expect(fits.push(encoder.encode(text))).toHaveLength(1);
+    const short = at(size - 1);
+    expect(short.push(encoder.encode(text))).toEqual([]);
+    expect(() => short.throwIfFailed()).toThrow(`the frame is ${size} bytes`);
+  });
+
+  it('reports a lower bound when the stream ends inside an oversized frame', () => {
+    const parser = new SseParser({ maxLineBytes: 8, maxFrameBytes: 8, maxBufferBytes: 8 });
+    expect(parser.push(new TextEncoder().encode(`data: ${'z'.repeat(30)}`))).toEqual([]);
+    expect(() => parser.finish()).toThrow('SSE buffer exceeded 8 bytes: the frame is at least 36 bytes');
   });
 
   it('rejects an incomplete data frame at EOF', () => {

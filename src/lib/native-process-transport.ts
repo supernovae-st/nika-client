@@ -48,6 +48,7 @@ import {
   compileSignal,
   removeCompileScratch,
 } from './compile.js';
+import { accessFlag, accessPin } from './access.js';
 import { captureEngine } from './engine-capture.js';
 import {
   verifyNikaEngine,
@@ -55,6 +56,11 @@ import {
   type ResolvedNikaEngine,
 } from './binary/index.js';
 import { literalInputs } from './literal-inputs.js';
+import {
+  machineBufferExceeded,
+  OVERFLOW_MEASURE_LIMIT_BYTES,
+  type MeasuredSize,
+} from './machine-buffer.js';
 import {
   legacyPrettyReport,
   legacyStderrRefusal,
@@ -103,10 +109,13 @@ export class NativeProcessTransport implements Transport {
   constructor(private readonly options: NativeProcessTransportOptions) {}
 
   async check(workflow: string, options: NikaCheckOptions): Promise<NikaCheckResult> {
+    // A pin the SDK cannot send is the caller's mistake: it needs no engine.
+    const access = accessPin(options.access, 'check');
     await this.ensureReady();
     const args = ['check', workflow, '--json'];
     if (options.model) args.push('--model', options.model);
     if (options.nativeStrict) args.push('--native-strict');
+    if (access !== undefined) args.push(accessFlag(access));
     const captured = await this.capture(args, options.signal);
     // The engine routes some reports (a missing file, a parse-fatal read) to
     // stderr behind a `nika: ` prefix. That is still the engine judging these
@@ -194,8 +203,9 @@ export class NativeProcessTransport implements Transport {
   }
 
   async startRun(workflow: string, options: NikaRunOptions): Promise<TransportRun> {
-    // A map the SDK cannot send is the caller's mistake: it needs no engine.
+    // A map or pin the SDK cannot send is the caller's mistake: it needs no engine.
     const inputs = literalInputs(options);
+    const access = accessPin(options.access, 'run');
     const identity = await this.ensureReady();
     if (options.idempotencyKey !== undefined) {
       throw new NikaCompatibilityError(
@@ -217,7 +227,7 @@ export class NativeProcessTransport implements Transport {
         + 'The SDK never falls back to --var, which reads @env: and coerces by declared type',
       );
     }
-    const args = ['run', workflow, '--json', ...runFlags(options, inputs !== undefined)];
+    const args = ['run', workflow, '--json', ...runFlags(options, inputs !== undefined, access)];
     const spawnOptions = { cwd: this.options.cwd, shell: false } as const;
     const child: EngineChild = inputs
       ? spawn(this.options.engine.bin, args, { ...spawnOptions, stdio: ['pipe', 'pipe', 'pipe'] })
@@ -331,10 +341,10 @@ export class NativeProcessTransport implements Transport {
 
   private nativeProcess(child: EngineChild): NativeProcess {
     let settled = false;
-    let stderr = '';
+    const stderr = new TailText(this.options.machineBufferBytes);
     child.stderr.setEncoding('utf8');
     child.stderr.on('data', (chunk: string) => {
-      stderr = boundedAppend(stderr, chunk, this.options.machineBufferBytes);
+      stderr.append(chunk);
     });
 
     const closed = new Promise<number>((resolve, reject) => {
@@ -358,7 +368,7 @@ export class NativeProcessTransport implements Transport {
       lines,
       closed,
       settled: () => settled,
-      diagnostics: () => stderr,
+      diagnostics: () => stderr.text(),
       stop: async () => {
         // Releasing the reader destroys stdout; the process exit is the wait.
         void lines.return(undefined).catch(() => {});
@@ -568,15 +578,21 @@ export class NativeProcessTransport implements Transport {
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: false,
       });
-      let stdout = '';
-      let stderr = '';
+      // The report is a machine document: past the bound it is refused, never
+      // cut. It is still read to the end, so the refusal names its size.
+      const limit = this.options.machineBufferBytes;
+      const stdout: string[] = [];
+      let stdoutBytes = 0;
+      const stderr = new TailText(limit);
       child.stdout.setEncoding('utf8');
       child.stderr.setEncoding('utf8');
       child.stdout.on('data', (chunk: string) => {
-        stdout = boundedAppend(stdout, chunk, this.options.machineBufferBytes);
+        stdoutBytes += Buffer.byteLength(chunk);
+        if (stdoutBytes <= limit) stdout.push(chunk);
+        else stdout.length = 0;
       });
       child.stderr.on('data', (chunk: string) => {
-        stderr = boundedAppend(stderr, chunk, this.options.machineBufferBytes);
+        stderr.append(chunk);
       });
       const abort = () => child.kill('SIGTERM');
       signal?.addEventListener('abort', abort, { once: true });
@@ -594,7 +610,14 @@ export class NativeProcessTransport implements Transport {
           reject(new NikaTransportError(this.kind, 'Operation aborted by caller'));
           return;
         }
-        resolve({ exitCode: code ?? 3, stdout, stderr });
+        if (stdoutBytes > limit) {
+          const verb = args[0] === 'trace' ? `trace ${args[1]}` : args[0];
+          reject(new NikaProtocolError(this.kind, machineBufferExceeded(
+            `\`nika ${verb}\` output`, limit, { bytes: stdoutBytes, exact: true },
+          )));
+          return;
+        }
+        resolve({ exitCode: code ?? 3, stdout: stdout.join(''), stderr: stderr.text() });
       });
     });
   }
@@ -644,34 +667,62 @@ function endsWithin(settling: Promise<unknown>, milliseconds: number): Promise<b
  * admitted run, so no byte is read twice or dropped between them. Every raw
  * line obeys the machine bound, however the pipe chunked it: a complete line
  * that arrived whole, an unterminated one still growing, and the final tail.
+ * Each byte is scanned once, so a line near a large bound costs no more than
+ * its own length.
+ *
+ * A line past the bound is refused, and first measured: the reader keeps
+ * counting it, storing nothing, to its line feed or the end of the stream, so
+ * the refusal says how large it is (a lower bound past the counting limit).
  */
 async function* machineLines(
   stdout: Readable,
   limit: number,
   kind: NikaTransportKind,
 ): AsyncGenerator<string, void, undefined> {
-  const bounded = (raw: string): string => {
-    if (Buffer.byteLength(raw) > limit) {
-      throw new NikaProtocolError(
-        kind,
-        `Native machine line exceeded ${limit} bytes; machineBufferBytes bounds one machine frame`,
-      );
-    }
-    return raw.trim();
-  };
-  let buffer = '';
+  const refuse = (size: MeasuredSize): NikaProtocolError => new NikaProtocolError(
+    kind,
+    machineBufferExceeded('Native machine line', limit, size),
+  );
+  let parts: string[] = [];
+  let pendingBytes = 0;
+  /** Bytes of the oversized line counted so far, while it is being measured. */
+  let oversized: number | undefined;
   stdout.setEncoding('utf8');
   for await (const chunk of stdout) {
-    buffer += String(chunk);
-    let newline: number;
-    while ((newline = buffer.indexOf('\n')) >= 0) {
-      const line = bounded(buffer.slice(0, newline));
-      buffer = buffer.slice(newline + 1);
+    let text = String(chunk);
+    while (text.length > 0) {
+      const newline = text.indexOf('\n');
+      const head = newline < 0 ? text : text.slice(0, newline);
+      const bytes = pendingBytes + Buffer.byteLength(head);
+      if (oversized !== undefined) {
+        oversized += Buffer.byteLength(head);
+        if (newline >= 0) throw refuse({ bytes: oversized, exact: true });
+        if (oversized > OVERFLOW_MEASURE_LIMIT_BYTES) throw refuse({ bytes: oversized, exact: false });
+        break;
+      }
+      if (newline < 0) {
+        if (bytes > limit) {
+          oversized = bytes;
+          parts = [];
+          pendingBytes = 0;
+        } else {
+          parts.push(head);
+          pendingBytes = bytes;
+        }
+        break;
+      }
+      if (bytes > limit) throw refuse({ bytes, exact: true });
+      const raw = parts.length > 0 ? parts.join('') + head : head;
+      parts = [];
+      pendingBytes = 0;
+      text = text.slice(newline + 1);
+      const line = raw.trim();
       if (line) yield line;
     }
-    bounded(buffer);
   }
-  const tail = bounded(buffer);
+  // The end of the stream ends the last line.
+  if (oversized !== undefined) throw refuse({ bytes: oversized, exact: true });
+  const tail = parts.join('').trim();
   if (tail) yield tail;
 }
 
@@ -728,7 +779,7 @@ function quoted(verdict: string, text: string): string {
   return excerpt ? `${verdict}: ${excerpt}` : verdict;
 }
 
-function runFlags(options: NikaRunOptions, literal: boolean): string[] {
+function runFlags(options: NikaRunOptions, literal: boolean, access: string | undefined): string[] {
   const flags: string[] = [];
   // The flag only names the channel: the map rides stdin, never argv.
   if (literal) flags.push('--inputs-json', '-');
@@ -737,6 +788,7 @@ function runFlags(options: NikaRunOptions, literal: boolean): string[] {
     flags.push('--var', `${key}=${String(value)}`);
   }
   if (options.model) flags.push('--model', options.model);
+  if (access !== undefined) flags.push(accessFlag(access));
   if (options.maxCostUsd !== undefined) flags.push('--max-cost-usd', String(options.maxCostUsd));
   return flags;
 }
@@ -761,10 +813,38 @@ function statusForExit(exitCode: number, kind?: string): string {
   }
 }
 
-function boundedAppend(current: string, chunk: string, limit: number): string {
-  const combined = current + chunk;
-  if (Buffer.byteLength(combined) <= limit) return combined;
-  return Buffer.from(combined).subarray(-limit).toString('utf8');
+/**
+ * The most recent `limit` bytes of a diagnostic text stream, at most. Chunks
+ * are kept whole and cut back to the bound only once they hold twice it, so
+ * appending stays linear in what the engine wrote. A cut starts on a character
+ * boundary: a character the cut would split is dropped whole.
+ */
+class TailText {
+  private parts: string[] = [];
+  private bytes = 0;
+
+  constructor(private readonly limit: number) {}
+
+  append(chunk: string): void {
+    this.parts.push(chunk);
+    this.bytes += Buffer.byteLength(chunk);
+    if (this.bytes > 2 * this.limit) this.cut();
+  }
+
+  text(): string {
+    if (this.bytes > this.limit) this.cut();
+    return this.parts.join('');
+  }
+
+  private cut(): void {
+    const kept = Buffer.from(this.parts.join(''));
+    let start = Math.max(0, kept.length - this.limit);
+    // Skip UTF-8 continuation bytes (0b10xxxxxx) left by the cut.
+    while (start < kept.length && (kept[start]! & 0xc0) === 0x80) start += 1;
+    const tail = kept.subarray(start).toString('utf8');
+    this.parts = [tail];
+    this.bytes = kept.length - start;
+  }
 }
 
 function receiptMismatch(

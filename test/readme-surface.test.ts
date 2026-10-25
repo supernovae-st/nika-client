@@ -68,6 +68,39 @@ describe('packed public documentation', () => {
     expect(httpApi).not.toContain('remote `run()` refuses\n  `vars`, `model`, and `maxCostUsd` until');
   });
 
+  it('teaches access, the 16 MiB buffer, the queued frame, the schedule codes and the cancel grace (NIK-267)', () => {
+    // `access` on both doors, with the engine's refusals.
+    for (const surface of [readme, runs]) {
+      expect(surface).toContain("{ access: 'codex' }");
+      expect(surface).toContain('`NIKA-1802`');
+      expect(surface).toContain('`NIKA-1801`');
+    }
+    expect(runs).toContain("`capability: 'snapshotAccess'`");
+    expect(runs).toContain('`verdicts.access_ready: false`');
+    expect(server).toContain('`access`');
+    // The default holds any result a server settles, and the refusal names the option.
+    expect(readme).toContain('| `machineBufferBytes` | 16 MiB |');
+    expect(runs).toContain('exceeded 65536 bytes (machineBufferBytes): it is 200756 bytes');
+    for (const surface of shipped) {
+      expect(surface).not.toContain('keep the default 64 KiB');
+      expect(surface).not.toContain('`machineBufferBytes` (64 KiB');
+    }
+    // A job with inputs streams `execution.queued` first: never "two frames" in every case.
+    for (const surface of [readme, runs, server, httpApi]) expect(surface).toContain('execution.queued');
+    // The server's 412 code is schedule_precondition_failed; schedule_conflict is the package's name.
+    expect(errors).not.toContain('`malformed_snapshot`, `schedule_conflict`');
+    for (const surface of [errors, server]) {
+      expect(surface).toContain("'schedule_precondition_failed'");
+      expect(surface).toContain('schedule_conflict');
+    }
+    expect(errors).toContain('`schedule_refused`');
+    // The fixed cancel grace and what a client sees past it.
+    for (const surface of [server, runs]) {
+      expect(surface).toMatch(/fixed 5-second grace|fixed 5 seconds/);
+      expect(surface).toContain('`run.interrupted`');
+    }
+  });
+
   it('documents the resident frame fields as the pinned 0.123 contract, and evidence as no verdict', () => {
     for (const word of ['`at`', '`evidence`', '`mirror_lost`', '`write_failed`', '`record_refused`']) {
       expect(httpApi).toContain(word);

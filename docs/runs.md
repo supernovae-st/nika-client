@@ -42,14 +42,17 @@ console.log(report.clean, report.exitCode);
 ```
 
 - **On a local engine** you get the engine's whole report: `clean`,
-  `exitCode` and its `findings[]`. Options: `model` (check against another
-  model), `nativeStrict` (the engine's `--native-strict` audit) and `signal`
-  (stops this check only).
+  `exitCode`, its `findings[]` and its `verdicts`. Options: `model` (check
+  against another model), `nativeStrict` (the engine's `--native-strict`
+  audit), `access` (judge the access plan under a pin, see
+  [Pin the access path](#pin-the-access-path-access)) and `signal` (stops
+  this check only).
 - **On a server, by served name**, you get the server's short answer:
   `clean: true`, or its typed refusal with `clean: false`. The package never
   invents findings or an exit code. An explicit local path (`./hello.nika`)
   is captured locally and returns the engine's findings and exit code.
-  `model` and `nativeStrict` are refused over HTTP with a typed error.
+  `model` and `nativeStrict` are refused over HTTP with a typed error;
+  `access` rides a served name only.
 
 The same audit, for humans, is `./node_modules/.bin/nika check hello.nika`.
 
@@ -153,6 +156,43 @@ converts text to the declared type, so it cannot carry literal values and has
 no HTTP form. Passing `inputs` and `vars` together rejects `run()`; they are
 never merged.
 
+## Pin the access path: `access`
+
+A workflow's `model:` picks the intelligence; an access pin picks the path
+the engine takes to it, the value `nika run --access` takes. It is an access
+class (`local`, `mock`, `harness`, `oauth`, `api`) or a harness seat
+(`claude-code`, `codex`, `copilot`, `gemini-cli`, `grok-build`, `kimi-code`,
+`opencode`, `qwen-code`), the words engine 0.123.1 knows. The type,
+`NikaAccessPin`, lists them for completion and still takes any string: the
+engine, never the package, judges a pin.
+
+```ts
+const run = await nika.run('triage.nika', { access: 'codex' });
+const report = await nika.check('triage.nika', { access: 'codex' });
+console.log(report.verdicts?.access_ready, report.verdicts?.blockers);
+```
+
+A pin is a pin: the engine refuses one it does not know or that is retired
+(`NIKA-1802`), or one the workflow's model cannot use (`NIKA-1801`), and it
+never takes another path or model instead. Each door reports that refusal as
+the engine wrote it:
+
+| | Local engine | `nika serve` |
+|---|---|---|
+| Sent as | one argv element, `--access=<pin>` (a pin that starts with `-` stays a value) | `access` in the `POST /v1/jobs` or `POST /v1/check` body, beside a served name |
+| A pin the engine takes | the run uses that path; `run_settled` lists it in `access_plan` with `pinned: true` | the job uses that path |
+| An unknown, retired or unusable pin | `run()` resolves and `run.result()` settles `failed`: `error.code` `NIKA-1802` or `NIKA-1801`, `settlement.cause` `refused`, `exitCode` 3; no task ran | the server admits the job (202), its execution refuses the pin, and `run.result()` settles `failed` with `error.code`, no `settlement` |
+| An empty or blank pin | the same, `NIKA-1802` | `run()` rejects with `NikaOperationError`: `code` `NIKA-1802`, `status` 422 |
+| `check({ access })` | the report judges the access plan under the pin: an unusable pin keeps `clean: true` (the file holds), with `verdicts.access_ready: false` and the refusal in `verdicts.blockers` | the server's check is source-only and evaluates no access plan: it acknowledges any other pin, and refuses an empty one with `clean: false`, `error.code` `NIKA-1802` |
+| A local file (`./flow.nika`) | the pin applies | refused before any capture or request: a snapshot carries no pin (`NikaCompatibilityError`, `capability: 'snapshotAccess'`) |
+
+The package itself refuses only a value neither door can carry unchanged,
+before anything starts: a non-string, a NUL byte or a lone surrogate
+(`NikaConfigurationError`, `run({ access })` or `check({ access })` in its
+message). Over HTTP the pin is part of the request bytes an idempotency key
+binds: a retry sends the same pin, and another pin under the same key is an
+`idempotency_conflict`. Measured on engine 0.123.1.
+
 ## Watch a run: `run.events()`
 
 `run.events()` yields `NikaRunEvent`s: a lifecycle `kind` that means the same
@@ -180,7 +220,12 @@ task `greeting`; one `engine.event` (the engine's `workflow_completed`); then
 trace (`run_sealed`), and that run streamed no `run_sealed` frame, so read
 `result.receipt.sealed` to know whether a run was sealed. A `nika serve` run
 of the same file yields two events, `run.started` and `run.settled`: the
-server streams no per-task frames, and the package never invents one.
+server streams no per-task frames, and the package never invents one. A
+server job admitted with `inputs` yields three: the server first records
+`execution.queued` (sequence 1, before `execution.started`), which the
+package names `engine.event`, with no `status` (the frame's `queued` stays on
+`event.raw.status`). Measured on engine 0.123.1; an empty `inputs` map adds
+no such frame.
 
 **Watch a four-task run stream its events.**
 
@@ -200,7 +245,7 @@ server streams no per-task frames, and the package never invents one.
 | `run.settled` | `run_settled` carrying `succeeded` · `failed` · `cancelled` | `execution.settled` carrying `succeeded` · `failed` · `cancelled`; `execution.cancelled` carrying `cancelled` only; `execution.refused` carrying `failed` only |
 | `run.interrupted` | `workflow_interrupted` carrying `interrupted` | `execution.interrupted` · `interrupted` carrying `interrupted` |
 | `run.sealed` | `run_sealed`, when an engine streams one | none |
-| `engine.event` | every other frame (`workflow_completed`, `workflow_paused`, `permit_checked`…) | every other frame, including a `null` or future kind |
+| `engine.event` | every other frame (`workflow_completed`, `workflow_paused`, `permit_checked`…) | every other frame: `execution.queued` (a job admitted with inputs), a `null` or future kind |
 
 `event.status` is always the engine's own word (a waiting run reads
 `paused`). `event.task` is the task a `task.*` frame named. `event.error` is
@@ -242,13 +287,14 @@ tasks: 33, 90 tasks: 273). That is one fixture, not a law: a `nika:wait`
 task adds a `permit_checked` frame, a failed task writes `task_failed`, and
 retries, agents and `for_each` were not measured. Count your own run:
 `error.observed` below gives the number. A `nika serve` job was measured at
-two frames, so the bound matters on a local engine.
+two frames (three with inputs), so the bound matters on a local engine.
 
 The bound is finite on purpose. Each frame is capped by `machineBufferBytes`
-(64 KiB), so a run's kept history holds at most
-`eventBufferSize × machineBufferBytes` of frame text: 256 MiB at the defaults.
-That is arithmetic, not a measurement: on engine 0.123.0 the 273 frames of
-the 90-task run totalled 0.19 MiB, and the largest, the run's first frame
+(16 MiB by default, see [Large results](#large-results-machinebufferbytes)),
+so a run's kept history holds at most `eventBufferSize × machineBufferBytes`
+of frame text: 64 GiB at the defaults. That is arithmetic over the per-frame
+cap, not a size any run approaches: on engine 0.123.0 the 273 frames of the
+90-task run totalled 0.19 MiB, and the largest, the run's first frame
 (`workflow_started`, which carries the engine's admission pricing), was about
 32 KiB. The bound covers the history only: events your code holds, other open
 views and other runs add their own. Nothing here is a claim about heap or
@@ -285,6 +331,40 @@ the package reads no journal to extend it. Over HTTP the server holds the
 job: recover there with `attachRun(id, { lastEventId })` (see
 [server.md](server.md#recovery-after-a-restart)).
 
+### Large results: `machineBufferBytes`
+
+`machineBufferBytes` is the most the package holds of one engine frame (a
+local engine's stdout line, a server's SSE event) or one document (a server's
+JSON answer, a captured report). Its default, **16 MiB**, is the bound of a
+`nika serve` job store: the server refuses, rather than truncates, a result
+that would outgrow it, so every result a server settles reaches
+`run.result()` and `attachRun()` under the default. Outputs that carry an
+image are the usual large result, base64 widening the bytes by a third: on
+engine 0.123.1 a 200,049-byte outputs map rode a 200,756-byte frame and a
+200,815-byte job record. A local engine bounds no frame: `run_settled`
+carries the outputs map whole, whatever its size, and a task's output rides
+its `task_completed` frame, so a local result above 16 MiB needs a larger
+value.
+
+Past the bound, the package reads the frame to its end without keeping it,
+then rejects with a `NikaProtocolError` that names the option and the size
+to set:
+
+```text
+SSE event frame of job 51b0db8a-518b-4b3b-83c4-9dec6f47de03 exceeded 65536 bytes (machineBufferBytes): it is 200756 bytes. Set machineBufferBytes to at least 200756, or leave it unset: its 16 MiB default holds any result nika serve settles. The job itself is unaffected: attachRun('51b0db8a-518b-4b3b-83c4-9dec6f47de03') reads it again
+```
+
+That is a 200,000-character output under `machineBufferBytes: 64 * 1024`
+(the former default), measured on engine 0.123.1.
+
+The same words name a server's JSON record (`HTTP /v1/jobs/<id> JSON
+exceeded …`, its size read from `Content-Length`), a local line (`Native
+machine line exceeded …`) and a local report (`` `nika check` output
+exceeded … ``). On a server the job keeps its result: a client with a larger
+bound reads it again with `attachRun(jobId)`, which reads the job's record
+first, a few dozen bytes larger than its last frame. Locally, that result
+never reaches your process: set the larger bound before the run.
+
 ## Cancel a run
 
 ```ts
@@ -308,14 +388,23 @@ request or view; it never cancels the run.
   cancelling a run waiting in a `nika:wait` task printed
   `true cancellation_requested cancelled` once the wait ended, and a cancel
   during the first of two waits settled `cancelled` with the second never
-  started.
+  started. A local engine sets no time limit on that settling.
 - **`nika serve`.** A running job answers 202,
-  `{ accepted: true, status: 'cancellation_requested' }`, and `run.result()`
-  settles on the ending the server records: `cancelled`, `succeeded`,
-  `failed`, or `interrupted` once its grace period expired. A job cancelled
-  before its execution started settles on the reply itself (200,
-  `status: 'cancelled'`). A job that already ended replays its result with
-  `accepted: false` and `status: 'already_settled'`.
+  `{ accepted: true, status: 'cancellation_requested' }`, and the server
+  gives the run a **fixed 5-second grace**, which no option changes, to reach
+  its next wave boundary and settle. Within it, `run.result()` settles on what
+  the run recorded: `cancelled`, or `succeeded` or `failed` when that raced the
+  request. Past it, the server drops the execution and records the job
+  `interrupted`: the events end with `run.interrupted`, `result.status` is
+  `interrupted`, never `cancelled`, and the result carries no `settlement`, so
+  that run's task tally and spend are unknown to the client; `run.status()`
+  then reads `interrupted`. A task still waiting, calling a model or running
+  a command 5 seconds after the request ends the job this way. Measured on
+  engine 0.123.1: a job inside a 20-second `nika:wait` settled `interrupted`
+  about 5 seconds after its cancel, with the events `run.started` and
+  `run.interrupted`. A job cancelled before its execution started settles on
+  the reply itself (200, `status: 'cancelled'`). A job that already ended
+  replays its result with `accepted: false` and `status: 'already_settled'`.
 
 [`examples/watch-and-cancel.ts`](https://github.com/supernovae-st/nika-client/blob/main/examples/watch-and-cancel.ts) prints each
 event as it arrives and cancels after a delay or on Ctrl+C, on either door.

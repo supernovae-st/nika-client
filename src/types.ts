@@ -12,12 +12,24 @@ interface NikaSharedConfig {
    * `replay_truncated` and whose `observed` says what to set. An explicit
    * value is kept exactly as given. Each frame is bounded by
    * `machineBufferBytes`, so the retained history holds at most
-   * `eventBufferSize * machineBufferBytes` of frame text per run. That bounds
-   * the history only: frames already handed to a consumer, other views and
-   * other runs are not counted in it.
+   * `eventBufferSize * machineBufferBytes` of frame text per run: arithmetic
+   * (64 GiB at both defaults), not a memory budget, since a frame is only as
+   * large as what the engine wrote. That bounds the history only: frames
+   * already handed to a consumer, other views and other runs are not counted
+   * in it.
    */
   eventBufferSize?: number;
-  /** Bound for buffered diagnostics and one machine frame. Default: 64 KiB. */
+  /**
+   * The most the SDK holds of one machine frame (a local engine's stdout line,
+   * a server's SSE event), one JSON document a server answers, one captured
+   * engine report, and the engine diagnostics a result keeps. Default: 16 MiB,
+   * the bound of a `nika serve` job store, which refuses rather than truncates
+   * a result that would exceed it: every result a server can settle reaches
+   * `run.result()` and `attachRun()` under the default. A local engine bounds
+   * no frame, so a local result above 16 MiB needs a larger value. A frame or
+   * document past the bound rejects with a `NikaProtocolError` whose message
+   * names `machineBufferBytes` and the size to set.
+   */
   machineBufferBytes?: number;
 }
 
@@ -93,6 +105,29 @@ export interface NikaCheckResult {
   report_version?: number;
   clean?: boolean;
   exitCode?: number;
+  /**
+   * The local engine report's layers (absent from a server's acknowledgement).
+   * `clean` judges the file; `access_ready` judges the access plan on this
+   * machine, under `check({ access })` when a pin was given. A pin the engine
+   * refuses leaves `clean: true` with `access_ready: false`, and `blockers`
+   * names the refusal in the engine's words.
+   */
+  verdicts?: NikaCheckVerdicts;
+  [key: string]: unknown;
+}
+
+/** The layers of a local check report (`nika check --json`, engine 0.123). Additive. */
+export interface NikaCheckVerdicts {
+  /** Grammar, DAG, permits and types hold, and the resolver knows every model. */
+  valid?: boolean;
+  /** A path exists on this machine for every model (presence, never a dial). */
+  access_ready?: boolean;
+  /** The seat's limits fit the declaration. */
+  capacity_fit?: boolean;
+  /** The three hold and no known blocker remains. */
+  run_ready?: boolean;
+  /** What stands in the way, in the engine's words. */
+  blockers?: string[];
   [key: string]: unknown;
 }
 
@@ -625,9 +660,49 @@ export interface NikaTraceVerifyResult {
   [key: string]: unknown;
 }
 
+/**
+ * An access pin: the path the engine takes to the workflow's models, the value
+ * `nika run --access` and `nika check --access` take. `model:` picks the
+ * intelligence; the pin picks the path. Engine 0.123.1 knows the classes
+ * `local`, `mock`, `harness`, `oauth` and `api` and the harness seats
+ * `claude-code`, `codex`, `copilot`, `gemini-cli`, `grok-build`, `kimi-code`,
+ * `opencode` and `qwen-code`. Known words aid completion without closing the
+ * set: the engine, never the SDK, judges a pin.
+ */
+export type NikaAccessPin =
+  | 'local'
+  | 'mock'
+  | 'harness'
+  | 'oauth'
+  | 'api'
+  | 'claude-code'
+  | 'codex'
+  | 'copilot'
+  | 'gemini-cli'
+  | 'grok-build'
+  | 'kimi-code'
+  | 'opencode'
+  | 'qwen-code'
+  | (string & {});
+
 export interface NikaCheckOptions {
   model?: string;
   nativeStrict?: boolean;
+  /**
+   * Judge the access plan under this pin (`nika check --access`). On a local
+   * engine the report answers in `verdicts`: a pin the engine refuses keeps
+   * `clean: true` (the file holds) with `verdicts.access_ready: false`, and
+   * `verdicts.blockers` names the refusal. On a server the by-name request
+   * carries it as `CheckByName.access`; the server's check is source-only and
+   * evaluates no access plan, so it refuses only an empty or blank pin
+   * (`clean: false`, `error.code` `NIKA-1802`) and acknowledges any other.
+   * A local file checked through a server is a snapshot, which carries no
+   * pin: `access` is refused there (`NikaCompatibilityError`, capability
+   * `snapshotAccess`). Only a value neither door can carry unchanged (not a
+   * string, a NUL byte, a lone surrogate) is refused by the SDK, with
+   * `NikaConfigurationError`.
+   */
+  access?: NikaAccessPin;
   /** Stops only this check request/process. */
   signal?: AbortSignal;
 }
@@ -661,6 +736,24 @@ export interface NikaRunOptions {
    */
   vars?: Record<string, string | number | boolean>;
   model?: string;
+  /**
+   * Pin this run's access path, on both doors: `nika run --access=<pin>` on a
+   * local engine, `JobByName.access` on a server, which takes it with a
+   * workflow named by its served name (a snapshot of a local file carries no
+   * pin, and `run()` refuses `access` there with `NikaCompatibilityError`,
+   * capability `snapshotAccess`, before anything is captured or sent). A pin
+   * is a pin: the engine refuses one it does not know or that is retired
+   * (`NIKA-1802`), or one the workflow's model cannot use (`NIKA-1801`), and
+   * never substitutes another path or model. That refusal is the run's typed
+   * result: `run()` resolves, and `run.result()` settles `failed` with
+   * `result.error.code` (on a local engine `result.settlement.cause` is
+   * `refused` and `exitCode` is 3). A server refuses an empty or blank pin at
+   * admission instead: `run()` rejects with `NikaOperationError` (`code`
+   * `NIKA-1802`, `status` 422). Only a value neither door can carry unchanged
+   * (not a string, a NUL byte, a lone surrogate) is refused by the SDK, with
+   * `NikaConfigurationError`.
+   */
+  access?: NikaAccessPin;
   maxCostUsd?: number;
   /**
    * Required for HTTP admission; reuse the same key and request after an

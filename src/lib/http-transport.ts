@@ -32,6 +32,7 @@ import type {
   NikaTraceVerifyResult,
   NikaWorkflowMetadata,
 } from '../types.js';
+import { accessPin } from './access.js';
 import { verifyNikaEngine, type ResolvedNikaEngine } from './binary/index.js';
 import { captureEngine } from './engine-capture.js';
 import {
@@ -57,8 +58,14 @@ import {
   observedWorldFrom,
 } from './compile.js';
 import { eventError, eventOutputs, eventReceipt, eventSettlement, machineObject } from './machine.js';
+import { machineBufferExceeded, type MeasuredSize } from './machine-buffer.js';
 import { readSettlement } from './settlement.js';
-import { decodeSse, SseParseError, type SseLimits } from './sse/parser.js';
+import {
+  decodeSse,
+  SseFrameOverflowError,
+  SseParseError,
+  type SseLimits,
+} from './sse/parser.js';
 import type { Transport, TransportRun } from './transport.js';
 import {
   isContainedWorkflowName,
@@ -142,6 +149,24 @@ interface JsonRefusal {
 
 type JsonOutcome = { object: Record<string, unknown>; status: number } | JsonRefusal;
 
+/** What bounds one JSON body, and how its refusal names that bound. */
+interface BodyBound {
+  readonly bytes: number;
+  /** Set when `machineBufferBytes` is the bound, so the refusal names the option. */
+  readonly option?: 'machineBufferBytes';
+  /** A resident job document: the default bound always holds it. */
+  readonly fitsDefault?: boolean;
+  /** A fixed bound no option raises, named in the refusal. */
+  readonly name?: string;
+}
+
+/** The `Content-Length` a response declares, when it is a plain decimal byte count. */
+function declaredLength(response: Response): number | undefined {
+  const value = response.headers.get('Content-Length');
+  if (value === null || !/^\d{1,15}$/.test(value.trim())) return undefined;
+  return Number(value.trim());
+}
+
 const JOB_STATUSES = new Set([
   'queued',
   'running',
@@ -169,6 +194,12 @@ const RETRY_MAX_MILLISECONDS = 5_000;
 const WORKFLOW_REFUSAL_STATUSES = new Set([404, 422]);
 /** The capability `/health` advertises for `JobByName.inputs` (nika#1642). */
 const JOB_INPUTS = 'jobInputs';
+/**
+ * The SDK's name for the refusal of `access` beside a snapshot body: the
+ * resident has no such capability, and every machine-protocol-2 resident
+ * reads `JobByName.access` and `CheckByName.access` (pinned OpenAPI 0.123.x).
+ */
+const SNAPSHOT_ACCESS = 'snapshotAccess';
 
 export class HttpTransport implements Transport {
   readonly kind = 'http' as const;
@@ -180,6 +211,7 @@ export class HttpTransport implements Transport {
   constructor(private readonly options: HttpTransportOptions) {}
 
   async check(workflow: string, options: NikaCheckOptions): Promise<NikaCheckResult> {
+    const access = accessPin(options.access, 'check');
     if (options.model !== undefined || options.nativeStrict === true) {
       throw this.gap(
         'checkOptions',
@@ -187,7 +219,16 @@ export class HttpTransport implements Transport {
       );
     }
     refuseLegacyContainedName(workflow);
-    if (isContainedWorkflowName(workflow)) return this.checkByName(workflow, options.signal);
+    if (isContainedWorkflowName(workflow)) return this.checkByName(workflow, access, options.signal);
+    if (access !== undefined) {
+      // A snapshot body carries no pin (the resident refuses any overlay):
+      // refused here, before a local capture is spawned or a byte is sent.
+      throw this.gap(
+        SNAPSHOT_ACCESS,
+        'An execution snapshot carries no access pin; check({ access }) over HTTP names '
+        + 'a workflow by its served name (listWorkflows()), which the server checks with the pin',
+      );
+    }
     const captured = await this.captureSnapshot(workflow, options.signal, true);
     if (captured.bytes === undefined) return captured.report;
     const snapshot = captured.identity;
@@ -272,9 +313,7 @@ export class HttpTransport implements Transport {
         throw new NikaProtocolError(this.kind, 'HTTP compile returned an invalid content-type');
       }
       const object = await this.readObservationObject(response, path, signal,
-        planned.generation === COMPILE_PROVIDER_WIRE_VERSION
-          ? COMPILE_RESPONSE_MAX_BYTES
-          : Math.min(this.options.machineBufferBytes, COMPILE_RESPONSE_MAX_BYTES), false);
+        this.compileBound(planned.generation === COMPILE_PROVIDER_WIRE_VERSION), false);
       if (signal?.aborted) throw new NikaTransportError(this.kind, 'compile aborted');
       if (response.status !== 200) {
         const error = machineObject(object.error);
@@ -338,8 +377,9 @@ export class HttpTransport implements Transport {
   }
 
   async startRun(workflow: string, options: NikaRunOptions): Promise<TransportRun> {
-    // A map the SDK cannot send is the caller's mistake: it needs no request.
+    // A map or pin the SDK cannot send is the caller's mistake: it needs no request.
     const inputs = literalInputs(options);
+    const access = accessPin(options.access, 'run');
     if (
       (options.vars && Object.keys(options.vars).length > 0)
       || options.model !== undefined
@@ -363,6 +403,15 @@ export class HttpTransport implements Transport {
         + 'run({ inputs }) over HTTP binds a workflow by its served name (listWorkflows())',
       );
     }
+    if (access !== undefined && !byName) {
+      // The same law for the pin: a snapshot job inherits the resident's
+      // unpinned plan, and the resident refuses an `access` beside one.
+      throw this.gap(
+        SNAPSHOT_ACCESS,
+        'An execution snapshot carries no access pin and takes no request overlay; '
+        + 'run({ access }) over HTTP binds a workflow by its served name (listWorkflows())',
+      );
+    }
     const idempotencyKey = options.idempotencyKey;
     if (idempotencyKey === undefined) {
       throw new NikaConfigurationError(
@@ -379,10 +428,13 @@ export class HttpTransport implements Transport {
       // carries. No local engine is spawned and no digest is expected here.
       await this.ensureServerIdentity();
       if (inputs) this.requireJobInputs();
-      // The map's bytes are the ones the native transport writes to stdin.
-      const body = inputs
-        ? `{"workflow":${JSON.stringify(workflow)},"inputs":${inputs.json}}`
-        : JSON.stringify({ workflow });
+      // The map's bytes are the ones the native transport writes to stdin. The
+      // key order is fixed, so a retry sends the same bytes its key is bound to;
+      // a request without a pin keeps the exact bytes it always had.
+      const body = `{"workflow":${JSON.stringify(workflow)}`
+        + (access === undefined ? '' : `,"access":${JSON.stringify(access)}`)
+        + (inputs ? `,"inputs":${inputs.json}` : '')
+        + '}';
       const job = await this.admitJob(body, idempotencyKey);
       return this.httpRun(job.id as NikaRunId, 0, job);
     }
@@ -405,13 +457,21 @@ export class HttpTransport implements Transport {
    * 404 (the name is not served) and 422 (the capture or admission refused
    * it). Authorization, deadline, envelope and availability refusals still
    * throw, because they judge the request, not the workflow.
+   *
+   * A pin rides `CheckByName.access`. The server's check is source-only: it
+   * refuses an empty or blank pin (422 `NIKA-1802`, a red result like any
+   * other 422) and evaluates no access plan for any other.
    */
-  private async checkByName(workflow: string, signal?: AbortSignal): Promise<NikaCheckResult> {
+  private async checkByName(
+    workflow: string,
+    access: string | undefined,
+    signal?: AbortSignal,
+  ): Promise<NikaCheckResult> {
     await this.ensureServerIdentity();
     const outcome = await this.jsonOutcome('/v1/check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ workflow }),
+      body: JSON.stringify(access === undefined ? { workflow } : { workflow, access }),
       signal,
     }, true, [200], 'check', true);
     if ('refusal' in outcome) {
@@ -819,6 +879,19 @@ export class HttpTransport implements Transport {
           if (state.terminalObserved) return;
         }
       } catch (cause) {
+        if (cause instanceof SseFrameOverflowError) {
+          // The bound is the client's, not the job's: the job keeps its
+          // result, and a client with a larger bound reads it again.
+          throw new NikaProtocolError(this.kind, machineBufferExceeded(
+            `SSE event frame of job ${id}`,
+            this.options.machineBufferBytes,
+            cause.size,
+            {
+              fitsDefault: true,
+              advice: `The job itself is unaffected: attachRun('${id}') reads it again`,
+            },
+          ), { cause });
+        }
         if (cause instanceof SseParseError) {
           throw new NikaProtocolError(this.kind, cause.message, { cause });
         }
@@ -986,11 +1059,19 @@ export class HttpTransport implements Transport {
     response: Response,
     path: string,
     signal?: AbortSignal,
-    maxBytes = this.options.machineBufferBytes,
+    bound: BodyBound = this.machineBound(),
     useRequestTimeout = true,
   ): Promise<Record<string, unknown>> {
     if (!response.body) {
       throw new NikaProtocolError(this.kind, `HTTP ${path} omitted its JSON body`);
+    }
+    const maxBytes = bound.bytes;
+    // A declared length past the bound is refused before a byte is read, with
+    // the exact size; without one, the count where the bound broke is a floor.
+    const declared = declaredLength(response);
+    if (declared !== undefined && declared > maxBytes) {
+      await discardResponse(response);
+      throw this.bodyTooLarge(path, bound, { bytes: declared, exact: true });
     }
     const reader = response.body.getReader();
     const chunks: Uint8Array[] = [];
@@ -1017,12 +1098,7 @@ export class HttpTransport implements Transport {
         const { done, value } = await Promise.race([reader.read(), boundary]);
         if (done) break;
         bytes += value.byteLength;
-        if (bytes > maxBytes) {
-          throw new NikaProtocolError(
-            this.kind,
-            `HTTP ${path} JSON exceeded ${maxBytes} bytes`,
-          );
-        }
+        if (bytes > maxBytes) throw this.bodyTooLarge(path, bound, { bytes, exact: false });
         chunks.push(value);
       }
     } catch (cause) {
@@ -1139,6 +1215,33 @@ export class HttpTransport implements Transport {
       maxFrameBytes: this.options.machineBufferBytes,
       maxBufferBytes: this.options.machineBufferBytes,
     };
+  }
+
+  /**
+   * A generation-2 compile answer reads to the fixed compile bound; a
+   * generation-1 answer keeps the smaller of `machineBufferBytes` and that bound.
+   */
+  private compileBound(provider: boolean): BodyBound {
+    if (provider || this.options.machineBufferBytes >= COMPILE_RESPONSE_MAX_BYTES) {
+      return { bytes: COMPILE_RESPONSE_MAX_BYTES, name: 'the compile response bound' };
+    }
+    return { bytes: this.options.machineBufferBytes, option: 'machineBufferBytes' };
+  }
+
+  /** The bound of a resident JSON document: `machineBufferBytes`, which its default holds. */
+  private machineBound(): BodyBound {
+    return { bytes: this.options.machineBufferBytes, option: 'machineBufferBytes', fitsDefault: true };
+  }
+
+  private bodyTooLarge(path: string, bound: BodyBound, size: MeasuredSize): NikaProtocolError {
+    const subject = `HTTP ${path} JSON`;
+    if (bound.option === 'machineBufferBytes') {
+      return new NikaProtocolError(this.kind, machineBufferExceeded(subject, bound.bytes, size, {
+        fitsDefault: bound.fitsDefault,
+      }));
+    }
+    return new NikaProtocolError(this.kind, `${subject} exceeded ${bound.bytes} bytes, `
+      + `${bound.name ?? 'its bound'}: it is ${size.exact ? '' : 'at least '}${size.bytes} bytes`);
   }
 
   /**
@@ -1276,6 +1379,7 @@ export class HttpTransport implements Transport {
         cwd: this.options.cwd,
         signal,
         bufferBytes: this.options.machineBufferBytes,
+        machineBuffer: true,
         transport: this.kind,
         label: 'SDK snapshot capture',
       },
@@ -1343,6 +1447,7 @@ export class HttpTransport implements Transport {
         cwd: this.options.cwd,
         signal,
         bufferBytes: this.options.machineBufferBytes,
+        machineBuffer: true,
         transport: this.kind,
         label: 'SDK teaching check',
       },
@@ -1440,7 +1545,7 @@ export class HttpTransport implements Transport {
     }
     return {
       object: await this.readObservationObject(response, path, init.signal ?? undefined,
-        this.options.machineBufferBytes, useRequestTimeout),
+        this.machineBound(), useRequestTimeout),
       status: response.status,
     };
   }

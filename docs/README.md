@@ -11,8 +11,8 @@ two doors. Then read the page for what you are building.
 
 | Page | What it covers |
 |---|---|
-| [runs.md](runs.md) | `check()`, results and statuses, literal `inputs`, `run.events()`, late views and their bounds, cancellation, typed frames, the deprecated wrappers |
-| [server.md](server.md) | `nika serve`: setup, idempotent runs, recovery with `attachRun`, restarts, connection rules, schedules, the local/server differences |
+| [runs.md](runs.md) | `check()`, results and statuses, literal `inputs`, access pins, `run.events()`, late views and their bounds, large results and `machineBufferBytes`, cancellation, typed frames, the deprecated wrappers |
+| [server.md](server.md) | `nika serve`: setup, idempotent runs, recovery with `attachRun`, the 5-second cancel grace, restarts, connection rules, schedules, the local/server differences |
 | [receipts.md](receipts.md) | Traces, receipts and `traceVerify()` on both doors, what a verified receipt proves, signing keys and where each process reads them |
 | [compile.md](compile.md) | `compile()`: from an intention or an edit to a checked candidate, answer rounds, provider rounds on a seated server |
 | [errors.md](errors.md) | The error hierarchy, refused runs, server refusals and a troubleshooting table |

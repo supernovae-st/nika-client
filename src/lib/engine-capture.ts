@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { NikaProtocolError, NikaTransportError } from '../errors.js';
 import type { NikaTransportKind } from '../types.js';
+import { machineBufferExceeded } from './machine-buffer.js';
 
 export interface EngineCapture {
   exitCode: number;
@@ -17,6 +18,12 @@ interface EngineCaptureOptions {
   cwd?: string;
   signal?: AbortSignal;
   bufferBytes: number;
+  /**
+   * `bufferBytes` is the client's `machineBufferBytes`: an overflow names the
+   * option. The engine is stopped at the bound, so the size it reports is the
+   * floor counted until the engine closed, never the whole output.
+   */
+  machineBuffer?: boolean;
   transport: NikaTransportKind;
   label: string;
   /**
@@ -47,7 +54,7 @@ export function captureEngine(
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     const bytes = { stdout: 0, stderr: 0 };
-    let overflow = false;
+    let overflow: 'stdout' | 'stderr' | undefined;
     let spawnError: Error | undefined;
     let closed = false;
     let killTimer: ReturnType<typeof setTimeout> | undefined;
@@ -60,10 +67,13 @@ export function captureEngine(
       killTimer.unref();
     };
     const append = (stream: 'stdout' | 'stderr', chunk: Buffer) => {
-      if (overflow) return;
+      // Past an overflow nothing is kept; the count goes on, as the floor to report.
       bytes[stream] += chunk.byteLength;
+      if (overflow) return;
       if (bytes[stream] > options.bufferBytes) {
-        overflow = true;
+        overflow = stream;
+        stdout.length = 0;
+        stderr.length = 0;
         stop();
         return;
       }
@@ -92,7 +102,12 @@ export function captureEngine(
       } else if (overflow) {
         reject(new NikaProtocolError(
           options.transport,
-          `${options.label} exceeded ${options.bufferBytes} bytes`,
+          options.machineBuffer === true
+            ? machineBufferExceeded(options.label, options.bufferBytes, {
+              bytes: bytes[overflow],
+              exact: false,
+            }, { advice: 'The engine was stopped at the bound, so its full size is unknown' })
+            : `${options.label} exceeded ${options.bufferBytes} bytes`,
         ));
       } else {
         // Bound raw bytes before decoding. Decode the complete stdout so a

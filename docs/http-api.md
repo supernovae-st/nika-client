@@ -16,8 +16,8 @@ Any other non-2xx body is discarded and reported as a redacted
 | `GET /v1/workflows` | `listWorkflows()` | contained relative workflow names |
 | `GET /v1/workflows/{name}` | `workflow(name)` | path-free metadata, never source bytes |
 | `POST /v1/compile` | `compile()` | capability-gated stateless source authoring; 200 ready/incomplete/refused, no job; generation 2 needs `compileNativeV2` |
-| `POST /v1/check` | `check()` | validates a served name or immutable snapshot bytes without a job |
-| `POST /v1/jobs` | `run()` | admits a served name or exact snapshot bytes with an idempotency key |
+| `POST /v1/check` | `check()` | validates a served name (with an optional `access` pin) or immutable snapshot bytes without a job |
+| `POST /v1/jobs` | `run()` | admits a served name (with optional `access` and `inputs`) or exact snapshot bytes with an idempotency key |
 | `GET /v1/jobs/{id}` | internal settlement | durable job identity, outputs, receipt, settlement, or redacted error |
 | `GET /v1/jobs/{id}/status` | `run.status()` | current status only |
 | `GET /v1/jobs/{id}/events` | `run.events()` / `attachRun()` | bounded, sequenced SSE with replay |
@@ -41,7 +41,23 @@ Any other non-2xx body is discarded and reported as a redacted
   machine protocol, snapshot, check-report and event clocks as the resident.
 - Each request has a bounded timeout, except a compile provider round
   without `timeoutMs` or `limits.deadline_ms` (see [compile.md](compile.md)),
-  and each JSON/SSE machine frame has a byte ceiling.
+  and each JSON body and SSE frame has a byte ceiling, `machineBufferBytes`:
+  16 MiB by default, the bound of the resident's own job store, which
+  refuses rather than truncates a larger result. A body past it is refused
+  before it is read when its `Content-Length` says so, and the refusal names
+  the option and the exact size; an SSE frame past it is read to its end,
+  uncollected, so its refusal names its size too (see
+  [runs.md](runs.md#large-results-machinebufferbytes)).
+- Remote `run()` and `check()` send `access` as `JobByName.access` or
+  `CheckByName.access`, the CLI's `--access` vocabulary, for a served name
+  only; a snapshot body takes no pin, so a local path with `access` is
+  refused (`NikaCompatibilityError`, `capability: 'snapshotAccess'`) before
+  any capture or request. Every machine-protocol-2 resident reads the field;
+  no capability gates it. The resident refuses an empty or blank pin at
+  admission (422 `NIKA-1802`); any other pin is admitted (202), and a pin the
+  execution cannot take settles the job `failed` with the engine's code. The
+  check door is source-only and evaluates no access plan: it refuses an empty
+  pin and acknowledges any other.
 - Remote `check()` refuses `model` and `nativeStrict`; remote `run()` refuses
   `model`, `maxCostUsd` and the deprecated `vars`. The server applies its own
   per-run ceiling to manual jobs (`nika serve --run-cost-ceiling`, 1 USD by
@@ -218,7 +234,10 @@ lifecycle vocabulary and keeps each frame on `event.raw`:
 
 The pairs above are exhaustive and listed, never computed as a product of
 kinds and words. An unnamed frame is still delivered with `event.raw` intact,
-and `run.result()` still reads the state word the engine wrote on it.
+and `run.result()` still reads the state word the engine wrote on it. One
+such frame is common: a job admitted with a non-empty `inputs` map opens its
+stream with `execution.queued` (status `queued`, sequence 1), so it streams
+three frames where a job without inputs streams two (engine 0.123.1).
 
 The resident streams no per-task frame, so an HTTP run yields no `task.*`
 event: the SDK never synthesizes one. `event.sequence` is the validated SSE
@@ -248,8 +267,11 @@ it throws `NikaConfigurationError` before network I/O or local snapshot capture.
 Persist the key before admission and retry the exact request with the same key
 if the response is lost or times out. The SDK never generates a hidden key or
 retries admission automatically. Reusing a key with different request bytes
-is an engine conflict, not a retry success. Direct native runs still omit the
-key and reject it if supplied.
+is an engine conflict, not a retry success: the `access` pin and the `inputs`
+map are part of those bytes, so another pin under the same key answers 409
+`idempotency_conflict`. A request without a pin keeps the exact bytes earlier
+releases sent. Direct native runs still omit the key and reject it if
+supplied.
 
 The namespace is the whole durable job store under the server's configured
 `state-root`, across workflows, clients, schedules, and server restarts. The

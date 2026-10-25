@@ -48,15 +48,30 @@ The historical paid-provider and three-pass trace ledgers remain useful prior
 evidence, but are explicitly labelled as historical 0.115 observations and are
 not release gates for the current candidate.
 
+## Public 0.123.1 replay
+
+The current replay uses public release engine `nika 0.123.1 (cc7b51964)`
+(the `nika-macos-arm64-0.123.1.tar.gz` archive of the v0.123.1 GitHub release,
+checked against its `SHA256SUMS`, the tag commit and its build attestation)
+with `supernovae-st-nika-0.123.1.tgz`, on 2026-10-25, in a cleared
+environment with a scratch `HOME`, a file run-signing key and
+`NIKA_KEYCHAIN=off`. All six projects passed (6/6), the hostile suite 14/14
+with 72 real engine runs, and the local corpus, mini-SaaS and two-process
+recovery ledgers are green. The engine still speaks machine protocol 2. Against
+the 0.123.0 ledgers, only the engine and package identities, the pack digest,
+fresh trace and job identifiers and timings moved: the 100 corpus output
+hashes and every behavioral verdict are the same.
+
 ## Public 0.123.0 replay
 
-The current replay uses public release engine `nika 0.123.0 (0bfde3765)`
+The previous public replay used engine `nika 0.123.0 (0bfde3765)`
 (the `nika-macos-arm64-0.123.0.tar.gz` archive of the v0.123.0 GitHub release,
 checked against its `SHA256SUMS`) with `supernovae-st-nika-0.123.0.tgz`, on
 2026-10-23. All six projects passed (6/6), the hostile suite 14/14 with 72
 real engine runs, and the local corpus, mini-SaaS and two-process recovery
 ledgers are green. The engine speaks machine protocol 2; the projects, their
-workflows and their verdicts are unchanged from the 0.120.3 replay.
+workflows and their verdicts are unchanged from the 0.120.3 replay. That
+ledger is historical; it is not the current release gate.
 
 ## Public 0.120.3 replay
 

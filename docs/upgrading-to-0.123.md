@@ -1,7 +1,7 @@
 # Upgrading to 0.123
 
-`@supernovae-st/nika` 0.123.0 bundles engine 0.123.0
-(`nika 0.123.0 (0bfde3765)`) and speaks its machine protocol, **2**. Engines
+`@supernovae-st/nika` 0.123.1 bundles engine 0.123.1
+(`nika 0.123.1 (cc7b51964)`) and speaks its machine protocol, **2**. Engines
 and servers up to 0.122 speak protocol 1. Each package version pairs with
 one protocol generation, so the move from 0.120.x is one rule:
 
@@ -9,8 +9,8 @@ one protocol generation, so the move from 0.120.x is one rule:
 
 | Your package | Your engine or server | Result |
 |---|---|---|
-| 0.123.0 | 0.123.x | works |
-| 0.123.0 | 0.122 and older (protocol 1) | refused at the identity probe, before any job: `NikaCompatibilityError`, `capability: 'engineIdentity'`, naming the engine version |
+| 0.123.x | 0.123.x | works |
+| 0.123.x | 0.122 and older (protocol 1) | refused at the identity probe, before any job: `NikaCompatibilityError`, `capability: 'engineIdentity'`, naming the engine version |
 | 0.120.3 | 0.120.x | works; that pair stays as it was |
 | 0.120.3 | 0.123.x | refused at identity by the 0.120.3 package |
 
@@ -20,12 +20,12 @@ package refuses as a protocol error.
 
 ## Steps
 
-1. **Update the package.** `npm install @supernovae-st/nika@0.123.0`, then
+1. **Update the package.** `npm install @supernovae-st/nika@0.123.1`, then
    check what you installed:
 
    ```sh
-   node -p "require('@supernovae-st/nika/package.json').version"   # 0.123.0
-   ./node_modules/.bin/nika --version                              # nika 0.123.0 (0bfde3765)
+   node -p "require('@supernovae-st/nika/package.json').version"   # 0.123.1
+   ./node_modules/.bin/nika --version                              # nika 0.123.1 (cc7b51964)
    ```
 
 2. **Point `NIKA_BIN` at a 0.123 engine, or unset it.** An explicit `bin` or
@@ -33,15 +33,15 @@ package refuses as a protocol error.
    command refuses a protocol-1 engine there too
    (`NIKA_BIN=<a 0.122 binary> npx nika --version` exits 1).
 
-3. **Upgrade each server.** Install engine 0.123.0 where your `nika serve`
+3. **Upgrade each server.** Install engine 0.123.1 where your `nika serve`
    runs (`brew install supernovae-st/tap/nika`,
    `curl -LsSf https://nika.sh/install.sh | sh`, or the container image
-   `ghcr.io/supernovae-st/nika:0.123.0`), stop the old server as usual
+   `ghcr.io/supernovae-st/nika:0.123.1`), stop the old server as usual
    (Ctrl-C drains running and queued jobs for up to 30 seconds), and start
    the new one with the same flags. Then check its identity:
 
    ```sh
-   curl -s http://127.0.0.1:8787/health   # "engineVersion":"0.123.0", "machineProtocolVersion":2
+   curl -s http://127.0.0.1:8787/health   # "engineVersion":"0.123.1", "machineProtocolVersion":2
    ```
 
 4. **Run your tests against the new pair.** Nothing in `check`, `run`,

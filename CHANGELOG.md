@@ -7,8 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.123.1] - 2026-10-25
+
 ### Documentation
 
+- The README, `docs/upgrading-to-0.123.md` and `docs/compile.md` name 0.123.1
+  as the engine this package bundles: the upgrade steps install 0.123.1 and
+  print `nika 0.123.1 (cc7b51964)`, and a 0.123.x package pairs with a 0.123.x
+  engine or server (one machine protocol, 2). Measurements keep the version
+  they were taken on.
 - The README is rebuilt as the entry for a TypeScript developer: install, a
   fifteen-line first run, what happens underneath (a sequence diagram of a
   local run), the two doors side by side with a server in ten lines, a real
@@ -62,6 +69,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Release train 0.123.1, in lockstep with engine `v0.123.1`**, the first
+  maintenance release of the 0.123 line (the crypto-bigint advisory and
+  first-run message fixes). The machine protocol stays 2, and the served
+  OpenAPI document differs from 0.123.0's only by `info.version`; the
+  generated types are unchanged. `package.json` is 0.123.1 and
+  `sync:native-versions` moved the four native payload manifests, the
+  `optionalDependencies` and the lockfile with it. `ENGINE_QUAL_PIN` and
+  `ENGINE_CANDIDATE` name the commit engine tag `v0.123.1` names
+  (`nika 0.123.1 (cc7b51964)`), and the committed gauntlet ledgers were
+  replayed against that verified public binary, with the same behavioral
+  verdicts as on 0.123.0.
 - `NikaTraceVerifyResult` names the verdicts the 0.123.0 resident writes, in
   lower case (`ok`, `sealed`, `anchored`, `replayed`, `incomplete`,
   `tampered`, `broken` and the CLI's refusal classes), and the `sealed` and
@@ -982,7 +1000,8 @@ Initial public release. Full rewrite from v0.1.0.
 - Error hierarchy completely redesigned
 - License changed from MIT to AGPL-3.0-or-later
 
-[Unreleased]: https://github.com/supernovae-st/nika-client/compare/v0.123.0...HEAD
+[Unreleased]: https://github.com/supernovae-st/nika-client/compare/v0.123.1...HEAD
+[0.123.1]: https://github.com/supernovae-st/nika-client/compare/v0.123.0...v0.123.1
 [0.123.0]: https://github.com/supernovae-st/nika-client/compare/v0.120.3...v0.123.0
 [0.120.3]: https://github.com/supernovae-st/nika-client/compare/v0.120.2...v0.120.3
 [0.120.2]: https://github.com/supernovae-st/nika-client/compare/v0.120.0...v0.120.2

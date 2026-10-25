@@ -595,8 +595,8 @@ The `package.json` subpath is exported for CommonJS, ESM build tools and CI
 pin checks. It reports the installed package, not a moving registry tag.
 
 **Package and engine move together.** Each package version bundles the engine
-with the same number, the one it was tested with: 0.123.0 bundles
-`nika 0.123.0 (0bfde3765)` and speaks its machine protocol, 2. It refuses an
+with the same number, the one it was tested with: 0.123.1 bundles
+`nika 0.123.1 (cc7b51964)` and speaks its machine protocol, 2. It refuses an
 engine or server on another generation (0.122 and older speak 1) at its
 identity probe (`nika --sdk-identity`, `GET /health`), before any job, with
 `NikaCompatibilityError`: upgrade the package and every `nika serve` together

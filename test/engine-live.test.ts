@@ -8,6 +8,7 @@ import {
   Nika,
   NikaCompatibilityError,
   NikaOperationError,
+  NikaProtocolError,
   isNikaRunSucceeded,
   nextCompileRequest,
 } from '../src/index.js';
@@ -66,7 +67,39 @@ const WORKFLOWS: Record<string, string> = {
     '      args: {duration: "6s"}',
     '',
   ].join('\n'),
+  // Outlives the server's fixed 5-second cancel grace by far.
+  'long-wait.nika': [
+    'nika: long-wait',
+    'permits: {tools: ["nika:wait"]}',
+    'tasks:',
+    '  hold:',
+    '    invoke:',
+    '      tool: nika:wait',
+    '      args: {duration: "20s"}',
+    '',
+  ].join('\n'),
+  // Echoes a literal input into its outputs: a result as large as the caller makes it.
+  'big-echo.nika': [
+    'nika: big-echo',
+    'inputs:',
+    '  blob:',
+    '    type: string',
+    '    required: true',
+    'permits: {}',
+    'tasks:',
+    '  note:',
+    '    infer:',
+    '      model: mock/echo',
+    '      prompt: "size probe"',
+    '      max_tokens: 8',
+    'outputs:',
+    '  blob: ${{ inputs.blob }}',
+    '',
+  ].join('\n'),
 };
+/** Above 64 KiB, the size of a 150 KB image once base64 rides `outputs`. */
+const BLOB = 'x'.repeat(200_000);
+const LEAVE_UNSET = ', or leave it unset: its 16 MiB default holds any result nika serve settles';
 
 /** Remove what could reach a provider or reconfigure the engine; restore it after. */
 function keyless(home: string): () => void {
@@ -97,6 +130,21 @@ async function kinds(events: AsyncIterable<NikaRunEvent>): Promise<string[]> {
   const seen: string[] = [];
   for await (const event of events) seen.push(event.kind);
   return seen;
+}
+
+async function collect(events: AsyncIterable<NikaRunEvent>): Promise<NikaRunEvent[]> {
+  const seen: NikaRunEvent[] = [];
+  for await (const event of events) seen.push(event);
+  return seen;
+}
+
+async function refusal(promise: Promise<unknown>): Promise<Error> {
+  try {
+    await promise;
+  } catch (cause) {
+    return cause as Error;
+  }
+  throw new Error('expected a refusal');
 }
 
 describe.skipIf(!live)('the SDK against a real machine-protocol-2 engine (NIKA_BIN)', () => {
@@ -207,6 +255,58 @@ describe.skipIf(!live)('the SDK against a real machine-protocol-2 engine (NIKA_B
       expect(result.settlement).toMatchObject({ status: 'cancelled', cause: 'operator' });
     }, SLOW);
 
+    it('pins the access path, and settles a pin the engine refuses as its typed failure', async () => {
+      const pinned = await local().run('hello.nika', { access: 'mock' });
+      const events = await collect(pinned.events());
+      expect(events.at(-1)?.raw).toMatchObject({
+        kind: 'run_settled',
+        access_plan: [{ model: 'mock/echo', access: 'mock', pinned: true }],
+      });
+      await expect(pinned.result()).resolves.toMatchObject({ status: 'succeeded', exitCode: 0 });
+      for (const [pin, code, words] of [
+        ['bogus-seat', 'NIKA-1802', 'names neither an access class nor a known agentic CLI'],
+        ['codex-acp', 'NIKA-1802', 'is retired'],
+        // One argv element: a pin that starts with a dash is still a value.
+        ['-x', 'NIKA-1802', '`--access -x` names neither'],
+        ['', 'NIKA-1802', 'names neither'],
+        ['local', 'NIKA-1801', 'has no access path matching `--access local`'],
+      ] as const) {
+        const run = await local().run('hello.nika', { access: pin });
+        const result = await run.result();
+        expect(result).toMatchObject({
+          status: 'failed', exitCode: 3, error: { code }, settlement: { status: 'failed', cause: 'refused' },
+        });
+        // With this HOME's signing key the refusal still seals a one-event trace.
+        expect(result.error?.message).toContain(words);
+      }
+    }, SLOW);
+
+    it('judges the access plan under a pin in the check report', async () => {
+      const ready = await local().check('hello.nika', { access: 'mock' });
+      expect(ready).toMatchObject({
+        clean: true, exitCode: 0, verdicts: { access_ready: true }, access_plan: [{ pinned: true }],
+      });
+      const refused = await local().check('hello.nika', { access: 'bogus-seat' });
+      // The file holds; the access layer does not, and says why.
+      expect(refused).toMatchObject({ clean: true, exitCode: 0, verdicts: { access_ready: false, run_ready: false } });
+      expect(refused.verdicts?.blockers?.[0]).toContain('pin `bogus-seat` refused');
+    }, SLOW);
+
+    it('settles a result above 64 KiB by default, and names the line size past a smaller bound', async () => {
+      const result = await (await local().run('big-echo.nika', { inputs: { blob: BLOB } })).result();
+      expect(result).toMatchObject({ status: 'succeeded', exitCode: 0 });
+      expect(result.outputs?.blob).toBe(BLOB);
+      const small = new Nika({ bin: BIN, cwd: project, machineBufferBytes: 64 * 1024 });
+      const refused = await refusal((await small.run('big-echo.nika', { inputs: { blob: BLOB } })).result());
+      expect(refused).toBeInstanceOf(NikaProtocolError);
+      const needed = Number(/it is (\d+) bytes/.exec(refused.message)?.[1]);
+      expect(needed).toBeGreaterThan(BLOB.length);
+      expect(refused.message).toBe(
+        `Native machine line exceeded 65536 bytes (machineBufferBytes): it is ${needed} bytes. `
+        + `Set machineBufferBytes to at least ${needed}`,
+      );
+    }, SLOW);
+
     it('compiles a scheduled intent into choice questions and answers one', async () => {
       const outcome = await local().compile(INTENT);
       expectScheduledChoices(outcome);
@@ -221,7 +321,9 @@ describe.skipIf(!live)('the SDK against a real machine-protocol-2 engine (NIKA_B
   describe('a resident nika serve', () => {
     it('admits a served workflow by name and settles it with its receipt', async () => {
       const nika = remote();
-      expect(await nika.listWorkflows()).toEqual(['hello.nika', 'refused.nika', 'wait.nika']);
+      expect(await nika.listWorkflows()).toEqual([
+        'big-echo.nika', 'hello.nika', 'long-wait.nika', 'refused.nika', 'wait.nika',
+      ]);
       const run = await nika.run('hello.nika', { idempotencyKey: 'live-by-name' });
       const seen = await kinds(run.events());
       expect(seen[0]).toBe('run.started');
@@ -254,6 +356,82 @@ describe.skipIf(!live)('the SDK against a real machine-protocol-2 engine (NIKA_B
       // landed at a task boundary (cancelled by the operator).
       expect(['interrupted', 'cancelled']).toContain(result.status);
       if (result.status === 'cancelled') expect(result.settlement?.cause).toBe('operator');
+    }, SLOW);
+
+    it('ends a job interrupted, not cancelled, once it outlives the 5-second cancel grace', async () => {
+      const run = await remote().run('long-wait.nika', { idempotencyKey: 'live-cancel-grace' });
+      const deadline = Date.now() + 20_000;
+      while (await run.status() !== 'running') {
+        if (Date.now() > deadline) throw new Error('the job never ran');
+        await delay(50);
+      }
+      const asked = Date.now();
+      await expect(run.cancel()).resolves.toMatchObject({ accepted: true, status: 'cancellation_requested' });
+      const result = await run.result();
+      const waited = Date.now() - asked;
+      expect(result.status).toBe('interrupted');
+      expect(result.settlement).toBeUndefined();
+      expect(waited).toBeGreaterThanOrEqual(4_500);
+      expect(waited).toBeLessThan(15_000);
+      expect(await kinds(run.events())).toEqual(['run.started', 'run.interrupted']);
+      await expect(run.status()).resolves.toBe('interrupted');
+    }, SLOW);
+
+    it('pins a served job\'s access path, and returns each refusal typed', async () => {
+      const nika = remote();
+      const pinned = await nika.run('hello.nika', { idempotencyKey: 'live-pin-mock', access: 'mock' });
+      await expect(pinned.result()).resolves.toMatchObject({ status: 'succeeded', outputs: { greeting: 'mock(echo) · hello' } });
+      for (const [pin, code] of [['bogus-seat', 'NIKA-1802'], ['codex-acp', 'NIKA-1802'], ['local', 'NIKA-1801']]) {
+        // Admitted: the job's execution refuses the pin, before any task.
+        const run = await nika.run('hello.nika', { idempotencyKey: `live-pin-${pin}`, access: pin });
+        const result = await run.result();
+        expect(result).toMatchObject({ status: 'failed', transport: 'http', error: { code } });
+        expect(result.settlement).toBeUndefined();
+      }
+      // An empty or blank pin is refused at admission.
+      for (const pin of ['', '  ']) {
+        const refused = await refusal(nika.run('hello.nika', { idempotencyKey: `live-pin-empty-${pin.length}`, access: pin }));
+        expect(refused).toBeInstanceOf(NikaOperationError);
+        expect(refused).toMatchObject({ operation: 'run', code: 'NIKA-1802', status: 422 });
+      }
+      await expect(nika.run('./hello.nika', { idempotencyKey: 'live-pin-snapshot', access: 'mock' }))
+        .rejects.toMatchObject({ name: 'NikaCompatibilityError', capability: 'snapshotAccess' });
+      // The server's check is source-only: it acknowledges a pin it does not judge.
+      await expect(nika.check('hello.nika', { access: 'bogus-seat' })).resolves.toMatchObject({ clean: true, status: 'accepted' });
+      await expect(nika.check('hello.nika', { access: '' })).resolves.toMatchObject({ clean: false, error: { code: 'NIKA-1802' } });
+    }, SLOW);
+
+    it('settles a result above 64 KiB by default, and names the exact bound past a smaller one', async () => {
+      const nika = remote();
+      const run = await nika.run('big-echo.nika', { idempotencyKey: 'live-big', inputs: { blob: BLOB } });
+      // A job with inputs opens with `execution.queued`, which the SDK names `engine.event`.
+      const events = await collect(run.events());
+      expect(events.map((event) => [event.kind, event.raw.kind, event.sequence])).toEqual([
+        ['engine.event', 'execution.queued', 1],
+        ['run.started', 'execution.started', 2],
+        ['run.settled', 'execution.settled', 3],
+      ]);
+      expect((await run.result()).outputs?.blob).toBe(BLOB);
+      expect((await (await nika.attachRun(run.id)).result()).outputs?.blob).toBe(BLOB);
+
+      const bounded = (machineBufferBytes: number) => new Nika({ url, token: TOKEN, allowInsecureHttp: true, machineBufferBytes });
+      const small = bounded(64 * 1024);
+      const streamed = await refusal((await small.run('big-echo.nika', { idempotencyKey: 'live-big-small', inputs: { blob: BLOB } })).result());
+      expect(streamed).toBeInstanceOf(NikaProtocolError);
+      expect(streamed.message).toMatch(new RegExp(
+        '^SSE event frame of job ([0-9a-f-]{36}) exceeded 65536 bytes \\(machineBufferBytes\\): it is (\\d+) bytes\\. '
+        + `Set machineBufferBytes to at least \\2${LEAVE_UNSET.replace(/[.()]/g, '\\$&')}\\. `
+        + "The job itself is unaffected: attachRun\\('\\1'\\) reads it again$",
+      ));
+      // The record's size comes from its Content-Length, and it is exactly enough.
+      const record = await refusal(small.attachRun(run.id));
+      const needed = Number(/it is (\d+) bytes/.exec(record.message)?.[1]);
+      expect(record.message).toBe(
+        `HTTP /v1/jobs/${run.id} JSON exceeded 65536 bytes (machineBufferBytes): it is ${needed} bytes. `
+        + `Set machineBufferBytes to at least ${needed}${LEAVE_UNSET}`,
+      );
+      expect((await (await bounded(needed).attachRun(run.id)).result()).outputs?.blob).toBe(BLOB);
+      await expect(bounded(needed - 1).attachRun(run.id)).rejects.toThrow(`it is ${needed} bytes`);
     }, SLOW);
 
     it('applies a schedule, reads its status and updates it at its revision', async () => {

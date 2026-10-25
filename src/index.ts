@@ -4,6 +4,7 @@ import {
 } from './errors.js';
 import { HttpTransport } from './lib/http-transport.js';
 import { fetchWithoutDeadline } from './lib/unbounded-fetch.js';
+import { DEFAULT_MACHINE_BUFFER_BYTES } from './lib/machine-buffer.js';
 import { NativeProcessTransport } from './lib/native-process-transport.js';
 import { NikaEngineUnavailable, resolveNikaEngine } from './lib/binary/index.js';
 import { RunSession } from './lib/run-session.js';
@@ -48,12 +49,12 @@ import type {
  *
  * It stays finite. With `machineBufferBytes` bounding each frame, the retained
  * HISTORY holds at most `eventBufferSize * machineBufferBytes` of frame text
- * (256 MiB at both defaults; the measured 273 frames total 0.15 MiB). That
- * bounds the history only, never the session or the process. An explicit
- * `eventBufferSize` is kept exactly as given.
+ * (64 GiB at both defaults: arithmetic over the per-frame bound, while the
+ * measured 273 frames total 0.15 MiB). That bounds the history only, never the
+ * session or the process. An explicit `eventBufferSize` is kept exactly as
+ * given. `DEFAULT_MACHINE_BUFFER_BYTES` (16 MiB) explains its own choice.
  */
 const DEFAULT_EVENT_BUFFER_SIZE = 4096;
-const DEFAULT_MACHINE_BUFFER_BYTES = 64 * 1024;
 const DEFAULT_REQUEST_TIMEOUT = 30_000;
 
 /** One client surface for a local engine process or a live nika serve URL. */
@@ -387,11 +388,13 @@ export {
 } from './events.js';
 
 export type {
+  NikaAccessPin,
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckFinding,
   NikaCheckOptions,
   NikaCheckResult,
+  NikaCheckVerdicts,
   NikaCompileAuthoringReceipt,
   NikaCompileCognition,
   NikaCompileCreateRequest,

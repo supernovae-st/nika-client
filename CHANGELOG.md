@@ -7,6 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `run()` and `check()` take `access`, the engine's access pin (NIK-267,
+  nika-client #107 for `access`): an access class (`local`, `mock`,
+  `harness`, `oauth`, `api`) or a harness seat (`claude-code`, `codex`…), the
+  value `nika run --access` and `nika check --access` take. A local engine
+  receives one argv element, `--access=<pin>`, so a pin that starts with `-`
+  stays a value; a `nika serve` receives `JobByName.access` or
+  `CheckByName.access` beside a served name, placed after `workflow` and
+  before `inputs`, and a request without a pin keeps its exact bytes. The
+  engine judges the pin on both doors and its refusal is typed as it wrote
+  it: locally `run.result()` settles `failed` with `error.code` `NIKA-1802`
+  (unknown or retired) or `NIKA-1801` (unusable for the model),
+  `settlement.cause` `refused` and `exitCode` 3; a server admits the job and
+  its execution settles `failed` with the same code, except an empty or
+  blank pin, refused at admission (`NikaOperationError`, `NIKA-1802`, 422).
+  A local `check({ access })` answers in the report's `verdicts`, now typed
+  (`NikaCheckVerdicts`: `access_ready`, `blockers`…); a server's check is
+  source-only and acknowledges any non-empty pin. A local file run or checked
+  through a server refuses `access` before any capture or request
+  (`NikaCompatibilityError`, `capability: 'snapshotAccess'`), since a
+  snapshot takes no pin. The package refuses only what no door can carry
+  unchanged (a non-string, a NUL byte, a lone surrogate) with
+  `NikaConfigurationError`. New types: `NikaAccessPin` (the 0.123.1 words,
+  open to new ones) and `NikaCheckVerdicts`. Measured on engine 0.123.1, and
+  replayed from its captures in `test/fixtures/run-wire/`.
+
+### Changed
+
+- `machineBufferBytes` defaults to 16 MiB instead of 64 KiB (NIK-267). It is
+  the bound of a `nika serve` job store (`MAX_JOB_SNAPSHOT_BYTES`, engine
+  0.123.1), which refuses rather than truncates a result that would outgrow
+  it, so every result a server settles now reaches `run.result()` and
+  `attachRun()`. Under 64 KiB, a job whose outputs carried about 48 KB of
+  image bytes (base64 widens them by a third) settled `succeeded` on the
+  server while `run.result()` threw « SSE buffer exceeded 65536 bytes ». A
+  local engine bounds no frame, so a local result above 16 MiB still needs a
+  larger value. An HTTP generation-1 compile answer is therefore bounded by
+  8 MiB by default, the smaller of the two. Engine diagnostics a result keeps
+  stay bounded by the same value, now cut in linear time on a character
+  boundary.
+
+### Fixed
+
+- A frame or document past `machineBufferBytes` is refused with a
+  `NikaProtocolError` that names the option and the size to set (NIK-267),
+  for example `SSE event frame of job <id> exceeded 65536 bytes
+  (machineBufferBytes): it is 200756 bytes. Set machineBufferBytes to at
+  least 200756, …`. An SSE frame is read to its blank line and a local
+  machine line to its line feed, counted and never kept, so the size is
+  exact and fits at that value; frames that completed before it are still
+  delivered. A server's JSON record is refused before it is read when its
+  `Content-Length` exceeds the bound, with that exact size, otherwise with
+  the floor where the bound broke. A server-side message adds that the
+  default holds any result a server settles and that `attachRun()` reads the
+  job again.
+- A local `check()` or `traceVerify()` report larger than
+  `machineBufferBytes` is refused with its size instead of being cut to its
+  last bytes, which read as an engine that emitted no report.
+
+### Documentation
+
+- `docs/errors.md` no longer lists `schedule_conflict` as a server code: the
+  server sends `schedule_precondition_failed` (HTTP 412), which stays on
+  `machineCode` beside `currentRevision`, while `code` carries the package's
+  `schedule_conflict`; a findings-only 422 is the package's
+  `schedule_refused`. `docs/server.md` says the same.
+- A server job is no longer said to stream two frames in every case: a job
+  admitted with a non-empty `inputs` map opens with `execution.queued`, which
+  the package names `engine.event` (README, `docs/runs.md`,
+  `docs/server.md`, `docs/http-api.md`).
+- `docs/server.md` and `docs/runs.md` document the server's fixed 5-second
+  cancel grace: a run still inside a task when it expires ends `interrupted`,
+  never `cancelled`, with `run.interrupted` last and no settlement; within it
+  the run settles `cancelled` with cause `operator` (measured on 0.123.1).
+- `docs/runs.md` gains "Pin the access path" and "Large results:
+  `machineBufferBytes`"; the README, `docs/server.md`, `docs/http-api.md`,
+  `docs/errors.md` and the glossary name `access` and the new default.
+
 ## [0.123.1] - 2026-10-25
 
 ### Documentation

@@ -70,12 +70,23 @@ a frame) rejects `run()` with `NikaProtocolError` instead.
 A refusal `nika serve` types as `{ error: { code, message } }` becomes a
 `NikaOperationError` with the HTTP `status`, the server's `code`
 (`unauthorized`, `job_not_found`, `idempotency_conflict`,
-`malformed_snapshot`, `schedule_conflict`, or a stamped `NIKA-…` admission
-code) and the refused `operation`. Server messages are the engine's, without
-paths, and a reflected bearer token is redacted before it reaches a message.
-A non-2xx answer without that typed body stays a `NikaTransportError` whose
-body is redacted entirely. Compile refusals are listed in
-[compile.md](compile.md#errors).
+`malformed_snapshot`, `NIKA-1802` for an empty access pin, or another stamped
+`NIKA-…` admission code), the same code on `machineCode`, and the refused
+`operation`. Server messages are the engine's, without paths, and a reflected
+bearer token is redacted before it reaches a message. A non-2xx answer
+without that typed body stays a `NikaTransportError` whose body is redacted
+entirely. Compile refusals are listed in [compile.md](compile.md#errors).
+
+Two schedule refusals carry a name of the package's own in `code`, and keep
+the server's word where it has one:
+
+| HTTP | The server sends | `code` | Also on the error |
+|---|---|---|---|
+| 412 | `{ error: { code: 'schedule_precondition_failed', currentRevision, message } }`: a stale, missing or malformed revision | `schedule_conflict` | `machineCode: 'schedule_precondition_failed'`, `currentRevision` (the revision to retry from, or `null`) |
+| 422 | `{ findings: [{ code, detail }] }`, no code of its own: a declaration the server refuses | `schedule_refused` | `findings`, each with the server's `code` (`schedule.cost`, `schedule.pause`…) |
+
+So branch on `code` for these two, and read `machineCode` when you need the
+server's own word.
 
 ## Also good to know
 
@@ -96,11 +107,14 @@ body is redacted entirely. Compile refusals are listed in
 | `NikaEngineUnavailable` from `new Nika()` | no engine payload for this machine: Windows, musl Linux (Alpine), Node.js older than 22 (npm skips the payload with an `EBADENGINE` warning), or an install with `--omit=optional` | Node.js 22 or newer on macOS or glibc Linux with optional dependencies; or an absolute `bin`/`NIKA_BIN`; or a `nika serve` by URL |
 | `NikaCompatibilityError` with `capability: 'engineIdentity'` | the engine or server speaks another machine protocol (0.122 and older speak 1) | upgrade the engine and every `nika serve` to 0.123, or point `NIKA_BIN` at a 0.123 engine; see [upgrading-to-0.123.md](upgrading-to-0.123.md) |
 | `NikaCompatibilityError` naming another capability (`inputsLiteral`, `jobInputs`, `compile`, `compileNativeV2`…) | the engine or server does not advertise what the call needs | use an engine that does, or drop the option; nothing was started |
+| `NikaCompatibilityError` with `capability: 'snapshotInputs'` or `'snapshotAccess'` | a local file (`./flow.nika`) run or checked through a server: its snapshot takes no `inputs` or `access` | name the workflow the server serves (`listWorkflows()`); nothing was captured or sent |
 | `NikaConfigurationError` about `bin` or `NIKA_BIN` | a bare name or a relative path, which would make the OS search `PATH` | an absolute path |
 | `nika serve` exits with `token file must be mode 0600` | the token file is readable by others | `chmod 600 .nika/serve.token` |
 | `nika serve` exits with `token file must be 32–512 visible ASCII` | the token is not 32–512 visible ASCII bytes (too short, too long, or other characters) | mint it again: `(umask 077 && openssl rand -hex 24 > .nika/serve.token)` |
 | `nika serve` exits with `nothing armed — this project has no nika.yaml` | the server needs a project file in its folder | a one-line `nika.yaml`: `nika: my-project` |
-| `NikaProtocolError: Native machine line exceeded … bytes` | `machineBufferBytes` is smaller than an engine frame | keep the default 64 KiB: a 0.123.0 run's first frame is about 32 KiB |
+| `NikaProtocolError: … exceeded … bytes (machineBufferBytes): it is … bytes` | a frame or document is larger than `machineBufferBytes`: a bound you lowered, or a local result above the 16 MiB default | set `machineBufferBytes` to at least the size the message names; over a server, leaving it unset also works (the default holds any result a server settles), and `attachRun(jobId)` reads the job again (see [runs.md](runs.md#large-results-machinebufferbytes)) |
 | `run()` rejects with `NikaOperationError` | the engine refused the workflow before it ran | `error.code` and `error.findings`; `./node_modules/.bin/nika check <file>` shows the same audit |
+| `result.status` is `failed` with `error.code` `NIKA-1802` or `NIKA-1801` after `run({ access })` | the engine refused the access pin: unknown or retired (`NIKA-1802`), or not usable for the workflow's model (`NIKA-1801`); it never takes another path | use a pin the engine knows (`./node_modules/.bin/nika doctor` lists every path), or drop `access`; `check({ access })` on a local engine shows it in `verdicts.blockers` |
+| `result.status` is `interrupted` after `run.cancel()` on a server | the run was still inside a task when the server's fixed 5-second cancel grace expired | that is the server's ending, not a failed cancel; the result has no settlement (see [server.md](server.md#cancel-a-running-job-the-5-second-grace)) |
 | `result.status` is `failed` and nothing threw | an admitted run failed: that is data | read `result.error` (`code`, `message`, `task`) and `result.settlement` |
 | `result.status` is `paused` | a human gate holds the run | it is neither success nor failure: show it as waiting |

@@ -593,12 +593,20 @@ describe('HTTP compile generation 2 (provider rounds and kept-round replay)', ()
     expect(outcome.candidate).toBe(preview);
   });
 
-  it('keeps a generation-1 answer within machineBufferBytes, as before', async () => {
+  it('keeps a generation-1 answer within a smaller machineBufferBytes, and names it', async () => {
     const fetch = vi.fn().mockResolvedValueOnce(server()).mockResolvedValueOnce(
       jsonResponse(document(1, { candidate: `nika: big\n# ${'x'.repeat(100 * 1024)}\n` })));
-    const error = await failure(client(fetch).compile('hello'));
+    const error = await failure(client(fetch, { machineBufferBytes: 64 * 1024 }).compile('hello'));
     expect(error).toBeInstanceOf(NikaProtocolError);
-    expect(error.message).toMatch(/exceeded 65536 bytes/);
+    expect(error.message).toMatch(/^HTTP \/v1\/compile JSON exceeded 65536 bytes \(machineBufferBytes\): it is at least \d+ bytes\. Set machineBufferBytes above \d+$/);
+  });
+
+  it('reads a generation-1 answer past 64 KiB under the default, up to the 8 MiB compile bound', async () => {
+    const candidate = `nika: big\n# ${'x'.repeat(100 * 1024)}\n`;
+    const fetch = vi.fn().mockResolvedValueOnce(server()).mockResolvedValueOnce(
+      jsonResponse(document(1, { candidate })));
+    const outcome = await client(fetch).compile('hello');
+    expect(outcome.candidate).toBe(candidate);
   });
 
   it('still bounds a provider round by an explicit timeoutMs', async () => {

@@ -8,6 +8,7 @@ The words these pages use, defined once. The engine's own vocabulary is in the
 |---|---|
 | **Workflow** | A `.nika` file: the model to use, what it may touch (`permits:`), its tasks and its outputs. On a server, a workflow is also addressed by its *served name*, a path relative to the server's `--workflows` folder. |
 | **Check** | The engine's static audit of a workflow, before any model is called: plan, models, access, cost, permits. `nika check` prints it; `check()` returns it; every `run()` applies it first. |
+| **Access pin** | The path the engine takes to a workflow's model: a class (`mock`, `api`…) or a harness seat (`codex`, `claude-code`…), set with `access` (`--access` on the CLI). A pin is a pin: one the engine cannot take is refused (`NIKA-1801`, `NIKA-1802`), never swapped for another path. |
 | **Admission** | The engine accepting a workflow for a run. `run()` resolves on admission and rejects on a refusal; nothing runs without it. |
 | **Run** | One admission of a workflow, and the `NikaRun` handle your code gets for it. |
 | **Job** | A run held by `nika serve`. Its id (`run.id` over HTTP) is durable: store it to reattach after a restart. |

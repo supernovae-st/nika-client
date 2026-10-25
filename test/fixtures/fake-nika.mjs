@@ -32,6 +32,18 @@ const WIRE_REPLAYS = {
     stderr: 'pr1679-input1708.stderr',
     exitCode: 3,
   },
+  // Released 0.123.1 refusing an access pin before the prologue: one
+  // `run_settled` frame, `failed` with cause `refused` and the engine's code.
+  'wire-01231-access1802': {
+    stdout: '0.123.1-access1802.ndjson.stdout',
+    stderr: '0.123.1-access1802.stderr',
+    exitCode: 3,
+  },
+  'wire-01231-access1801': {
+    stdout: '0.123.1-access1801.ndjson.stdout',
+    stderr: '0.123.1-access1801.stderr',
+    exitCode: 3,
+  },
 };
 
 function wire(name) {
@@ -110,6 +122,14 @@ if (command === 'check') {
     // Neither stream carries a JSON object; only prose reaches the caller.
     console.error('nika: the engine could not produce a check report for this input');
     process.exit(3);
+  }
+  const bigReport = workflow.match(/big-report-(\d+)\./);
+  if (bigReport) {
+    // SYNTHETIC size: a clean report whose one line is padded to this many bytes.
+    const open = '{"report_version":1,"clean":true,"pad":"';
+    const line = `${open}${'r'.repeat(Number(bigReport[1]) - open.length - 2)}"}`;
+    process.stdout.write(`${line}\n`, () => process.exit(0));
+    return;
   }
   if (workflow.includes('red-snapshot')) {
     if (sdkSnapshot) {
@@ -201,6 +221,23 @@ if (command === 'run' && argv.includes('--json')) {
       { kind: 'workflow_completed', fields: [{ key: 'status', value: 'succeeded' }] },
       { kind: 'run_settled', status: 'succeeded', cause: 'normal', outputs: { tasks } },
     );
+    emitThenExit({ stdout: `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`, exitCode: 0 });
+    return;
+  }
+  // SYNTHETIC size: `big-settled-<N>` settles with one output of N characters,
+  // whole on `run_settled` as engine 0.123.1 writes a large outputs map (its
+  // journal frame keeps only `outputs_bytes`). The first frame echoes argv.
+  const bigSettled = workflow.match(/big-settled-(\d+)\./);
+  if (bigSettled) {
+    const blob = 'b'.repeat(Number(bigSettled[1]));
+    const lines = [
+      { kind: 'workflow_started', argv },
+      { kind: 'workflow_completed', fields: [
+        { key: 'status', value: 'succeeded' },
+        { key: 'outputs_bytes', value: blob.length + 11 },
+      ] },
+      { kind: 'run_settled', status: 'succeeded', cause: 'normal', outputs: { blob } },
+    ];
     emitThenExit({ stdout: `${lines.map((line) => JSON.stringify(line)).join('\n')}\n`, exitCode: 0 });
     return;
   }

@@ -1,0 +1,1 @@
+nika run: NIKA-1801 · model `mock/echo` has no access path matching `--access local` — a pin is a pin (refusal, never a substitute) · mock · pin_unsatisfied (pin layer) · pin `--access local` names another path

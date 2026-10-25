@@ -410,7 +410,7 @@ SIGTERM, then SIGKILL after two seconds.
 Responses are bounded: 8 MiB for a local compile and for an HTTP
 generation-2 request, whose answer carries the round's plan, decision records
 and receipt. An HTTP generation-1 answer keeps the smaller of
-`machineBufferBytes` (64 KiB by default) and 8 MiB.
+`machineBufferBytes` (16 MiB by default, so 8 MiB applies) and 8 MiB.
 
 ## Files a local compile touches
 

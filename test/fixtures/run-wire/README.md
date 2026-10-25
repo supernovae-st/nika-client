@@ -59,3 +59,21 @@ Recaptured at 2026-09-18 15:01 UTC from the clean integration build above.
 All eight refusal stdout/stderr files were byte-identical. The admitted seven-frame
 trace was replaced with the new measured bytes, including Spec pin
 `be8ff017d448c4d4e413d11c40613af0afb90754`. No envelope or refusal changed.
+
+## Access pins (`0.123.1-access*` · NIK-267)
+
+Replayed by `fake-nika.mjs`. Captured 2026-10-26 on macos/aarch64 with the
+SDK's own argv (`run workflows/hello.nika --json --access=<pin>`), a cleared
+environment, a throwaway `HOME` with no signing key, `NIKA_KEYCHAIN=off` and a
+`mock/echo` workflow: no provider, no network, no seat. Without a key the
+refusal writes no trace (`evidence: "none"`, no receipt); with one, the engine
+also seals a one-event trace and the frame carries its receipt.
+
+| Prefix | Engine | Dialect |
+|---|---|---|
+| `0.123.1-*` | released `nika 0.123.1 (cc7b51964)`: the `v0.123.1` release tarball `nika-macos-arm64-0.123.1.tar.gz`, sha256 `26e31cbb…4923` as its `SHA256SUMS` lists, binary sha256 `8e493fa9…3b54` | a pin refused before the prologue: one compact `run_settled` frame, `status: "failed"`, `cause: "refused"`, the code on `error`, and `access_plan` naming the rejected path; prose on stderr |
+
+| File | Pin | Exit |
+|---|---|---|
+| `0.123.1-access1802.*` | `bogus-seat`: names neither an access class nor a known agentic CLI (`NIKA-1802`) | 3 |
+| `0.123.1-access1801.*` | `local` for `mock/echo`: the model has no path matching the pin (`NIKA-1801`) | 3 |

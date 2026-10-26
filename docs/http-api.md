@@ -194,14 +194,19 @@ native transport, they reject with `NikaCompatibilityError`
 token, `requestTimeout`, `machineBufferBytes`. The SDK checks each field the
 contract names by type and lets any other key ride through, so a later
 additive key is not a refusal: `receipt` (the closed `JobReceipt`, its
-`job_id` the run's, with a `chain_head`), `verdict`, `max_artifact_bytes`,
+`job_id` the run's, with a `chain_head`), `verdict` (the journal tier,
+`sealed` or `anchored`; any other word is refused), `max_artifact_bytes`,
 `truncated` and `artifacts`. Each entry has a unique `name`, a `kind`, a
 `size` that is a byte count, a `sha256` of 64 lowercase hexadecimal digits,
 a `mime`, an optional `task` and an `event_id`; a `file` carries its `path`,
 an `agent_image` none. A `path` must be contained (relative, `/`-separated,
-no empty, `.` or `..` segment, no backslash, no NUL), so it can be joined
-under a local directory. Any other shape is a `NikaProtocolError` that quotes
-no value. The receipt must equal the job's own, compared key by key: the one
+no empty, `.` or `..` segment, no backslash, no NUL). That check is lexical
+and POSIX, the server's own: it does not make a path safe to join under a
+local directory on every system (`C:x` is drive-relative on Windows, and two
+paths that differ only by case collide on a case-insensitive disk). To write
+an artifact locally, resolve the joined path, check that it stays under your
+directory, and open it exclusively (`wx`). Any other shape is a
+`NikaProtocolError` that quotes no value. The receipt must equal the job's own, compared key by key: the one
 the handle settled with, or, when the handle has not seen the settlement, the
 one `GET /v1/jobs/{id}` returns.
 

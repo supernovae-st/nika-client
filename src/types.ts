@@ -670,8 +670,8 @@ export interface NikaArtifact {
 export interface NikaArtifactManifest {
   /** The job's receipt. The SDK checked that it is the job's own. */
   receipt: NikaReceipt;
-  /** The tier the job's journal attained: `sealed` or `anchored`. Open to new words. */
-  verdict: 'sealed' | 'anchored' | (string & {});
+  /** The tier the job's sealed journal attained. The SDK refuses any other word. */
+  verdict: 'sealed' | 'anchored';
   /**
    * The largest artifact this server downloads (256 MiB by default). A larger
    * one stays listed, and its download is refused (403 `artifact_too_large`).

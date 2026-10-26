@@ -427,6 +427,12 @@ describe('run.artifacts(): the settled job manifest', () => {
       [{ receipt: { ...RECEIPT, extra: 1 } }, /Receipt contained unknown fields/],
       [{ receipt: { ...RECEIPT, job_id: 'another-job' } }, /Receipt job identity/],
       [{ verdict: 7 }, /verdict/],
+      // The journal tier is the manifest's only proof of a seal: a word outside the
+      // contract's enum is not one, whatever its case.
+      ...['tampered', 'unsealed', 'SEALED', '']
+        .map((bad) => [{ verdict: bad }, /verdict was not a sealed tier/] as [
+          Record<string, unknown>, RegExp,
+        ]),
       [{ max_artifact_bytes: 0 }, /max_artifact_bytes/],
       [{ truncated: 'no' }, /truncated/],
       [{ artifacts: {} }, /artifacts was not an array/],
@@ -454,6 +460,17 @@ describe('run.artifacts(): the settled job manifest', () => {
       expect(refused.message).toMatch(message);
       expect(refused.message).not.toContain('secret');
       expect(refused.message).not.toContain('passwd');
+      expect(refused.message).not.toContain('tampered');
+    }
+  });
+
+  it('accepts each sealed tier the contract names', async () => {
+    const server = await serve();
+    const run = await attached();
+    for (const verdict of ['sealed', 'anchored'] as const) {
+      server.manifest = (_request, response) => json(response, 200, manifestBody({ verdict }));
+      const manifest = await run.artifacts();
+      expect(manifest.verdict).toBe(verdict);
     }
   });
 

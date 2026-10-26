@@ -33,6 +33,13 @@ export const DEFAULT_ARTIFACT_READ_BYTES = 16 * 1024 * 1024;
 const SHA256_HEX = /^[0-9a-f]{64}$/;
 
 /**
+ * The journal tiers a manifest can name (`ArtifactManifest.verdict`). The
+ * server lists artifacts only from a sealed journal, so any other word, in
+ * any case, is not the proof the manifest stands on.
+ */
+const SEALED_TIERS: ReadonlySet<unknown> = new Set(['sealed', 'anchored']);
+
+/**
  * A response body as a fetch hands it over: only its reader is used, so the
  * global stream of `fetch` and Node's own web stream both fit.
  */
@@ -80,7 +87,7 @@ export function checkedArtifactManifest(
   const fault = (what: string) => new NikaProtocolError(transport, `Artifact manifest ${what}`);
   const receipt = machineObject(value.receipt);
   if (!receipt) throw fault('omitted its receipt');
-  if (typeof value.verdict !== 'string' || value.verdict.length === 0) throw fault('verdict was not a word');
+  if (!SEALED_TIERS.has(value.verdict)) throw fault('verdict was not a sealed tier (sealed or anchored)');
   if (!Number.isSafeInteger(value.max_artifact_bytes) || (value.max_artifact_bytes as number) < 1) {
     throw fault('max_artifact_bytes was not a positive integer');
   }
@@ -125,8 +132,11 @@ function artifactEntry(value: unknown, transport: NikaTransportKind, index: numb
 /**
  * The engine's own containment law for an artifact path (nika-serve
  * `artifacts::manifest::contained`): relative, `/`-separated, normalized, no
- * backslash and no NUL. A path that holds it can be joined under a directory
- * without leaving it.
+ * backslash and no NUL. The check is lexical and POSIX: it does not make a
+ * path safe to join on every system (`C:x` is drive-relative on Windows, and
+ * names that differ only by case collide on a case-insensitive disk). A caller
+ * that writes one under a directory resolves it, checks the result stays
+ * there, and opens it exclusively.
  */
 function isContainedPath(value: unknown): boolean {
   return typeof value === 'string'

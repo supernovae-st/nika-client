@@ -39,8 +39,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `nika:chart`, `nika:image_generate`, `nika:tts_generate` and `nika:image_fx`
   saved, the images an agent's harness sent, each with its recorded size and
   SHA-256), and `attachRun()` handles have it too. The SDK checks every field
-  the contract names, keeps any other, requires a contained `path`, and checks
-  that the manifest's receipt, chain head included, is the job's own.
+  the contract names, keeps any other, requires a `verdict` of `sealed` or
+  `anchored` and a contained `path` (a lexical, POSIX check: a caller writing
+  under a local directory still resolves and checks the joined path), and
+  checks that the manifest's receipt, chain head included, is the job's own.
   `run.downloadArtifact(nameOrEntry)` returns the bytes of `GET
   /v1/jobs/{id}/artifacts/{name}` as a Node web stream: the name travels as
   one segment (`/` as `%2F`), the response must carry the entry's size as

@@ -143,7 +143,7 @@ no network.
 `nika check` is the static audit that runs before any model is called: what
 the workflow will do, which models and tools it uses, what it may touch and
 what it can cost. An excerpt of its report for the file above, on engine
-0.123.0:
+0.123.2:
 
 ```text
 nika check · hello.nika
@@ -210,10 +210,10 @@ a model's answer. [Use a real model](#use-a-real-model) when you are ready.
 > `NIKA_RUN_KEY_FILE` and `NIKA_RUN_PUB_FILE` pair), never an OS keychain.
 > Run step 1's `NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init`, then
 > run the demo again. A key that Nika 0.122 or older kept in the macOS
-> keychain cannot be read or copied by 0.123.0: on such a Mac, this command
-> mints a new key as files. On Linux, a key that `nika key init --force` put
-> in the Secret Service can be copied instead, from a terminal:
-> `./node_modules/.bin/nika key align`.
+> keychain cannot be read or copied by Nika 0.123, which never opens the
+> keychain on macOS: on such a Mac, this command mints a new key as files.
+> On Linux, a key that `nika key init --force` put in the Secret Service can
+> be copied instead, from a terminal: `./node_modules/.bin/nika key align`.
 
 The same file is [`examples/quick-start.ts`](https://github.com/supernovae-st/nika-client/blob/main/examples/quick-start.ts),
 next to examples that watch, cancel and recover runs.
@@ -242,7 +242,7 @@ sequenceDiagram
   participant Engine as nika engine (child process)
   App->>SDK: nika.run('hello.nika', { maxCostUsd: 0 })
   SDK->>Engine: nika --sdk-identity (once per client)
-  Engine-->>SDK: version 0.123.0, machine protocol 2, capabilities
+  Engine-->>SDK: version (the package's own), machine protocol 2, capabilities
   SDK->>Engine: nika run hello.nika --json --max-cost-usd 0
   Engine-->>SDK: first frame: admitted, or a refusal
   SDK-->>App: NikaRun (a refusal rejects run() instead)
@@ -440,8 +440,8 @@ All four rows were measured with the quick-start file on engine 0.123.0.
 
 **Signing keys.** The engine your app starts and `nika serve` sign with
 `~/.nika/keys/` or the explicit `NIKA_RUN_KEY_FILE` and `NIKA_RUN_PUB_FILE`
-pair, never with an OS keychain. On macOS, 0.123.0 opens no keychain even from
-a terminal; on Linux, `nika` run from a terminal also uses the desktop's
+pair, never with an OS keychain. On macOS, Nika 0.123 opens no keychain even
+from a terminal; on Linux, `nika` run from a terminal also uses the desktop's
 Secret Service. `NIKA_KEYCHAIN=off nika key init` creates the key as files on
 both, and with the same variable `nika key rotate` retires it and writes the
 next one there (records it signed stay verifiable). `nika key trust` prints

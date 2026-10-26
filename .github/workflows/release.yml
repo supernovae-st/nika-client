@@ -385,7 +385,10 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event.inputs.dry_run != 'true'
     needs: [prepare, verify-native-runtime]
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Five sequential publications, each waiting until npm serves it. For 0.123.2
+    # one package took up to 7.5 minutes, and the former 15-minute bound
+    # cancelled the job during the third package.
+    timeout-minutes: 60
     environment: npm-publish
     permissions:
       contents: read

@@ -287,7 +287,9 @@ file/out/totals.svg image/svg+xml
   `artifacts`, but its journals are unsealed, so every request answers 409
   `artifact_journal_unverified`. Run `NIKA_KEYCHAIN=off
   ./node_modules/.bin/nika key init` as the server's user: the jobs that run
-  after it serve their artifacts.
+  after it serve their artifacts. A server started with an explicit pair,
+  `NIKA_RUN_KEY_FILE` and `NIKA_RUN_PUB_FILE`, seals with that pair and
+  verifies its journals against its public half.
 - **Bound to the job.** The manifest carries the job's receipt, chain head
   included, and the package checks that it is the job's own: the receipt the
   run settled with, or the one the server's record of the job carries.
@@ -323,9 +325,9 @@ file/out/totals.svg image/svg+xml
   still downloads, proven against the response's headers alone, and
   `download.artifact` is then absent.
 - **Which servers.** A server that serves artifacts lists `artifacts` in
-  `/health`; the released 0.123.1 does not. On any other server, and on a
-  local run, the three methods reject with `NikaCompatibilityError`
-  (`capability: 'artifacts'`) before any request. A local run's files are
+  `/health`, from engine 0.123.2; 0.123.1 and older do not. On any other
+  server, and on a local run, the three methods reject with
+  `NikaCompatibilityError` (`capability: 'artifacts'`) before any request. A local run's files are
   where its workflow wrote them, in the client's `cwd`.
 
 Every refusal is a `NikaOperationError` with the server's `code` and HTTP

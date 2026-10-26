@@ -5,7 +5,7 @@ import type { NikaArtifact, NikaTransportKind } from '../types.js';
 import { machineObject } from './machine.js';
 
 /**
- * A settled server job's artifacts (engine nika#1834): the byte streams its
+ * A settled server job's artifacts (engine 0.123.2, nika#1834): the byte streams its
  * sealed journal records with their SHA-256, listed by
  * `GET /v1/jobs/{id}/artifacts` and downloaded by
  * `GET /v1/jobs/{id}/artifacts/{name}`. The server checks every byte it sends

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A local `run.events()` names a skipped or a cancelled task: `task_skipped`
+  is `task.skipped` and `task_cancelled` is `task.cancelled`, two additive
+  `NikaRunEventKind` words that carry `task`, never `error` or `status`.
+  Before, both frames arrived as `engine.event`, so an application waiting
+  for one ending per task never saw one for them. A recovered task still ends
+  on `task.completed`, and its `task_recovered` frame stays an `engine.event`.
+  A `nika serve` run is unchanged: the server streams no per-task frame.
+  Measured on engine 0.123.2 (`test/fixtures/run-wire/0.123.2-*`).
+
 ## [0.123.2] - 2026-10-26
 
 ### Added

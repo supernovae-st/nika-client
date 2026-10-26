@@ -77,3 +77,35 @@ also seals a one-event trace and the frame carries its receipt.
 |---|---|---|
 | `0.123.1-access1802.*` | `bogus-seat`: names neither an access class nor a known agentic CLI (`NIKA-1802`) | 3 |
 | `0.123.1-access1801.*` | `local` for `mock/echo`: the model has no path matching the pin (`NIKA-1801`) | 3 |
+
+## Skipped, recovered and cancelled tasks (`0.123.2-*`)
+
+Replayed by `test/run-events.test.ts`. Captured 2026-10-26 on macos/aarch64
+with the SDK's own argv (`run workflows/lifecycle.nika --json`), a cleared
+environment, a throwaway `HOME` with no signing key (so the run settles
+`evidence: "unsealed"`), `NIKA_KEYCHAIN=off` and a workflow of three
+`nika:assert` tasks: no model, no provider, no network.
+
+| Prefix | Engine | Dialect |
+|---|---|---|
+| `0.123.2-*` | released `nika 0.123.2 (5591478a7)`: the `@supernovae-st/nika-darwin-arm64@0.123.2` npm payload, `bin/nika` sha256 `910e9736…8856` equal to its `INTEGRITY.json` | admitted lifecycle frames, a `task_*` ending per task |
+
+```yaml
+nika: probe-sdk-lifecycle
+permits:
+  tools: ["nika:assert"]
+tasks:
+  skipped_one:
+    on_error: { skip: true }
+    invoke: { tool: "nika:assert", args: { condition: false, message: "skip me" } }
+  recovered_one:
+    on_error: { recover: { ok: false } }
+    invoke: { tool: "nika:assert", args: { condition: false, message: "recover me" } }
+  cancelled_one:
+    after: { recovered_one: failure }
+    invoke: { tool: "nika:assert", args: { condition: true } }
+```
+
+| File | Run | Exit |
+|---|---|---|
+| `0.123.2-skipped-cancelled.ndjson.stdout` | `task_skipped` for `skipped_one`; `task_recovered` then `task_completed` for `recovered_one`; `task_cancelled` for `cancelled_one` (its `after:` edge waits for a failure that was recovered); `run_settled` `succeeded`: fourteen frames | 0 |

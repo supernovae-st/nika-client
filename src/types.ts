@@ -342,9 +342,13 @@ export type NikaEvent<
  * one that contradicts its kind, stays an `engine.event`.
  *
  * - `run.started`: `workflow_started` · `execution.started`.
- * - `task.scheduled` · `task.started` · `task.completed` · `task.failed`: the
- *   native `task_*` frames. `nika serve` streams no per-task frame, so an HTTP
- *   run yields none; the SDK never synthesizes one.
+ * - `task.scheduled` · `task.started` · `task.completed` · `task.failed` ·
+ *   `task.skipped` · `task.cancelled`: the native `task_*` frames. A skip or
+ *   a cancellation ends a task as a completion or a failure does; it names
+ *   its `task`, never an `error`. A recovered task ends on `task.completed`,
+ *   and its `task_recovered` frame stays an `engine.event`. `nika serve`
+ *   streams no per-task frame, so an HTTP run yields none; the SDK never
+ *   synthesizes one.
  * - `run.waiting`: the settlement frame (`run_settled` · `execution.settled`)
  *   carrying `paused`. A human gate holds the run: it is not failed, not a
  *   completed execution, and stays resumable.
@@ -373,6 +377,8 @@ export type NikaRunEventKind =
   | 'task.started'
   | 'task.completed'
   | 'task.failed'
+  | 'task.skipped'
+  | 'task.cancelled'
   | 'run.waiting'
   | 'run.settled'
   | 'run.interrupted'

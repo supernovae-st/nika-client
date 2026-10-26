@@ -18,11 +18,16 @@ const STARTED: ReadonlySet<string> = new Set(['workflow_started', 'execution.sta
 
 // A Map, never an object literal: a frame's kind is engine-supplied text, and
 // `constructor` must stay a word instead of resolving up a prototype chain.
+// A skip and a cancellation end a task as a completion or a failure does.
+// `task_recovered` ends nothing: a recovered task still ends on
+// `task_completed`, so that frame stays an engine event.
 const TASKS: ReadonlyMap<string, NikaRunEventKind> = new Map([
   ['task_scheduled', 'task.scheduled'],
   ['task_started', 'task.started'],
   ['task_completed', 'task.completed'],
   ['task_failed', 'task.failed'],
+  ['task_skipped', 'task.skipped'],
+  ['task_cancelled', 'task.cancelled'],
 ]);
 
 /** The settlement frame of each transport: the one frame a run can wait on. */

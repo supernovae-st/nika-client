@@ -27,6 +27,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Before, an application waiting for one ending per task never saw one for a
   skipped or a cancelled task.
 
+### Documentation
+
+- `docs/receipts.md` and `docs/errors.md` name Nika 0.123, not 0.123.0, as
+  the engine that never opens the keychain on macOS and so can neither read
+  nor copy a run-key that Nika 0.122 or older stored there, as the README
+  does. Rechecked on 0.123.2: from a terminal, `nika doctor` says
+  `the keychain is not opened by this ad-hoc build`, and
+  `NIKA_KEYCHAIN=off nika key init` writes the key as two `0600` files under
+  `~/.nika/keys/`.
+
 ## [0.123.2] - 2026-10-26
 
 ### Added

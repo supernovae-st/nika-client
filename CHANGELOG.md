@@ -33,9 +33,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `NikaConfigurationError`. New types: `NikaAccessPin` (the 0.123.1 words,
   open to new ones) and `NikaCheckVerdicts`. Measured on engine 0.123.1, and
   replayed from its captures in `test/fixtures/run-wire/`.
+- A server run's handle reads what its settled job produced (NIK-265, engine
+  nika#1834): `run.artifacts()` returns the manifest `GET
+  /v1/jobs/{id}/artifacts` derives from the job's sealed journal (the files
+  `nika:chart`, `nika:image_generate`, `nika:tts_generate` and `nika:image_fx`
+  saved, the images an agent's harness sent, each with its recorded size and
+  SHA-256), and `attachRun()` handles have it too. The SDK checks every field
+  the contract names, keeps any other, requires a contained `path`, and checks
+  that the manifest's receipt, chain head included, is the job's own.
+  `run.downloadArtifact(nameOrEntry)` returns the bytes of `GET
+  /v1/jobs/{id}/artifacts/{name}` as a Node web stream: the name travels as
+  one segment (`/` as `%2F`), the response must carry the entry's size as
+  `Content-Length` and its digest as `Nika-Artifact-Sha256`, and the stream
+  hashes every chunk, holds the last one back and closes only once exactly
+  the recorded size hashed to the recorded SHA-256, erroring otherwise. A body
+  cut short is requested again, up to 3 more times, its first bytes held to
+  the ones already received; a file that changed then answers 409
+  `artifact_changed`. Neither `machineBufferBytes` nor `requestTimeout` bounds
+  a download: it goes through the unbounded fetch and stops on its `signal`
+  or a cancelled stream. `run.readArtifact()` resolves the proven bytes as one
+  `Uint8Array`, refusing an artifact larger than `maxBytes` (16 MiB by
+  default) with `NikaConfigurationError` before its download. Every refusal
+  of the two routes is a `NikaOperationError` with the server's code
+  (`job_not_settled`, `artifact_journal_unverified`, `artifact_too_large`…)
+  and `operation` `artifacts`, `downloadArtifact` or `readArtifact`. A server
+  that does not list `artifacts` in `/health` (the released 0.123.1 does not)
+  and a local run, whose engine serves no manifest, refuse with
+  `NikaCompatibilityError` (`capability: 'artifacts'`) before any request.
+  New types: `NikaArtifact`, `NikaArtifactManifest`, `NikaArtifactDownload`
+  and their options. Qualified against engine main at nika#1834 on loopback
+  (`test/engine-live.test.ts`), and against a fake server for every code, a
+  wrong digest, short bodies and the missing capability
+  (`test/artifacts-http.test.ts`).
 
 ### Changed
 
+- The pinned `openapi.json` and `src/generated/openapi.d.ts` are engine
+  main's at nika#1834 (`b32524244`): the two artifact routes, and the answers
+  0.123.1 already sent undeclared (the trace verify `tier`, the schedule 412
+  and 422 shapes, the by-name 404s, the PUT schedule 507, the 5-second cancel
+  grace). `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name that commit, so the
+  candidate CI qualifies the package against it. The CI type-drift job stays
+  bound to the released engine `package.json` names, 0.123.1, whose document
+  lacks those routes, until the 0.123.2 lockstep moves both.
 - `machineBufferBytes` defaults to 16 MiB instead of 64 KiB (NIK-267). It is
   the bound of a `nika serve` job store (`MAX_JOB_SNAPSHOT_BYTES`, engine
   0.123.1), which refuses rather than truncates a result that would outgrow

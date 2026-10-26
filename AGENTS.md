@@ -23,8 +23,10 @@ illustration in `media/` (see `media/README.md`; not shipped).
 1. The remote wire types mirror live `nika serve` OpenAPI (`openapi.json`) —
    never invent fields; check the owning contract and engine source when in
    doubt. Bare `nika serve` is the resident cadence firer; HTTP is the
-   `--bind` door. Artifacts stay absent; cancel answers 200 (a settled job)
-   or 202 (the request accepted on a running job, engine 0.118).
+   `--bind` door. Artifacts are the server's: its manifest and verified
+   download routes (capability `artifacts`, engine nika#1834), never a local
+   file the SDK lists itself; cancel answers 200 (a settled job) or 202 (the
+   request accepted on a running job, engine 0.118).
 2. 4 verbs only: `infer` · `exec` · `invoke` · `agent`.
 3. Commit trailer: `Co-Authored-By: Nika 🦋 <nika@supernovae.studio>`.
 4. Media are rendered, never edited: change a tape or scene under

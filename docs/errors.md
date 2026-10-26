@@ -77,6 +77,29 @@ bearer token is redacted before it reaches a message. A non-2xx answer
 without that typed body stays a `NikaTransportError` whose body is redacted
 entirely. Compile refusals are listed in [compile.md](compile.md#errors).
 
+The artifact routes add their own codes, on `run.artifacts()`,
+`run.downloadArtifact()` and `run.readArtifact()` (`operation` names the
+method):
+
+| HTTP | `code` | When |
+|---|---|---|
+| 401 | `unauthorized` | no bearer token, or a wrong one |
+| 403 | `artifact_too_large` | a download over the server's `max_artifact_bytes` (256 MiB by default); the artifact stays listed |
+| 404 | `job_not_found` | an unknown or foreign job id |
+| 404 | `artifact_not_found` | no manifest entry by that name |
+| 408 | `request_timeout` | the manifest took longer than the server's request deadline |
+| 409 | `job_not_settled` | the job is queued, running or paused: `await run.result()` first |
+| 409 | `artifact_journal_unavailable` | no journal binds the job: an interrupted job never sealed one |
+| 409 | `artifact_journal_unverified` | the job's journal is not sealed and intact with its receipt's head: a server without a run key answers this for every job |
+| 409 | `artifact_changed` | the bytes at the recorded place no longer match the record: changed, moved, removed or replaced since the run |
+| 500 | `internal_error` | the server could not read the journal or the file |
+| 503 | `store_busy` · `artifact_capacity` | the server's job state, or all four of its artifact slots, are busy: retry with backoff |
+
+A download that the server refused on a retry fails its stream with that
+error; one still cut short after its retries fails with a
+`NikaTransportError`, and bytes that are not the recorded ones with a
+`NikaProtocolError` (see [server.md](server.md#download-what-a-job-produced-artifacts)).
+
 Two schedule refusals carry a name of the package's own in `code`, and keep
 the server's word where it has one:
 
@@ -107,6 +130,10 @@ server's own word.
 | `NikaEngineUnavailable` from `new Nika()` | no engine payload for this machine: Windows, musl Linux (Alpine), Node.js older than 22 (npm skips the payload with an `EBADENGINE` warning), or an install with `--omit=optional` | Node.js 22 or newer on macOS or glibc Linux with optional dependencies; or an absolute `bin`/`NIKA_BIN`; or a `nika serve` by URL |
 | `NikaCompatibilityError` with `capability: 'engineIdentity'` | the engine or server speaks another machine protocol (0.122 and older speak 1) | upgrade the engine and every `nika serve` to 0.123, or point `NIKA_BIN` at a 0.123 engine; see [upgrading-to-0.123.md](upgrading-to-0.123.md) |
 | `NikaCompatibilityError` naming another capability (`inputsLiteral`, `jobInputs`, `compile`, `compileNativeV2`…) | the engine or server does not advertise what the call needs | use an engine that does, or drop the option; nothing was started |
+| `NikaCompatibilityError` with `capability: 'artifacts'` | the server does not list `artifacts` in `/health` (the released 0.123.1 does not), or the run is a local one, whose files are where its workflow wrote them | connect to a server that serves artifacts; for a local run, read the files in the client's `cwd` |
+| `NikaOperationError` with `code: 'artifact_journal_unverified'` | the server has no run key, so the journals of its jobs are unsealed | run `NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init` as the server's user; the jobs that run after it serve their artifacts |
+| `NikaOperationError` with `code: 'artifact_changed'` | the file the run saved was changed, moved or removed on the server since | restore it or run the job again: the server never serves other bytes |
+| `NikaConfigurationError: Artifact … more than readArtifact() holds` | the artifact is larger than `maxBytes` (16 MiB by default) | raise `maxBytes`, or stream it with `run.downloadArtifact()` |
 | `NikaCompatibilityError` with `capability: 'snapshotInputs'` or `'snapshotAccess'` | a local file (`./flow.nika`) run or checked through a server: its snapshot takes no `inputs` or `access` | name the workflow the server serves (`listWorkflows()`); nothing was captured or sent |
 | `NikaConfigurationError` about `bin` or `NIKA_BIN` | a bare name or a relative path, which would make the OS search `PATH` | an absolute path |
 | `nika serve` exits with `token file must be mode 0600` | the token file is readable by others | `chmod 600 .nika/serve.token` |

@@ -1,7 +1,10 @@
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { createWriteStream, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { setTimeout as delay } from 'node:timers/promises';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
@@ -76,6 +79,22 @@ const WORKFLOWS: Record<string, string> = {
     '    invoke:',
     '      tool: nika:wait',
     '      args: {duration: "20s"}',
+    '',
+  ].join('\n'),
+  // Saves one SVG with `nika:chart`: a byte stream its journal records with its SHA-256.
+  'chart.nika': [
+    'nika: chart',
+    'permits:',
+    '  fs: { write: ["./out/**"] }',
+    '  tools: ["nika:chart"]',
+    'tasks:',
+    '  draw:',
+    '    invoke:',
+    '      tool: "nika:chart"',
+    '      args:',
+    '        data: [{ region: "north", total: 10 }, { region: "south", total: 4 }]',
+    '        chart: { type: bar, x: region, y: total }',
+    '        out: "./out/totals.svg"',
     '',
   ].join('\n'),
   // Echoes a literal input into its outputs: a result as large as the caller makes it.
@@ -322,7 +341,7 @@ describe.skipIf(!live)('the SDK against a real machine-protocol-2 engine (NIKA_B
     it('admits a served workflow by name and settles it with its receipt', async () => {
       const nika = remote();
       expect(await nika.listWorkflows()).toEqual([
-        'big-echo.nika', 'hello.nika', 'long-wait.nika', 'refused.nika', 'wait.nika',
+        'big-echo.nika', 'chart.nika', 'hello.nika', 'long-wait.nika', 'refused.nika', 'wait.nika',
       ]);
       const run = await nika.run('hello.nika', { idempotencyKey: 'live-by-name' });
       const seen = await kinds(run.events());
@@ -349,6 +368,9 @@ describe.skipIf(!live)('the SDK against a real machine-protocol-2 engine (NIKA_B
         if (Date.now() > deadline) throw new Error('the job never ran');
         await delay(50);
       }
+      await expect(run.artifacts()).rejects.toMatchObject({
+        name: 'NikaOperationError', operation: 'artifacts', code: 'job_not_settled', status: 409,
+      });
       const cancel = await run.cancel();
       expect(cancel).toMatchObject({ accepted: true, status: 'cancellation_requested', transport: 'http' });
       const result = await run.result();
@@ -375,6 +397,10 @@ describe.skipIf(!live)('the SDK against a real machine-protocol-2 engine (NIKA_B
       expect(waited).toBeLessThan(15_000);
       expect(await kinds(run.events())).toEqual(['run.started', 'run.interrupted']);
       await expect(run.status()).resolves.toBe('interrupted');
+      // An interrupted run never sealed its journal: the server lists nothing for it.
+      await expect(run.artifacts()).rejects.toMatchObject({
+        name: 'NikaOperationError', operation: 'artifacts', code: 'artifact_journal_unavailable', status: 409,
+      });
     }, SLOW);
 
     it('pins a served job\'s access path, and returns each refusal typed', async () => {
@@ -432,6 +458,124 @@ describe.skipIf(!live)('the SDK against a real machine-protocol-2 engine (NIKA_B
       );
       expect((await (await bounded(needed).attachRun(run.id)).result()).outputs?.blob).toBe(BLOB);
       await expect(bounded(needed - 1).attachRun(run.id)).rejects.toThrow(`it is ${needed} bytes`);
+    }, SLOW);
+
+    it('lists and downloads what a settled job recorded, proven against its sealed journal', async () => {
+      const nika = remote();
+      const run = await nika.run('chart.nika', { idempotencyKey: 'live-artifacts' });
+      const result = await run.result();
+      expect(result).toMatchObject({ status: 'succeeded', transport: 'http' });
+      const file = path.join(project, 'out', 'totals.svg');
+      const written = readFileSync(file);
+      const digest = createHash('sha256').update(written).digest('hex');
+
+      const manifest = await run.artifacts();
+      expect(manifest).toEqual({
+        receipt: result.receipt,
+        verdict: 'sealed',
+        max_artifact_bytes: 256 * 1024 * 1024,
+        truncated: false,
+        artifacts: [{
+          name: 'file/out/totals.svg',
+          kind: 'file',
+          path: 'out/totals.svg',
+          size: written.length,
+          sha256: digest,
+          mime: 'image/svg+xml',
+          task: 'draw',
+          event_id: expect.stringMatching(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/),
+        }],
+      });
+      const [entry] = manifest.artifacts;
+
+      // By name: the stream, piped to a file, closes once its bytes are proven.
+      const download = await run.downloadArtifact(entry!.name);
+      expect(download).toMatchObject({ name: entry!.name, size: written.length, sha256: digest, mime: 'image/svg+xml' });
+      const copy = path.join(root, 'totals.copy.svg');
+      await pipeline(Readable.fromWeb(download.stream), createWriteStream(copy));
+      expect(readFileSync(copy).equals(written)).toBe(true);
+      // By entry, whole; and through the recovery door, from another client.
+      expect(Buffer.from(await run.readArtifact(entry!)).equals(written)).toBe(true);
+      const recovered = await remote().attachRun(run.id);
+      expect(Buffer.from(await recovered.readArtifact('file/out/totals.svg')).equals(written)).toBe(true);
+      await expect(recovered.artifacts()).resolves.toEqual(manifest);
+
+      // What the server serves is what the journal recorded, or nothing.
+      writeFileSync(file, Buffer.concat([written, Buffer.from('<!-- edited -->')]));
+      await expect(run.readArtifact(entry!)).rejects.toMatchObject({
+        name: 'NikaOperationError', operation: 'readArtifact', code: 'artifact_changed', status: 409,
+      });
+      writeFileSync(file, written);
+      expect(Buffer.from(await run.readArtifact(entry!)).equals(written)).toBe(true);
+      await expect(run.downloadArtifact('file/out/absent.svg')).rejects.toMatchObject({
+        name: 'NikaOperationError', code: 'artifact_not_found', status: 404,
+      });
+      await expect(run.readArtifact(entry!, { maxBytes: written.length - 1 })).rejects.toMatchObject({
+        name: 'NikaConfigurationError',
+      });
+
+      // The served headers the SDK checks, and the ones it leaves to a browser.
+      const raw = await fetch(`${url}/v1/jobs/${run.id}/artifacts/file%2Fout%2Ftotals.svg`, {
+        headers: { Authorization: `Bearer ${TOKEN}` },
+      });
+      expect(Object.fromEntries([...raw.headers].filter(([name]) => name !== 'date' && name !== 'connection'))).toEqual({
+        'content-type': 'image/svg+xml',
+        'content-length': String(written.length),
+        'nika-artifact-sha256': digest,
+        'content-disposition': 'attachment',
+        'x-content-type-options': 'nosniff',
+        'content-security-policy': 'sandbox',
+        'cache-control': 'no-store',
+      });
+      await raw.body?.cancel();
+
+      // A local run has no manifest: a typed gap, never an invented path.
+      const localRun = await local().run('hello.nika');
+      await expect(localRun.artifacts()).rejects.toMatchObject({
+        name: 'NikaCompatibilityError', capability: 'artifacts', transport: 'native-process',
+      });
+      await localRun.result();
+    }, SLOW);
+
+    it('serves no artifact from a server without a run key, which seals no journal', async () => {
+      // Another server, in a HOME without `nika key init`: it still lists `artifacts`.
+      const keyless = path.join(root, 'keyless');
+      mkdirSync(path.join(keyless, 'home'), { recursive: true });
+      mkdirSync(path.join(keyless, 'project'));
+      writeFileSync(path.join(keyless, 'project', 'nika.yaml'), 'nika: engine-live-keyless\n');
+      writeFileSync(path.join(keyless, 'project', 'chart.nika'), WORKFLOWS['chart.nika']!);
+      const server = spawn(BIN!, [
+        'serve', '--bind', '127.0.0.1:0', '--workflows', path.join(keyless, 'project'),
+        '--token-file', path.join(root, 'token'), '--state-root', path.join(keyless, 'state'), '--plain',
+      ], {
+        cwd: path.join(keyless, 'project'),
+        env: { ...process.env, HOME: path.join(keyless, 'home') },
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      try {
+        let log = '';
+        server.stdout!.on('data', (chunk) => { log += String(chunk); });
+        server.stderr!.on('data', (chunk) => { log += String(chunk); });
+        let keylessUrl = '';
+        const deadline = Date.now() + 20_000;
+        while (!keylessUrl) {
+          const listening = log.match(/nika serve[^\n]*listening (http:\/\/127\.0\.0\.1:\d+)/);
+          if (listening) keylessUrl = listening[1]!;
+          else if (Date.now() > deadline || server.exitCode !== null) throw new Error(`nika serve did not listen: ${log}`);
+          else await delay(25);
+        }
+        const nika = new Nika({ url: keylessUrl, token: TOKEN, allowInsecureHttp: true });
+        const run = await nika.run('chart.nika', { idempotencyKey: 'live-artifacts-keyless' });
+        await expect(run.result()).resolves.toMatchObject({ status: 'succeeded' });
+        for (const refused of [() => run.artifacts(), () => run.readArtifact('file/out/totals.svg')]) {
+          await expect(refused()).rejects.toMatchObject({
+            name: 'NikaOperationError', code: 'artifact_journal_unverified', status: 409,
+          });
+        }
+      } finally {
+        server.kill('SIGINT');
+        if (!await untilSettled(server, 5_000)) server.kill('SIGKILL');
+      }
     }, SLOW);
 
     it('applies a schedule, reads its status and updates it at its revision', async () => {

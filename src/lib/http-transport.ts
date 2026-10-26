@@ -7,6 +7,12 @@ import {
   NikaTransportError,
 } from '../errors.js';
 import type {
+  NikaArtifact,
+  NikaArtifactDownload,
+  NikaArtifactDownloadOptions,
+  NikaArtifactManifest,
+  NikaArtifactReadOptions,
+  NikaArtifactsOptions,
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckOptions,
@@ -33,6 +39,21 @@ import type {
   NikaWorkflowMetadata,
 } from '../types.js';
 import { accessPin } from './access.js';
+import {
+  ARTIFACT_SHA256_HEADER,
+  ARTIFACTS_CAPABILITY,
+  artifactReadBound,
+  artifactSegment,
+  artifactTooLarge,
+  canonicalJson,
+  checkedArtifactManifest,
+  collectArtifact,
+  emptyBody,
+  requestedArtifact,
+  verifiedArtifactStream,
+  type ArtifactBody,
+  type ArtifactExpectation,
+} from './artifacts.js';
 import { verifyNikaEngine, type ResolvedNikaEngine } from './binary/index.js';
 import { captureEngine } from './engine-capture.js';
 import {
@@ -148,6 +169,16 @@ interface JsonRefusal {
 }
 
 type JsonOutcome = { object: Record<string, unknown>; status: number } | JsonRefusal;
+
+/** What a run handle knows of its job when it asks for the job's artifacts. */
+interface ArtifactContext {
+  readonly id: string;
+  /** The receipt the handle settled with, once it observed the settlement. */
+  readonly receipt: () => NikaReceipt | undefined;
+  readonly executionId?: string;
+  readonly traceId?: string;
+  readonly snapshotDigest?: string;
+}
 
 /** What bounds one JSON body, and how its refusal names that bound. */
 interface BodyBound {
@@ -630,6 +661,7 @@ export class HttpTransport implements Transport {
   ): TransportRun {
     const controller = new AbortController();
     let terminalObserved = false;
+    let settledReceipt: NikaReceipt | undefined;
     let resolveDone!: (result: NikaRunResult) => void;
     let rejectDone!: (error: Error) => void;
     const done = new Promise<NikaRunResult>((resolve, reject) => {
@@ -667,6 +699,7 @@ export class HttpTransport implements Transport {
           knownTraceId,
           expectedSnapshotDigest,
         );
+        settledReceipt = receipt;
       }
       // A run admitted by POST and settled from its SSE frame has no durable
       // read to name its identities; the receipt on that frame carries them
@@ -701,6 +734,16 @@ export class HttpTransport implements Transport {
       });
     };
     if (attachedState && isObservationEnded(attachedState)) settle(attachedState);
+
+    // Artifacts belong to the job, not to this observation: they use the
+    // caller's signal only, so the observation's cleanup never stops them.
+    const artifacts: ArtifactContext = {
+      id,
+      receipt: () => settledReceipt,
+      executionId: attachedState?.execution_id,
+      traceId: attachedState?.trace_id,
+      snapshotDigest: expectedSnapshotDigest,
+    };
 
     const events: AsyncIterable<NikaEvent> = {
       [Symbol.asyncIterator]: async function* (this: HttpTransport) {
@@ -778,10 +821,304 @@ export class HttpTransport implements Transport {
           transport: this.kind,
         };
       },
+      artifacts: (options) => this.artifacts(artifacts, options),
+      downloadArtifact: (artifact, options) => this.downloadArtifact(artifacts, artifact, options),
+      readArtifact: (artifact, options) => this.readArtifact(artifacts, artifact, options),
       cleanup: async () => {
         controller.abort();
       },
     };
+  }
+
+  /**
+   * `run.artifacts()`: the settled job's manifest. A server that does not
+   * advertise `artifacts` is refused after `/health` alone; a refusal of the
+   * server is a `NikaOperationError` with its code.
+   */
+  private async artifacts(
+    context: ArtifactContext,
+    options: NikaArtifactsOptions,
+  ): Promise<NikaArtifactManifest> {
+    const signal = options.signal;
+    try {
+      if (signal?.aborted) throw this.abortedBy('artifacts', signal);
+      return await this.artifactManifest(context, 'artifacts', signal);
+    } catch (cause) {
+      if (signal?.aborted) throw this.abortedBy('artifacts', signal, cause);
+      throw cause;
+    }
+  }
+
+  /** `run.downloadArtifact()`: one artifact's verified stream. */
+  private async downloadArtifact(
+    context: ArtifactContext,
+    artifact: string | NikaArtifact,
+    options: NikaArtifactDownloadOptions,
+    operation: NikaOperation = 'downloadArtifact',
+    maxBytes?: number,
+  ): Promise<NikaArtifactDownload> {
+    const requested = requestedArtifact(artifact);
+    const signal = options.signal;
+    try {
+      if (signal?.aborted) throw this.abortedBy(operation, signal);
+      await this.requireArtifacts();
+      let entry = requested.entry;
+      let truncated = false;
+      if (!entry) {
+        const manifest = await this.artifactManifest(context, operation, signal);
+        entry = manifest.artifacts.find((candidate) => candidate.name === requested.name);
+        truncated = manifest.truncated;
+      }
+      // A listed size past the caller's bound needs no download to refuse.
+      if (entry && maxBytes !== undefined && entry.size > maxBytes) {
+        throw artifactTooLarge(requested.name, entry.size, maxBytes);
+      }
+      return await this.openArtifact(context.id, requested.name, entry, truncated, operation, signal, maxBytes);
+    } catch (cause) {
+      if (signal?.aborted) throw this.abortedBy(operation, signal, cause);
+      throw cause;
+    }
+  }
+
+  /** `run.readArtifact()`: one artifact's whole bytes, resolved once proven. */
+  private async readArtifact(
+    context: ArtifactContext,
+    artifact: string | NikaArtifact,
+    options: NikaArtifactReadOptions,
+  ): Promise<Uint8Array> {
+    const maxBytes = artifactReadBound(options.maxBytes);
+    const download = await this.downloadArtifact(context, artifact, options, 'readArtifact', maxBytes);
+    return collectArtifact(download.stream, download.size);
+  }
+
+  /**
+   * The settled job's manifest (`GET /v1/jobs/{id}/artifacts`), bound to the
+   * job: its receipt names the journal's head, and it must be the job's own,
+   * the one this handle settled with or, before the handle saw a settlement,
+   * the one the job's durable record carries.
+   */
+  private async artifactManifest(
+    context: ArtifactContext,
+    operation: NikaOperation,
+    signal?: AbortSignal,
+  ): Promise<NikaArtifactManifest> {
+    await this.requireArtifacts();
+    const object = await this.json(`/v1/jobs/${encodeURIComponent(context.id)}/artifacts`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal,
+    }, true, [200], operation);
+    const manifest = checkedArtifactManifest(object, this.kind);
+    assertReceiptIdentity(
+      manifest.receipt,
+      context.id,
+      this.kind,
+      context.executionId,
+      context.traceId,
+      context.snapshotDigest,
+    );
+    if (typeof manifest.receipt.chain_head !== 'string') {
+      throw new NikaProtocolError(this.kind, 'Artifact manifest receipt names no chain head, so it binds no journal');
+    }
+    const job = context.receipt() ?? await this.settledJobReceipt(context.id, operation, signal);
+    if (canonicalJson(manifest.receipt) !== canonicalJson(job)) {
+      throw new NikaProtocolError(this.kind, "Artifact manifest receipt is not the job's receipt");
+    }
+    return {
+      ...manifest.object,
+      receipt: Object.freeze({ ...manifest.receipt }),
+      artifacts: manifest.artifacts,
+    } as NikaArtifactManifest;
+  }
+
+  /** The receipt a settled job's durable record carries. */
+  private async settledJobReceipt(
+    id: string,
+    operation: NikaOperation,
+    signal?: AbortSignal,
+  ): Promise<NikaReceipt> {
+    const object = await this.json(`/v1/jobs/${encodeURIComponent(id)}`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      signal,
+    }, true, [200], operation);
+    const durable = durableJob(object, id, this.kind);
+    if (!durable.receipt) {
+      throw new NikaProtocolError(
+        this.kind,
+        "The job's record carries no receipt to bind its artifact manifest to",
+      );
+    }
+    return durable.receipt;
+  }
+
+  /**
+   * The first response of one download, checked against what the manifest
+   * records, and the verified stream over it. A name the manifest does not
+   * list is still asked for, so the server's own answer decides: 404
+   * `artifact_not_found`, or, past a truncated manifest, the bytes proven
+   * against the response's headers alone.
+   */
+  private async openArtifact(
+    id: string,
+    name: string,
+    entry: NikaArtifact | undefined,
+    truncated: boolean,
+    operation: NikaOperation,
+    signal: AbortSignal | undefined,
+    maxBytes: number | undefined,
+  ): Promise<NikaArtifactDownload> {
+    const path = `/v1/jobs/${encodeURIComponent(id)}/artifacts/${artifactSegment(name)}`;
+    const controller = new AbortController();
+    const abort = () => controller.abort(signal?.reason);
+    if (signal?.aborted) abort();
+    else signal?.addEventListener('abort', abort, { once: true });
+    const release = () => signal?.removeEventListener('abort', abort);
+    let response: Response | undefined;
+    try {
+      response = await this.artifactResponse(path, operation, controller.signal);
+      const expected = this.artifactExpectation(response, path, name, entry, truncated);
+      if (maxBytes !== undefined && expected.size > maxBytes) {
+        throw artifactTooLarge(name, expected.size, maxBytes);
+      }
+      const stream = verifiedArtifactStream({
+        transport: this.kind,
+        expected,
+        first: response.body ?? emptyBody(),
+        again: (attempt) => this.artifactAgain(path, operation, expected, attempt, controller.signal),
+        controller,
+        aborted: () => (signal?.aborted ? this.abortedBy(operation, signal) : undefined),
+        finished: release,
+      });
+      const contentType = response.headers.get('Content-Type')?.trim();
+      return {
+        name,
+        size: expected.size,
+        sha256: expected.sha256,
+        mime: typeof entry?.mime === 'string' ? entry.mime : contentType || 'application/octet-stream',
+        ...(entry ? { artifact: entry } : {}),
+        stream,
+      };
+    } catch (cause) {
+      release();
+      controller.abort();
+      if (response) await discardResponse(response);
+      throw cause;
+    }
+  }
+
+  /** A retry of a download whose body ended early: after a bounded wait, the same request. */
+  private async artifactAgain(
+    path: string,
+    operation: NikaOperation,
+    expected: ArtifactExpectation,
+    attempt: number,
+    signal: AbortSignal,
+  ): Promise<ArtifactBody> {
+    await (this.options.retryDelay ?? abortableDelay)(
+      boundedDelay(RETRY_BASE_MILLISECONDS * (2 ** (attempt - 2))),
+      signal,
+    );
+    const response = await this.artifactResponse(path, operation, signal);
+    try {
+      this.artifactExpectation(response, path, expected.name, expected, false);
+    } catch (cause) {
+      await discardResponse(response);
+      throw cause;
+    }
+    return response.body ?? emptyBody();
+  }
+
+  /**
+   * One request for an artifact's bytes: a 200, or the server's typed refusal.
+   * No deadline applies, as to an event stream's body: the server reads the
+   * whole file against its record before the first byte, and streams it past
+   * its own request deadline. The unbounded fetch keeps the default client's
+   * header and body timers away from it. Only the caller's signal ends it.
+   */
+  private async artifactResponse(
+    path: string,
+    operation: NikaOperation,
+    signal: AbortSignal,
+  ): Promise<Response> {
+    const response = await this.fetchResponse(path, {
+      method: 'GET',
+      // The recorded bytes, as recorded: a proxy must not encode them.
+      headers: { 'Accept-Encoding': 'identity' },
+      signal,
+    }, false, true, false, true);
+    if (response.status === 200) return response;
+    if (response.ok) {
+      await discardResponse(response);
+      throw new NikaProtocolError(this.kind, `HTTP ${path} returned non-contract status ${response.status}`);
+    }
+    const refusal = await this.readRefusal(response, path);
+    if (refusal) throw this.refused(path, { operation, status: response.status, refusal });
+    throw new NikaTransportError(this.kind, `HTTP ${response.status} for ${path}: [REDACTED]`);
+  }
+
+  /**
+   * What a 200 says it carries, held to what the manifest records: its
+   * `Content-Length` is the recorded size and its `Nika-Artifact-Sha256` the
+   * recorded digest, and its bytes are not encoded. Without an entry, only a
+   * truncated manifest may leave one out.
+   */
+  private artifactExpectation(
+    response: Response,
+    path: string,
+    name: string,
+    recorded: { size: number; sha256: string } | undefined,
+    truncated: boolean,
+  ): ArtifactExpectation {
+    const encoding = response.headers.get('Content-Encoding')?.trim().toLowerCase();
+    if (encoding && encoding !== 'identity') {
+      throw new NikaProtocolError(
+        this.kind,
+        `HTTP ${path} encoded the artifact (Content-Encoding ${encoding}); its recorded bytes travel as they are`,
+      );
+    }
+    const size = declaredLength(response);
+    if (size === undefined) {
+      throw new NikaProtocolError(this.kind, `HTTP ${path} declared no Content-Length for the artifact`);
+    }
+    const sha256 = response.headers.get(ARTIFACT_SHA256_HEADER);
+    if (sha256 === null || !/^[0-9a-f]{64}$/.test(sha256)) {
+      throw new NikaProtocolError(this.kind, `HTTP ${path} omitted its ${ARTIFACT_SHA256_HEADER} digest`);
+    }
+    if (recorded) {
+      if (size !== recorded.size || sha256 !== recorded.sha256) {
+        throw new NikaProtocolError(
+          this.kind,
+          `HTTP ${path} answered ${size} bytes with SHA-256 ${sha256}, not the ${recorded.size} bytes `
+          + `and ${recorded.sha256} its manifest entry records`,
+        );
+      }
+    } else if (!truncated) {
+      throw new NikaProtocolError(this.kind, `HTTP ${path} served an artifact its complete manifest does not list`);
+    }
+    return { name, size, sha256 };
+  }
+
+  /** The server lists `artifacts` in `/health`, or nothing is requested. */
+  private async requireArtifacts(): Promise<void> {
+    const identity = await this.ensureServerIdentity();
+    if (identity.supportedCapabilities.includes(ARTIFACTS_CAPABILITY)) return;
+    throw this.gap(
+      ARTIFACTS_CAPABILITY,
+      `The connected nika serve ${identity.engineVersion} does not advertise ${ARTIFACTS_CAPABILITY} `
+      + `(advertised: ${identity.supportedCapabilities.join(', ') || 'nothing'}): it serves no artifact `
+      + 'manifest and no download. Nothing was requested',
+    );
+  }
+
+  /** The caller stopped an artifact request: the one error it then sees. */
+  private abortedBy(operation: NikaOperation, signal: AbortSignal, cause?: unknown): NikaTransportError {
+    const reason: unknown = cause ?? signal.reason;
+    return new NikaTransportError(
+      this.kind,
+      `${operation}() aborted by caller`,
+      reason instanceof Error ? { cause: reason } : undefined,
+    );
   }
 
   private async *observeJob(

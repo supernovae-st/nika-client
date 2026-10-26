@@ -1,3 +1,5 @@
+import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
+
 interface NikaSharedConfig {
   /**
    * How many of a run's most recent frames a session retains, and therefore
@@ -526,8 +528,9 @@ export interface NikaRunResult<
  * never yields a handle. Every member is bound to the run, so a method may be
  * extracted (`const { events, result } = run`) and still works.
  *
- * The handle owns observation, settlement, status and cancellation, nothing
- * else: checking, proof, catalogs and authoring stay on `Nika`. It is
+ * The handle owns observation, settlement, status, cancellation and, on a
+ * server, what the settled job produced (its artifacts), nothing else:
+ * checking, proof, catalogs and authoring stay on `Nika`. It is
  * process-bound. To continue in another process, persist `id` and the last
  * `event.sequence` you fully processed, then call
  * `nika.attachRun(id, { lastEventId })`, the one recovery door.
@@ -574,8 +577,169 @@ export interface NikaRun<
    * Acceptance is not a result; read what the engine recorded from `result()`.
    */
   readonly cancel: () => Promise<NikaCancelResult>;
+  /**
+   * Server only: what the settled job produced, as its sealed journal records
+   * it (`GET /v1/jobs/{id}/artifacts`): the files its builtins saved
+   * (`nika:chart`, `nika:image_generate`, `nika:tts_generate`, `nika:image_fx`)
+   * and the images its agents' harnesses sent, each with its recorded size and
+   * SHA-256. The SDK checks that the manifest's receipt is the job's own.
+   *
+   * Needs a server whose `/health` lists `artifacts`; any other server, and a
+   * local run, reject with `NikaCompatibilityError` (capability `artifacts`)
+   * before any request. A job that has not settled rejects with
+   * `NikaOperationError` (`job_not_settled`, 409): await `result()` first.
+   */
+  readonly artifacts: (options?: NikaArtifactsOptions) => Promise<NikaArtifactManifest>;
+  /**
+   * Server only: one artifact's bytes as a stream, named by its manifest
+   * `name` or given as its entry. It resolves once the server answered with
+   * the recorded size and digest. The stream closes only once every byte is
+   * proven (exactly the recorded size, hashing to the recorded SHA-256, as the
+   * manifest entry and the response headers both say), and errors otherwise.
+   * A body cut short is downloaded again, up to 3 more times; a file that
+   * changed then answers 409 `artifact_changed`, a `NikaOperationError` like
+   * every refusal of the server. Neither `machineBufferBytes` nor
+   * `requestTimeout` bounds a download: stop it with `signal`, or cancel the
+   * stream.
+   */
+  readonly downloadArtifact: (
+    artifact: string | NikaArtifact,
+    options?: NikaArtifactDownloadOptions,
+  ) => Promise<NikaArtifactDownload>;
+  /**
+   * Server only: one artifact's whole bytes, resolved only once they are
+   * proven, as `downloadArtifact()` proves them. An artifact larger than
+   * `maxBytes` (16 MiB by default) is refused with `NikaConfigurationError`
+   * before its download starts: stream it with `downloadArtifact()` instead.
+   */
+  readonly readArtifact: (
+    artifact: string | NikaArtifact,
+    options?: NikaArtifactReadOptions,
+  ) => Promise<Uint8Array>;
   /** Compatibility alias of `result()`: the same promise, kept while code migrates. */
   readonly done: Promise<NikaRunResult<Outputs>>;
+}
+
+/**
+ * One byte stream a settled server job produced, as the job's sealed journal
+ * records it: a file a builtin saved inside the server's project, or an image
+ * an agent's harness sent. Every size and digest is the journal's. The SDK
+ * reads the fields below typed and lets any other ride through, since the
+ * server's contract may add some.
+ */
+export interface NikaArtifact {
+  /**
+   * The artifact's key, unique within the job: `file/<path>` or
+   * `agent_image/<n>.<ext>`. Pass it, or this entry, to
+   * `run.downloadArtifact()`. It is a key, never a filesystem path.
+   */
+  name: string;
+  /**
+   * `file`: a file a builtin saved (`nika:chart`, `nika:image_generate`,
+   * `nika:tts_generate`, `nika:image_fx`). `agent_image`: an image an agent's
+   * harness sent, kept by the server. Known words aid completion without
+   * closing the set.
+   */
+  kind: 'file' | 'agent_image' | (string & {});
+  /**
+   * A file's path in the server's project, as the workflow wrote it
+   * (normalized); absent for an agent image. The SDK refuses a manifest whose
+   * path is not contained: it is relative, `/`-separated, with no empty, `.`
+   * or `..` segment, no backslash and no NUL byte.
+   */
+  path?: string;
+  /** The recorded size, in bytes. */
+  size: number;
+  /** The recorded SHA-256 of the bytes: 64 lowercase hexadecimal digits. */
+  sha256: string;
+  /** The recorded media type, else one derived from the extension, else `application/octet-stream`. */
+  mime: string;
+  /** The task whose journal event records it. */
+  task?: string;
+  /** The id of that journal event. */
+  event_id: string;
+  [key: string]: unknown;
+}
+
+/**
+ * What a settled server job produced, as its sealed journal records it
+ * (`GET /v1/jobs/{id}/artifacts`, read by `run.artifacts()`), bound to the
+ * job's receipt. The server lists only the byte streams its journal records
+ * with a digest: what `nika:write` and `nika:edit` wrote is not listed.
+ */
+export interface NikaArtifactManifest {
+  /** The job's receipt. The SDK checked that it is the job's own. */
+  receipt: NikaReceipt;
+  /** The tier the job's journal attained: `sealed` or `anchored`. Open to new words. */
+  verdict: 'sealed' | 'anchored' | (string & {});
+  /**
+   * The largest artifact this server downloads (256 MiB by default). A larger
+   * one stays listed, and its download is refused (403 `artifact_too_large`).
+   */
+  max_artifact_bytes: number;
+  /**
+   * The job recorded more artifacts than the server lists (1,024). A name past
+   * them still downloads by its name, proven against the response alone (see
+   * `NikaArtifactDownload.artifact`).
+   */
+  truncated: boolean;
+  /** In journal order; a file written twice appears once, at its last write. */
+  artifacts: NikaArtifact[];
+  [key: string]: unknown;
+}
+
+export interface NikaArtifactsOptions {
+  /** Stops only this request. It never cancels the run. */
+  signal?: AbortSignal;
+}
+
+export interface NikaArtifactDownloadOptions {
+  /**
+   * Stops this download: its requests, the wait before a retry and the
+   * stream, which then errors with `NikaTransportError`. It never cancels the
+   * run.
+   */
+  signal?: AbortSignal;
+}
+
+export interface NikaArtifactReadOptions extends NikaArtifactDownloadOptions {
+  /**
+   * The most bytes `readArtifact()` holds: a positive integer. Default: 16 MiB.
+   * A listed artifact larger than it is refused before its download starts.
+   */
+  maxBytes?: number;
+}
+
+/** One artifact download (`run.downloadArtifact()`): what it is proven against, and its bytes. */
+export interface NikaArtifactDownload {
+  /** The artifact's name, as requested. */
+  readonly name: string;
+  /** The size the bytes are proven against: the manifest entry's, which `Content-Length` repeats. */
+  readonly size: number;
+  /**
+   * The SHA-256 the bytes are proven against: the manifest entry's, which the
+   * response's `Nika-Artifact-Sha256` header repeats.
+   */
+  readonly sha256: string;
+  /** The recorded media type: the entry's `mime`, or the response's `Content-Type` without one. */
+  readonly mime: string;
+  /**
+   * The manifest entry the bytes are proven against. Absent only for a name
+   * past the entries a truncated manifest lists: those bytes are proven
+   * against the response's `Content-Length` and `Nika-Artifact-Sha256` alone.
+   */
+  readonly artifact?: NikaArtifact;
+  /**
+   * The bytes, readable once. It closes only once they are proven, and holds
+   * its last chunk back until then; otherwise it errors: `NikaProtocolError`
+   * for bytes that are not the recorded ones, `NikaOperationError` for a
+   * server refusal on a retry (`artifact_changed`…), `NikaTransportError` for
+   * a download that stayed incomplete or was aborted. Read it to its end or
+   * cancel it: an unread stream holds its connection open. It is a Node web
+   * stream (`node:stream/web`): `Readable.fromWeb(download.stream)` pipes it,
+   * `for await` reads it.
+   */
+  readonly stream: NodeReadableStream<Uint8Array>;
 }
 
 export interface NikaCancelResult {
@@ -797,7 +961,10 @@ export type NikaOperation =
   | 'traceVerify'
   | 'schedule'
   | 'scheduleStatus'
-  | 'compile';
+  | 'compile'
+  | 'artifacts'
+  | 'downloadArtifact'
+  | 'readArtifact';
 
 /** One engine-owned schedule finding. The vocabulary remains additive. */
 export interface NikaScheduleFinding {

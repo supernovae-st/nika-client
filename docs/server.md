@@ -5,8 +5,8 @@ It holds durable jobs and schedules, so a run outlives the process that
 started it. Your code talks to it through the same `Nika` class and the same
 methods; the constructor names the server, and a few options change (a run
 needs an `idempotencyKey` and takes no `maxCostUsd`). This page covers setup,
-the job lifecycle, recovery, retries and schedules. The wire contract, route by
-route, is [http-api.md](http-api.md).
+the job lifecycle, recovery, retries, artifacts and schedules. The wire
+contract, route by route, is [http-api.md](http-api.md).
 
 ```mermaid
 sequenceDiagram
@@ -27,6 +27,9 @@ sequenceDiagram
   SDK->>Serve: GET /v1/jobs/{id}, then SSE with Last-Event-ID
   App->>SDK: nika.traceVerify(result.receipt)
   SDK->>Serve: GET /v1/jobs/{id}/trace/verify
+  App->>SDK: run.artifacts(), run.downloadArtifact(name)
+  SDK->>Serve: GET /v1/jobs/{id}/artifacts, then GET /v1/jobs/{id}/artifacts/{name}
+  Serve-->>SDK: the manifest, then the bytes the job's sealed journal recorded
 ```
 
 ## Set it up
@@ -218,6 +221,112 @@ jobs become `interrupted` and queued jobs stay queued; a restart with the same
 A SIGKILL skips the drain: the next start marks ownerless running jobs
 `interrupted`. (`nika serve --help` documents the same rules.)
 
+## Download what a job produced: artifacts
+
+A settled job's artifacts are the files its builtins saved (`nika:chart`,
+`nika:image_generate`, `nika:tts_generate`, `nika:image_fx`) and the images
+its agents' harnesses sent. The server lists the ones the job's sealed journal
+records with their SHA-256, and serves their bytes checked against that record,
+so your app gets the files without base64 in `outputs` and without uploading
+them anywhere. The package checks every byte again as it arrives.
+
+This workflow saves one chart:
+
+```yaml
+nika: chart
+permits:
+  fs: { write: ["./out/**"] }
+  tools: ["nika:chart"]
+tasks:
+  draw:
+    invoke:
+      tool: "nika:chart"
+      args:
+        data: [{ region: "north", total: 10 }, { region: "south", total: 4 }]
+        chart: { type: bar, x: region, y: total }
+        out: "./out/totals.svg"
+```
+
+```ts
+import { createWriteStream } from 'node:fs';
+import { rename } from 'node:fs/promises';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
+
+const run = await nika.run('chart.nika', { idempotencyKey: 'chart-2026-10-26' });
+await run.result(); // artifacts are served once the job has settled
+
+const manifest = await run.artifacts();
+for (const artifact of manifest.artifacts) console.log(artifact.name, artifact.mime);
+
+// A stream: write it under a temporary name, and keep the file once the stream closed.
+const download = await run.downloadArtifact('file/out/totals.svg');
+await pipeline(Readable.fromWeb(download.stream), createWriteStream('totals.svg.part'));
+await rename('totals.svg.part', 'totals.svg');
+
+// Or the whole bytes at once, up to maxBytes (16 MiB by default).
+const svg = await run.readArtifact('file/out/totals.svg');
+```
+
+```text
+file/out/totals.svg image/svg+xml
+```
+
+- **What is listed.** Each entry has a `name`, its `kind` (`file` or
+  `agent_image`), a file's `path` in the server's project, the recorded `size`
+  and `sha256`, its `mime`, the `task` and the journal `event_id`. A name such
+  as `file/out/totals.svg` or `agent_image/1.png` is a key, never a path: pass
+  it, or the entry itself, to `downloadArtifact()` or `readArtifact()`. What
+  `nika:write` and `nika:edit` wrote is not listed, nor a file an agent wrote
+  itself: the journal records no digest for those bytes. An agent's image is
+  still listed, as the image the server kept.
+- **Settled jobs only.** A queued, running or paused job answers 409
+  `job_not_settled`: `await run.result()` first. An interrupted job never
+  sealed its journal and answers 409 `artifact_journal_unavailable`.
+- **The server needs a run key.** A server without one still lists
+  `artifacts`, but its journals are unsealed, so every request answers 409
+  `artifact_journal_unverified`. Run `NIKA_KEYCHAIN=off
+  ./node_modules/.bin/nika key init` as the server's user: the jobs that run
+  after it serve their artifacts.
+- **Bound to the job.** The manifest carries the job's receipt, chain head
+  included, and the package checks that it is the job's own: the receipt the
+  run settled with, or the one the server's record of the job carries.
+- **Proven on arrival.** `downloadArtifact()` resolves once the server
+  answered with the recorded size (`Content-Length`) and digest
+  (`Nika-Artifact-Sha256`), both equal to the manifest entry's. The stream
+  hashes each chunk, holds its last one back, and closes only once exactly the
+  recorded size hashed to the recorded SHA-256; otherwise it errors, and the
+  file you wrote is not the artifact. `readArtifact()` resolves only then.
+- **A body cut short is downloaded again,** up to 3 more times, because a
+  server that stops or cannot read the file ends the stream early. The server
+  has no range requests, so each retry is the whole artifact again, and its
+  first bytes must hash as they did. A file that changed since the run
+  answers 409 `artifact_changed` instead: the server never serves other bytes.
+- **No timeout of the package's.** Neither `machineBufferBytes` nor
+  `requestTimeout` bounds a download: the server reads the whole file against
+  its record before the first byte, and the body takes as long as it needs.
+  Stop it with `signal`, or cancel the stream; an unread stream holds its
+  connection open.
+- **Size bounds.** `readArtifact()` holds at most `maxBytes`, 16 MiB by
+  default; a larger artifact is refused with `NikaConfigurationError` before
+  its download starts, so stream it. The server refuses an artifact over its
+  own `max_artifact_bytes` (256 MiB by default) with 403
+  `artifact_too_large`; that one stays listed.
+- **Fewer requests.** Pass the entry from `run.artifacts()`: a name makes the
+  package read the manifest first, an entry does not. A name the manifest
+  does not list gets the server's 404 `artifact_not_found`. A manifest lists
+  at most 1,024 entries (`truncated: true` says more exist); a name past them
+  still downloads, proven against the response's headers alone, and
+  `download.artifact` is then absent.
+- **Which servers.** A server that serves artifacts lists `artifacts` in
+  `/health`; the released 0.123.1 does not. On any other server, and on a
+  local run, the three methods reject with `NikaCompatibilityError`
+  (`capability: 'artifacts'`) before any request. A local run's files are
+  where its workflow wrote them, in the client's `cwd`.
+
+Every refusal is a `NikaOperationError` with the server's `code` and HTTP
+`status`; [errors.md](errors.md#a-servers-refusal) lists them.
+
 ## Connection rules
 
 Plain HTTP is accepted only to a loopback host (`localhost`, `127.0.0.0/8`,
@@ -327,6 +436,7 @@ not see the keys you export in your shell, so pass them with
 | `run.cancel()` | signals the process; idempotent; in-flight work settles, however long | 200 settles the job; 202 accepts the request, and `run.result()` settles on the server's ending: `interrupted` once the fixed 5-second grace expires |
 | `run.id` | a throwaway correlation id, never durable | the server's durable job id: the one to store |
 | `traceVerify` | the engine's verifier plus the signed receipt binding | the server's verdict on the journal it wrote (`ok`, `sealed`…), or `unavailable` without one |
+| `run.artifacts()` · `run.downloadArtifact()` · `run.readArtifact()` | refused: a local run's files are where its workflow wrote them | the files a settled job's sealed journal records, each download proven against its recorded size and SHA-256, when the server lists `artifacts` |
 | `schedule` / `scheduleStatus` | refused | the server's schedules |
 | `listWorkflows` / `workflow` | refused | the served workflow catalog, without paths |
 | `compile` | the engine's `compile` capability; `authoringModel`, `decisionModel`, `fresh` and `output` allowed | `POST /v1/compile`, when advertised; `cognition` and `replay_token` need `compileNativeV2` |

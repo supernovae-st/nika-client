@@ -1,4 +1,4 @@
 # Candidate supernovae-st/nika commit for premerge qualification.
 # Not a release pin and not ENGINE_PIN. Exact 40-hex SHA only.
-# Release train 0.123.1: the commit tag v0.123.1 names, as ENGINE_QUAL_PIN.
-cc7b519648a2223b378d971929df40b675457883
+# Engine main at nika#1834 (the artifact routes), as ENGINE_QUAL_PIN.
+b3252424475e63a0177b6e866de31a67b37eae63

@@ -255,6 +255,8 @@ no such frame.
 `paused`). `event.task` is the task a `task.*` frame named. A task the engine
 skipped ends on `task.skipped` and a task it cancelled on `task.cancelled`,
 whatever the reason: both name their `task`, never an `error` or a `status`.
+A task skipped by `on_error: { skip: true }` still keeps the error that made
+it skip: the engine leaves it on `event.raw`, in the frame's `outcome` row.
 A recovered task ends on `task.completed`; the engine's `task_recovered` frame
 before it stays an `engine.event`. Measured on engine 0.123.2 with one task
 skipped by `on_error: { skip: true }`, one recovered by

@@ -129,12 +129,25 @@ describe('semantic run events over measured native frames', () => {
     for (const kind of ['task.skipped', 'task.cancelled'] as const) {
       const event = events.find((candidate) => candidate.kind === kind)!;
       // A skip or a cancellation names its task, never a failure or a state:
-      // the skipped frame's `detail` row is the engine's words, not an error.
+      // `event.error` belongs to a failed task or a failed settlement only.
       expect(Object.keys(event).sort()).toEqual(['kind', 'raw', 'task', 'transport']);
       expect(typeof event.task).toBe('string');
       expect(event.error).toBeUndefined();
       expect(event.status).toBeUndefined();
     }
+
+    // A skip under `on_error: { skip: true }` keeps the error that made it
+    // skip: the engine leaves it on `raw`, in the frame's `outcome` row.
+    const skipped = events.find((event) => event.kind === 'task.skipped')!;
+    const rows = (skipped.raw as unknown as { fields: { key: string; value: unknown }[] })
+      .fields;
+    const outcome = rows.find((row) => row.key === 'outcome');
+    expect(typeof outcome?.value).toBe('string');
+    expect(JSON.parse(outcome!.value as string)).toMatchObject({
+      cause: 'error_skip',
+      class: 'skipped',
+      payload: { error: { code: 'NIKA-BUILTIN-ASSERT-001', transient: false } },
+    });
 
     const recovered = events.find((event) => event.raw.kind === 'task_recovered')!;
     expect(Object.keys(recovered).sort()).toEqual(['kind', 'raw', 'transport']);

@@ -345,7 +345,9 @@ export type NikaEvent<
  * - `task.scheduled` · `task.started` · `task.completed` · `task.failed` ·
  *   `task.skipped` · `task.cancelled`: the native `task_*` frames. A skip or
  *   a cancellation ends a task as a completion or a failure does; it names
- *   its `task`, never an `error`. A recovered task ends on `task.completed`,
+ *   its `task`, never an `error`. A skip under `on_error: { skip: true }`
+ *   keeps the error that made it skip on `raw`, in the frame's `outcome`
+ *   row. A recovered task ends on `task.completed`,
  *   and its `task_recovered` frame stays an `engine.event`. `nika serve`
  *   streams no per-task frame, so an HTTP run yields none; the SDK never
  *   synthesizes one.

@@ -185,10 +185,10 @@ matching receipt.
 ## Artifacts
 
 `run.artifacts()`, `run.downloadArtifact()` and `run.readArtifact()` need a
-server whose `/health` lists `artifacts` (the engine added the routes in
-nika#1834; the released 0.123.1 does not list them). Without it, and on the
-native transport, they reject with `NikaCompatibilityError`
-(`capability: 'artifacts'`) before any request.
+server whose `/health` lists `artifacts` (engine 0.123.2 added the routes;
+0.123.1 and older do not list them). Without it, and on the native transport,
+they reject with `NikaCompatibilityError` (`capability: 'artifacts'`) before
+any request.
 
 **The manifest** (`ArtifactManifest`) is read like any JSON answer: bearer
 token, `requestTimeout`, `machineBufferBytes`. The SDK checks each field the

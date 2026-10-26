@@ -437,16 +437,18 @@ announcing machine protocol 1. 0.122.0 adds `limits.max_calls` and
 judged answer round with its capability, `nika compile --observe-only`,
 `observed_world` with its `compileObservedWorld` capability, `trial_inputs`
 with `compileTrialInputs`, and `nika serve --decision-model` with
-`compileDecisionSeat`. 0.123.1, the engine this package version bundles, is a
-maintenance release: the same machine protocol, and a default served document
-that differs from 0.123.0's only by its version. This package refuses an
-engine on protocol 1 at its identity. An engine without a flag
+`compileDecisionSeat`. 0.123.1 is a maintenance release: the same machine
+protocol, and a default served document that differs from 0.123.0's only by
+its version. 0.123.2, the engine this package version bundles, keeps machine
+protocol 2; its served document adds the two artifact routes and declares
+answers 0.123.1 already sent, and its compile door is unchanged. This package
+refuses an engine on protocol 1 at its identity. An engine without a flag
 answers with a usage error; a server without a field answers
 `422 malformed_compile_request`. Point `NIKA_BIN` (or `bin`) at the engine you
 mean to use.
 
 The pinned `openapi.json` and `src/generated/openapi.d.ts` are the default
-document of the released engine 0.123.1 resident, regenerated from the
+document of the released engine 0.123.2 resident, regenerated from the
 released `nika serve`. The generation-2 types are written by hand from the
 engine source at tag `v0.123.0`: `crates/nika-serve/src/server/compile/v2.rs`,
 `author.rs` and `openapi-native.json` (the rounds, the judged answer round

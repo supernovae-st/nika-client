@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.123.2] - 2026-10-26
+
 ### Added
 
 - `run()` and `check()` take `access`, the engine's access pin (NIK-267,
@@ -59,25 +61,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of the two routes is a `NikaOperationError` with the server's code
   (`job_not_settled`, `artifact_journal_unverified`, `artifact_too_large`…)
   and `operation` `artifacts`, `downloadArtifact` or `readArtifact`. A server
-  that does not list `artifacts` in `/health` (the released 0.123.1 does not)
+  that does not list `artifacts` in `/health` (0.123.1 and older do not)
   and a local run, whose engine serves no manifest, refuse with
   `NikaCompatibilityError` (`capability: 'artifacts'`) before any request.
   New types: `NikaArtifact`, `NikaArtifactManifest`, `NikaArtifactDownload`
-  and their options. Qualified against engine main at nika#1834 on loopback
-  (`test/engine-live.test.ts`), and against a fake server for every code, a
-  wrong digest, short bodies and the missing capability
+  and their options. Qualified against the released engine 0.123.2 on
+  loopback (`test/engine-live.test.ts`), and against a fake server for every
+  code, a wrong digest, short bodies and the missing capability
   (`test/artifacts-http.test.ts`).
 
 ### Changed
 
-- The pinned `openapi.json` and `src/generated/openapi.d.ts` are engine
-  main's at nika#1834 (`b32524244`): the two artifact routes, and the answers
-  0.123.1 already sent undeclared (the trace verify `tier`, the schedule 412
-  and 422 shapes, the by-name 404s, the PUT schedule 507, the 5-second cancel
-  grace). `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name that commit, so the
-  candidate CI qualifies the package against it. The CI type-drift job stays
-  bound to the released engine `package.json` names, 0.123.1, whose document
-  lacks those routes, until the 0.123.2 lockstep moves both.
+- **Release train 0.123.2, in lockstep with engine `v0.123.2`**, the second
+  maintenance release of the 0.123 line (the artifact routes, journals sealed
+  with an explicit run key pair, harness seats held to `permits:`). The
+  machine protocol stays 2. `package.json` is 0.123.2 and
+  `sync:native-versions` moved the four native payload manifests, the
+  `optionalDependencies` and the lockfile with it. `ENGINE_QUAL_PIN` and
+  `ENGINE_CANDIDATE` name the commit engine tag `v0.123.2` names
+  (`nika 0.123.2 (5591478a7)`), and the committed gauntlet ledgers were
+  replayed against that verified public binary, with the same behavioral
+  verdicts as on 0.123.1.
+- The pinned `openapi.json` and `src/generated/openapi.d.ts` are the served
+  document of the released engine 0.123.2: the two artifact routes, and the
+  answers 0.123.1 already sent undeclared (the trace verify `tier`, the
+  schedule 412 and 422 shapes, the by-name 404s, the PUT schedule 507, the
+  5-second cancel grace). The artifact manifest route names the explicit
+  `NIKA_RUN_KEY_FILE` · `NIKA_RUN_PUB_FILE` pair among the run keys its
+  verifier weighs.
 - `machineBufferBytes` defaults to 16 MiB instead of 64 KiB (NIK-267). It is
   the bound of a `nika serve` job store (`MAX_JOB_SNAPSHOT_BYTES`, engine
   0.123.1), which refuses rather than truncates a result that would outgrow
@@ -111,6 +122,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- The README, `docs/upgrading-to-0.123.md`, `docs/compile.md` and the
+  artifact pages name 0.123.2 as the engine this package bundles and the first
+  that serves artifacts: the upgrade steps install 0.123.2 and print
+  `nika 0.123.2 (5591478a7)`. `docs/server.md` says that a server started
+  with `NIKA_RUN_KEY_FILE` and `NIKA_RUN_PUB_FILE` serves the artifacts of
+  the journals it seals with that pair. Measurements keep the version they
+  were taken on.
 - `docs/errors.md` no longer lists `schedule_conflict` as a server code: the
   server sends `schedule_precondition_failed` (HTTP 412), which stays on
   `machineCode` beside `currentRevision`, while `code` carries the package's
@@ -1121,7 +1139,8 @@ Initial public release. Full rewrite from v0.1.0.
 - Error hierarchy completely redesigned
 - License changed from MIT to AGPL-3.0-or-later
 
-[Unreleased]: https://github.com/supernovae-st/nika-client/compare/v0.123.1...HEAD
+[Unreleased]: https://github.com/supernovae-st/nika-client/compare/v0.123.2...HEAD
+[0.123.2]: https://github.com/supernovae-st/nika-client/compare/v0.123.1...v0.123.2
 [0.123.1]: https://github.com/supernovae-st/nika-client/compare/v0.123.0...v0.123.1
 [0.123.0]: https://github.com/supernovae-st/nika-client/compare/v0.120.3...v0.123.0
 [0.120.3]: https://github.com/supernovae-st/nika-client/compare/v0.120.2...v0.120.3

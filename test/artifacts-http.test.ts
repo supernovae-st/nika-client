@@ -224,7 +224,7 @@ function healthBody(capabilities: string[]): Record<string, unknown> {
   return {
     status: 'ok',
     service: 'nika-serve',
-    engineVersion: '0.123.1',
+    engineVersion: '0.123.2',
     machineProtocolVersion: 2,
     snapshotFormatVersion: 1,
     checkReportVersion: 1,

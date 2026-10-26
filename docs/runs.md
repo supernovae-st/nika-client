@@ -244,15 +244,24 @@ no such frame.
 | `event.kind` | Local engine frame (`event.raw.kind`) | Server frame (`event.raw.kind`) |
 |---|---|---|
 | `run.started` | `workflow_started` | `execution.started` |
-| `task.scheduled` · `task.started` · `task.completed` · `task.failed` | `task_scheduled` · `task_started` · `task_completed` · `task_failed` | none: the server streams no per-task frame |
+| `task.scheduled` · `task.started` · `task.completed` · `task.failed` · `task.skipped` · `task.cancelled` | `task_scheduled` · `task_started` · `task_completed` · `task_failed` · `task_skipped` · `task_cancelled` | none: the server streams no per-task frame |
 | `run.waiting` | `run_settled` carrying `paused` | `execution.settled` carrying `paused` |
 | `run.settled` | `run_settled` carrying `succeeded` · `failed` · `cancelled` | `execution.settled` carrying `succeeded` · `failed` · `cancelled`; `execution.cancelled` carrying `cancelled` only; `execution.refused` carrying `failed` only |
 | `run.interrupted` | `workflow_interrupted` carrying `interrupted` | `execution.interrupted` · `interrupted` carrying `interrupted` |
 | `run.sealed` | `run_sealed`, when an engine streams one | none |
-| `engine.event` | every other frame (`workflow_completed`, `workflow_paused`, `permit_checked`…) | every other frame: `execution.queued` (a job admitted with inputs), a `null` or future kind |
+| `engine.event` | every other frame (`workflow_completed`, `workflow_paused`, `permit_checked`, `task_recovered`…) | every other frame: `execution.queued` (a job admitted with inputs), a `null` or future kind |
 
 `event.status` is always the engine's own word (a waiting run reads
-`paused`). `event.task` is the task a `task.*` frame named. `event.error` is
+`paused`). `event.task` is the task a `task.*` frame named. A task the engine
+skipped ends on `task.skipped` and a task it cancelled on `task.cancelled`,
+whatever the reason: both name their `task`, never an `error` or a `status`.
+A task skipped by `on_error: { skip: true }` still keeps the error that made
+it skip: the engine leaves it on `event.raw`, in the frame's `outcome` row.
+A recovered task ends on `task.completed`; the engine's `task_recovered` frame
+before it stays an `engine.event`. Measured on engine 0.123.2 with one task
+skipped by `on_error: { skip: true }`, one recovered by
+`on_error: { recover: … }` and one cancelled because its `after:` edge never
+admitted. `event.error` is
 the failure a `task.failed` frame or a `failed` settlement named; no other
 event carries one. `event.sequence` is the server's replay cursor and exists
 only over HTTP. An `engine.event` carries only its cursor and `raw`, never a

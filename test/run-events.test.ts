@@ -21,6 +21,8 @@ const SEMANTIC_KINDS: ReadonlySet<NikaRunEventKind> = new Set([
   'task.started',
   'task.completed',
   'task.failed',
+  'task.skipped',
+  'task.cancelled',
   'run.waiting',
   'run.settled',
   'run.interrupted',
@@ -84,6 +86,78 @@ describe('semantic run events over measured native frames', () => {
       kind: 'run.settled',
       status: 'failed',
       error: { code: 'NIKA-BUILTIN-ASSERT-001', task: 'fail' },
+    });
+  });
+
+  it('names a skipped and a cancelled task over measured 0.123.2 frames', () => {
+    // One task skipped by `on_error: { skip: true }`, one recovered by
+    // `on_error: { recover: … }`, one cancelled because its `after:` edge
+    // never admitted. Each of the three tasks ends on one named word.
+    const events = native(wire('0.123.2-skipped-cancelled.ndjson.stdout'));
+
+    expect(events.map((event) => [event.kind, event.raw.kind, event.task])).toEqual([
+      ['run.started', 'workflow_started', undefined],
+      ['task.scheduled', 'task_scheduled', 'skipped_one'],
+      ['task.scheduled', 'task_scheduled', 'recovered_one'],
+      ['task.scheduled', 'task_scheduled', 'cancelled_one'],
+      ['task.started', 'task_started', 'skipped_one'],
+      ['engine.event', 'permit_checked', undefined],
+      ['task.skipped', 'task_skipped', 'skipped_one'],
+      ['task.started', 'task_started', 'recovered_one'],
+      ['engine.event', 'permit_checked', undefined],
+      // The recovery is a journal fact; the task's ending is its completion.
+      ['engine.event', 'task_recovered', undefined],
+      ['task.completed', 'task_completed', 'recovered_one'],
+      ['task.cancelled', 'task_cancelled', 'cancelled_one'],
+      ['engine.event', 'workflow_completed', undefined],
+      ['run.settled', 'run_settled', undefined],
+    ]);
+
+    const TERMINAL = new Set<NikaRunEventKind>([
+      'task.completed',
+      'task.failed',
+      'task.skipped',
+      'task.cancelled',
+    ]);
+    const endings = events.filter((event) => TERMINAL.has(event.kind));
+    expect(endings.map((event) => [event.task, event.kind])).toEqual([
+      ['skipped_one', 'task.skipped'],
+      ['recovered_one', 'task.completed'],
+      ['cancelled_one', 'task.cancelled'],
+    ]);
+
+    for (const kind of ['task.skipped', 'task.cancelled'] as const) {
+      const event = events.find((candidate) => candidate.kind === kind)!;
+      // A skip or a cancellation names its task, never a failure or a state:
+      // `event.error` belongs to a failed task or a failed settlement only.
+      expect(Object.keys(event).sort()).toEqual(['kind', 'raw', 'task', 'transport']);
+      expect(typeof event.task).toBe('string');
+      expect(event.error).toBeUndefined();
+      expect(event.status).toBeUndefined();
+    }
+
+    // A skip under `on_error: { skip: true }` keeps the error that made it
+    // skip: the engine leaves it on `raw`, in the frame's `outcome` row.
+    const skipped = events.find((event) => event.kind === 'task.skipped')!;
+    const rows = (skipped.raw as unknown as { fields: { key: string; value: unknown }[] })
+      .fields;
+    const outcome = rows.find((row) => row.key === 'outcome');
+    expect(typeof outcome?.value).toBe('string');
+    expect(JSON.parse(outcome!.value as string)).toMatchObject({
+      cause: 'error_skip',
+      class: 'skipped',
+      payload: { error: { code: 'NIKA-BUILTIN-ASSERT-001', transient: false } },
+    });
+
+    const recovered = events.find((event) => event.raw.kind === 'task_recovered')!;
+    expect(Object.keys(recovered).sort()).toEqual(['kind', 'raw', 'transport']);
+
+    expect(events.at(-1)).toMatchObject({ kind: 'run.settled', status: 'succeeded' });
+    expect(events.at(-1)!.error).toBeUndefined();
+    expect(events.at(-1)!.raw).toMatchObject({
+      kind: 'run_settled',
+      cause: 'normal',
+      tasks: { total: 3, ok: 1, recovered: 1, skipped: 1, cancelled: 1, failed: 0 },
     });
   });
 
@@ -158,6 +232,34 @@ describe('semantic run events over the resident projection', () => {
 
     expect(event).toMatchObject({ kind, status, transport: 'http', sequence: raw.sequence });
     expect(event.raw).toBe(raw);
+  });
+
+  it('yields no task event for a server run: the resident streams no per-task frame', () => {
+    // The same three-task shape as the native 0.123.2 capture, as a server
+    // job streams it: its settlement counts the skipped and cancelled tasks,
+    // and the SDK synthesizes no `task.*` event out of those counts.
+    const events = [
+      { sequence: 1, kind: 'execution.queued', status: 'queued' },
+      { sequence: 2, kind: 'execution.started', status: 'running' },
+      {
+        sequence: 3,
+        kind: 'execution.settled',
+        status: 'succeeded',
+        settlement: {
+          status: 'succeeded',
+          cause: 'normal',
+          tasks: { total: 3, ok: 1, recovered: 1, skipped: 1, cancelled: 1, failed: 0 },
+        },
+      },
+    ].map((frame) => semanticRunEvent(frame as NikaEvent, 'http'));
+
+    expect(events.map((event) => event.kind)).toEqual([
+      'engine.event',
+      'run.started',
+      'run.settled',
+    ]);
+    expect(events.some((event) => event.kind.startsWith('task.'))).toBe(false);
+    expect(events.some((event) => event.task !== undefined)).toBe(false);
   });
 
   it('names the interrupted evidence state, never a settlement', () => {
@@ -400,6 +502,7 @@ describe('the projection is total and writes nothing of its own', () => {
       '0.119.0-admitted-failure.ndjson.stdout',
       '0.118.7-human-gate.ndjson.stdout',
       '0.118.7-sigterm-cancel.ndjson.stdout',
+      '0.123.2-skipped-cancelled.ndjson.stdout',
     ]) {
       for (const frame of wire(name)) {
         const before = JSON.stringify(frame);

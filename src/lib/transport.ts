@@ -1,4 +1,10 @@
 import type {
+  NikaArtifact,
+  NikaArtifactDownload,
+  NikaArtifactDownloadOptions,
+  NikaArtifactManifest,
+  NikaArtifactReadOptions,
+  NikaArtifactsOptions,
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckOptions,
@@ -27,6 +33,15 @@ export interface TransportRun {
   readonly done: Promise<NikaRunResult>;
   status(): Promise<NikaRunStatus>;
   cancel(): Promise<NikaCancelResult>;
+  /** The settled job's artifact manifest; a native run refuses with a typed gap. */
+  artifacts(options: NikaArtifactsOptions): Promise<NikaArtifactManifest>;
+  /** One artifact's verified stream; a native run refuses with a typed gap. */
+  downloadArtifact(
+    artifact: string | NikaArtifact,
+    options: NikaArtifactDownloadOptions,
+  ): Promise<NikaArtifactDownload>;
+  /** One artifact's proven bytes, bounded; a native run refuses with a typed gap. */
+  readArtifact(artifact: string | NikaArtifact, options: NikaArtifactReadOptions): Promise<Uint8Array>;
   cleanup(): Promise<void>;
 }
 

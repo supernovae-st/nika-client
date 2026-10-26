@@ -84,6 +84,15 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
+                /** @description No workflow by that name under the served registry (by-name form) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
                 /** @description Request deadline */
                 408: {
                     headers: {
@@ -298,6 +307,15 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
+                /** @description No workflow by that name under the served registry (by-name form) */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
                 /** @description Request deadline */
                 408: {
                     headers: {
@@ -425,6 +443,206 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/jobs/{id}/artifacts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The artifacts a settled job's sealed journal records
+         * @description Answers only for a settled job (succeeded, failed, cancelled, interrupted); an interrupted run never sealed its journal, so its job answers 409 `artifact_journal_unavailable`. The manifest is read from the journal the job's receipt names, judged by the one verifier `nika trace verify` runs: the chain must be intact, the seal must verify against a run key that verifier weighs on the server, in the order the server signs (the public half of an explicit `NIKA_RUN_KEY_FILE` · `NIKA_RUN_PUB_FILE` pair, `~/.nika/keys/run-signing.pub`, the retired-key ledger), and the head must be the receipt's `chain_head`. Each entry is one journal event that records a written byte stream with its SHA-256: a file a builtin saved (`nika:chart`, `nika:image_generate`, `nika:tts_generate`, `nika:image_fx`) at a relative path inside the project and outside its `.nika` (refused by name in any ASCII case, and by device and inode under any other spelling the filesystem folds onto it), its last write winning, or an image an agent's harness sent, kept under `.nika/blobs`. `nika:write` and `nika:edit` journal no hash of what they wrote, so their files are not listed. Every size and digest is the journal's; the download route checks the bytes against them. No filesystem path of the server is exposed.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The manifest, bound to the job's receipt */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ArtifactManifest"];
+                    };
+                };
+                /** @description Error envelope */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `job_not_found`: unknown or foreign job id */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Request deadline */
+                408: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `job_not_settled`: queued, running or paused · `artifact_journal_unavailable`: no receipt chain head, or no journal by the job's identity · `artifact_journal_unverified`: the journal is not sealed and intact with the receipt's head */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `internal_error`: the server could not read the journal */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `store_busy`: durable job state unavailable · `artifact_capacity`: every artifact slot is busy */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/jobs/{id}/artifacts/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stream one artifact's bytes, verified against its journaled SHA-256
+         * @description `{name}` is an entry's `name` from GET /v1/jobs/{id}/artifacts, never a filesystem path. Every name contains `/` (`file/out/report.pdf`, `agent_image/1.png`): send it with its `/` literal or percent-encoded (`%2F`), as one path parameter. The rest of the path is percent-decoded once and matched exactly against the manifest's names; an escape that is not two hexadecimal digits, bytes that are not UTF-8 or NUL match no entry. The server opens the recorded place below the project root it holds, refusing a symbolic link at any component, and reads every byte against the recorded size and SHA-256 before the response starts (409 `artifact_changed` on a mismatch), keeping the SHA-256 of each 256 KiB chunk. While the bytes stream, each chunk is read again and sent only if it hashes to the digest kept for it: every byte that leaves is a byte of the recorded file, and a file changed during the stream ends it before its `Content-Length`. A stream also ends short when the server stops or cannot read the file: retry a short body, and a file that really changed then answers 409 `artifact_changed`. The bound is `max_artifact_bytes`; a larger artifact stays listed and is refused 403. At most 4 journal verifications and pre-download hash passes run at once (`artifact_capacity` otherwise); a stream holds no slot once its bytes start, is bounded by the connection limit, and is not bounded by the request deadline.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                    /** @description An entry's manifest `name`; its `/` may be sent literally or as `%2F` (decoded once, matched exactly) */
+                    name: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The recorded bytes */
+                200: {
+                    headers: {
+                        "Cache-Control"?: "no-store";
+                        "Content-Disposition"?: "attachment";
+                        /** @description The recorded size */
+                        "Content-Length"?: number;
+                        "Content-Security-Policy"?: "sandbox";
+                        /** @description The recorded SHA-256 (lowercase hex), the manifest's `sha256` */
+                        "Nika-Artifact-Sha256"?: string;
+                        "X-Content-Type-Options"?: "nosniff";
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "*/*": string;
+                    };
+                };
+                /** @description Error envelope */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `artifact_too_large`: over this server's download bound */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `job_not_found`: unknown or foreign job id · `artifact_not_found`: no entry by that name */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `job_not_settled` · `artifact_journal_unavailable` · `artifact_journal_unverified` (as the manifest) · `artifact_changed`: the bytes at the recorded place no longer match the record */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `internal_error`: the server could not read the journal or the artifact */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description `store_busy` · `artifact_capacity` */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/jobs/{id}/cancel": {
         parameters: {
             query?: never;
@@ -436,7 +654,7 @@ export interface paths {
         put?: never;
         /**
          * Request cancellation or replay an ended observation
-         * @description A queued job cancels atomically before execution claims it. An active job receives the run-scoped cancellation signal and returns 202 until its execution owner settles: the result may be success, failure or cancellation; expired grace means interrupted, never an invented cancellation. A paused or final observation returns its existing result unchanged.
+         * @description A queued job cancels atomically before execution claims it. An active job receives the run-scoped cancellation signal and returns 202 until its execution owner settles: the result may be success, failure or cancellation. The grace is fixed at 5 seconds from the signal: a run that has not reached a wave boundary and settled by then is dropped and the job settles `interrupted`, never an invented cancellation. A task still inside one long step when the signal arrives (an agent turn, a long wait) typically outlasts the grace. A paused or final observation returns its existing result unchanged.
          */
         post: {
             parameters: {
@@ -778,7 +996,7 @@ export interface paths {
         };
         /**
          * Create or revision-conditionally update one resident schedule
-         * @description Create requires If-None-Match: *. Update requires the exact ETag in If-Match. Identical lost-response retries are unchanged and retain the revision.
+         * @description Create requires If-None-Match: *. Update requires the exact ETag in If-Match. Identical lost-response retries are unchanged and retain the revision. A refused precondition answers 412 with the schedule's current revision (null when none exists). A definition the planner or the schedule validator refuses answers 422 with its findings; a malformed body, refused inputs or a refused workflow answer 422 with the error envelope.
          */
         put: {
             parameters: {
@@ -817,13 +1035,15 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description Error envelope */
+                /** @description Precondition refused; carries the current revision */
                 412: {
                     headers: {
+                        /** @description The current revision, when one exists */
+                        ETag?: string;
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["Error"];
+                        "application/json": components["schemas"]["SchedulePreconditionFailed"];
                     };
                 };
                 /** @description Error envelope */
@@ -844,8 +1064,17 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description Error envelope */
+                /** @description Refused definition: its findings, or the error envelope */
                 422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ScheduleFindings"] | components["schemas"]["Error"];
+                    };
+                };
+                /** @description Error envelope */
+                503: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -853,8 +1082,8 @@ export interface paths {
                         "application/json": components["schemas"]["Error"];
                     };
                 };
-                /** @description Error envelope */
-                503: {
+                /** @description Durable schedule capacity exhausted */
+                507: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -923,12 +1152,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Workflow metadata without source bytes */
+        /**
+         * Workflow metadata without source bytes
+         * @description `{name}` is a served name exactly as GET /v1/workflows lists it: a project-relative path that usually contains `/` (`workflows/daily.nika`). Send its `/` separators literally, as path separators: GET /v1/workflows/workflows/daily.nika. A served name uses only ASCII letters, digits, `.`, `_`, `-` and `/`, so no segment needs percent-encoding; an encoded separator (`%2F`) or any other escape is not decoded and answers 404.
+         */
         get: {
             parameters: {
                 query?: never;
                 header?: never;
                 path: {
+                    /** @description The served name, `/` separators sent literally (it spans several path segments) */
                     name: string;
                 };
                 cookie?: never;
@@ -976,6 +1209,40 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Artifact: {
+            /**
+             * Format: uuid
+             * @description The id of that journal event
+             */
+            event_id: string;
+            /** @enum {string} */
+            kind: "file" | "agent_image";
+            /** @description The recorded media type, else one derived from the extension, else application/octet-stream */
+            mime: string;
+            /** @description Unique within the job: `file/<path>` or `agent_image/<n>.<ext>` (the n-th image the job's agents sent that the blob store kept). The download route's `{name}`. */
+            name: string;
+            /** @description A file's project-relative path, as the workflow wrote it (normalized). Absent for an agent image. */
+            path?: string;
+            /** @description SHA-256 of the recorded bytes, as journaled */
+            sha256: string;
+            /** @description Bytes, as journaled */
+            size: number;
+            /** @description The task whose event records it */
+            task?: string;
+        };
+        /** @description A settled job's artifacts, as its sealed journal records them, bound to its receipt: `receipt` is the job's own (trace id and chain head included), `verdict` the tier its journal attained. At most 1024 entries are listed, in journal order; `truncated` says more exist (a download still finds every recorded name). */
+        ArtifactManifest: {
+            artifacts: components["schemas"]["Artifact"][];
+            /**
+             * @description The largest artifact this server downloads (256 MiB by default)
+             * @example 268435456
+             */
+            max_artifact_bytes: number;
+            receipt: components["schemas"]["JobReceipt"];
+            truncated: boolean;
+            /** @enum {string} */
+            verdict: "sealed" | "anchored";
+        };
         /** @description Source-only Check by served name. Required launch inputs may remain unsupplied; caller inputs are accepted only on POST /v1/jobs and are refused here. Check does not execute an access plan. */
         CheckByName: {
             /** @description Access pin, same vocabulary as `--access` (class or harness id). A pin never silently substitutes a metered seat. */
@@ -1290,6 +1557,20 @@ export interface components {
             changed: boolean;
             status: components["schemas"]["ScheduleStatus"];
         };
+        ScheduleFindings: {
+            findings: {
+                code: string;
+                detail: string;
+            }[];
+        };
+        SchedulePreconditionFailed: {
+            error: {
+                /** @constant */
+                code: "schedule_precondition_failed";
+                currentRevision: string | null;
+                message: string;
+            };
+        };
         SchedulePut: {
             active?: boolean;
             /** @enum {string} */
@@ -1359,6 +1640,11 @@ export interface components {
             seal?: {
                 [key: string]: unknown;
             };
+            /**
+             * @description The CLI's own `tier`, verbatim: the attained tier over an intact chain, or its refusal class. `verdict` is its projection; a forged seal still reads `ok` here with `exit` 2, so read `exit` and the legs, not a word alone.
+             * @enum {string}
+             */
+            tier?: "ok" | "sealed" | "anchored" | "replayed" | "broken" | "line-over-long" | "unchained" | "empty" | "unreadable" | "refused" | "buried-seal" | "unknown";
             trace_id?: string;
             /** @enum {string} */
             verdict: "unavailable" | "ok" | "sealed" | "anchored" | "replayed" | "incomplete" | "tampered" | "broken" | "unchained" | "empty" | "unreadable" | "refused" | "line-over-long" | "unknown";

@@ -1,5 +1,9 @@
 import { NikaEventBufferOverflowError } from '../errors.js';
 import type {
+  NikaArtifact,
+  NikaArtifactDownloadOptions,
+  NikaArtifactReadOptions,
+  NikaArtifactsOptions,
   NikaCancelResult,
   NikaEvent,
   NikaEventsOptions,
@@ -46,6 +50,11 @@ export class RunSession {
       result: () => this.done,
       status: () => this.status(),
       cancel: () => this.cancel(),
+      artifacts: (options?: NikaArtifactsOptions) => source.artifacts(options ?? {}),
+      downloadArtifact: (artifact: string | NikaArtifact, options?: NikaArtifactDownloadOptions) =>
+        source.downloadArtifact(artifact, options ?? {}),
+      readArtifact: (artifact: string | NikaArtifact, options?: NikaArtifactReadOptions) =>
+        source.readArtifact(artifact, options ?? {}),
       done: this.done,
     });
     void this.observeSettlement();

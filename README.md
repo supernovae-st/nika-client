@@ -311,6 +311,7 @@ local process cannot honestly own a schedule.
 | **Schedules** | refused (the CLI's `nika arm` can hand them to the OS) | `schedule()` and `scheduleStatus()` |
 | **Spend limit** | `maxCostUsd` per run | the server's own ceiling per job (`nika serve --run-cost-ceiling`, 1 USD by default); a schedule's `maxCostUsd` |
 | **Proof** | the engine verifies the local trace against your receipt | the server's verdict on the job's journal |
+| **Files a run produced** | where its workflow wrote them, in your `cwd` | `run.artifacts()` lists them from the job's sealed journal; `run.downloadArtifact()` streams one, proven against its recorded SHA-256 |
 
 **Your server in a few lines.** In the folder that holds `hello.nika`, give
 the server a project file and a private token, then start it:
@@ -349,7 +350,7 @@ so your app needs no local engine for it. A server with a signing key answers
 `sealed`; one without answers `ok`. Store `run.id` (the job id) and the last
 `event.sequence` you processed, and a new process picks the job back up with
 `attachRun`. [docs/server.md](https://github.com/supernovae-st/nika-client/blob/main/docs/server.md)
-covers setup, retries, recovery, restarts, connection rules and schedules,
+covers setup, retries, recovery, restarts, artifacts, connection rules and schedules,
 and [`examples/server-recovery.ts`](https://github.com/supernovae-st/nika-client/blob/main/examples/server-recovery.ts)
 recovers a job across two processes.
 
@@ -474,6 +475,9 @@ Create the client once: it drives the bundled engine by default, or a
 | `run.result()` | The final result, settled once; a failed run resolves, it does not throw |
 | `run.status()` | The current status without waiting (server runs only) |
 | `run.cancel()` | Asks the engine to stop the run; every call returns the same request |
+| `run.artifacts(options?)` | What the settled job produced, as its sealed journal lists it (server runs only) |
+| `run.downloadArtifact(artifact, options?)` | One artifact's bytes as a stream that closes once they are proven (server runs only) |
+| `run.readArtifact(artifact, options?)` | One artifact's proven bytes, whole, up to `maxBytes` (16 MiB by default; server runs only) |
 | `run.done` | The same promise as `run.result()`, kept for older code |
 
 Every member is bound to its run, so you can pass it around:
@@ -554,7 +558,7 @@ passing them to a local client throws `NikaConfigurationError`.
 | Topic | Page |
 |---|---|
 | `check()`, results, `inputs`, `run.events()` and its bounds, cancellation, typed frames, the deprecated wrappers | [docs/runs.md](https://github.com/supernovae-st/nika-client/blob/main/docs/runs.md) |
-| `nika serve`: setup, idempotent runs, `attachRun`, restarts, schedules | [docs/server.md](https://github.com/supernovae-st/nika-client/blob/main/docs/server.md) |
+| `nika serve`: setup, idempotent runs, `attachRun`, restarts, artifacts, schedules | [docs/server.md](https://github.com/supernovae-st/nika-client/blob/main/docs/server.md) |
 | Receipts, `traceVerify()` on both doors, signing keys | [docs/receipts.md](https://github.com/supernovae-st/nika-client/blob/main/docs/receipts.md) |
 | `compile()`: from an intention to a checked candidate, answer rounds, provider rounds | [docs/compile.md](https://github.com/supernovae-st/nika-client/blob/main/docs/compile.md) |
 | Every error, server refusals, troubleshooting | [docs/errors.md](https://github.com/supernovae-st/nika-client/blob/main/docs/errors.md) |
@@ -615,8 +619,8 @@ The `package.json` subpath is exported for CommonJS, ESM build tools and CI
 pin checks. It reports the installed package, not a moving registry tag.
 
 **Package and engine move together.** Each package version bundles the engine
-with the same number, the one it was tested with: 0.123.1 bundles
-`nika 0.123.1 (cc7b51964)` and speaks its machine protocol, 2. It refuses an
+with the same number, the one it was tested with: 0.123.2 bundles
+`nika 0.123.2 (5591478a7)` and speaks its machine protocol, 2. It refuses an
 engine or server on another generation (0.122 and older speak 1) at its
 identity probe (`nika --sdk-identity`, `GET /health`), before any job, with
 `NikaCompatibilityError`: upgrade the package and every `nika serve` together

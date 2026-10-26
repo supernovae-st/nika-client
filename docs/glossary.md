@@ -21,6 +21,7 @@ The words these pages use, defined once. The engine's own vocabulary is in the
 | **Trace** | The tamper-evident, hash-chained record of a run that the engine writes (locally under `.nika/traces/`). |
 | **Seal** | The engine's signature over a trace, written as its last line when the run ends, with a signing key. A trace without one is *unsealed*. |
 | **Receipt** | The proof material a run hands your code (`result.receipt`). Pass it back unchanged to `traceVerify()`. |
+| **Artifact** | A file a settled server job produced, as its sealed journal records it with its size and SHA-256: what a builtin saved (`nika:chart`, `nika:image_generate`…) or an image an agent sent. `run.artifacts()` lists them (the job's *manifest*, bound to its receipt), and `run.downloadArtifact()` streams one, its bytes proven against that record. A local run has no manifest. |
 | **Signing key** | The engine's run-signing key pair (`nika key init`). The engine your app starts reads it from `~/.nika/keys/` or `NIKA_RUN_KEY_FILE`/`NIKA_RUN_PUB_FILE`, never from an OS keychain. |
 | **Door** | One of the two ways the package reaches an engine: the bundled engine as a child process (`new Nika()`, transport `native-process`) or a `nika serve` over HTTP (`new Nika({ url, token })`, transport `http`). |
 | **`nika serve` (the resident)** | The engine running as a long-lived server you operate. It holds jobs and schedules across restarts. |

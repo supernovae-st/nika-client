@@ -329,11 +329,12 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
   });
 
   describe('the Run owns its lifecycle', () => {
-    it('exposes identity, the four lifecycle methods, and the done alias, frozen', async () => {
+    it('exposes identity, the four lifecycle methods, the artifacts, and the done alias, frozen', async () => {
       const run = await native().run('ok.nika');
 
       expect(Object.keys(run).sort()).toEqual([
-        'cancel', 'done', 'events', 'id', 'result', 'status',
+        'artifacts', 'cancel', 'done', 'downloadArtifact', 'events', 'id', 'readArtifact', 'result',
+        'status',
       ]);
       expect(Object.isFrozen(run)).toBe(true);
       // Authoring, proof, catalog and listing stay on the client.
@@ -575,7 +576,8 @@ describe.skipIf(!posix)('one application, two transports (issues #117 and #120)'
       const recovered = await client.attachRun('job-1', { lastEventId: 4 });
 
       expect(Object.keys(recovered).sort()).toEqual([
-        'cancel', 'done', 'events', 'id', 'result', 'status',
+        'artifacts', 'cancel', 'done', 'downloadArtifact', 'events', 'id', 'readArtifact', 'result',
+        'status',
       ]);
       await expect(recovered.result()).resolves.toMatchObject({ id: 'job-1', status: 'succeeded' });
 

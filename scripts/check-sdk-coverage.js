@@ -24,7 +24,6 @@ const ABSENT = [
   '/v1/cancel',
   '/v1/events',
   '/v1/reload',
-  '/v1/jobs/:param/artifacts',
   '/v1/schedules/:param/trigger',
   '/v1/schedules/:param/backfill',
 ];

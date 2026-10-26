@@ -23,6 +23,8 @@ Any other non-2xx body is discarded and reported as a redacted
 | `GET /v1/jobs/{id}/events` | `run.events()` / `attachRun()` | bounded, sequenced SSE with replay |
 | `POST /v1/jobs/{id}/cancel` | `run.cancel()` | 200 a settled job or its terminal replay; 202 the request accepted on a running job, settled later by observation |
 | `GET /v1/jobs/{id}/trace/verify` | `traceVerify(receipt)` | the server's engine-owned verdict on the journal it wrote for the job, in the CLI's lower-case words, and its `reason` (the seal tier beside a verdict that holds); see [Trace verification](#trace-verification) |
+| `GET /v1/jobs/{id}/artifacts` | `run.artifacts()` | a settled job's artifact manifest, read from its sealed journal and bound to its receipt; see [Artifacts](#artifacts) |
+| `GET /v1/jobs/{id}/artifacts/{name}` | `run.downloadArtifact()` / `run.readArtifact()` | one artifact's recorded bytes, with their size and SHA-256 in the headers, streamed past the request deadline |
 | `GET/PUT /v1/schedules/{id}` | `scheduleStatus()` / `schedule()` | resident schedule projection and CAS mutation |
 
 ## Connection rules
@@ -40,7 +42,8 @@ Any other non-2xx body is discarded and reported as a redacted
   that captures a snapshot or observes a compile must report the same
   machine protocol, snapshot, check-report and event clocks as the resident.
 - Each request has a bounded timeout, except a compile provider round
-  without `timeoutMs` or `limits.deadline_ms` (see [compile.md](compile.md)),
+  without `timeoutMs` or `limits.deadline_ms` (see [compile.md](compile.md))
+  and an artifact download (see [Artifacts](#artifacts)),
   and each JSON body and SSE frame has a byte ceiling, `machineBufferBytes`:
   16 MiB by default, the bound of the resident's own job store, which
   refuses rather than truncates a larger result. A body past it is refused
@@ -178,6 +181,86 @@ not match keeps the server's `sealed` and reads `verified: false`. Measured on
 engine 0.123.0: a server with a signing key answers `sealed`/`sealed`, one
 without answers `ok`/`unsealed`, and both read `verified: true` for the
 matching receipt.
+
+## Artifacts
+
+`run.artifacts()`, `run.downloadArtifact()` and `run.readArtifact()` need a
+server whose `/health` lists `artifacts` (engine 0.123.2 added the routes;
+0.123.1 and older do not list them). Without it, and on the native transport,
+they reject with `NikaCompatibilityError` (`capability: 'artifacts'`) before
+any request.
+
+**The manifest** (`ArtifactManifest`) is read like any JSON answer: bearer
+token, `requestTimeout`, `machineBufferBytes`. The SDK checks each field the
+contract names by type and lets any other key ride through, so a later
+additive key is not a refusal: `receipt` (the closed `JobReceipt`, its
+`job_id` the run's, with a `chain_head`), `verdict` (the journal tier,
+`sealed` or `anchored`; any other word is refused), `max_artifact_bytes`,
+`truncated` and `artifacts`. Each entry has a unique `name`, a `kind`, a
+`size` that is a byte count, a `sha256` of 64 lowercase hexadecimal digits,
+a `mime`, an optional `task` and an `event_id`; a `file` carries its `path`,
+an `agent_image` none. A `path` must be contained (relative, `/`-separated,
+no empty, `.` or `..` segment, no backslash, no NUL). That check is lexical
+and POSIX, the server's own: it does not make a path safe to join under a
+local directory on every system (`C:x` is drive-relative on Windows, and two
+paths that differ only by case collide on a case-insensitive disk). To write
+an artifact locally, resolve the joined path, check that it stays under your
+directory, and open it exclusively (`wx`). Any other shape is a
+`NikaProtocolError` that quotes no value. The receipt must equal the job's own, compared key by key: the one
+the handle settled with, or, when the handle has not seen the settlement, the
+one `GET /v1/jobs/{id}` returns.
+
+**A download** sends the name as one path segment, `encodeURIComponent(name)`
+(its `/` become `%2F`, which the server decodes once and matches exactly),
+with `Accept-Encoding: identity`. A name the manifest lists is held to its
+entry: the 200 must carry `Content-Length` equal to `size`,
+`Nika-Artifact-Sha256` equal to `sha256`, and no `Content-Encoding`. Any
+other 200 is a `NikaProtocolError` before a byte is read. A name the complete
+manifest does not list is still sent, so the server answers its own 404
+`artifact_not_found`; a 200 for it is a protocol fault. Past a truncated
+manifest's 1,024 entries a name is held to the response's two headers alone,
+and `download.artifact` is absent.
+
+The request goes through the client's unbounded fetch, as a provider compile
+round does: no `requestTimeout` on its headers (the server hashes the whole
+file against its record before it answers) or its body, which the server
+streams outside its own request deadline, and no `machineBufferBytes`. Only
+the caller's `signal`, or cancelling the stream, ends it. With an injected
+`fetch`, that fetch's own timeouts apply.
+
+The stream hashes every chunk as it arrives and never passes the recorded
+size. It holds its last chunk back and closes only once exactly `size` bytes
+hashed to `sha256`; bytes that are not the recorded ones fail it with a
+`NikaProtocolError`. A body that ends before its `Content-Length`, or resets
+before its end, is requested again, up to 3 more times, after 100, 200 and
+400 ms: the server has no range requests, so the whole artifact comes again,
+its headers are held to the same size and digest, and its first bytes must
+hash as the bytes already received. A retry the transport cannot deliver (no
+connection, or one dropped before its headers) counts as one more incomplete
+attempt. A refusal on a retry fails the stream with that `NikaOperationError`
+(409 `artifact_changed` for a file that changed); a download still incomplete
+after the last attempt fails with a `NikaTransportError`, and an abort with a
+`NikaTransportError` naming the method. A body whose bytes all arrived but
+whose end was lost is judged by its digest, without a retry.
+
+`readArtifact()` reads the same stream into one `Uint8Array` and resolves
+only once it closed. It refuses an artifact larger than `maxBytes` (16 MiB by
+default) with `NikaConfigurationError`: before any download for a listed
+one, from its `Content-Length` for one past a truncated manifest.
+
+| Route | HTTP status · `error.code` |
+|---|---|
+| both | 401 `unauthorized` · 404 `job_not_found` · 409 `job_not_settled`, `artifact_journal_unavailable`, `artifact_journal_unverified` · 500 `internal_error` · 503 `store_busy`, `artifact_capacity` |
+| the manifest only | 408 `request_timeout` |
+| a download only | 403 `artifact_too_large` · 404 `artifact_not_found` · 409 `artifact_changed` |
+
+Each is a `NikaOperationError` whose `operation` is the method called
+(`artifacts`, `downloadArtifact` or `readArtifact`), with the server's code on
+`code` and `machineCode` and the HTTP `status`. The SDK retries none of them:
+a 503 says to retry with backoff. A server without a run key lists
+`artifacts` but answers every request 409 `artifact_journal_unverified`,
+since its journals are unsealed (see
+[server.md](server.md#download-what-a-job-produced-artifacts)).
 
 ## Settlement
 

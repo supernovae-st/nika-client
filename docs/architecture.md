@@ -45,7 +45,13 @@ local nika process         authenticated nika serve
 - `src/lib/run-session.ts` is the lifecycle Seam. It owns the eager event
   pump, bounded independent observers, cancellation memoization, and the sole
   terminal settlement. It builds the `NikaRun` handle as closures over itself,
-  so the Run owns `events()`, `result()`, `status()` and `cancel()`.
+  so the Run owns `events()`, `result()`, `status()` and `cancel()`, and
+  passes `artifacts()`, `downloadArtifact()` and `readArtifact()` to its
+  transport.
+- `src/lib/artifacts.ts` reads a server's artifact manifest and proves each
+  download: one verified stream that hashes every chunk, never passes the
+  recorded size, holds its last chunk until the digest matches, and requests
+  a body cut short again. It reads no journal and derives no artifact.
 - `src/lib/run-events.ts` is the semantic Adapter: a pure projection of one
   protocol frame onto the SDK's lifecycle vocabulary, with the frame kept by
   identity on `raw`. It is applied at the edge of an observer view. There is
@@ -75,18 +81,24 @@ Some operations deliberately have one authority:
 - remote trace verification returns the server's verdict on the journal it
   wrote for the job (`ok`, `sealed`, `broken`…, in the CLI's words), and
   `unavailable` only when no journal exists for it; the adapter adds only
-  `verified`, true when that verdict holds and names the receipt's trace.
+  `verified`, true when that verdict holds and names the receipt's trace;
+- artifacts are the server's: its manifest, derived from the job's sealed
+  journal, is the only list, bound to the job's receipt, and each download is
+  proven against it. A native run refuses with `NikaCompatibilityError`
+  (`capability: 'artifacts'`); the SDK never lists a local file as one.
 
 ## Lifecycle invariants
 
 1. `run()` resolves only after stable admission and returns an immutable
-   `NikaRun` handle: `id`, `events()`, `result()`, `status()`, `cancel()`, and
+   `NikaRun` handle: `id`, `events()`, `result()`, `status()`, `cancel()`,
+   the job's `artifacts()`, `downloadArtifact()` and `readArtifact()`, and
    `done`, the compatibility alias of `result()`. Admission is not execution;
    a succeeded `result()` is not a sealed receipt (`traceVerify` can return
    `receipt_mismatch` on an UNSEALED journal). Its members are closures
    over the run's one session, so an extracted method still works. The handle
-   owns the lifecycle and nothing else: checking, proof, catalogs and
-   authoring stay on the facade. A run handle never means "maybe a run": a refusal
+   owns the lifecycle and what the job produced, nothing else: checking,
+   proof, catalogs and authoring stay on the facade. A run handle never
+   means "maybe a run": a refusal
    before admission rejects `run()` with `NikaOperationError` and no handle
    exists. Over HTTP a red local snapshot refuses before any request is sent;
    on the native transport the first machine frame decides. A run event is the

@@ -563,6 +563,15 @@ export class NativeProcessTransport implements Transport {
         );
         return cancelPromise;
       },
+      artifacts: async () => {
+        throw localArtifacts(this.kind);
+      },
+      downloadArtifact: async () => {
+        throw localArtifacts(this.kind);
+      },
+      readArtifact: async () => {
+        throw localArtifacts(this.kind);
+      },
       cleanup: () => engine.stop(),
     };
   }
@@ -631,6 +640,22 @@ export class NativeProcessTransport implements Transport {
 
 /** The capability an engine advertises for `nika run --inputs-json -` (nika#1683). */
 const INPUTS_LITERAL = 'inputsLiteral';
+
+/**
+ * A local run has no artifact manifest: the engine offers none for it (only
+ * `nika serve` derives one, from a job's sealed journal), and the SDK derives
+ * none itself. Its files are where its workflow wrote them, in the working
+ * directory the engine ran in.
+ */
+function localArtifacts(kind: NikaTransportKind): NikaCompatibilityError {
+  return new NikaCompatibilityError(
+    'artifacts',
+    kind,
+    "A local run's artifacts are the files its workflow wrote in the engine's working directory "
+    + "(the client's cwd): the local engine serves no artifact manifest, and the SDK lists and "
+    + 'downloads artifacts only from a nika serve job. Read the files where the workflow wrote them',
+  );
+}
 
 /**
  * Hand the map to the engine's stdin and close it. The engine's frames and its

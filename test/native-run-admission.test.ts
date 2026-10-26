@@ -324,7 +324,8 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
       const client = native();
       const run = await client.run<{ greeting: string }>('wire-0119-hello.nika');
       expect(Object.keys(run).sort()).toEqual([
-        'cancel', 'done', 'events', 'id', 'result', 'status',
+        'artifacts', 'cancel', 'done', 'downloadArtifact', 'events', 'id', 'readArtifact', 'result',
+        'status',
       ]);
 
       const events: NikaEvent[] = [];

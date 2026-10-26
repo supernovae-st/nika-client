@@ -24,11 +24,15 @@ console.log(isNikaRunSucceeded(result) ? result.outputs?.answer : result.status)
 | `run.result()` | The final result, settled once; a failed run resolves, it does not throw |
 | `run.status()` | The current status without waiting (server runs only) |
 | `run.cancel()` | Asks the engine to stop the run; every call returns the same request |
+| `run.artifacts(options?)` | What the settled job produced, as its sealed journal lists it (server runs only) |
+| `run.downloadArtifact(artifact, options?)` | One artifact's bytes as a stream that closes once they are proven (server runs only) |
+| `run.readArtifact(artifact, options?)` | One artifact's proven bytes, whole, up to `maxBytes` (server runs only) |
 | `run.done` | The same promise as `run.result()`, kept for older code |
 
 Every member is bound to its run, so you can pass it around:
-`const { events, result } = run`. The handle only observes, settles, reports
-and cancels its run; checking, proof, catalogs and authoring stay on `Nika`.
+`const { events, result } = run`. The handle observes, settles, reports and
+cancels its run, and on a server reads what its job produced; checking, proof,
+catalogs and authoring stay on `Nika`.
 
 ## Check a workflow without running it: `check()`
 
@@ -364,6 +368,28 @@ exceeded … ``). On a server the job keeps its result: a client with a larger
 bound reads it again with `attachRun(jobId)`, which reads the job's record
 first, a few dozen bytes larger than its last frame. Locally, that result
 never reaches your process: set the larger bound before the run.
+
+## Files a server run produced: artifacts
+
+An image in `outputs` rides as base64. A server run can hand you the file
+itself instead: the files its builtins saved (`nika:chart`,
+`nika:image_generate`, `nika:tts_generate`, `nika:image_fx`) and the images
+its agents sent, listed from the job's sealed journal, each one downloaded
+with its bytes proven against the size and SHA-256 recorded there:
+
+```ts
+await run.result();
+const { artifacts } = await run.artifacts();
+const chart = await run.readArtifact(artifacts[0]!); // Uint8Array, up to 16 MiB by default
+const { stream } = await run.downloadArtifact('file/out/totals.svg'); // streamed, no maxBytes
+```
+
+Neither `machineBufferBytes` nor `requestTimeout` bounds a download. A local
+run has no artifact manifest: its files are where its workflow wrote them, in
+the client's `cwd`, and the three methods reject with
+`NikaCompatibilityError` (`capability: 'artifacts'`).
+[server.md](server.md#download-what-a-job-produced-artifacts) covers what is
+listed, what a download proves, its retries and its errors.
 
 ## Cancel a run
 

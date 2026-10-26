@@ -161,9 +161,11 @@ describe('one Nika surface', () => {
     });
     const run = await client.run('flow.nika', { idempotencyKey: 'test-admission' });
     // Issue #120: the handle owns events/result/status/cancel; `done` stays
-    // as the compatibility alias. Nothing else rides it.
+    // as the compatibility alias. NIK-265 adds the job's artifacts. Nothing
+    // else rides it.
     expect(Object.keys(run).sort()).toEqual([
-      'cancel', 'done', 'events', 'id', 'result', 'status',
+      'artifacts', 'cancel', 'done', 'downloadArtifact', 'events', 'id', 'readArtifact', 'result',
+      'status',
     ]);
     await expect(run.done).resolves.toMatchObject({ id: 'run-shape', status: 'succeeded' });
   });

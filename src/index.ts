@@ -389,6 +389,12 @@ export {
 
 export type {
   NikaAccessPin,
+  NikaArtifact,
+  NikaArtifactDownload,
+  NikaArtifactDownloadOptions,
+  NikaArtifactManifest,
+  NikaArtifactReadOptions,
+  NikaArtifactsOptions,
   NikaCancelResult,
   NikaAttachRunOptions,
   NikaCheckFinding,

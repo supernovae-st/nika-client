@@ -86,9 +86,10 @@ was originally written.
    users, never substitutes for human usability evidence.
 7. `test/engine-live.test.ts` drives the engine `NIKA_BIN` names through the
    public API on both doors (check, run with its events and result, a refused
-   run, cancellation, trace verification, a snapshot run, schedules and
-   compile choices), keyless and offline; it is skipped without `NIKA_BIN`,
-   and candidate CI runs it against `ENGINE_QUAL_PIN`.
+   run, cancellation, trace verification, a snapshot run, schedules, compile
+   choices, and a server job's artifacts, listed, streamed and refused once
+   changed), keyless and offline; it is skipped without `NIKA_BIN`, and
+   candidate CI runs it against `ENGINE_QUAL_PIN`.
    `test/engine-0123-wire.test.ts` decodes bytes recorded from a real 0.123
    engine and the released 0.122.0 identity, hermetically, in `npm test`.
 

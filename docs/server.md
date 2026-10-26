@@ -297,11 +297,15 @@ file/out/totals.svg image/svg+xml
   hashes each chunk, holds its last one back, and closes only once exactly the
   recorded size hashed to the recorded SHA-256; otherwise it errors, and the
   file you wrote is not the artifact. `readArtifact()` resolves only then.
-- **A body cut short is downloaded again,** up to 3 more times, because a
-  server that stops or cannot read the file ends the stream early. The server
-  has no range requests, so each retry is the whole artifact again, and its
-  first bytes must hash as they did. A file that changed since the run
-  answers 409 `artifact_changed` instead: the server never serves other bytes.
+- **A body cut short is downloaded again,** up to 3 more times, 100, 200
+  and 400 ms apart: a stream ends early when the server cannot read the file
+  or stops while it streams, and a retry that cannot reach the server counts
+  as one more attempt. The server has no range requests, so each retry is the
+  whole artifact again, and its first bytes must hash as they did. A file
+  that changed since the run answers 409 `artifact_changed` instead: the
+  server never serves other bytes. Still incomplete after the last attempt
+  (a server restart takes longer than these waits), the stream fails with a
+  `NikaTransportError`: download it again once the server is back.
 - **No timeout of the package's.** Neither `machineBufferBytes` nor
   `requestTimeout` bounds a download: the server reads the whole file against
   its record before the first byte, and the body takes as long as it needs.

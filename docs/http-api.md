@@ -225,15 +225,18 @@ the caller's `signal`, or cancelling the stream, ends it. With an injected
 
 The stream hashes every chunk as it arrives and never passes the recorded
 size. It holds its last chunk back and closes only once exactly `size` bytes
-hashed to `sha256`; otherwise it errors with a `NikaProtocolError`. A body
-that ends before its `Content-Length`, or resets before its end, is requested
-again, up to 3 more times, after 100, 200 and 400 ms: the server has no range
-requests, so the whole artifact comes again, its headers are held to the same
-size and digest, and its first bytes must hash as the bytes already received.
-A refusal on a retry fails the stream with that `NikaOperationError` (409
-`artifact_changed` for a file that changed); a download still incomplete
-after the last attempt fails with a `NikaTransportError`. A body whose bytes
-all arrived but whose end was lost is judged by its digest, without a retry.
+hashed to `sha256`; bytes that are not the recorded ones fail it with a
+`NikaProtocolError`. A body that ends before its `Content-Length`, or resets
+before its end, is requested again, up to 3 more times, after 100, 200 and
+400 ms: the server has no range requests, so the whole artifact comes again,
+its headers are held to the same size and digest, and its first bytes must
+hash as the bytes already received. A retry the transport cannot deliver (no
+connection, or one dropped before its headers) counts as one more incomplete
+attempt. A refusal on a retry fails the stream with that `NikaOperationError`
+(409 `artifact_changed` for a file that changed); a download still incomplete
+after the last attempt fails with a `NikaTransportError`, and an abort with a
+`NikaTransportError` naming the method. A body whose bytes all arrived but
+whose end was lost is judged by its digest, without a retry.
 
 `readArtifact()` reads the same stream into one `Uint8Array` and resolves
 only once it closed. It refuses an artifact larger than `maxBytes` (16 MiB by

@@ -19,6 +19,7 @@ import {
   NikaTransportError,
 } from '../src/index.js';
 import type { NikaArtifact, NikaArtifactDownload, NikaRemoteConfig, NikaRun } from '../src/index.js';
+import { HttpTransport } from '../src/lib/http-transport.js';
 
 // run.artifacts(), run.downloadArtifact() and run.readArtifact() against a
 // fake `nika serve` on loopback that answers the two routes of engine nika#1834
@@ -434,6 +435,8 @@ describe('run.artifacts(): the settled job manifest', () => {
       [{ artifacts: [IMAGE, { ...CHART, size: -1 }] }, /entry 1 size/],
       [{ artifacts: [{ ...CHART, size: 1.5 }] }, /size/],
       [{ artifacts: [{ ...CHART, name: '' }] }, /name/],
+      [{ artifacts: [{ ...CHART, name: '..' }] }, /name was not a name the download route takes/],
+      [{ artifacts: [{ ...CHART, name: 'file/\ud800.svg' }] }, /name was not a name the download route takes/],
       [{ artifacts: [{ ...CHART, mime: '' }] }, /mime/],
       [{ artifacts: [{ ...CHART, event_id: undefined }] }, /event_id/],
       [{ artifacts: [{ ...CHART, task: 3 }] }, /task/],
@@ -581,7 +584,7 @@ describe('run.downloadArtifact(): one artifact, proven', () => {
     await expect(run.readArtifact(CHART)).rejects.toBeInstanceOf(NikaProtocolError);
   });
 
-  it('refuses a response whose headers contradict the manifest entry, before any byte', async () => {
+  it('refuses a response whose headers contradict the manifest entry', async () => {
     const server = await serve();
     const run = await attached();
     const cases: Array<[Handler, RegExp]> = [
@@ -624,6 +627,25 @@ describe('run.downloadArtifact(): one artifact, proven', () => {
     expect(server.downloadRequests).toHaveLength(2);
   });
 
+  it('counts a retry the server never answered as one more incomplete attempt', async () => {
+    const server = await serve();
+    // Cut short; then a connection dropped before its headers; then the bytes.
+    server.downloads = [cutShort(30_000), (request) => request.socket.destroy()];
+    const run = await attached();
+    const bytes = await run.readArtifact(IMAGE.name);
+    expect(Buffer.from(bytes).equals(PNG)).toBe(true);
+    expect(server.downloadRequests).toHaveLength(3);
+  });
+
+  it('names readArtifact() on a refusal its retry met', async () => {
+    const server = await serve();
+    server.downloads = [cutShort(30_000), refuse(409, 'artifact_changed')];
+    const run = await attached();
+    const refused = await failure(run.readArtifact(IMAGE));
+    expect(refused).toBeInstanceOf(NikaOperationError);
+    expect(refused).toMatchObject({ operation: 'readArtifact', code: 'artifact_changed', status: 409 });
+  });
+
   it('gives up, typed, once every retry was cut short too', async () => {
     const server = await serve();
     server.downloads = [cutShort(10_000), cutShort(20_000), cutShort(30_000), cutShort(40_000)];
@@ -632,7 +654,7 @@ describe('run.downloadArtifact(): one artifact, proven', () => {
     expect(refused).toBeInstanceOf(NikaTransportError);
     expect(refused).not.toBeInstanceOf(NikaProtocolError);
     expect(refused.message).toMatch(
-      /^Artifact "agent_image\/1\.png" ended before its 70000 bytes on 4 attempts \(\d+ arrived\), so nothing was proven/,
+      /^Artifact "agent_image\/1\.png" did not arrive whole in 4 attempts \(\d+ of its 70000 bytes arrived\), so nothing was proven/,
     );
     expect(server.downloadRequests).toHaveLength(4);
   });
@@ -795,7 +817,7 @@ describe('run.readArtifact(): the whole bytes, bounded', () => {
     expect(server.downloadRequests).toEqual([]);
   });
 
-  it('refuses an unlisted artifact past maxBytes from its Content-Length, before its body', async () => {
+  it('refuses an unlisted artifact past maxBytes from its Content-Length', async () => {
     const server = await serve();
     server.manifest = (_request, response) => json(response, 200, manifestBody({ truncated: true, artifacts: [] }));
     const run = await attached();
@@ -836,10 +858,20 @@ function artifactResponse(stream: ReadableStream<Uint8Array>, recordedBytes: Uin
 }
 
 /** An in-process server for the one job, whose downloads answer `downloads` in order. */
-function injected(downloads: Response[]): { nika: Nika; downloads: () => number } {
-  let served = 0;
-  const fetch = async (input: string | URL | Request): Promise<Response> => {
+function injected(downloads: Array<Response | Promise<Response>>): { nika: Nika; downloads: () => number } {
+  const served = inProcess(downloads);
+  return {
+    nika: new Nika({ url: REMOTE, token: TOKEN, fetch: served.fetch('fetch') }),
+    downloads: () => served.seen.filter(([, path]) => path.includes('/artifacts/')).length,
+  };
+}
+
+/** The routes of `injected`, as fetches that record which one served which path. */
+function inProcess(downloads: Array<Response | Promise<Response>>) {
+  const seen: Array<[string, string]> = [];
+  const fetch = (door: string) => (async (input: string | URL | Request): Promise<Response> => {
     const url = new URL(String(input));
+    seen.push([door, url.pathname]);
     const job = `/v1/jobs/${JOB}`;
     if (url.pathname === '/health') {
       return Response.json(healthBody(['check', 'executionSnapshot', 'eventStream', 'artifacts']));
@@ -850,16 +882,20 @@ function injected(downloads: Response[]): { nika: Nika; downloads: () => number 
     }
     if (url.pathname === `${job}/artifacts`) return Response.json(manifestBody());
     if (url.pathname.startsWith(`${job}/artifacts/`)) {
-      served += 1;
       const next = downloads.shift();
       if (next) return next;
     }
     throw new Error(`unexpected ${url.pathname}`);
-  };
-  return {
-    nika: new Nika({ url: REMOTE, token: TOKEN, fetch: fetch as typeof globalThis.fetch }),
-    downloads: () => served,
-  };
+  }) as typeof globalThis.fetch;
+  return { fetch, seen };
+}
+
+async function until(holds: () => boolean): Promise<void> {
+  const deadline = Date.now() + 2_000;
+  while (!holds()) {
+    if (Date.now() > deadline) throw new Error('the condition never held');
+    await delay(5);
+  }
 }
 
 describe('a verified stream, on answers no server puts on the wire', () => {
@@ -878,6 +914,91 @@ describe('a verified stream, on answers no server puts on the wire', () => {
     tail.release();
     expect((await last).value?.byteLength).toBe(PNG.length - 40_000);
     expect((await reader.read()).done).toBe(true);
+  });
+
+  it('downloads through the unbounded fetch, and reads the manifest through the bounded one', async () => {
+    const served = inProcess([artifactResponse(body([PNG]).stream, PNG)]);
+    const transport = new HttpTransport({
+      url: REMOTE,
+      token: TOKEN,
+      fetch: served.fetch('fetch'),
+      unboundedFetch: served.fetch('unbounded'),
+      requestTimeout: 1_000,
+      machineBufferBytes: 64 * 1024,
+      resolveEngine: () => {
+        throw new Error('no local engine is needed');
+      },
+    });
+    const run = await transport.attachRun(JOB, { lastEventId: 0 });
+    await run.done;
+    expect(Buffer.from(await run.readArtifact(IMAGE.name, {})).equals(PNG)).toBe(true);
+    expect(served.seen.filter(([, path]) => path.includes('/artifacts'))).toEqual([
+      ['fetch', `/v1/jobs/${JOB}/artifacts`],
+      ['unbounded', `/v1/jobs/${JOB}/artifacts/agent_image%2F1.png`],
+    ]);
+  });
+
+  it('refuses contradicting headers without reading the body, and releases it', async () => {
+    let pulled = 0;
+    let released = false;
+    const untouched = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulled += 1;
+        controller.enqueue(PNG);
+        controller.close();
+      },
+      cancel() {
+        released = true;
+      },
+    }, { highWaterMark: 0 });
+    const { nika } = injected([new Response(untouched, {
+      status: 200,
+      headers: artifactHeaders(PNG, 'image/png', { 'Content-Length': String(PNG.length + 1) }),
+    })]);
+    const run = await nika.attachRun(JOB);
+    await expect(run.downloadArtifact(IMAGE)).rejects.toBeInstanceOf(NikaProtocolError);
+    expect(pulled).toBe(0);
+    expect(released).toBe(true);
+  });
+
+  it('releases a retry that answers after the stream was cancelled', async () => {
+    let answer!: (response: Response) => void;
+    const deferred = new Promise<Response>((resolve) => { answer = resolve; });
+    let lateReleased = false;
+    const late = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(PNG);
+        controller.close();
+      },
+      cancel() {
+        lateReleased = true;
+      },
+    }, { highWaterMark: 0 });
+    const served = injected([artifactResponse(body([PNG.subarray(0, 1_000)], 'error').stream, PNG), deferred]);
+    const run = await served.nika.attachRun(JOB);
+    const download = await run.downloadArtifact(IMAGE);
+    const reader = download.stream.getReader();
+    const reading = reader.read();
+    // The first body broke; its retry is on the wire when the reader cancels.
+    await until(() => served.downloads() === 2);
+    await reader.cancel();
+    await expect(reading).resolves.toMatchObject({ done: true });
+    answer(new Response(late, { status: 200, headers: artifactHeaders(PNG, 'image/png') }));
+    await until(() => lateReleased);
+  });
+
+  it('stops on the caller signal while it waits to retry', async () => {
+    const served = injected([artifactResponse(body([PNG.subarray(0, 1_000)], 'error').stream, PNG)]);
+    const run = await served.nika.attachRun(JOB);
+    const controller = new AbortController();
+    const download = await run.downloadArtifact(IMAGE, { signal: controller.signal });
+    const reading = failure(bytesOf(download.stream));
+    // Inside the 100 ms the first retry waits.
+    setTimeout(() => controller.abort(new Error('the caller stopped')), 30);
+    const refused = await reading;
+    expect(refused).toBeInstanceOf(NikaTransportError);
+    expect(refused.message).toBe('downloadArtifact() aborted by caller');
+    expect(served.downloads()).toBe(1);
   });
 
   it('refuses a body that yields something other than bytes', async () => {

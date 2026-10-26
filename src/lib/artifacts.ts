@@ -103,9 +103,7 @@ function artifactEntry(value: unknown, transport: NikaTransportKind, index: numb
   );
   const entry = machineObject(value);
   if (!entry) throw fault('was not an object');
-  if (typeof entry.name !== 'string' || entry.name.length === 0 || entry.name.includes('\0')) {
-    throw fault('name was not a non-empty string');
-  }
+  if (!isSendableName(entry.name)) throw fault('name was not a name the download route takes');
   if (typeof entry.kind !== 'string' || entry.kind.length === 0) throw fault('kind was not a word');
   if (entry.kind === 'file' && entry.path === undefined) throw fault('is a file without its path');
   if (entry.kind === 'agent_image' && entry.path !== undefined) throw fault('is an agent image with a path');
@@ -169,12 +167,20 @@ function artifactName(value: unknown): string {
   // One path segment: its `/` travel as %2F. Only a dot segment would be
   // resolved away by the URL itself, and no manifest names one.
   if (value === '.' || value === '..') throw new TypeError('An artifact name is never a dot segment');
+  if (!isSendableName(value)) throw new TypeError('An artifact name must be valid Unicode');
+  return value;
+}
+
+/** A name one path segment can carry: non-empty, no NUL, no dot segment, valid Unicode. */
+function isSendableName(value: unknown): value is string {
+  if (typeof value !== 'string' || value.length === 0 || value.includes('\0')) return false;
+  if (value === '.' || value === '..') return false;
   try {
     encodeURIComponent(value);
+    return true;
   } catch {
-    throw new TypeError('An artifact name must be valid Unicode');
+    return false;
   }
-  return value;
 }
 
 /** The path segment that carries a name: the server decodes it once and matches it exactly. */
@@ -257,23 +263,39 @@ export function verifiedArtifactStream(options: VerifiedArtifactOptions): Readab
     void reader.cancel().catch(() => {});
   };
 
+  /**
+   * The next attempt's body. A retry the transport could not deliver (the
+   * server refused the connection or dropped it before its headers) is one
+   * more incomplete attempt; a refusal of the server, a protocol fault and an
+   * abort end the download.
+   */
   const requestAgain = async (cause?: unknown) => {
     void reader.cancel().catch(() => {});
-    if (attempt > ARTIFACT_RETRIES) {
-      throw new NikaTransportError(
-        transport,
-        `Artifact ${label} ended before its ${expected.size} bytes on ${attempt} attempts `
-        + `(${received} arrived), so nothing was proven. Download it again later: a file that `
-        + 'changed answers 409 artifact_changed',
-        cause instanceof Error ? { cause } : undefined,
-      );
-    }
     prefix = received > 0 ? hash.copy().digest('hex') : undefined;
-    attempt += 1;
-    const body = await options.again(attempt);
-    reader = body.getReader();
-    skip = received;
-    resent = received > 0 ? createHash('sha256') : undefined;
+    let last = cause;
+    for (;;) {
+      if (attempt > ARTIFACT_RETRIES) {
+        throw new NikaTransportError(
+          transport,
+          `Artifact ${label} did not arrive whole in ${attempt} attempts (${received} of its `
+          + `${expected.size} bytes arrived), so nothing was proven. Download it again later: a `
+          + 'file that changed answers 409 artifact_changed',
+          last instanceof Error ? { cause: last } : undefined,
+        );
+      }
+      attempt += 1;
+      try {
+        const body = await options.again(attempt);
+        reader = body.getReader();
+        skip = received;
+        resent = received > 0 ? createHash('sha256') : undefined;
+        return;
+      } catch (error) {
+        const undelivered = error instanceof NikaTransportError && !(error instanceof NikaProtocolError);
+        if (ended || options.controller.signal.aborted || !undelivered) throw error;
+        last = error;
+      }
+    }
   };
 
   return new ReadableStream<Uint8Array>({
@@ -375,7 +397,14 @@ export async function collectArtifact(
   stream: ReadableStream<Uint8Array>,
   size: number,
 ): Promise<Uint8Array> {
-  const bytes = new Uint8Array(size);
+  let bytes: Uint8Array;
+  try {
+    bytes = new Uint8Array(size);
+  } catch (cause) {
+    // No room for the bytes: release the download rather than leave it open.
+    await stream.cancel().catch(() => {});
+    throw cause;
+  }
   let offset = 0;
   const reader = stream.getReader();
   try {

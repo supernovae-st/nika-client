@@ -58,6 +58,17 @@ console.log(report.clean, report.exitCode);
   `model` and `nativeStrict` are refused over HTTP with a typed error;
   `access` rides a served name only.
 
+Each finding keeps the engine's fields (`NikaCheckFinding`): `code`,
+`message`, `severity`, `gate`, `kind`, `task`, `docs_url`, and `span`, the
+byte range of the workflow file it names (`start` inclusive, `end`
+exclusive), so an editor can underline it. From engine 0.124 a parse refusal
+in a local report carries a `span` too. A local check of a workflow that calls
+a child workflow (`invoke: { workflow: ./child.nika }`) reads the children,
+and engine 0.124 judges each call as the tasks the child stands for: a
+lethal trifecta (`NIKA-SEC-009`) or a confirm gate that does not stop an
+effect (`NIKA-SEC-014`) is refused through a child as it is inline. The
+report lists those calls in `composed_calls`, which rides untyped.
+
 The same audit, for humans, is `./node_modules/.bin/nika check hello.nika`.
 
 ## Read the result
@@ -100,10 +111,24 @@ missing outputs. A paused run arrives as a `run.waiting` event, never as
 `run.settled`, and `result.status` keeps the engine's word, `paused`: show it
 as waiting, and never let a CI job pass it as success.
 
+A paused run waits for an answer this package cannot give: `run()` has no
+way to answer a gate. On a local engine the question is on the native
+`workflow_paused` frame, an `engine.event` whose `raw.fields` hold it in the
+`message` row; answer it from a terminal with
+`nika run --resume <trace> --answer <task>=<value>`. From engine 0.124, a
+command a Codex seat asks to run outside its sandbox always pauses, whatever
+`permits.exec` grants, and its question names the command and the reason on
+one line (`Run command: curl -sS https://example.com (reason: …)`). A
+server's frames do not carry the question: the job reads `paused`.
+
 `result.settlement` carries the engine's own account of the ending: its
 `cause` (`normal`, `human_gate`, `task_failed`, `budget`, `operator`…), the
 task tally, the elapsed time and the spend with its pricing qualifier. An
-unknown cost is never reported as zero.
+unknown cost is never reported as zero. From engine 0.124 the keyless system
+voice (`nika:tts_generate` with `provider: system`) counts as an unpriced
+call, like a mock or local model: a run whose only spend is that voice
+settles with `spend.qualifier` `unpriced` and `unpriced_calls: 1`, and its
+native task frame names why (`cost_unpriced: local_model`).
 
 ## Pass your app's data: `inputs`
 
@@ -158,7 +183,9 @@ accepts the field and ignores its values.
 channel, unchanged: the engine reads `@env:NAME` from its environment and
 converts text to the declared type, so it cannot carry literal values and has
 no HTTP form. Passing `inputs` and `vars` together rejects `run()`; they are
-never merged.
+never merged. From engine 0.124, a `vars` pair the engine refuses carries the
+same code as `inputs` (`unknown_input`, `input_type_mismatch`); engine 0.123
+named none, so the package's `run_refused` stood in its place.
 
 ## Pin the access path: `access`
 
@@ -382,9 +409,10 @@ never reaches your process: set the larger bound before the run.
 
 An image in `outputs` rides as base64. A server run can hand you the file
 itself instead: the files its builtins saved (`nika:chart`,
-`nika:image_generate`, `nika:tts_generate`, `nika:image_fx`) and the images
-its agents sent, listed from the job's sealed journal, each one downloaded
-with its bytes proven against the size and SHA-256 recorded there:
+`nika:image_generate`, `nika:tts_generate`, `nika:image_fx`, and
+`nika:image_compose` from engine 0.124) and the images its agents sent,
+listed from the job's sealed journal, each one downloaded with its bytes
+proven against the size and SHA-256 recorded there:
 
 ```ts
 await run.result();
@@ -392,6 +420,12 @@ const { artifacts } = await run.artifacts();
 const chart = await run.readArtifact(artifacts[0]!); // Uint8Array, up to 16 MiB by default
 const { stream } = await run.downloadArtifact('file/out/totals.svg'); // streamed, no maxBytes
 ```
+
+From engine 0.124, an `agent:` task that declares
+`images: { save: ./out/banner.png }` has the engine write the image its
+harness sent to that path, and the manifest lists that file
+(`file/out/banner.png`) beside the image itself (`agent_image/1.png`),
+the same bytes under two names.
 
 Neither `machineBufferBytes` nor `requestTimeout` bounds a download. A local
 run has no artifact manifest: its files are where its workflow wrote them, in

@@ -224,8 +224,9 @@ A SIGKILL skips the drain: the next start marks ownerless running jobs
 ## Download what a job produced: artifacts
 
 A settled job's artifacts are the files its builtins saved (`nika:chart`,
-`nika:image_generate`, `nika:tts_generate`, `nika:image_fx`) and the images
-its agents' harnesses sent. The server lists the ones the job's sealed journal
+`nika:image_generate`, `nika:tts_generate`, `nika:image_fx`, and
+`nika:image_compose` from engine 0.124) and the images its agents' harnesses
+sent. The server lists the ones the job's sealed journal
 records with their SHA-256, and serves their bytes checked against that record,
 so your app gets the files without base64 in `outputs` and without uploading
 them anywhere. The package checks every byte again as it arrives.
@@ -279,7 +280,11 @@ file/out/totals.svg image/svg+xml
   it, or the entry itself, to `downloadArtifact()` or `readArtifact()`. What
   `nika:write` and `nika:edit` wrote is not listed, nor a file an agent wrote
   itself: the journal records no digest for those bytes. An agent's image is
-  still listed, as the image the server kept.
+  still listed, as the image the server kept. From engine 0.124, an `agent:`
+  task can declare `images: { save: ./out/banner.png }`: the engine writes
+  the image's received bytes there, and the manifest lists that file too
+  (`file/out/banner.png`, the received digest) beside `agent_image/1.png`,
+  the same bytes under two names.
 - **Settled jobs only.** A queued, running or paused job answers 409
   `job_not_settled`: `await run.result()` first. An interrupted job never
   sealed its journal and answers 409 `artifact_journal_unavailable`.

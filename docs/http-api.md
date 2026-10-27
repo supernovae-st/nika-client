@@ -199,9 +199,12 @@ additive key is not a refusal: `receipt` (the closed `JobReceipt`, its
 `truncated` and `artifacts`. Each entry has a unique `name`, a `kind`, a
 `size` that is a byte count, a `sha256` of 64 lowercase hexadecimal digits,
 a `mime`, an optional `task` and an `event_id`; a `file` carries its `path`,
-an `agent_image` none. A `path` must be contained (relative, `/`-separated,
-no empty, `.` or `..` segment, no backslash, no NUL). That check is lexical
-and POSIX, the server's own: it does not make a path safe to join under a
+an `agent_image` none. Names are unique, digests need not be: from engine
+0.124 the file an `agent:` task saved with `images: { save: }` is listed as a
+`file` beside the `agent_image` it was written from, both from one journal
+event, with one size and digest. A `path` must be contained (relative,
+`/`-separated, no empty, `.` or `..` segment, no backslash, no NUL). That
+check is lexical and POSIX, the server's own: it does not make a path safe to join under a
 local directory on every system (`C:x` is drive-relative on Windows, and two
 paths that differ only by case collide on a case-insensitive disk). To write
 an artifact locally, resolve the joined path, check that it stays under your

@@ -11,6 +11,7 @@ import type {
   NikaLocalConfig,
   NikaOperationFinding,
   NikaScheduleFinding,
+  NikaSourceSpan,
 } from '../src/index.js';
 
 // Issue #121 · the admission law on the native transport:
@@ -206,6 +207,33 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
       expect(failure).toMatchObject({ operation: 'run', code: 'run_refused', status: 3 });
       expect((failure as NikaOperationError).machineCode).toBeUndefined();
       expect((failure as Error).message).toContain('the project root is not readable');
+    });
+
+    it('SYNTHETIC · a refused vars pair carries the input code engine 0.124 names', async () => {
+      // nika#1844: a `--var` refusal now names `unknown_input` or
+      // `input_type_mismatch`, as `inputs` always did, where 0.123 sent null.
+      const log = scratchFile('argv');
+      process.env.NIKA_FAKE_ARGV_LOG = log;
+      let failure: unknown;
+      try {
+        failure = await native().run('synthetic-var-unknown-input.nika', { vars: { ghost: 1 } })
+          .then((admitted) => { throw new Error(`admitted: ${JSON.stringify(admitted)}`); }, (cause) => cause);
+      } finally {
+        delete process.env.NIKA_FAKE_ARGV_LOG;
+      }
+
+      expect(failure).toBeInstanceOf(NikaOperationError);
+      expect(failure).toMatchObject({
+        operation: 'run',
+        transport: 'native-process',
+        code: 'unknown_input',
+        machineCode: 'unknown_input',
+        status: 3,
+      });
+      expect((failure as Error).message).toContain('--var ghost: unknown input');
+      const invoked = readFileSync(log, 'utf8').trim().split('\n').map((line) => JSON.parse(line) as string[]);
+      rmSync(log, { force: true });
+      expect(invoked.at(-1)).toEqual(['run', 'synthetic-var-unknown-input.nika', '--json', '--var', 'ghost=1']);
     });
 
   });
@@ -547,5 +575,8 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     expectTypeOf<NikaOperationFinding>().toEqualTypeOf<NikaScheduleFinding | NikaCheckFinding>();
     expectTypeOf<NikaOperationError['findings']>()
       .toEqualTypeOf<readonly NikaOperationFinding[] | undefined>();
+    // The source range a finding names: byte offsets, end exclusive.
+    expectTypeOf<NikaCheckFinding['span']>().toEqualTypeOf<NikaSourceSpan | undefined>();
+    expectTypeOf<NikaSourceSpan>().toEqualTypeOf<{ start: number; end: number }>();
   });
 });

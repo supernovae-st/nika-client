@@ -386,7 +386,10 @@ the workflow to one that `./node_modules/.bin/nika catalog` lists.
   Never put a key in `inputs`.
 - **Check the machine.** `./node_modules/.bin/nika doctor` diagnoses access
   paths, providers and the signing key, and prints fixes; it changes
-  nothing. `nika doctor --ping` also probes local model servers.
+  nothing. `nika doctor --ping` also probes local model servers. From engine
+  0.124 it also names the binary that runs (the one this package installed
+  reads `installer: npm-payload`) and every other `nika` on your `PATH` with
+  its version, which your app never uses but your shell may.
 
 On a server, the provider keys belong to the server's environment, and a
 server run takes no per-run model: the workflow names it.

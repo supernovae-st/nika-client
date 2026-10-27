@@ -467,6 +467,7 @@ export type {
   NikaScheduleSlot,
   NikaScheduleStatus,
   NikaScheduleWhen,
+  NikaSourceSpan,
   NikaTaskCompletedEvent,
   NikaTaskScheduledEvent,
   NikaTaskStartedEvent,

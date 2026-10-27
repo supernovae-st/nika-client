@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `engine.event`. A `nika serve` run is unchanged: the server streams no
   per-task frame. Measured on engine 0.123.2
   (`test/fixtures/run-wire/0.123.2-*`).
+- `NikaCheckFinding.span`, typed as the new `NikaSourceSpan`
+  (`{ start, end }`): the byte range of the workflow file a check finding
+  names, `start` inclusive and `end` exclusive, as the engine already wrote
+  it on the findings that name a site. From engine 0.124 a parse refusal in a
+  local check report carries one too (nika#1848, #1608). The field was
+  already on the wire and rode untyped.
 
 ### Changed
 
@@ -26,8 +32,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `event.raw.kind` for them now receives `task.skipped` and `task.cancelled`.
   Before, an application waiting for one ending per task never saw one for a
   skipped or a cancelled task.
+- **What engine 0.124 changes in the data an app reads.** The machine
+  protocol stays 2, no `nika serve` route, schema or closed set changes, and
+  the package reads every change below without new code:
+  - A server's artifact manifest lists the sheet `nika:image_compose` saves
+    (nika#1845) and, for an `agent:` task that declares
+    `images: { save: <path> }`, the file the engine wrote from the image its
+    harness sent, as `file/<path>` beside that image's `agent_image/<n>`
+    entry, with the same size and digest (nika#1850). Such a task's output
+    becomes `{ message, images }`, and it fails with `NIKA-AGENT-007` when no
+    image bytes arrive.
+  - The keyless system voice (`nika:tts_generate` with `provider: system`,
+    nika#1845) counts as one unpriced call: its native task frame carries
+    `cost_unpriced: local_model`, and a run whose only spend it is settles
+    `spend.qualifier: 'unpriced'`, never `unmetered`.
+  - A refused `vars` pair names its code, `unknown_input` or
+    `input_type_mismatch`, as `inputs` does: `run()` rejects with that code
+    on `NikaOperationError` (`status` 3) instead of `run_refused` (nika#1844).
+  - A failed turn that a Codex or Claude Code seat reports now fails its task
+    with `NIKA-1804` (the seat offers a retry) or `NIKA-1805`, where engine
+    0.123 settled it `succeeded` with the error text as its output; an
+    expired sign-in is `NIKA-1803` (nika#1842).
+  - A command a Codex seat asks to run outside its sandbox always pauses the
+    run, whatever `permits.exec` grants; on a local run the question on the
+    `workflow_paused` frame names the command and the reason on one line
+    (nika#1842).
+  - `check()` and `run()` judge a child workflow through the task that calls
+    it, and follow untrusted content through a file a builtin reads, so a
+    workflow that passed engine 0.123 can now be refused with `NIKA-SEC-009`
+    or `NIKA-SEC-014` (nika#1840, #1847). A local check report lists the
+    calls it resolved in `composed_calls`, untyped.
+  - A local check also blocks `run_ready` on a field a harness seat cannot
+    carry (`temperature`, `max_tokens`, an enabled `thinking` budget, a
+    `vision:` URL on an ACP `infer:`, a `tools:` list on a seated `agent:`)
+    and on `images:` without a seat, naming each in `verdicts.blockers`
+    (nika#1850). It refuses `temperature` on OpenAI's fixed-sampling models
+    (`gpt-5`, `gpt-5-mini`, `gpt-5-nano`, the o-series; nika#1848).
+  - `./node_modules/.bin/nika doctor` names the binary that runs and its
+    installer, and every other `nika` on `PATH` with its version
+    (`--json`: `running`, `others[]`, `others_truncated`; nika#1849).
 
 ### Documentation
+
+- `docs/runs.md`, `docs/server.md`, `docs/http-api.md`, `docs/errors.md`
+  and the README describe the engine 0.124 changes above: a finding's `span`
+  and `composed_calls`, the question a paused local run carries, the system
+  voice's unpriced spend, the `vars` codes, the saved agent images and the
+  composed sheet a manifest lists, the failed harness turns and the new
+  refusals in the troubleshooting table, and what `nika doctor` now names.
 
 - `docs/receipts.md` and `docs/errors.md` name Nika 0.123, not 0.123.0, as
   the engine that never opens the keychain on macOS and so can neither read

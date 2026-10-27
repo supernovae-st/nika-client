@@ -1,6 +1,6 @@
 {
-  "engine": "nika 0.123.2 (5591478a7)",
-  "package": "supernovae-st-nika-0.123.2.tgz",
+  "engine": "nika 0.124.0 (866ed914b)",
+  "package": "supernovae-st-nika-0.124.0.tgz",
   "install_mode": "npm pack + npm install --omit=optional + explicit NIKA_BIN",
   "projects": [
     {

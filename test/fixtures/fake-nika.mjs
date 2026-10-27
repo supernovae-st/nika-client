@@ -303,6 +303,21 @@ if (command === 'run' && argv.includes('--json')) {
     });
     return;
   }
+  if (workflow.includes('synthetic-var-unknown-input')) {
+    // Not measured: the envelope engine main 8daeef114 (nika#1844, to ship in
+    // 0.124.0) writes for a refused `--var` pair, read from its source and its
+    // test `var_refusals_carry_the_same_codes_as_inputs_json` (one line on
+    // stdout, the sentence on stderr, exit 3). Engine 0.123 sent `code: null`.
+    const pair = argv[argv.indexOf('--var') + 1] ?? '';
+    const key = pair.split('=')[0];
+    const message = `--var ${key}: unknown input — the workflow declares: pages`;
+    emitThenExit({
+      stdout: `${JSON.stringify({ error: { code: 'unknown_input', message } })}\n`,
+      stderr: `nika run: ${message}\n`,
+      exitCode: 3,
+    });
+    return;
+  }
   if (workflow.includes('synthetic-unknown-first-object')) {
     emitThenExit({ stdout: `${JSON.stringify({ protocol: 2 })}\n`, exitCode: 0 });
     return;

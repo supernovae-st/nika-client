@@ -102,7 +102,12 @@ export type NikaRunStatus =
   | 'cancelled'
   | (string & {});
 
-/** A machine check report. Unknown engine fields deliberately ride through. */
+/**
+ * A machine check report. Unknown engine fields deliberately ride through:
+ * from engine 0.124, for example, a local report on a workflow that calls a
+ * child workflow lists those calls in `composed_calls`, and one that makes a
+ * paid image or speech call lists it in `cost.media`, both untyped here.
+ */
 export interface NikaCheckResult {
   report_version?: number;
   clean?: boolean;
@@ -118,7 +123,7 @@ export interface NikaCheckResult {
   [key: string]: unknown;
 }
 
-/** The layers of a local check report (`nika check --json`, engine 0.123). Additive. */
+/** The layers of a local check report (`nika check --json`, engine 0.123 and later). Additive. */
 export interface NikaCheckVerdicts {
   /** Grammar, DAG, permits and types hold, and the resolver knows every model. */
   valid?: boolean;
@@ -460,8 +465,16 @@ export type NikaRunCause =
 
 /**
  * How much of the spend is priced (engine 0.118+): `unmetered` = no metered
- * call · `unpriced` = a local or subscription seat, never free · `partially_priced`
- * · `priced`.
+ * call · `unpriced` = calls without a known price (a mock, a local model, a
+ * subscription seat and, from engine 0.124, the keyless system voice of
+ * `nika:tts_generate`), never free · `partially_priced` · `priced`. A native
+ * task frame names why its cost is absent in its `cost_unpriced` row
+ * (`mock_provider`, `local_model`, `subscription_quota`…). From engine 0.124
+ * a paid image or speech call is billed from the engine's dated price table
+ * (its bill under `by_source['nika:image_generate']` or
+ * `by_source['nika:tts_generate']`), or counted unpriced with
+ * `missing_catalog_price` when the table cannot price it, or
+ * `provider_did_not_report_usage` when its response reported nothing to bill.
  */
 export type NikaCostQualifier =
   | 'priced'
@@ -605,8 +618,10 @@ export interface NikaRun<
   /**
    * Server only: what the settled job produced, as its sealed journal records
    * it (`GET /v1/jobs/{id}/artifacts`): the files its builtins saved
-   * (`nika:chart`, `nika:image_generate`, `nika:tts_generate`, `nika:image_fx`)
-   * and the images its agents' harnesses sent, each with its recorded size and
+   * (`nika:chart`, `nika:image_generate`, `nika:tts_generate`, `nika:image_fx`,
+   * and `nika:image_compose` from engine 0.124), the images its agents'
+   * harnesses sent and, from engine 0.124, the file an `agent:` task saved
+   * such an image to with `images: { save: }`, each with its recorded size and
    * SHA-256. The SDK checks that the manifest's receipt is the job's own.
    *
    * Needs a server whose `/health` lists `artifacts`; any other server, and a
@@ -661,9 +676,11 @@ export interface NikaArtifact {
   name: string;
   /**
    * `file`: a file a builtin saved (`nika:chart`, `nika:image_generate`,
-   * `nika:tts_generate`, `nika:image_fx`). `agent_image`: an image an agent's
-   * harness sent, kept by the server. Known words aid completion without
-   * closing the set.
+   * `nika:tts_generate`, `nika:image_fx`, `nika:image_compose`), or the file
+   * the engine wrote from an agent's image under `images: { save: }` (engine
+   * 0.124: the same bytes as that image's `agent_image` entry).
+   * `agent_image`: an image an agent's harness sent, kept by the server.
+   * Known words aid completion without closing the set.
    */
   kind: 'file' | 'agent_image' | (string & {});
   /**
@@ -1013,7 +1030,21 @@ export interface NikaCheckFinding {
   /** The task the finding judges, when it judges one. */
   task?: string;
   docs_url?: string;
+  /**
+   * The part of the workflow file the finding names, when it names one: byte
+   * offsets into the file, `start` inclusive and `end` exclusive. From engine
+   * 0.124 a parse refusal in a local check report carries one too.
+   */
+  span?: NikaSourceSpan;
   [key: string]: unknown;
+}
+
+/** A byte range of a workflow file, as the engine's check findings name it. */
+export interface NikaSourceSpan {
+  /** The first byte, inclusive. */
+  start: number;
+  /** The byte after the last one. */
+  end: number;
 }
 
 /**

@@ -224,8 +224,9 @@ A SIGKILL skips the drain: the next start marks ownerless running jobs
 ## Download what a job produced: artifacts
 
 A settled job's artifacts are the files its builtins saved (`nika:chart`,
-`nika:image_generate`, `nika:tts_generate`, `nika:image_fx`) and the images
-its agents' harnesses sent. The server lists the ones the job's sealed journal
+`nika:image_generate`, `nika:tts_generate`, `nika:image_fx`, and
+`nika:image_compose` from engine 0.124) and the images its agents' harnesses
+sent. The server lists the ones the job's sealed journal
 records with their SHA-256, and serves their bytes checked against that record,
 so your app gets the files without base64 in `outputs` and without uploading
 them anywhere. The package checks every byte again as it arrives.
@@ -286,7 +287,11 @@ holds a run key (see below).
   it, or the entry itself, to `downloadArtifact()` or `readArtifact()`. What
   `nika:write` and `nika:edit` wrote is not listed, nor a file an agent wrote
   itself: the journal records no digest for those bytes. An agent's image is
-  still listed, as the image the server kept.
+  still listed, as the image the server kept. From engine 0.124, an `agent:`
+  task can declare `images: { save: ./out/banner.png }`: the engine writes
+  the image's received bytes there, and the manifest lists that file too
+  (`file/out/banner.png`, the received digest) beside `agent_image/1.png`,
+  the same bytes under two names.
 - **Settled jobs only.** A queued, running or paused job answers 409
   `job_not_settled`: `await run.result()` first. An interrupted job never
   sealed its journal and answers 409 `artifact_journal_unavailable`.
@@ -354,13 +359,19 @@ with `https://`.
 
 `inputs` work by served name when the server advertises `jobInputs` (see
 [runs.md](runs.md#pass-your-apps-data-inputs)), and so does `access`, which
-every 0.123 server reads (see
+every server from engine 0.123 on reads (see
 [runs.md](runs.md#pin-the-access-path-access)). A local file's snapshot takes
 neither: the package refuses them beside one (`snapshotInputs`,
 `snapshotAccess`). There is no per-run `model`, `vars` or `maxCostUsd` over
 HTTP: the package refuses them with a typed error instead of dropping them.
 The server applies its own per-run ceiling to manual jobs
 (`nika serve --run-cost-ceiling`, 1 USD by default; `none` turns it off).
+From engine 0.124 that ceiling covers paid media too: a priced image or
+speech call is floored and billed against it, and one the engine's price
+table cannot price is refused before any request. The server still admits
+such a job (`202`): it settles `failed` with `error.code` `NIKA-1709` before
+any task runs, and its result has no `settlement` (see
+[errors.md](errors.md#troubleshooting)).
 Bound a server run through its workflow too: its model and `max_tokens`. A
 server `check()` refuses `model` and `nativeStrict` the same way; its
 `access` is acknowledged, not judged, since the server's check evaluates no
@@ -415,7 +426,11 @@ await nika.schedule('hello.nika', {
 - **Overlap.** `afterSkip` needs `overlap: "skip"`, the engine's default, so
   leaving `overlap` out works too.
 - **Budget.** A schedule's `maxCostUsd` must be a positive number: `0` is
-  refused, where a local `run()` accepts it.
+  refused, where a local `run()` accepts it. An occurrence runs under the
+  lower of it and the server's own ceiling, when the server keeps one. From
+  engine 0.124 that cap covers paid media too: an occurrence whose workflow
+  makes a paid image or speech call the engine's price table cannot price
+  fails with `NIKA-1709` before any task runs, as a manual job does.
 - **Older state.** Treat any `status.finding` recovered from older state as
   not runnable. The engine refuses a new active declaration it cannot plan
   before storing it. The planning facts in a status are the engine's, and new

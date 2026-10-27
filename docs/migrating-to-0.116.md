@@ -1,7 +1,7 @@
 # Migrating to 0.116
 
 > This guide is history: it maps the 0.115 clients onto the one `Nika` class
-> that 0.116 introduced. Moving from 0.120.x to the current 0.123.2 is
+> that 0.116 introduced. Moving from 0.120.x to the current 0.124.0 is
 > [upgrading-to-0.123.md](upgrading-to-0.123.md).
 
 Version 0.116 is an intentional breaking consolidation of the two published

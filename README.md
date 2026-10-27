@@ -143,7 +143,7 @@ no network.
 `nika check` is the static audit that runs before any model is called: what
 the workflow will do, which models and tools it uses, what it may touch and
 what it can cost. An excerpt of its report for the file above, on engine
-0.123.2:
+0.124.0:
 
 ```text
 nika check · hello.nika
@@ -202,6 +202,10 @@ receipt verified
 the engine refuses to start a run whose paid calls would cost more, and never
 blocks local or mock models. The `mock(echo) ·` prefix marks a rehearsal, not
 a model's answer. [Use a real model](#use-a-real-model) when you are ready.
+From engine 0.124 the budget covers paid image and speech calls too: a call
+the engine's dated price table prices is floored and billed against it, and
+one the table cannot price is refused before any request (`NIKA-1709`).
+Local and mock models and the keyless system voice are never blocked.
 
 > [!NOTE]
 > **Seeing `not verified: receipt_mismatch`?** The run succeeded, but the
@@ -210,8 +214,9 @@ a model's answer. [Use a real model](#use-a-real-model) when you are ready.
 > `NIKA_RUN_KEY_FILE` and `NIKA_RUN_PUB_FILE` pair), never an OS keychain.
 > Run step 1's `NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init`, then
 > run the demo again. A key that Nika 0.122 or older kept in the macOS
-> keychain cannot be read or copied by Nika 0.123, which never opens the
-> keychain on macOS: on such a Mac, this command mints a new key as files.
+> keychain cannot be read or copied by Nika 0.123 and later, which never
+> open the keychain on macOS: on such a Mac, this command mints a new key as
+> files.
 > On Linux, a key that `nika key init --force` put in the Secret Service can
 > be copied instead, from a terminal: `./node_modules/.bin/nika key align`.
 
@@ -386,7 +391,10 @@ the workflow to one that `./node_modules/.bin/nika catalog` lists.
   Never put a key in `inputs`.
 - **Check the machine.** `./node_modules/.bin/nika doctor` diagnoses access
   paths, providers and the signing key, and prints fixes; it changes
-  nothing. `nika doctor --ping` also probes local model servers.
+  nothing. `nika doctor --ping` also probes local model servers. From engine
+  0.124 it also names the binary that runs (the one this package installed
+  reads `installer: npm-payload`) and every other `nika` on your `PATH` with
+  its version, which your app never uses but your shell may.
 
 On a server, the provider keys belong to the server's environment, and a
 server run takes no per-run model: the workflow names it.
@@ -440,15 +448,15 @@ All four rows were measured with the quick-start file on engine 0.123.0.
 
 **Signing keys.** The engine your app starts and `nika serve` sign with
 `~/.nika/keys/` or the explicit `NIKA_RUN_KEY_FILE` and `NIKA_RUN_PUB_FILE`
-pair, never with an OS keychain. On macOS, Nika 0.123 opens no keychain even
-from a terminal; on Linux, `nika` run from a terminal also uses the desktop's
-Secret Service. `NIKA_KEYCHAIN=off nika key init` creates the key as files on
-both, and with the same variable `nika key rotate` retires it and writes the
-next one there (records it signed stay verifiable). `nika key trust` prints
-the public key to enroll elsewhere; on Linux, `nika key align` copies a Secret
-Service key to the files. In CI, give the engine the explicit pair. Never copy
-a private run key into SDK configuration, source control, workflow inputs or
-an HTTP request.
+pair, never with an OS keychain. On macOS, Nika 0.123 and later open no
+keychain even from a terminal; on Linux, `nika` run from a terminal also uses
+the desktop's Secret Service. `NIKA_KEYCHAIN=off nika key init` creates the
+key as files on both, and with the same variable `nika key rotate` retires
+it and writes the next one there (records it signed stay verifiable).
+`nika key trust` prints the public key to enroll elsewhere; on Linux,
+`nika key align` copies a Secret Service key to the files. In CI, give the
+engine the explicit pair. Never copy a private run key into SDK
+configuration, source control, workflow inputs or an HTTP request.
 [docs/receipts.md](https://github.com/supernovae-st/nika-client/blob/main/docs/receipts.md)
 covers what a receipt carries, every server verdict and key custody.
 
@@ -570,7 +578,7 @@ passing them to a local client throws `NikaConfigurationError`.
 |---|---|
 | `not verified: receipt_mismatch` after a successful run | Create a key the engine your app starts can read: `NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init`. On a Mac whose keychain holds a key from Nika 0.122 or older, that mints a new key as files; on Linux, `./node_modules/.bin/nika key align` from a terminal copies a key that `nika key init --force` stored in the Secret Service instead. |
 | `NikaEngineUnavailable` from `new Nika()` | No engine payload for this machine: use Node.js 22 or newer on macOS or glibc Linux, keep optional dependencies (no `--omit=optional`); on Windows or musl (Alpine), set an absolute `bin`/`NIKA_BIN` or connect to a `nika serve` by URL. |
-| `NikaCompatibilityError` with `capability: 'engineIdentity'` | The engine or server is not 0.123 (machine protocol 2). Upgrade it with the package: [docs/upgrading-to-0.123.md](https://github.com/supernovae-st/nika-client/blob/main/docs/upgrading-to-0.123.md). |
+| `NikaCompatibilityError` with `capability: 'engineIdentity'` | The engine or server does not speak machine protocol 2 (0.123 or later). Upgrade it with the package: [docs/upgrading-to-0.123.md](https://github.com/supernovae-st/nika-client/blob/main/docs/upgrading-to-0.123.md). |
 | `NikaConfigurationError` about `bin` or `NIKA_BIN` | Give an absolute path; a bare name or a relative path is refused. |
 | `nika serve` exits: `token file must be mode 0600` | `chmod 600 .nika/serve.token`; the token must be 32–512 visible ASCII bytes. |
 | `nika serve` exits: `nothing armed — this project has no nika.yaml` | Add a one-line `nika.yaml` in the folder you serve: `nika: my-project`. |
@@ -586,9 +594,10 @@ More causes, and every error class, are in
 npm install @supernovae-st/nika
 ```
 
-**Status.** 0.123 is Nika's open-source reference release. It is maintained
-with security fixes, bug fixes and compatibility updates. Read the
-[known limits](https://docs.nika.sh/changelog/known-limits) of 0.123 before
+**Status.** 0.124 is the current release line. Work stays focused on
+maintenance, security and the media capabilities workflows need; native
+video is planned for 0.125. The 0.123.x line is the previous line. Read the
+[known limits](https://docs.nika.sh/changelog/known-limits) of 0.124 before
 you build on it.
 
 - **Node.js 22 or newer.** That is the tested floor. On an older Node.js, npm
@@ -619,12 +628,12 @@ The `package.json` subpath is exported for CommonJS, ESM build tools and CI
 pin checks. It reports the installed package, not a moving registry tag.
 
 **Package and engine move together.** Each package version bundles the engine
-with the same number, the one it was tested with: 0.123.2 bundles
-`nika 0.123.2 (5591478a7)` and speaks its machine protocol, 2. It refuses an
-engine or server on another generation (0.122 and older speak 1) at its
-identity probe (`nika --sdk-identity`, `GET /health`), before any job, with
-`NikaCompatibilityError`: upgrade the package and every `nika serve` together
-([docs/upgrading-to-0.123.md](https://github.com/supernovae-st/nika-client/blob/main/docs/upgrading-to-0.123.md)).
+with the same number, the one it was tested with: 0.124.0 bundles
+`nika 0.124.0 (866ed914b)` and speaks its machine protocol, 2, as 0.123 did.
+It refuses an engine or server on another generation (0.122 and older speak 1)
+at its identity probe (`nika --sdk-identity`, `GET /health`), before any job,
+with `NikaCompatibilityError`: upgrade the package and every `nika serve`
+together ([docs/upgrading-to-0.123.md](https://github.com/supernovae-st/nika-client/blob/main/docs/upgrading-to-0.123.md)).
 The older 0.120.3 package pairs only with engines 0.120.x. The standalone CLI
 (GitHub releases, `brew install supernovae-st/tap/nika`,
 `curl -LsSf https://nika.sh/install.sh | sh`, the
@@ -733,7 +742,7 @@ the tools and the rules.
 | 🦋 | [nika](https://github.com/supernovae-st/nika) | The engine and CLI: write, check, run and verify AI workflows |
 | 📖 | [nika-docs](https://github.com/supernovae-st/nika-docs) | The documentation, live at [docs.nika.sh](https://docs.nika.sh) |
 | 📜 | [nika-spec](https://github.com/supernovae-st/nika-spec) | The language specification and the suite that proves an engine follows it |
-| 🧩 | [nika-vscode](https://github.com/supernovae-st/nika-vscode) | The editor extension, frozen at 0.120 and not qualified with 0.123: use `nika lsp` and the JSON Schema |
+| 🧩 | [nika-vscode](https://github.com/supernovae-st/nika-vscode) | The editor extension, frozen at 0.120 and not qualified with 0.124: use `nika lsp` and the JSON Schema |
 | 🟦 | **[nika-client](https://github.com/supernovae-st/nika-client)** | **Run and verify workflows from TypeScript** |
 | ✅ | [nika-action](https://github.com/supernovae-st/nika-action) | A GitHub Action that posts a `nika check` verdict on your pull requests |
 | 🚀 | [nika-actions-starter](https://github.com/supernovae-st/nika-actions-starter) | A ready template: workflows, editor setup and CI from the first push |

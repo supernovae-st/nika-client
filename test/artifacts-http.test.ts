@@ -80,11 +80,43 @@ const BLANK: NikaArtifact = {
   mime: 'application/octet-stream',
   event_id: '01a17453-93be-75a0-bbdc-d0f9da805b6b',
 };
+/**
+ * Engine 0.124 (nika#1850): an `agent:` task that declares
+ * `images: { save: ./out/banner.png }` has the engine write the received image
+ * there. The manifest derives both entries from the one `agent_image_observed`
+ * event: the image the server kept and the file written from the same bytes,
+ * one digest under two names.
+ */
+const SEEN: NikaArtifact = { ...IMAGE, task: 'banner' };
+const SAVED: NikaArtifact = {
+  name: 'file/out/banner.png',
+  kind: 'file',
+  path: 'out/banner.png',
+  size: PNG.length,
+  sha256: sha256(PNG),
+  mime: 'image/png',
+  task: 'banner',
+  event_id: IMAGE.event_id,
+};
+/** Engine 0.124 (nika#1845): the sheet `nika:image_compose` saved, a file like any builtin's. */
+const SHEET_BYTES = Buffer.from(Array.from({ length: 4_096 }, (_, index) => (index * 13) % 256));
+const SHEET: NikaArtifact = {
+  name: 'file/out/sheet.png',
+  kind: 'file',
+  path: 'out/sheet.png',
+  size: SHEET_BYTES.length,
+  sha256: sha256(SHEET_BYTES),
+  mime: 'image/png',
+  task: 'sheet',
+  event_id: '01a17453-93be-75a0-bbdc-d0f9da805b6c',
+};
 /** What the fake server holds, by artifact name. */
 const FILES = new Map<string, { bytes: Buffer; mime: string }>([
   [CHART.name, { bytes: SVG, mime: CHART.mime }],
   [IMAGE.name, { bytes: PNG, mime: IMAGE.mime }],
   [BLANK.name, { bytes: EMPTY, mime: BLANK.mime }],
+  [SAVED.name, { bytes: PNG, mime: SAVED.mime }],
+  [SHEET.name, { bytes: SHEET_BYTES, mime: SHEET.mime }],
   // Served, never listed: a name past a truncated manifest, or a contradiction.
   ['file/out/unlisted.svg', { bytes: SVG, mime: 'image/svg+xml' }],
 ]);
@@ -381,6 +413,32 @@ describe('run.artifacts(): the settled job manifest', () => {
       method: 'GET', url: `/v1/jobs/${JOB}/artifacts`, authorization: `Bearer ${TOKEN}`,
       acceptEncoding: expect.any(String),
     }]);
+  });
+
+  it('lists a saved agent image under both its names, and a composed sheet (engine 0.124)', async () => {
+    const server = await serve();
+    server.manifest = (_request, response) => json(response, 200, manifestBody({
+      artifacts: [SEEN, SAVED, SHEET],
+    }));
+    const run = await attached();
+    const { artifacts } = await run.artifacts();
+    expect(artifacts).toEqual([SEEN, SAVED, SHEET]);
+    // One recorded digest under two names: neither entry is refused as a duplicate.
+    expect(artifacts.map((artifact) => artifact.name)).toEqual([
+      'agent_image/1.png', 'file/out/banner.png', 'file/out/sheet.png',
+    ]);
+    expect(new Set(artifacts.slice(0, 2).map((artifact) => artifact.sha256)).size).toBe(1);
+    // Each downloads by its own name and proves the same bytes.
+    const kept = await run.readArtifact(SEEN);
+    const saved = await run.readArtifact(SAVED);
+    expect(Buffer.from(saved).equals(PNG)).toBe(true);
+    expect(Buffer.from(kept).equals(Buffer.from(saved))).toBe(true);
+    expect(Buffer.from(await run.readArtifact(SHEET)).equals(SHEET_BYTES)).toBe(true);
+    expect(server.downloadRequests.map((request) => request.url)).toEqual([
+      `/v1/jobs/${JOB}/artifacts/agent_image%2F1.png`,
+      `/v1/jobs/${JOB}/artifacts/file%2Fout%2Fbanner.png`,
+      `/v1/jobs/${JOB}/artifacts/file%2Fout%2Fsheet.png`,
+    ]);
   });
 
   it('binds the manifest to the durable record when the handle has not seen the settlement', async () => {

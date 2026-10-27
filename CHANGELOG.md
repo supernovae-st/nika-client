@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.124.0] - 2026-10-28
+
 ### Added
 
 - A local `run.events()` names a skipped or a cancelled task: `task_skipped`
@@ -28,9 +30,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the frame's rows. The package itself never passes `--resume`. Measured on
   engine 0.123.2 (`test/fixtures/run-wire/0.123.2-cache-hit.ndjson.stdout`);
   the code that writes the frame is the same on engine `main` (8daeef114).
+- `NikaCheckFinding.span`, typed as the new `NikaSourceSpan`
+  (`{ start, end }`): the byte range of the workflow file a check finding
+  names, `start` inclusive and `end` exclusive, as the engine already wrote
+  it on the findings that name a site. From engine 0.124 a parse refusal in a
+  local check report carries one too (nika#1848, #1608). The field was
+  already on the wire and rode untyped.
 
 ### Changed
 
+- **Release train 0.124.0, in lockstep with engine `v0.124.0`**, the first
+  release of the 0.124 line (child workflows judged through their calls,
+  `nika:image_compose`, the keyless system voice, harness images, the cost
+  cap over paid media, vision files as reads). The machine protocol stays 2.
+  `package.json` is 0.124.0 and `sync:native-versions` moved the four native
+  payload manifests, the `optionalDependencies` and the lockfile with it.
+  `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name the commit engine tag
+  `v0.124.0` names (`nika 0.124.0 (866ed914b)`), and the committed gauntlet
+  ledgers were replayed against that verified public binary, with the same
+  behavioral verdicts as on 0.123.2: the 100 corpus output hashes are
+  unchanged.
+- The pinned `openapi.json` and `src/generated/openapi.d.ts` are the served
+  document of the released engine 0.124.0. It differs from 0.123.2's in two
+  places only: `info.version`, and the artifacts route's description, which
+  now names `nika:image_compose`. No route, schema or closed set moved.
 - A local run's `task_skipped` and `task_cancelled` frames leave the
   `engine.event` branch: code that matched `engine.event` on
   `event.raw.kind` for them now receives `task.skipped` and `task.cancelled`.
@@ -52,9 +75,152 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   itself is not checked. The `test/*.test.mjs` suites stay unchecked
   JavaScript. The README's contributing commands name `npm run typecheck`
   instead of `npx tsc --noEmit -p .`, which CI never ran.
+- **What engine 0.124 changes in the data an app reads.** The machine
+  protocol stays 2, no `nika serve` route, schema or closed set changes, and
+  the package reads every change below without new code:
+  - A server's artifact manifest lists the sheet `nika:image_compose` saves
+    (nika#1845) and, for an `agent:` task that declares
+    `images: { save: <path> }`, the file the engine wrote from the image its
+    harness sent, as `file/<path>` beside that image's `agent_image/<n>`
+    entry, with the same size and digest (nika#1850). Such a task's output
+    becomes `{ message, images }`, and it fails with `NIKA-AGENT-007` when no
+    image bytes arrive.
+  - The keyless system voice (`nika:tts_generate` with `provider: system`,
+    nika#1845) counts as one unpriced call: its native task frame carries
+    `cost_unpriced: local_model`, and a run whose only spend it is settles
+    `spend.qualifier: 'unpriced'`, never `unmetered`.
+  - A refused `vars` pair names its code, `unknown_input` or
+    `input_type_mismatch`, as `inputs` does: `run()` rejects with that code
+    on `NikaOperationError` (`status` 3) instead of `run_refused` (nika#1844).
+  - A failed turn that a Codex or Claude Code seat reports now fails its task
+    with `NIKA-1804` (the seat offers a retry) or `NIKA-1805`, where engine
+    0.123 settled it `succeeded` with the error text as its output; an
+    expired sign-in is `NIKA-1803` (nika#1842).
+  - A command a Codex seat asks to run outside its sandbox always pauses the
+    run, whatever `permits.exec` grants; on a local run the question on the
+    `workflow_paused` frame names the command and the reason on one line
+    (nika#1842).
+  - `check()` and `run()` judge a child workflow through the task that calls
+    it, and follow untrusted content through a file a builtin reads, so a
+    workflow that passed engine 0.123 can now be refused with `NIKA-SEC-009`
+    or `NIKA-SEC-014` (nika#1840, #1847). A gate inside the child does not
+    clear its caller: the parent needs a blocking `nika:prompt` of its own
+    before the call, and a confirm gate in front of a call whose child acts
+    must stop it on a "no", for example by binding the answer on the call
+    (`with: { go: "${{ tasks.ask.output }}" }` and
+    `when: ${{ with.go == true }}`). A local check report lists the calls it
+    resolved in `composed_calls`, untyped.
+  - A local check also blocks `run_ready` on what a harness seat cannot
+    carry, naming each in `verdicts.blockers` (nika#1850): on an `infer:`
+    seated over ACP (`run.access.protocol: acp`), `temperature`,
+    `max_tokens`, an enabled `thinking` budget or a `vision:` URL; on a
+    seated `agent:`, a `tools:` list; and `images:` on an `agent:` no seat
+    serves. On a seat route without ACP (the direct `codex exec` or
+    `claude -p` one-shot), check judges none of those `infer:` fields and the
+    run does not send them, `vision:` files included; and an
+    `images: { save: }` task on a seat other than Codex passes check, then
+    fails `NIKA-AGENT-007`. Check also refuses `temperature` on
+    `openai/gpt-5`, `gpt-5-mini`, `gpt-5-nano` and the o-series, on the
+    `openai` provider only, not yet on a dated snapshot id or on `gpt-5.1`
+    and later (nika#1848).
+  - One `--answer` now decides one ask of a task: an attempt that `retry:`
+    replays asks again instead of reusing it (nika#1842).
+  - `./node_modules/.bin/nika doctor` names the binary that runs and its
+    installer, and every other `nika` on `PATH` with its version
+    (`--json`: `running`, `others[]`, `others_truncated`; nika#1849).
+  - **Paid media under a cost cap** (nika#1846). A cap is `maxCostUsd` on a
+    local run or a schedule, a project `ceiling:`, or a server's
+    `--run-cost-ceiling`. The engine now carries a price table for
+    `nika:image_generate` and `nika:tts_generate`, read from the providers'
+    public price pages on 2026-10-27: OpenAI `gpt-image-2` (the default);
+    Gemini `gemini-3.1-flash-image` (the default), `gemini-3-pro-image`,
+    `gemini-2.5-flash-image`, `gemini-3.1-flash-lite-image` and
+    `gemini-nano-banana-2.1`; OpenAI `tts-1` and `tts-1-hd`; and nine
+    ElevenLabs models, the default `eleven_multilingual_v2` among them. Under
+    a cap these calls are floored at launch and billed against it. OpenAI
+    `gpt-image-2.5-sunburst` and `gpt-image-2.5-flare` publish token rates
+    only, so they are billed from the usage they report and, like speech
+    whose text only the run renders, refused only under a zero cap. xAI
+    images were already floored and metered in 0.123.2. Every other paid
+    media call is refused under a cap before any request: OpenAI's default
+    voice `gpt-4o-mini-tts`, `gpt-image-1.5`, `gpt-image-1-mini`, and any id
+    the table does not list, an ElevenLabs id outside its price families
+    included. A call the workflow writes out refuses the run at launch with
+    `NIKA-1709`, as a priced call whose floor exceeds the cap does: locally
+    `run()` rejects with it; a server admits the job (`202`), which settles
+    `failed` with `error.code` `NIKA-1709` before any task runs, with no
+    `settlement`. Each call is judged again on its rendered arguments before
+    its request, against what the cap leaves then, and refused there with
+    `NIKA-1704` when the table cannot price it or its floor no longer fits;
+    a call whose provider, model or arguments only the run decides, or one an
+    `agent:` makes through its tools, is first judged there. The refusal
+    names every model the table prices. The ways out: for speech `tts-1`,
+    `tts-1-hd`, a priced ElevenLabs model, or the keyless `provider: system`
+    voice, which bills no provider and runs under any cap as unpriced local
+    work; for images `gpt-image-2` or a 2.5 model; `local` and `mock` are
+    never blocked. Every priced call is billed into the settlement, under
+    `spend.by_source['nika:image_generate']` or
+    `spend.by_source['nika:tts_generate']`, and a paid call that fails after
+    its provider billed keeps that spend (a local `task_failed` frame carries
+    it as `cost_usd`). A paid call the table cannot price runs only with no
+    cap and counts in `spend.unpriced_calls` (`cost_unpriced:
+    missing_catalog_price`), as does a priced call whose response reported
+    nothing billable (`provider_did_not_report_usage`), so the settlement
+    reads `unpriced` or `partially_priced`, never `priced`. A local check
+    report lists each paid media call in `cost.media` (its provider, and its
+    model, floor, rate and table date when they are known), and its
+    `failure_plan` gains `unpriced_media_cap` and `priced_speech_over_cap`
+    beside `priced_image_over_cap`; both ride untyped. A local run's
+    `workflow_started` frame records the table in a `media_pricing` row.
+  - **Vision files are reads** (breaking; nika-spec#400, nika#1851). An
+    `infer:` `vision:` entry with `source: file` is read under the
+    workflow's own `permits.fs.read`, on its resolved path, so a symlink or a
+    `..` reaches no further than the grant, before any provider call. This
+    holds on every route and door: a local run, a server job, a child
+    workflow. `check()` judges a literal or bare-`const` path,
+    `NIKA-AUTH-006` with no `permits:` block and `NIKA-SEC-004` outside a
+    declared one, and refuses a computed path, or a computed `images.save`,
+    under a block whose side grants no path at all (no block, `permits: {}`,
+    an empty `fs.read` or, for a save, `fs.write`). At run, a computed
+    path outside the grant fails its task with `NIKA-SEC-004`, and a granted
+    file that cannot be read fails it with `NIKA-BUILTIN-READ-001` (no file
+    at the path, or a path that renders empty) or `NIKA-BUILTIN-READ-002`
+    (any other read failure) instead of `NIKA-432`, each before any provider
+    call. The entries are sink fields too: a secret in a vision URL or path
+    is an `infer` leak (`NIKA-SEC-006`, unless the secret declares
+    `egress: [{ to: "infer" }]`), and untrusted content that picks an entry
+    can complete a lethal trifecta (`NIKA-SEC-009`). A `source: url` entry
+    needs no grant: the provider fetches it. Grant each file in
+    `permits.fs.read`; `./node_modules/.bin/nika check --infer-permits
+    <file>` prints the block for a literal path, and only a note for a
+    computed one. A save of agent images that receives more than four images
+    now fails its task before any write.
 
 ### Documentation
 
+- The README, `docs/upgrading-to-0.123.md` and `docs/compile.md` name 0.124.0
+  as the engine this package bundles: the upgrade steps install 0.124.0, and
+  the engine history adds 0.124.0, which keeps machine protocol 2 and the
+  compile door of 0.123.2. `docs/migrating-to-0.116.md` names 0.124.0 as
+  current. The README's `nika check` excerpt was measured again on the
+  released 0.124.0: every line it shows is unchanged. Other measurements keep
+  the version they were taken on.
+- `docs/runs.md`, `docs/server.md`, `docs/http-api.md`, `docs/errors.md`
+  and the README describe the engine 0.124 changes above: a finding's `span`
+  and `composed_calls`, the question a paused local run carries, the system
+  voice's unpriced spend, paid media under a cost cap and the spend it
+  bills, the `vars` codes, the saved agent images and the composed sheet a
+  manifest lists, the failed harness turns and the new refusals in the
+  troubleshooting table, and what `nika doctor` now names.
+- The README, `SECURITY.md`, `AGENTS.md` and the pages name 0.124 as the
+  current release line, its work focused on maintenance, security and the
+  media capabilities workflows need, with native video planned for 0.125,
+  and 0.123.x as the previous line; `SECURITY.md` says fixes ship as
+  0.124.x. Where a fact holds for both lines they say "0.123 and later":
+  machine protocol 2, and a keychain never opened on macOS.
+  `docs/upgrading-to-0.123.md` gains "From 0.123 to 0.124: the same
+  protocol", and its table pairs 0.123.x and 0.124.x both ways at the
+  identity probe.
 - `docs/receipts.md` and `docs/errors.md` name Nika 0.123, not 0.123.0, as
   the engine that never opens the keychain on macOS and so can neither read
   nor copy a run-key that Nika 0.122 or older stored there, as the README
@@ -1205,7 +1371,8 @@ Initial public release. Full rewrite from v0.1.0.
 - Error hierarchy completely redesigned
 - License changed from MIT to AGPL-3.0-or-later
 
-[Unreleased]: https://github.com/supernovae-st/nika-client/compare/v0.123.2...HEAD
+[Unreleased]: https://github.com/supernovae-st/nika-client/compare/v0.124.0...HEAD
+[0.124.0]: https://github.com/supernovae-st/nika-client/compare/v0.123.2...v0.124.0
 [0.123.2]: https://github.com/supernovae-st/nika-client/compare/v0.123.1...v0.123.2
 [0.123.1]: https://github.com/supernovae-st/nika-client/compare/v0.123.0...v0.123.1
 [0.123.0]: https://github.com/supernovae-st/nika-client/compare/v0.120.3...v0.123.0

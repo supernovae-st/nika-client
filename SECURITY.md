@@ -7,12 +7,13 @@ handling, transport, and dependency supply chain matter.
 
 ## Supported Versions
 
-0.123 is Nika's open-source reference release. It is maintained with
-security fixes, bug fixes and compatibility updates: the **0.123.x** line
-(the latest published package version) and `main` receive fixes. Older
-versions, including the retired `@supernovae-st/nika-client` package name,
-receive none. See the
-[known limits](https://docs.nika.sh/changelog/known-limits) of 0.123.
+0.124 is the current release line. Work stays focused on maintenance,
+security and the media capabilities workflows need; native video is planned
+for 0.125. The **0.124.x** line (the latest published package version) and
+`main` receive fixes, which ship as 0.124.x releases. Older versions,
+including the previous 0.123.x line and the retired
+`@supernovae-st/nika-client` package name, receive none. See the
+[known limits](https://docs.nika.sh/changelog/known-limits) of 0.124.
 
 ## Reporting a Vulnerability
 

@@ -167,6 +167,18 @@ export interface NikaTaskCompletedEvent extends NikaEventFields {
 }
 
 /**
+ * A resumed run (`nika run --resume <trace>`) reused a task instead of running
+ * it: the task's identity matched a success the trace records. The frame ends
+ * the task with no `task_started` before it, and the run counts the task as an
+ * ordinary success. Its rows (`fields`) name the `task`, the identity it
+ * matched (`def_hash`, `input_hash`), the reused `output` as JSON text and the
+ * `outcome`. A run this package starts is never a resumed one.
+ */
+export interface NikaTaskCacheHitEvent extends NikaEventFields {
+  kind: 'task_cache_hit';
+}
+
+/**
  * The workflow graph settled. This is the terminal frame of a native-process
  * run and carries the run's outputs, receipt, and final status together.
  */
@@ -323,6 +335,7 @@ export type NikaEvent<
   | NikaTaskScheduledEvent
   | NikaTaskStartedEvent
   | NikaTaskCompletedEvent
+  | NikaTaskCacheHitEvent
   | NikaWorkflowCompletedEvent<Outputs>
   | NikaWorkflowFailedEvent
   | NikaWorkflowInterruptedEvent
@@ -347,14 +360,17 @@ export type NikaEvent<
  *
  * - `run.started`: `workflow_started` · `execution.started`.
  * - `task.scheduled` · `task.started` · `task.completed` · `task.failed` ·
- *   `task.skipped` · `task.cancelled`: the native `task_*` frames. A skip or
- *   a cancellation ends a task as a completion or a failure does; it names
- *   its `task`, never an `error`. A skip under `on_error: { skip: true }`
- *   keeps the error that made it skip on `raw`, in the frame's `outcome`
- *   row. A recovered task ends on `task.completed`,
- *   and its `task_recovered` frame stays an `engine.event`. `nika serve`
- *   streams no per-task frame, so an HTTP run yields none; the SDK never
- *   synthesizes one.
+ *   `task.skipped` · `task.cancelled` · `task.cache_hit`: the native `task_*`
+ *   frames. A skip or a cancellation ends a task as a completion or a failure
+ *   does; it names its `task`, never an `error`. A skip under
+ *   `on_error: { skip: true }` keeps the error that made it skip on `raw`, in
+ *   the frame's `outcome` row. A recovered task ends on `task.completed`,
+ *   and its `task_recovered` frame stays an `engine.event`. A task a resumed
+ *   run (`nika run --resume`) reused ends on `task.cache_hit`, with no
+ *   `task.started` before it: it names its `task`, and the identity it matched
+ *   and the output it reused stay on `raw`; a run this package starts is
+ *   never a resumed one. `nika serve` streams no per-task frame, so an HTTP
+ *   run yields none; the SDK never synthesizes one.
  * - `run.waiting`: the settlement frame (`run_settled` · `execution.settled`)
  *   carrying `paused`. A human gate holds the run: it is not failed, not a
  *   completed execution, and stays resumable.
@@ -385,6 +401,7 @@ export type NikaRunEventKind =
   | 'task.failed'
   | 'task.skipped'
   | 'task.cancelled'
+  | 'task.cache_hit'
   | 'run.waiting'
   | 'run.settled'
   | 'run.interrupted'

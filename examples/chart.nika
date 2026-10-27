@@ -1,0 +1,12 @@
+nika: chart
+permits:
+  fs: { write: ["./out/totals.svg"] }
+  tools: ["nika:chart"]
+tasks:
+  draw:
+    invoke:
+      tool: "nika:chart"
+      args:
+        data: [{ region: "north", total: 10 }, { region: "south", total: 4 }]
+        chart: { type: bar, x: region, y: total }
+        out: "./out/totals.svg"

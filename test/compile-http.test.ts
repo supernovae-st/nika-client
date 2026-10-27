@@ -201,8 +201,8 @@ describe('authenticated HTTP compile foundation', () => {
   it.each(['health headers', 'health body', 'post headers', 'post body'])(
     'allows a longer compile timeout during %s', async (phase) => {
       const controller = new AbortController();
-      const fetch = vi.fn(async (url: string, init?: RequestInit) => {
-        const isHealth = url.endsWith('/health');
+      const fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+        const isHealth = String(input).endsWith('/health');
         const response = isHealth ? health() : jsonResponse(outcome());
         const selected = phase.startsWith(isHealth ? 'health' : 'post');
         if (!selected) return response;

@@ -271,7 +271,7 @@ no such frame.
 | `event.kind` | Local engine frame (`event.raw.kind`) | Server frame (`event.raw.kind`) |
 |---|---|---|
 | `run.started` | `workflow_started` | `execution.started` |
-| `task.scheduled` · `task.started` · `task.completed` · `task.failed` · `task.skipped` · `task.cancelled` | `task_scheduled` · `task_started` · `task_completed` · `task_failed` · `task_skipped` · `task_cancelled` | none: the server streams no per-task frame |
+| `task.scheduled` · `task.started` · `task.completed` · `task.failed` · `task.skipped` · `task.cancelled` · `task.cache_hit` | `task_scheduled` · `task_started` · `task_completed` · `task_failed` · `task_skipped` · `task_cancelled` · `task_cache_hit` | none: the server streams no per-task frame |
 | `run.waiting` | `run_settled` carrying `paused` | `execution.settled` carrying `paused` |
 | `run.settled` | `run_settled` carrying `succeeded` · `failed` · `cancelled` | `execution.settled` carrying `succeeded` · `failed` · `cancelled`; `execution.cancelled` carrying `cancelled` only; `execution.refused` carrying `failed` only |
 | `run.interrupted` | `workflow_interrupted` carrying `interrupted` | `execution.interrupted` · `interrupted` carrying `interrupted` |
@@ -288,7 +288,12 @@ A recovered task ends on `task.completed`; the engine's `task_recovered` frame
 before it stays an `engine.event`. Measured on engine 0.123.2 with one task
 skipped by `on_error: { skip: true }`, one recovered by
 `on_error: { recover: … }` and one cancelled because its `after:` edge never
-admitted. `event.error` is
+admitted. A task a resumed run reused ends on `task.cache_hit`, which names
+its `task` and has no `task.started` before it: `nika run --resume <trace>`
+skips a task whose identity matches a success the trace records, and the
+frame keeps that identity (`def_hash`, `input_hash`) and the reused `output`
+on `event.raw`, in its rows. The package itself never resumes a run. Measured
+on engine 0.123.2, resuming a run whose second task had failed. `event.error` is
 the failure a `task.failed` frame or a `failed` settlement named; no other
 event carries one. `event.sequence` is the server's replay cursor and exists
 only over HTTP. An `engine.event` carries only its cursor and `raw`, never a

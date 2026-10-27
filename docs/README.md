@@ -50,8 +50,8 @@ what the illustration draws.
 
 [`examples/`](https://github.com/supernovae-st/nika-client/blob/main/examples/README.md) in the repository holds programs you can
 run against the bundled engine or a local `nika serve`: the quick start, a
-watched and cancelled run, a server job recovered across two processes, and
-compile then run.
+watched and cancelled run, a server job recovered across two processes,
+compile then run, and a server job's artifacts listed and downloaded.
 
 ## Elsewhere
 

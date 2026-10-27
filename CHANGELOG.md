@@ -21,6 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `engine.event`. A `nika serve` run is unchanged: the server streams no
   per-task frame. Measured on engine 0.123.2
   (`test/fixtures/run-wire/0.123.2-*`).
+- A local `run.events()` names a task a resumed run reused: the engine's
+  `task_cache_hit` frame is `task.cache_hit`, an additive `NikaRunEventKind`
+  word that carries `task`, never `error` or `status`, and the frame has its
+  own type, `NikaTaskCacheHitEvent`, a new variant of `NikaEvent`.
+  `nika run --resume <trace>` writes it, with no `task_started` before it, for
+  a task whose identity matches a success the trace records; the matched
+  `def_hash` and `input_hash` and the reused `output` stay on `event.raw`, in
+  the frame's rows. The package itself never passes `--resume`. Measured on
+  engine 0.123.2 (`test/fixtures/run-wire/0.123.2-cache-hit.ndjson.stdout`);
+  the code that writes the frame is the same on engine `main` (8daeef114).
 - `NikaCheckFinding.span`, typed as the new `NikaSourceSpan`
   (`{ start, end }`): the byte range of the workflow file a check finding
   names, `start` inclusive and `end` exclusive, as the engine already wrote
@@ -50,6 +60,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `event.raw.kind` for them now receives `task.skipped` and `task.cancelled`.
   Before, an application waiting for one ending per task never saw one for a
   skipped or a cancelled task.
+- A local run's `task_cache_hit` frame leaves the `engine.event` branch too:
+  code that matched `engine.event` on `event.raw.kind` for it now receives
+  `task.cache_hit`.
+- CI typechecks the TypeScript test files. `npm run typecheck` runs
+  `tsc -p tsconfig.test.json`, the package's strict `tsconfig.json` over
+  `src/**/*.ts` and `test/**/*.ts`, before `npm test` on Node 22 and 24.
+  Vitest strips a test's types without checking them, which hid nine type
+  errors in six test files and left the `expectTypeOf` assertions unjudged;
+  a wrong one now fails CI. Among the nine was an HTTP frame whose `status`
+  is `null`, a value the resident's `JobEvent` allows and `NikaEvent` does
+  not spell. Those tests are fixed; no published type changed. Two release
+  tests import a `.mjs` release script with no declaration file: `allowJs`
+  lets `tsc` read its types instead of refusing the import, and the script
+  itself is not checked. The `test/*.test.mjs` suites stay unchecked
+  JavaScript. The README's contributing commands name `npm run typecheck`
+  instead of `npx tsc --noEmit -p .`, which CI never ran.
 - **What engine 0.124 changes in the data an app reads.** The machine
   protocol stays 2, no `nika serve` route, schema or closed set changes, and
   the package reads every change below without new code:
@@ -133,7 +159,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `docs/upgrading-to-0.123.md` gains "From 0.123 to 0.124: the same
   protocol", and its table pairs 0.123.x and 0.124.x both ways at the
   identity probe.
-
 - `docs/receipts.md` and `docs/errors.md` name Nika 0.123, not 0.123.0, as
   the engine that never opens the keychain on macOS and so can neither read
   nor copy a run-key that Nika 0.122 or older stored there, as the README
@@ -141,6 +166,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `the keychain is not opened by this ad-hoc build`, and
   `NIKA_KEYCHAIN=off nika key init` writes the key as two `0600` files under
   `~/.nika/keys/`.
+- `examples/artifacts.ts` runs a server job and reads what it produced: it
+  submits `examples/chart.nika` (one `nika:chart` task: no model, no provider
+  key, no network) to a local `nika serve`, lists the settled job's artifacts
+  with `run.artifacts()`, and streams one into `downloads/` with
+  `run.downloadArtifact()`, keeping the file only once the stream closed.
+  `npm run check:package-surface` typechecks it against the packed types with
+  the other examples. Measured on engine 0.123.2: the job lists
+  `file/out/totals.svg` (`image/svg+xml`, 3669 bytes), and the downloaded
+  bytes hash as the file the job wrote; a server without a run key answers
+  409 `artifact_journal_unverified`.
 
 ## [0.123.2] - 2026-10-26
 

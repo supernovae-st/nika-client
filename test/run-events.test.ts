@@ -23,6 +23,7 @@ const SEMANTIC_KINDS: ReadonlySet<NikaRunEventKind> = new Set([
   'task.failed',
   'task.skipped',
   'task.cancelled',
+  'task.cache_hit',
   'run.waiting',
   'run.settled',
   'run.interrupted',
@@ -158,6 +159,54 @@ describe('semantic run events over measured native frames', () => {
       kind: 'run_settled',
       cause: 'normal',
       tasks: { total: 3, ok: 1, recovered: 1, skipped: 1, cancelled: 1, failed: 0 },
+    });
+  });
+
+  it('names a task a resumed run reused over measured 0.123.2 frames', () => {
+    // `publish` failed in a first run; `nika run --resume` of that run's
+    // trace, with `--var ready=true`, reused `prepare`, whose identity matched
+    // its recorded success, and ran `publish` live. The package itself never
+    // resumes a run: this is the engine's frame, as any resumed run writes it.
+    const events = native(wire('0.123.2-cache-hit.ndjson.stdout'));
+
+    expect(events.map((event) => [event.kind, event.raw.kind, event.task])).toEqual([
+      ['run.started', 'workflow_started', undefined],
+      ['task.scheduled', 'task_scheduled', 'prepare'],
+      ['task.scheduled', 'task_scheduled', 'publish'],
+      // Reused, never started: the cache hit is the task's one ending.
+      ['task.cache_hit', 'task_cache_hit', 'prepare'],
+      ['task.started', 'task_started', 'publish'],
+      ['engine.event', 'permit_checked', undefined],
+      ['task.completed', 'task_completed', 'publish'],
+      ['engine.event', 'workflow_completed', undefined],
+      ['run.settled', 'run_settled', undefined],
+    ]);
+
+    const hit = events.find((event) => event.kind === 'task.cache_hit')!;
+    // A reuse names its task, never a failure or a state.
+    expect(Object.keys(hit).sort()).toEqual(['kind', 'raw', 'task', 'transport']);
+    // The identity it matched and the output it reused stay on `raw`, in its rows.
+    const rows = (hit.raw as unknown as { fields: { key: string; value: unknown }[] }).fields;
+    const row = (key: string) => rows.find((candidate) => candidate.key === key)?.value;
+    expect(rows.map((candidate) => candidate.key)).toEqual([
+      'task', 'note', 'def_hash', 'input_hash', 'output', 'outcome',
+    ]);
+    expect(row('note')).toBe('cache hit');
+    expect(row('def_hash')).toMatch(/^[0-9a-f]{64}$/);
+    expect(row('input_hash')).toMatch(/^[0-9a-f]{64}$/);
+    expect(JSON.parse(row('output') as string)).toBe(true);
+    expect(JSON.parse(row('outcome') as string)).toEqual({
+      cause: 'normal',
+      class: 'success',
+      payload: { attempts: 1, value: true },
+    });
+
+    // The run counts the reused task as an ordinary success.
+    expect(events.at(-1)).toMatchObject({ kind: 'run.settled', status: 'succeeded' });
+    expect(events.at(-1)!.raw).toMatchObject({
+      kind: 'run_settled',
+      cause: 'normal',
+      tasks: { total: 2, ok: 2, failed: 0, skipped: 0 },
     });
   });
 
@@ -503,6 +552,7 @@ describe('the projection is total and writes nothing of its own', () => {
       '0.118.7-human-gate.ndjson.stdout',
       '0.118.7-sigterm-cancel.ndjson.stdout',
       '0.123.2-skipped-cancelled.ndjson.stdout',
+      '0.123.2-cache-hit.ndjson.stdout',
     ]) {
       for (const frame of wire(name)) {
         const before = JSON.stringify(frame);
@@ -547,8 +597,11 @@ describe('the projection is total and writes nothing of its own', () => {
 
   it('still advances the replay cursor on a frame it does not name', () => {
     // The cursor is the transport's, not a lifecycle meaning: an application
-    // that persists it must never fall behind on an unnamed frame.
-    const event = semanticRunEvent({ sequence: 7, kind: 'execution.custom', status: null }, 'http');
+    // that persists it must never fall behind on an unnamed frame. The
+    // resident's `JobEvent` allows `status: null`, a value `NikaEvent` does not
+    // spell: the frame is read from its bytes, as the transport reads it.
+    const raw = JSON.parse('{"sequence":7,"kind":"execution.custom","status":null}') as NikaEvent;
+    const event = semanticRunEvent(raw, 'http');
 
     expect(event).toEqual({
       kind: 'engine.event',

@@ -273,6 +273,13 @@ const svg = await run.readArtifact('file/out/totals.svg');
 file/out/totals.svg image/svg+xml
 ```
 
+[`examples/artifacts.ts`](https://github.com/supernovae-st/nika-client/blob/main/examples/artifacts.ts) runs
+[`examples/chart.nika`](https://github.com/supernovae-st/nika-client/blob/main/examples/chart.nika), this
+workflow with its write narrowed to `./out/totals.svg`, on a local server,
+lists the job's artifacts and streams one into a file it keeps once the
+stream closed: no model, no provider key and no network, on a server that
+holds a run key (see below).
+
 - **What is listed.** Each entry has a `name`, its `kind` (`file` or
   `agent_image`), a file's `path` in the server's project, the recorded `size`
   and `sha256`, its `mime`, the `task` and the journal `event_id`. A name such

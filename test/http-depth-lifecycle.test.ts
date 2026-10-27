@@ -105,7 +105,8 @@ describe('independent event observers', () => {
 
     await expect(fast).resolves.toHaveLength(3);
     await expect(run.done).resolves.toMatchObject({ id: 'job-1', status: 'succeeded' });
-    await expect(collect(slow)).rejects.toMatchObject({
+    // The view opened above, before any frame: drain that same subscription.
+    await expect(collect({ [Symbol.asyncIterator]: () => slow })).rejects.toMatchObject({
       name: 'NikaEventBufferOverflowError',
       runId: 'job-1',
       limit: 1,
@@ -142,7 +143,7 @@ describe('independent event observers', () => {
   it.each([
     [2, undefined, 'global replay capacity'],
     [6, 2, 'smaller observer capacity'],
-  ] as const)('refuses late observation after exceeding %s', async (eventBufferSize, bufferSize) => {
+  ] as const)('refuses late observation after exceeding %s', async (eventBufferSize, bufferSize, _capacity) => {
     const replay = Array.from({ length: 5 }, (_, index) => ({
       sequence: index + 1,
       kind: index === 4 ? 'settled' : 'running',
@@ -742,7 +743,8 @@ describe('cancellation and terminal identity', () => {
       sequence: 1, kind: 'settled', status: 'succeeded', receipt: 'private',
     }],
   ])('rejects %s in the closed SSE projection', async (_name, event) => {
-    const fetch = admissionThen(sseResponse([event]));
+    // Each frame breaks the projection on purpose, so the event type does not hold it.
+    const fetch = admissionThen(sseResponse([event as NikaEvent]));
     const nika = client(fetch as typeof globalThis.fetch);
     const run = await nika.run('flow.nika', { idempotencyKey: 'test-admission' });
     await expect(run.done).rejects.toBeInstanceOf(NikaProtocolError);

@@ -5,3 +5,5 @@ dist/
 .env.*
 .openapi-cache.json
 examples/recovery.json
+examples/out/
+examples/downloads/

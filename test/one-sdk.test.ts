@@ -319,6 +319,7 @@ describe.skipIf(!posix)('native-process transport', () => {
     const client = native();
     await expect(client.run('ok.nika', { idempotencyKey: 'remote-only' }))
       .rejects.toBeInstanceOf(NikaCompatibilityError);
+    // @ts-expect-error an id and a result are no handle: the type refuses it, and so does the client
     const foreign: NikaRun = {
       id: 'foreign' as NikaRunId,
       done: Promise.resolve({
@@ -413,6 +414,7 @@ describe('HTTP transport', () => {
     const run = await client.run('flow.nika', { idempotencyKey: 'test-admission' });
     await expect(client.status(run)).resolves.toBe('running');
     await expect(run.done).resolves.toMatchObject({ status: 'succeeded' });
+    // @ts-expect-error a copy of the id and the result is no handle, for the type or the client
     expect(() => client.status({ id: run.id, done: run.done }))
       .toThrow(NikaRunOwnershipError);
   });

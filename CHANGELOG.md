@@ -102,6 +102,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   voice's unpriced spend, the `vars` codes, the saved agent images and the
   composed sheet a manifest lists, the failed harness turns and the new
   refusals in the troubleshooting table, and what `nika doctor` now names.
+- The README, `SECURITY.md`, `AGENTS.md` and the pages name 0.124 as the
+  current release line, its work focused on maintenance, security and the
+  media capabilities workflows need, with native video planned for 0.125,
+  and 0.123.x as the previous line; `SECURITY.md` says fixes ship as
+  0.124.x. Where a fact holds for both lines they say "0.123 and later": machine
+  protocol 2, and a keychain never opened on macOS.
+  `docs/upgrading-to-0.123.md` gains "From 0.123 to 0.124: the same
+  protocol", and its table pairs 0.123.x and 0.124.x both ways at the
+  identity probe.
 
 - `docs/receipts.md` and `docs/errors.md` name Nika 0.123, not 0.123.0, as
   the engine that never opens the keychain on macOS and so can neither read

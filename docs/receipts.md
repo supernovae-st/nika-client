@@ -100,11 +100,11 @@ with a retired key stay verifiable), and, on Linux, `nika key align` copies a
 Secret Service key to the files the other processes read.
 
 Which key a process signs with depends on the process and, for `nika` run
-from a terminal, on the platform. Nika 0.123:
+from a terminal, on the platform. Nika 0.123 and later:
 
 | Process | Opens an OS keychain? | Signs with, in this order |
 |---|---|---|
-| `nika` run from a terminal, on macOS | no: Nika 0.123 never opens the keychain on macOS, even from a terminal (`nika doctor` says `the keychain is not opened by this ad-hoc build`) | `NIKA_RUN_KEY_FILE` + `NIKA_RUN_PUB_FILE`, then `~/.nika/keys/` |
+| `nika` run from a terminal, on macOS | no: Nika 0.123 and later never open the keychain on macOS, even from a terminal (`nika doctor` says `the keychain is not opened by this ad-hoc build`) | `NIKA_RUN_KEY_FILE` + `NIKA_RUN_PUB_FILE`, then `~/.nika/keys/` |
 | `nika` run from a terminal, on Linux | yes: the desktop's Secret Service, when one answers | `NIKA_RUN_KEY_FILE` + `NIKA_RUN_PUB_FILE`, the Secret Service, then `~/.nika/keys/` |
 | the engine your app starts (`new Nika()`) | never: it has no terminal | `NIKA_RUN_KEY_FILE` + `NIKA_RUN_PUB_FILE`, then `~/.nika/keys/` |
 | `nika serve` | never | `NIKA_RUN_KEY_FILE` + `NIKA_RUN_PUB_FILE`, then `~/.nika/keys/` |
@@ -127,10 +127,10 @@ one on every platform:
 - **Without the variable, on macOS.** `nika key init` from a terminal writes
   the files too, unless the keychain holds a run-key that Nika 0.122 or older
   stored there. Then it refuses, and the repair it names, `nika key align`,
-  cannot succeed with Nika 0.123, which can neither read nor copy that key: it
-  exits with `this process does not open the keychain`. The variable skips
-  the keychain check and mints a new key as files, a new signing identity
-  beside the old keychain key.
+  cannot succeed with Nika 0.123 and later, which can neither read nor copy
+  that key: it exits with `this process does not open the keychain`. The
+  variable skips the keychain check and mints a new key as files, a new
+  signing identity beside the old keychain key.
 - **CI and servers.** Give the engine an explicit pair through
   `NIKA_RUN_KEY_FILE` and `NIKA_RUN_PUB_FILE`; `nika key init` with those two
   variables set writes the pair there.

@@ -11,8 +11,10 @@ the bundled engine (or `bin`/`NIKA_BIN`) as a child process; with
 (`--workflows` + `--token-file`). The engine is `supernovae-st/nika` (AGPL);
 the language spec is `supernovae-st/nika-spec` (Apache-2.0). Each package
 version bundles the engine with the same number and speaks its machine
-protocol (2 for 0.123). 0.123 is the open-source reference release, in
-maintenance: security fixes, bug fixes and compatibility.
+protocol (2 for 0.123 and 0.124). 0.124 is the current release line: work
+stays focused on maintenance, security and the media capabilities workflows
+need, and native video is planned for 0.125. The 0.123.x line is the previous
+line.
 
 User documentation: `README.md` (the entry) and `docs/*.md` (shipped in the
 npm package); runnable programs in `examples/`; recordings and one labelled

@@ -35,9 +35,9 @@ Any other non-2xx body is discarded and reported as a redacted
 - URLs containing credentials, a query, or a fragment are rejected.
 - Tokens must contain 32–512 visible ASCII bytes and are never sent to
   `/health`.
-- `GET /health` must name machine protocol 2, the generation of engine 0.123
-  and of the engine this package bundles. A resident on another generation
-  (0.122 and older speak 1) is refused with `NikaCompatibilityError`
+- `GET /health` must name machine protocol 2, the generation of engines 0.123
+  and 0.124 and of the engine this package bundles. A resident on another
+  generation (0.122 and older speak 1) is refused with `NikaCompatibilityError`
   (`capability: 'engineIdentity'`) before any other request. A local engine
   that captures a snapshot or observes a compile must report the same
   machine protocol, snapshot, check-report and event clocks as the resident.
@@ -71,7 +71,7 @@ Any other non-2xx body is discarded and reported as a redacted
   extra field and ignores its values, so the SDK refuses it after `/health`
   alone with `NikaCompatibilityError` (`capability: 'jobInputs'`). The
   `inputs` envelope is engine-owned (nika#1642); `JobByName.inputs` is in the
-  pinned `openapi.json` of engine 0.123.
+  pinned `openapi.json` since engine 0.123.
 - A snapshot body takes no `inputs` overlay, an empty map included: `run()` of
   a local path with `inputs` is refused before any capture or request.
 - The serialized `inputs` map is bounded at 1 MiB by the SDK, the bound the
@@ -151,12 +151,13 @@ generation-2 answer is read up to 8 MiB. Refusals add 409 (`compile_replay_unava
 `compile_replay_capacity` or `stopping`.
 
 This contract is ahead of the pinned `openapi.json`, which describes the
-default document of the engine 0.123 resident: the default document never
-carries it, and a seated resident merges it into its live document. Its types
+default document of a resident from engine 0.123 on: the default document
+never carries it, and a seated resident merges it into its live document. Its types
 are written by hand from the engine source at tag `v0.123.0`
 (`crates/nika-serve/src/server/compile/v2.rs`, `author.rs`,
-`openapi-native.json`). This package speaks only to engine 0.123 (machine
-protocol 2), which serves it when seated. See [compile.md](compile.md).
+`openapi-native.json`). This package speaks only to an engine on machine
+protocol 2 (0.123 or later), which serves it when seated. See
+[compile.md](compile.md).
 
 ## Trace verification
 

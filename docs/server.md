@@ -352,7 +352,7 @@ with `https://`.
 
 `inputs` work by served name when the server advertises `jobInputs` (see
 [runs.md](runs.md#pass-your-apps-data-inputs)), and so does `access`, which
-every 0.123 server reads (see
+every server from engine 0.123 on reads (see
 [runs.md](runs.md#pin-the-access-path-access)). A local file's snapshot takes
 neither: the package refuses them beside one (`snapshotInputs`,
 `snapshotAccess`). There is no per-run `model`, `vars` or `maxCostUsd` over

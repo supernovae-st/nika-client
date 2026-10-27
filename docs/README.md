@@ -16,7 +16,7 @@ two doors. Then read the page for what you are building.
 | [receipts.md](receipts.md) | Traces, receipts and `traceVerify()` on both doors, what a verified receipt proves, signing keys and where each process reads them |
 | [compile.md](compile.md) | `compile()`: from an intention or an edit to a checked candidate, answer rounds, provider rounds on a seated server |
 | [errors.md](errors.md) | The error hierarchy, refused runs, server refusals and a troubleshooting table |
-| [upgrading-to-0.123.md](upgrading-to-0.123.md) | Moving from 0.120.x: the machine-protocol rule and what changed in the data |
+| [upgrading-to-0.123.md](upgrading-to-0.123.md) | Moving from 0.120.x, or from 0.123.x to 0.124: the machine-protocol rule and what changed in the data |
 | [glossary.md](glossary.md) | Workflow, run, job, execution, trace, seal, receipt, door, seat, round… defined once |
 
 ## Contracts and internals
@@ -64,6 +64,6 @@ compile then run.
   [remote jobs](https://docs.nika.sh/sdk/remote/jobs),
   [OS schedulers](https://docs.nika.sh/sdk/operations/os-schedulers) and
   [deployment topologies](https://docs.nika.sh/sdk/operations/deployment-topologies).
-- [Known limits in 0.123](https://docs.nika.sh/changelog/known-limits).
+- [Known limits in 0.124](https://docs.nika.sh/changelog/known-limits).
 - The [engine](https://github.com/supernovae-st/nika) and the
   [language specification](https://github.com/supernovae-st/nika-spec).

@@ -9,14 +9,49 @@ one protocol generation, so the move from 0.120.x is one rule:
 
 | Your package | Your engine or server | Result |
 |---|---|---|
-| 0.123.x | 0.123.x | works |
-| 0.123.x | 0.122 and older (protocol 1) | refused at the identity probe, before any job: `NikaCompatibilityError`, `capability: 'engineIdentity'`, naming the engine version |
+| 0.124.x | 0.124.x | works: the pair this package is tested with |
+| 0.123.x or 0.124.x | 0.123.x or 0.124.x | passes the identity probe (one protocol, 2); each call still checks the capability it needs (`artifacts` needs engine 0.123.2 or later) |
+| 0.123.x or 0.124.x | 0.122 and older (protocol 1) | refused at the identity probe, before any job: `NikaCompatibilityError`, `capability: 'engineIdentity'`, naming the engine version |
 | 0.120.3 | 0.120.x | works; that pair stays as it was |
-| 0.120.3 | 0.123.x | refused at identity by the 0.120.3 package |
+| 0.120.3 | 0.123.x or later | refused at identity by the 0.120.3 package |
 
 Engines 0.121 and 0.122 have no matching package: they already sent compile
 questions of type `choice` while announcing protocol 1, which the 0.120.3
 package refuses as a protocol error.
+
+## From 0.123 to 0.124: the same protocol
+
+0.124 keeps machine protocol 2 and changes no `nika serve` route, schema or
+field this package reads closed, so moving from 0.123.x needs no new rule:
+upgrade the package and every `nika serve` together, with the steps below.
+The package itself changes one word a local `run.events()` consumer may
+match: a skipped or cancelled task now arrives as `task.skipped` or
+`task.cancelled`, no longer as an `engine.event` (see
+[runs.md](runs.md#watch-a-run-runevents)). The rest is in the data your app
+reads (the
+[changelog](https://github.com/supernovae-st/nika-client/blob/main/CHANGELOG.md)
+lists it):
+
+- **More workflows are refused before they run.** A child workflow is judged
+  through the task that calls it, untrusted content is followed through a
+  file a builtin reads (`NIKA-SEC-009`, `NIKA-SEC-014`), a field a harness
+  seat cannot carry blocks `run_ready`, and `temperature` on OpenAI's
+  fixed-sampling models is refused. Run `./node_modules/.bin/nika check` on
+  your workflows before you switch.
+- **A failed harness turn fails its task** (`NIKA-1804`, `NIKA-1805`) where
+  0.123 settled it `succeeded` with the error text as its output.
+- **A refused `vars` pair names its code** (`unknown_input`,
+  `input_type_mismatch`) instead of the package's `run_refused`.
+- **The artifact manifest lists more files**: the sheet `nika:image_compose`
+  saves, and an agent's image saved with `images: { save: }` beside the image
+  itself.
+- **The keyless system voice is unpriced local work**: a run whose only spend
+  it is settles `unpriced`.
+<!-- TODO(0.124.0): re-check these two items against supernovae-st/nika#1846 (C-D3) and supernovae-st/nika-spec#400 with its engine PR (V-1) once they merge. -->
+- **Under a cost cap, a paid media call the catalog cannot price is refused**
+  (`NIKA-1709`) before any request.
+- **A `vision:` file is a read**: it needs a `permits:` block whose `fs.read`
+  admits it (`NIKA-AUTH-006`, `NIKA-SEC-004`).
 
 ## Steps
 
@@ -28,7 +63,7 @@ package refuses as a protocol error.
    ./node_modules/.bin/nika --version                              # nika 0.123.2 (5591478a7)
    ```
 
-2. **Point `NIKA_BIN` at a 0.123 engine, or unset it.** An explicit `bin` or
+2. **Point `NIKA_BIN` at a 0.123 or later engine, or unset it.** An explicit `bin` or
    `NIKA_BIN` wins over the bundled engine, and the package's own `nika`
    command refuses a protocol-1 engine there too
    (`NIKA_BIN=<a 0.122 binary> npx nika --version` exits 1).

@@ -567,5 +567,5 @@ for await (const e of run.events()) {
 
 **How long they stay.** The wrappers shipped unchanged next to the Run-owned
 lifecycle from 0.120.0, the first version published to npm with it, and they
-are still here in 0.123.0. They stay through the 0.123 maintenance line. If a
-later version removes them, its release notes say so.
+are still here in 0.124.0. If a later version removes them, its release notes
+say so.

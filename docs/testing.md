@@ -223,7 +223,7 @@ round trips, incomplete questions, refused expression islands, invalid bases,
 authentication, no project-file changes and no created jobs. HTTP is given a
 nonexistent local engine path, proving that it cannot use a fallback. The report
 records binary and package hashes and is green only after owned-process cleanup.
-The script needs a 0.123 engine (machine protocol 2), which advertises
+The script needs a 0.123 or later engine (machine protocol 2), which advertises
 `compile` on both doors; this package refuses older engines at identity. The
 route itself first shipped with engine commit
 `4334e58bddf539a6253f448eb05d562b6919f2b7`, in release 0.120.3. This is a

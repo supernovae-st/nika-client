@@ -37,5 +37,5 @@ The words these pages use, defined once. The engine's own vocabulary is in the
 | **Kept plan** | The plan a server keeps from a provider round, named by its `replay_token`, so an answer round can replay it instead of authoring again. |
 | **Compile generation** | The compile wire version: `compile_version` 2 exactly when a provider call happened, 1 otherwise. |
 | **Capability** | A feature an engine or server advertises (`nika --sdk-identity`, `GET /health`): `inputsLiteral`, `jobInputs`, `compile`, `compileNativeV2`… The package checks it before it asks. |
-| **Machine protocol** | The generation of the machine contract between this package and the engine (2 for 0.123). The package refuses an engine on another generation at its identity probe, before any job. |
+| **Machine protocol** | The generation of the machine contract between this package and the engine (2 for 0.123 and 0.124). The package refuses an engine on another generation at its identity probe, before any job. |
 | **Release train (lockstep)** | Each package version bundles the engine with the same number, the one it was tested with, and moves with it. |

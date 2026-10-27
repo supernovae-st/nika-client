@@ -2,8 +2,8 @@
 
 Small programs that use `@supernovae-st/nika` the way an application does.
 Each one imports the package by name, runs on Node.js 22.18 or newer as a
-`.ts` file as is, and works keyless and offline with `mock/echo` or
-`nika:wait`.
+`.ts` file as is, and works keyless and offline with `mock/echo`,
+`nika:wait` or `nika:chart`.
 
 | Example | What it shows | Door |
 |---|---|---|
@@ -11,11 +11,14 @@ Each one imports the package by name, runs on Node.js 22.18 or newer as a
 | [`watch-and-cancel.ts`](watch-and-cancel.ts) | `run.events()` as the run happens, `run.cancel()` after a delay or on Ctrl+C, the settled result | local or server |
 | [`server-recovery.ts`](server-recovery.ts) | An idempotent job on `nika serve`, a retry that returns the same job, `attachRun()` from a saved cursor in a second process, `traceVerify()` | server |
 | [`compile-then-run.ts`](compile-then-run.ts) | `compile()` an intention, answer its questions from a JSON file, run the ready candidate | local or server |
+| [`artifacts.ts`](artifacts.ts) | A job that saves a chart, `run.artifacts()` to list what it produced, `run.downloadArtifact()` to stream one into a file once its bytes are proven | server |
 
 The workflows they run are here too: [`hello.nika`](hello.nika) (one
-`mock/echo` task) and [`wait.nika`](wait.nika) (two three-second `nika:wait`
-tasks, so there is time to watch and to cancel). [`nika.yaml`](nika.yaml) is
-the one-line project file `nika serve` needs.
+`mock/echo` task), [`wait.nika`](wait.nika) (two three-second `nika:wait`
+tasks, so there is time to watch and to cancel) and
+[`chart.nika`](chart.nika) (one `nika:chart` task that saves
+`out/totals.svg`). [`nika.yaml`](nika.yaml) is the one-line project file
+`nika serve` needs.
 
 ## Run them from a clone
 
@@ -45,6 +48,7 @@ export NIKA_URL=http://127.0.0.1:8787 NIKA_TOKEN="$(cat .nika/serve.token)"
 node server-recovery.ts start      # submits wait.nika, retries, stops after the first event
 node server-recovery.ts resume     # reattaches from recovery.json, verifies the record
 node watch-and-cancel.ts           # the same watch-and-cancel, over HTTP
+node artifacts.ts                  # runs chart.nika, lists its artifacts, downloads one
 ```
 
 Measured on engine 0.123.0: `start` prints `retry with the same key · same
@@ -54,6 +58,14 @@ job: true` and stops at `1 run.started running`; `resume` prints
 `sealed false` without one). `watch-and-cancel.ts` asks to cancel after one
 second: the running task finishes, and the run settles `cancelled` with cause
 `operator` before the second task starts.
+
+`artifacts.ts` needs the signing key made above: a server without one keeps
+its journals unsealed and answers 409 `artifact_journal_unverified`. With it,
+measured on engine 0.123.2 (macOS arm64), the job writes `out/totals.svg` in
+the server's project, and the example prints `file/out/totals.svg ·
+image/svg+xml · 3669 bytes · sha256 e18d482e8322…`, then
+`saved downloads/totals.svg · 3669 bytes, proven against the job's journal`:
+the download is the client's own copy, as an app on another machine gets it.
 
 `compile-then-run.ts` documents its own arguments; run it from the repository
 root as its header shows.

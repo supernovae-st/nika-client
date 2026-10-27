@@ -45,6 +45,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `the keychain is not opened by this ad-hoc build`, and
   `NIKA_KEYCHAIN=off nika key init` writes the key as two `0600` files under
   `~/.nika/keys/`.
+- `examples/artifacts.ts` runs a server job and reads what it produced: it
+  submits `examples/chart.nika` (one `nika:chart` task: no model, no provider
+  key, no network) to a local `nika serve`, lists the settled job's artifacts
+  with `run.artifacts()`, and streams one into `downloads/` with
+  `run.downloadArtifact()`, keeping the file only once the stream closed.
+  `npm run check:package-surface` typechecks it against the packed types with
+  the other examples. Measured on engine 0.123.2: the job lists
+  `file/out/totals.svg` (`image/svg+xml`, 3669 bytes), and the downloaded
+  bytes hash as the file the job wrote; a server without a run key answers
+  409 `artifact_journal_unverified`.
 
 ## [0.123.2] - 2026-10-26
 

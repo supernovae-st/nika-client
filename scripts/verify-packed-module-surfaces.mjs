@@ -219,7 +219,8 @@ try {
   // The other documented programs, verbatim from examples/ (the README quick
   // start among them): typechecked below against the packed types. They need a
   // real engine or a server to run, which the gauntlets and docs/testing.md own.
-  const TYPED_EXAMPLES = ['quick-start', 'watch-and-cancel', 'server-recovery'].map((name) => `${name}.mts`);
+  const TYPED_EXAMPLES = ['quick-start', 'watch-and-cancel', 'server-recovery', 'artifacts']
+    .map((name) => `${name}.mts`);
   for (const example of TYPED_EXAMPLES) {
     await copyFile(path.join(root, 'examples', example.replace(/\.mts$/, '.ts')), path.join(consumer, example));
   }

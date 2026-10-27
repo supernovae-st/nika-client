@@ -71,6 +71,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `./node_modules/.bin/nika doctor` names the binary that runs and its
     installer, and every other `nika` on `PATH` with its version
     (`--json`: `running`, `others[]`, `others_truncated`; nika#1849).
+  <!-- TODO(0.124.0): re-check this item against supernovae-st/nika#1846 (C-D3) once it merges: prices, codes, the serve door. -->
+  - **Paid media under a cost cap** (nika#1846). Under a cap (`maxCostUsd`
+    on a local run, a project `ceiling:`, a server's `--run-cost-ceiling`),
+    a `nika:image_generate` or `nika:tts_generate` call the engine's catalog
+    cannot price is refused before any request: `run()` rejects with
+    `NIKA-1709` when the workflow names the provider, and a provider only
+    the run decides fails its task with `NIKA-1704`. Public catalog prices
+    meter OpenAI `gpt-image-2`, the Gemini image models, OpenAI `tts-1` and
+    `tts-1-hd` and ElevenLabs speech against the cap; OpenAI's default voice
+    `gpt-4o-mini-tts`, `gpt-image-1.5`, `gpt-image-1-mini` and unknown model
+    ids stay refused under a cap, and the keyless `provider: system` voice
+    runs under any cap as unpriced local work. Without a cap, an unpriced
+    paid media call is counted in `spend.unpriced_calls`, so the settlement
+    reads `unpriced` or `partially_priced`, never `priced`.
+  <!-- TODO(0.124.0): re-check this item against supernovae-st/nika-spec#400 and its engine PR (V-1) once both merge. -->
+  - **Vision files are reads** (nika-spec#400). An `infer:` `vision:`
+    entry with `source: file` is judged against `permits.fs.read` before the
+    file is opened, on the API and harness routes alike: `check()` reports
+    and `run()` refuses it with `NIKA-AUTH-006` when the workflow declares
+    no `permits:` block and `NIKA-SEC-004` when `fs.read` does not admit the
+    path; a path only the run renders fails its task with `NIKA-SEC-004`. A
+    `source: url` entry is unchanged: the provider fetches it.
 
 ### Documentation
 

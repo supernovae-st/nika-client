@@ -359,6 +359,10 @@ neither: the package refuses them beside one (`snapshotInputs`,
 HTTP: the package refuses them with a typed error instead of dropping them.
 The server applies its own per-run ceiling to manual jobs
 (`nika serve --run-cost-ceiling`, 1 USD by default; `none` turns it off).
+<!-- TODO(0.124.0): re-check this sentence against supernovae-st/nika#1846 (C-D3) once it merges: the door and the status of the refusal. -->
+From engine 0.124 that ceiling also refuses a paid media call the engine's
+catalog cannot price, as `maxCostUsd` does locally (see
+[errors.md](errors.md#troubleshooting)).
 Bound a server run through its workflow too: its model and `max_tokens`. A
 server `check()` refuses `model` and `nativeStrict` the same way; its
 `access` is acknowledged, not judged, since the server's check evaluates no

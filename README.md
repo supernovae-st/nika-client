@@ -202,6 +202,10 @@ receipt verified
 the engine refuses to start a run whose paid calls would cost more, and never
 blocks local or mock models. The `mock(echo) ·` prefix marks a rehearsal, not
 a model's answer. [Use a real model](#use-a-real-model) when you are ready.
+<!-- TODO(0.124.0): re-check this sentence against supernovae-st/nika#1846 (C-D3) once it merges. -->
+From engine 0.124 the budget covers paid media too: an image or speech call
+whose price the engine's catalog does not know is refused before any
+request, while local, mock and keyless media are never blocked.
 
 > [!NOTE]
 > **Seeing `not verified: receipt_mismatch`?** The run succeeded, but the

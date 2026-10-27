@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `engine.event`. A `nika serve` run is unchanged: the server streams no
   per-task frame. Measured on engine 0.123.2
   (`test/fixtures/run-wire/0.123.2-*`).
+- A local `run.events()` names a task a resumed run reused: the engine's
+  `task_cache_hit` frame is `task.cache_hit`, an additive `NikaRunEventKind`
+  word that carries `task`, never `error` or `status`, and the frame has its
+  own type, `NikaTaskCacheHitEvent`, a new variant of `NikaEvent`.
+  `nika run --resume <trace>` writes it, with no `task_started` before it, for
+  a task whose identity matches a success the trace records; the matched
+  `def_hash` and `input_hash` and the reused `output` stay on `event.raw`, in
+  the frame's rows. The package itself never passes `--resume`. Measured on
+  engine 0.123.2 (`test/fixtures/run-wire/0.123.2-cache-hit.ndjson.stdout`);
+  the code that writes the frame is the same on engine `main` (8daeef114).
 
 ### Changed
 
@@ -26,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `event.raw.kind` for them now receives `task.skipped` and `task.cancelled`.
   Before, an application waiting for one ending per task never saw one for a
   skipped or a cancelled task.
+- A local run's `task_cache_hit` frame leaves the `engine.event` branch too:
+  code that matched `engine.event` on `event.raw.kind` for it now receives
+  `task.cache_hit`.
 - CI typechecks the test files. `npm run typecheck` runs
   `tsc -p tsconfig.test.json`, the package's strict `tsconfig.json` over
   `src/` and `test/`, before `npm test` on Node 22 and 24: vitest strips a

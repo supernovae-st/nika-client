@@ -41,7 +41,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 <!-- TODO(0.124.0): replace the bracketed parts from the tagged engine: the tag commit, the served document's diff, and the replayed ledgers. -->
-<!-- TODO(0.124.0 V-1 merge): re-check "vision files as reads" against the merged supernovae-st/nika#1851; drop it if the change did not land. -->
 - **Release train 0.124.0, in lockstep with engine `v0.124.0`**, the first
   release of the 0.124 line (child workflows judged through their calls,
   `nika:image_compose`, the keyless system voice, harness images, the cost
@@ -175,7 +174,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `failure_plan` gains `unpriced_media_cap` and `priced_speech_over_cap`
     beside `priced_image_over_cap`; both ride untyped. A local run's
     `workflow_started` frame records the table in a `media_pricing` row.
-  <!-- TODO(0.124.0 V-1 merge): re-check this item against the merged supernovae-st/nika#1851 (written from its head dfe29896b), or drop it if the change did not land. -->
   - **Vision files are reads** (breaking; nika-spec#400, nika#1851). An
     `infer:` `vision:` entry with `source: file` is read under the
     workflow's own `permits.fs.read`, on its resolved path, so a symlink or a

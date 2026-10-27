@@ -68,7 +68,6 @@ lists it):
   `nika arm`. Move speech to `tts-1`, `tts-1-hd`, a priced ElevenLabs model
   or the keyless `provider: system` voice, and images to `gpt-image-2` or a
   2.5 model.
-<!-- TODO(0.124.0 V-1 merge): re-check this item against the merged supernovae-st/nika#1851 (written from its head dfe29896b), or drop it if the change did not land. -->
 - **A `vision:` file is a read.** Grant each file in `permits.fs.read`: with
   no `permits:` block it is refused (`NIKA-AUTH-006`); outside the grant, or
   under a block that grants no read at all, a computed path included, it is

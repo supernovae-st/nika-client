@@ -136,6 +136,8 @@ describe.skipIf(!posix || !HOST_PACKAGE)('packed native distribution', () => {
   });
 
   it('refuses a packaged executable whose integrity no longer matches', () => {
+    // The suite is skipped on a host without a payload package; say so if it ever runs there.
+    if (HOST_PACKAGE === undefined) throw new Error('no payload package for this host');
     const project = stageProject(HOST_PACKAGE);
     const suffix = HOST_PACKAGE.replace('@supernovae-st/nika-', '');
     appendFileSync(path.join(

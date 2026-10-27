@@ -696,8 +696,8 @@ Issues and pull requests are welcome. Before you open one, run what CI runs:
 
 ```sh
 npm ci
+npm run typecheck                 # the sources and the test files, under the strict tsconfig
 npm test                          # unit and contract tests, then the retired-suffix ratchet
-npx tsc --noEmit -p .
 npm run build
 npm run check:package-surface     # the packed ESM and CommonJS faces, and the examples
 npm run check:release-evidence    # the committed gauntlet ledgers match this version

@@ -26,6 +26,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `event.raw.kind` for them now receives `task.skipped` and `task.cancelled`.
   Before, an application waiting for one ending per task never saw one for a
   skipped or a cancelled task.
+- CI typechecks the test files. `npm run typecheck` runs
+  `tsc -p tsconfig.test.json`, the package's strict `tsconfig.json` over
+  `src/` and `test/`, before `npm test` on Node 22 and 24: vitest strips a
+  test's types without checking them, which hid eleven type errors in eight
+  test files. Among them was an HTTP frame whose `status` is `null`, a value
+  the resident's `JobEvent` allows and `NikaEvent` does not spell. The tests
+  are fixed; no published type changed. The README's contributing commands
+  name `npm run typecheck` instead of `npx tsc --noEmit -p .`, which CI never
+  ran.
 
 ### Documentation
 

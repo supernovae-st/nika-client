@@ -547,8 +547,11 @@ describe('the projection is total and writes nothing of its own', () => {
 
   it('still advances the replay cursor on a frame it does not name', () => {
     // The cursor is the transport's, not a lifecycle meaning: an application
-    // that persists it must never fall behind on an unnamed frame.
-    const event = semanticRunEvent({ sequence: 7, kind: 'execution.custom', status: null }, 'http');
+    // that persists it must never fall behind on an unnamed frame. The
+    // resident's `JobEvent` allows `status: null`, a value `NikaEvent` does not
+    // spell: the frame is read from its bytes, as the transport reads it.
+    const raw = JSON.parse('{"sequence":7,"kind":"execution.custom","status":null}') as NikaEvent;
+    const event = semanticRunEvent(raw, 'http');
 
     expect(event).toEqual({
       kind: 'engine.event',

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+<!-- TODO(0.124.0): set this date to the day the package publishes, beside engine tag v0.124.0. -->
+## [0.124.0] - 2026-10-27
+
 ### Added
 
 - A local `run.events()` names a skipped or a cancelled task: `task_skipped`
@@ -27,6 +30,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+<!-- TODO(0.124.0): replace the bracketed parts from the tagged engine: the tag commit, the served document's diff, and the replayed ledgers. -->
+- **Release train 0.124.0, in lockstep with engine `v0.124.0`**, the first
+  release of the 0.124 line (child workflows judged through their calls,
+  `nika:image_compose`, the keyless system voice, harness images, the cost
+  cap over paid media, vision files as reads). The machine protocol stays 2.
+  `package.json` is 0.124.0 and `sync:native-versions` moved the four native
+  payload manifests, the `optionalDependencies` and the lockfile with it.
+  `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name the commit engine tag
+  `v0.124.0` names ([`nika 0.124.0 (<tag commit>)`]), and the committed
+  gauntlet ledgers were replayed against that verified public binary
+  ([the replay's verdicts]).
+- The pinned `openapi.json` and `src/generated/openapi.d.ts` are the served
+  document of the released engine 0.124.0: [expected, from engine main
+  8daeef114: only `info.version` and the artifacts route's description,
+  which now names `nika:image_compose`, differ from 0.123.2's].
 - A local run's `task_skipped` and `task_cancelled` frames leave the
   `engine.event` branch: code that matched `engine.event` on
   `event.raw.kind` for them now receives `task.skipped` and `task.cancelled`.
@@ -96,6 +114,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- The README, `docs/upgrading-to-0.123.md` and `docs/compile.md` name 0.124.0
+  as the engine this package bundles: the upgrade steps install 0.124.0, and
+  the engine history adds 0.124.0, which keeps machine protocol 2 and the
+  compile door of 0.123.2. Measurements keep the version they were taken on.
 - `docs/runs.md`, `docs/server.md`, `docs/http-api.md`, `docs/errors.md`
   and the README describe the engine 0.124 changes above: a finding's `span`
   and `composed_calls`, the question a paused local run carries, the system
@@ -1252,7 +1274,8 @@ Initial public release. Full rewrite from v0.1.0.
 - Error hierarchy completely redesigned
 - License changed from MIT to AGPL-3.0-or-later
 
-[Unreleased]: https://github.com/supernovae-st/nika-client/compare/v0.123.2...HEAD
+[Unreleased]: https://github.com/supernovae-st/nika-client/compare/v0.124.0...HEAD
+[0.124.0]: https://github.com/supernovae-st/nika-client/compare/v0.123.2...v0.124.0
 [0.123.2]: https://github.com/supernovae-st/nika-client/compare/v0.123.1...v0.123.2
 [0.123.1]: https://github.com/supernovae-st/nika-client/compare/v0.123.0...v0.123.1
 [0.123.0]: https://github.com/supernovae-st/nika-client/compare/v0.120.3...v0.123.0

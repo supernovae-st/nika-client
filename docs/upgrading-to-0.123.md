@@ -1,8 +1,9 @@
 # Upgrading to 0.123
 
-`@supernovae-st/nika` 0.123.2 bundles engine 0.123.2
-(`nika 0.123.2 (5591478a7)`) and speaks its machine protocol, **2**. Engines
-and servers up to 0.122 speak protocol 1. Each package version pairs with
+<!-- TODO(0.124.0): add the tag commit in this page, as `nika 0.124.0 (<9 hex>)`, here and in step 1. -->
+`@supernovae-st/nika` 0.124.0 bundles engine 0.124.0 (`nika 0.124.0`) and
+speaks its machine protocol, **2**, as 0.123 did. Engines and servers up to
+0.122 speak protocol 1. Each package version pairs with
 one protocol generation, so the move from 0.120.x is one rule:
 
 > **Upgrade the package and every `nika serve` it talks to together.**
@@ -55,12 +56,12 @@ lists it):
 
 ## Steps
 
-1. **Update the package.** `npm install @supernovae-st/nika@0.123.2`, then
+1. **Update the package.** `npm install @supernovae-st/nika@0.124.0`, then
    check what you installed:
 
    ```sh
-   node -p "require('@supernovae-st/nika/package.json').version"   # 0.123.2
-   ./node_modules/.bin/nika --version                              # nika 0.123.2 (5591478a7)
+   node -p "require('@supernovae-st/nika/package.json').version"   # 0.124.0
+   ./node_modules/.bin/nika --version                              # nika 0.124.0 (<tag commit>)
    ```
 
 2. **Point `NIKA_BIN` at a 0.123 or later engine, or unset it.** An explicit `bin` or
@@ -68,23 +69,24 @@ lists it):
    command refuses a protocol-1 engine there too
    (`NIKA_BIN=<a 0.122 binary> npx nika --version` exits 1).
 
-3. **Upgrade each server.** Install engine 0.123.2 where your `nika serve`
+3. **Upgrade each server.** Install engine 0.124.0 where your `nika serve`
    runs (`brew install supernovae-st/tap/nika`,
    `curl -LsSf https://nika.sh/install.sh | sh`, or the container image
-   `ghcr.io/supernovae-st/nika:0.123.2`), stop the old server as usual
+   `ghcr.io/supernovae-st/nika:0.124.0`), stop the old server as usual
    (Ctrl-C drains running and queued jobs for up to 30 seconds), and start
    the new one with the same flags. Then check its identity:
 
    ```sh
-   curl -s http://127.0.0.1:8787/health   # "engineVersion":"0.123.2", "machineProtocolVersion":2
+   curl -s http://127.0.0.1:8787/health   # "engineVersion":"0.124.0", "machineProtocolVersion":2
    ```
 
 4. **Run your tests against the new pair.** Nothing in `check`, `run`,
    `events`, `result`, `cancel`, `attachRun`, `schedule` or `traceVerify`
-   changed its signature: 0.123.0 only adds exports. The changes below are
-   in the data those methods return.
+   changed its signature: 0.123.0 and 0.124.0 only add exports. The changes
+   are in the data those methods return: from 0.123, in the section above;
+   from 0.120.x, below.
 
-## What changed in the data
+## What changed in the data from 0.120
 
 - **Compile questions.** A question may now be `type: 'choice'` with
   `options[]` (at least one); answer it with one option's `key`. A `text` or
@@ -112,8 +114,10 @@ lists it):
   built-in `fetch` header timeout no longer cuts it short.
 
 The full list is in the [changelog](https://github.com/supernovae-st/nika-client/blob/main/CHANGELOG.md). The engine's own
-changes are in its [release notes](https://github.com/supernovae-st/nika/releases/tag/v0.123.0),
-and what 0.123 does not do yet is on the
+changes are in its release notes
+([0.123.0](https://github.com/supernovae-st/nika/releases/tag/v0.123.0),
+[0.124.0](https://github.com/supernovae-st/nika/releases/tag/v0.124.0)),
+and what 0.124 does not do yet is on the
 [known limits](https://docs.nika.sh/changelog/known-limits) page.
 
 ## Coming from 0.115 or 0.116

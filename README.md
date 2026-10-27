@@ -696,7 +696,7 @@ Issues and pull requests are welcome. Before you open one, run what CI runs:
 
 ```sh
 npm ci
-npm run typecheck                 # the sources and the test files, under the strict tsconfig
+npm run typecheck                 # the sources and the .ts tests, under the strict tsconfig
 npm test                          # unit and contract tests, then the retired-suffix ratchet
 npm run build
 npm run check:package-surface     # the packed ESM and CommonJS faces, and the examples

@@ -39,15 +39,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A local run's `task_cache_hit` frame leaves the `engine.event` branch too:
   code that matched `engine.event` on `event.raw.kind` for it now receives
   `task.cache_hit`.
-- CI typechecks the test files. `npm run typecheck` runs
+- CI typechecks the TypeScript test files. `npm run typecheck` runs
   `tsc -p tsconfig.test.json`, the package's strict `tsconfig.json` over
-  `src/` and `test/`, before `npm test` on Node 22 and 24: vitest strips a
-  test's types without checking them, which hid eleven type errors in eight
-  test files. Among them was an HTTP frame whose `status` is `null`, a value
-  the resident's `JobEvent` allows and `NikaEvent` does not spell. The tests
-  are fixed; no published type changed. The README's contributing commands
-  name `npm run typecheck` instead of `npx tsc --noEmit -p .`, which CI never
-  ran.
+  `src/**/*.ts` and `test/**/*.ts`, before `npm test` on Node 22 and 24.
+  Vitest strips a test's types without checking them, which hid nine type
+  errors in six test files and left the `expectTypeOf` assertions unjudged;
+  a wrong one now fails CI. Among the nine was an HTTP frame whose `status`
+  is `null`, a value the resident's `JobEvent` allows and `NikaEvent` does
+  not spell. Those tests are fixed; no published type changed. Two release
+  tests import a `.mjs` release script with no declaration file: `allowJs`
+  lets `tsc` read its types instead of refusing the import, and the script
+  itself is not checked. The `test/*.test.mjs` suites stay unchecked
+  JavaScript. The README's contributing commands name `npm run typecheck`
+  instead of `npx tsc --noEmit -p .`, which CI never ran.
 
 ### Documentation
 

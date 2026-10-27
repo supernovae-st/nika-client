@@ -450,9 +450,8 @@ answers with a usage error; a server without a field answers
 `422 malformed_compile_request`. Point `NIKA_BIN` (or `bin`) at the engine you
 mean to use.
 
-<!-- TODO(0.124.0): re-pin openapi.json from the released 0.124.0 resident, regenerate the types, then name 0.124.0 here and check the sentence above against the diff. -->
 The pinned `openapi.json` and `src/generated/openapi.d.ts` are the default
-document of the released engine 0.123.2 resident, regenerated from the
+document of the released engine 0.124.0 resident, regenerated from the
 released `nika serve`. The generation-2 types are written by hand from the
 engine source at tag `v0.123.0`: `crates/nika-serve/src/server/compile/v2.rs`,
 `author.rs` and `openapi-native.json` (the rounds, the judged answer round

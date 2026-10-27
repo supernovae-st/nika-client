@@ -1,10 +1,9 @@
 # Upgrading to 0.123
 
-<!-- TODO(0.124.0): add the tag commit in this page, as `nika 0.124.0 (<9 hex>)`, here and in step 1. -->
-`@supernovae-st/nika` 0.124.0 bundles engine 0.124.0 (`nika 0.124.0`) and
-speaks its machine protocol, **2**, as 0.123 did. Engines and servers up to
-0.122 speak protocol 1. Each package version pairs with
-one protocol generation, so the move from 0.120.x is one rule:
+`@supernovae-st/nika` 0.124.0 bundles engine 0.124.0
+(`nika 0.124.0 (866ed914b)`) and speaks its machine protocol, **2**, as 0.123
+did. Engines and servers up to 0.122 speak protocol 1. Each package version
+pairs with one protocol generation, so the move from 0.120.x is one rule:
 
 > **Upgrade the package and every `nika serve` it talks to together.**
 
@@ -82,7 +81,7 @@ lists it):
 
    ```sh
    node -p "require('@supernovae-st/nika/package.json').version"   # 0.124.0
-   ./node_modules/.bin/nika --version                              # nika 0.124.0 (<tag commit>)
+   ./node_modules/.bin/nika --version                              # nika 0.124.0 (866ed914b)
    ```
 
 2. **Point `NIKA_BIN` at a 0.123 or later engine, or unset it.** An explicit `bin` or

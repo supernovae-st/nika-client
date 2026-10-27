@@ -143,7 +143,7 @@ no network.
 `nika check` is the static audit that runs before any model is called: what
 the workflow will do, which models and tools it uses, what it may touch and
 what it can cost. An excerpt of its report for the file above, on engine
-0.123.2:
+0.124.0:
 
 ```text
 nika check · hello.nika
@@ -627,14 +627,13 @@ node -p "require('@supernovae-st/nika/package.json').version"
 The `package.json` subpath is exported for CommonJS, ESM build tools and CI
 pin checks. It reports the installed package, not a moving registry tag.
 
-<!-- TODO(0.124.0): add the tag commit to the next paragraph, as `nika 0.124.0 (<9 hex>)`. -->
 **Package and engine move together.** Each package version bundles the engine
 with the same number, the one it was tested with: 0.124.0 bundles
-`nika 0.124.0` and speaks its machine protocol, 2, as 0.123 did. It refuses an
-engine or server on another generation (0.122 and older speak 1) at its
-identity probe (`nika --sdk-identity`, `GET /health`), before any job, with
-`NikaCompatibilityError`: upgrade the package and every `nika serve` together
-([docs/upgrading-to-0.123.md](https://github.com/supernovae-st/nika-client/blob/main/docs/upgrading-to-0.123.md)).
+`nika 0.124.0 (866ed914b)` and speaks its machine protocol, 2, as 0.123 did.
+It refuses an engine or server on another generation (0.122 and older speak 1)
+at its identity probe (`nika --sdk-identity`, `GET /health`), before any job,
+with `NikaCompatibilityError`: upgrade the package and every `nika serve`
+together ([docs/upgrading-to-0.123.md](https://github.com/supernovae-st/nika-client/blob/main/docs/upgrading-to-0.123.md)).
 The older 0.120.3 package pairs only with engines 0.120.x. The standalone CLI
 (GitHub releases, `brew install supernovae-st/tap/nika`,
 `curl -LsSf https://nika.sh/install.sh | sh`, the

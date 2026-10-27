@@ -7,8 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-<!-- TODO(0.124.0): set this date to the day the package publishes, beside engine tag v0.124.0. -->
-## [0.124.0] - 2026-10-27
+## [0.124.0] - 2026-10-28
 
 ### Added
 
@@ -40,7 +39,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-<!-- TODO(0.124.0): replace the bracketed parts from the tagged engine: the tag commit, the served document's diff, and the replayed ledgers. -->
 - **Release train 0.124.0, in lockstep with engine `v0.124.0`**, the first
   release of the 0.124 line (child workflows judged through their calls,
   `nika:image_compose`, the keyless system voice, harness images, the cost
@@ -48,14 +46,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `package.json` is 0.124.0 and `sync:native-versions` moved the four native
   payload manifests, the `optionalDependencies` and the lockfile with it.
   `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name the commit engine tag
-  `v0.124.0` names ([`nika 0.124.0 (<tag commit>)`]), and the committed
-  gauntlet ledgers were replayed against that verified public binary
-  ([the replay's verdicts]).
+  `v0.124.0` names (`nika 0.124.0 (866ed914b)`), and the committed gauntlet
+  ledgers were replayed against that verified public binary, with the same
+  behavioral verdicts as on 0.123.2: the 100 corpus output hashes are
+  unchanged.
 - The pinned `openapi.json` and `src/generated/openapi.d.ts` are the served
-  document of the released engine 0.124.0: [expected, from engine main
-  89606a28d and the vision-read change at dfe29896b: only `info.version` and
-  the artifacts route's description, which now names `nika:image_compose`,
-  differ from 0.123.2's].
+  document of the released engine 0.124.0. It differs from 0.123.2's in two
+  places only: `info.version`, and the artifacts route's description, which
+  now names `nika:image_compose`. No route, schema or closed set moved.
 - A local run's `task_skipped` and `task_cancelled` frames leave the
   `engine.event` branch: code that matched `engine.event` on
   `event.raw.kind` for them now receives `task.skipped` and `task.cancelled`.
@@ -203,7 +201,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The README, `docs/upgrading-to-0.123.md` and `docs/compile.md` name 0.124.0
   as the engine this package bundles: the upgrade steps install 0.124.0, and
   the engine history adds 0.124.0, which keeps machine protocol 2 and the
-  compile door of 0.123.2. Measurements keep the version they were taken on.
+  compile door of 0.123.2. `docs/migrating-to-0.116.md` names 0.124.0 as
+  current. The README's `nika check` excerpt was measured again on the
+  released 0.124.0: every line it shows is unchanged. Other measurements keep
+  the version they were taken on.
 - `docs/runs.md`, `docs/server.md`, `docs/http-api.md`, `docs/errors.md`
   and the README describe the engine 0.124 changes above: a finding's `span`
   and `composed_calls`, the question a paused local run carries, the system

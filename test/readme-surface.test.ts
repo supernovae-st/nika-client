@@ -258,6 +258,7 @@ describe('media the pages embed', () => {
   const media = JSON.parse(readFileSync(repo('media/media-sources.json'), 'utf8')) as {
     tapes: Record<string, { outputs: Outputs }>;
     motion?: Record<string, { kind: string; outputs: Outputs }>;
+    package: { version: string };
   };
   const captions = JSON.parse(readFileSync(repo('media/captions.json'), 'utf8')) as Record<
     string,
@@ -387,9 +388,19 @@ describe('media the pages embed', () => {
         expect(captions[file]?.caption, file).toMatch(/illustration/i);
       }
     }
+    // The release the render installed, as media-sources.json records it.
+    const recordedRelease = media.package.version;
+    expect(recordedRelease).toMatch(/^\d+\.\d+\.\d+$/);
     for (const entry of Object.values(media.tapes)) {
       for (const file of Object.keys(entry.outputs).filter((name) => !name.endsWith('.txt'))) {
-        expect(captions[file]?.caption, file).toContain('0.123.0');
+        expect(captions[file]?.caption, file).toContain(recordedRelease);
+      }
+    }
+    // A re-render relabels every caption and alt text: none names another release.
+    for (const [file, entry] of Object.entries(captions)) {
+      const text = typeof entry === 'string' ? entry : `${entry.caption ?? ''} ${entry.alt ?? ''}`;
+      for (const [version] of text.matchAll(/(?<![\d.])\d+\.\d+\.\d+(?!\.?\d)/g)) {
+        expect(version, `${file} names ${version}, not the recorded ${recordedRelease}`).toBe(recordedRelease);
       }
     }
   });

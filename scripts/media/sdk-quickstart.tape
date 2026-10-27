@@ -19,7 +19,7 @@ Enter
 Sleep 400ms
 Show
 
-Type "npm install @supernovae-st/nika@0.123.0"
+Type "npm install @supernovae-st/nika@0.124.0"
 Sleep 300ms
 Enter
 Wait@120s

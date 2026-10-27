@@ -46,7 +46,7 @@ $ node watch.mts
  2.0s  task.started    brief
  2.0s  task.completed  brief
  2.0s  engine.event    (workflow_completed)
- 2.1s  run.settled     succeeded
+ 2.0s  run.settled     succeeded
 
 result  succeeded · cause normal · 4/4 tasks ok
 $

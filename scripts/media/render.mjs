@@ -60,9 +60,9 @@ const ROOT = dirname(dirname(HERE));
 const MEDIA = join(ROOT, 'media');
 const PROJECTS = process.env.SDK_MEDIA_PROJECTS ?? join(tmpdir(), 'nika-sdk-media');
 const PACKAGE = '@supernovae-st/nika';
-const VERSION = process.env.SDK_MEDIA_VERSION ?? '0.123.0';
+const VERSION = process.env.SDK_MEDIA_VERSION ?? '0.124.0';
 // The captions name this exact build: a package that bundles another one is refused.
-const ENGINE_BUILD = process.env.SDK_MEDIA_BUILD ?? '0bfde3765';
+const ENGINE_BUILD = process.env.SDK_MEDIA_BUILD ?? '866ed914b';
 const ENGINE_VERSION_LINE = `nika ${VERSION} (${ENGINE_BUILD})`;
 const HOST_PAYLOAD = `nika-${platform()}-${arch()}`;
 const TAPES = ['sdk-quickstart', 'sdk-events', 'sdk-admitted-executed-sealed', 'sdk-compile', 'sdk-remote'];
@@ -630,7 +630,7 @@ const SCENES = {
       }
     },
     transcript: [
-      '"engineVersion":"0.123.0"', '"machineProtocolVersion":2', 'served   hello.nika', 'check    clean',
+      `"engineVersion":"${VERSION}"`, '"machineProtocolVersion":2', 'served   hello.nika', 'check    clean',
       '#1 run.started running', '#2 run.settled succeeded', 'result   succeeded · mock(echo) · Say hello from the Nika SDK.',
       'verify   verified · sealed', 'retry    the same job: it did not run twice', 'bad token 401 unauthorized',
     ],

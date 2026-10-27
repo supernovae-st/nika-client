@@ -1,12 +1,12 @@
-$ npm install @supernovae-st/nika@0.123.0
+$ npm install @supernovae-st/nika@0.124.0
 
-added 2 packages in 1s
+added 2 packages in 863ms
 $ ls node_modules/@supernovae-st         # the client and its native engine
 nika                    nika-darwin-arm64
 $ ./node_modules/.bin/nika --version
-nika 0.123.0 (0bfde3765)
+nika 0.124.0 (866ed914b)
 $ NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init   # once per machine: a key that signs each run's record
-run-signing key minted · fingerprint 1d2b9e2bc2f0108b
+run-signing key minted · fingerprint 20409f1ed2c887a6
   every run on this machine now seals its journal (verify: nika trace verify <file>)
 $
 

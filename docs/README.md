@@ -30,7 +30,7 @@ two doors. Then read the page for what you are building.
 
 ## Watch it
 
-Five terminal recordings of the published 0.123.0 package and the engine it
+Five terminal recordings of the published 0.124.0 package and the engine it
 bundles, each run in a fresh project with `mock/echo` (no model key), and one
 illustration. Each comes as a GIF, an MP4 you can pause, and a text
 transcript. They live in the GitHub repository, not in the npm package.

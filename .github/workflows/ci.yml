@@ -20,6 +20,8 @@ jobs:
           node-version: ${{ matrix.node }}
 
       - run: npm ci
+      # The sources and the .ts tests: vitest strips a test's types unchecked.
+      - run: npm run typecheck
       - run: npm test
       - run: npm run check:package-surface
 

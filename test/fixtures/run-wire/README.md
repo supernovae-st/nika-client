@@ -109,3 +109,36 @@ tasks:
 | File | Run | Exit |
 |---|---|---|
 | `0.123.2-skipped-cancelled.ndjson.stdout` | `task_skipped` for `skipped_one`; `task_recovered` then `task_completed` for `recovered_one`; `task_cancelled` for `cancelled_one` (its `after:` edge waits for a failure that was recovered); `run_settled` `succeeded`: fourteen frames | 0 |
+
+## A task a resumed run reused (`0.123.2-cache-hit.ndjson.stdout`)
+
+Replayed by `test/run-events.test.ts`. Captured 2026-10-27 on macos/aarch64
+from the same released `nika 0.123.2 (5591478a7)` npm payload (`bin/nika`
+sha256 `910e9736…8856`, equal to its `INTEGRITY.json`), with a cleared
+environment, a throwaway `HOME` with no signing key, `NIKA_KEYCHAIN=off` and
+two `nika:assert` tasks: no model, no provider, no network. The package never
+passes `--resume`, so the argv is the engine's own resume line, not the
+SDK's. The code that writes the frame (`settle_cache_hit` in
+`crates/nika-runtime/src/settle.rs`) is unchanged from `v0.123.2` to engine
+`main` at `8daeef114`.
+
+```yaml
+nika: probe-sdk-resume
+inputs:
+  ready:
+    type: bool
+    default: false
+permits:
+  tools: ["nika:assert"]
+tasks:
+  prepare:
+    invoke: { tool: "nika:assert", args: { condition: true } }
+  publish:
+    after: { prepare: success }
+    invoke: { tool: "nika:assert", args: { condition: "${{ inputs.ready }}", message: "not ready" } }
+```
+
+| Step | Argv | Exit |
+|---|---|---|
+| first run, not kept | `run workflows/resume.nika --json`, stdout saved as `first.ndjson`: `publish` fails, since `ready` is `false` | 1 |
+| `0.123.2-cache-hit.ndjson.stdout` | `run workflows/resume.nika --json --resume first.ndjson --var ready=true`: `task_cache_hit` for `prepare` with no `task_started` before it, then `publish` runs live; `run_settled` `succeeded` with `tasks.ok` 2: nine frames | 0 |

@@ -52,11 +52,9 @@ const HTTP_RECEIPT = Object.freeze({
 });
 
 // Every expectTypeOf assertion in this file is judged by `tsc`; vitest runs it
-// as a no-op, so a green run alone does not prove one. The repo tsconfig covers
-// `src`, so typecheck this file explicitly to make them speak:
-//   npx tsc --noEmit --strict --target ES2022 --module ESNext \
-//     --moduleResolution bundler --skipLibCheck --lib ES2022,DOM \
-//     test/typed-terminal.test.ts
+// as a no-op, so a green vitest run alone does not prove one.
+// `npm run typecheck` (tsconfig.test.json), which CI runs before `npm test`,
+// makes them speak: a wrong expected type fails it with TS2344.
 
 // Compile-time only: this function is never invoked, so nothing in it runs.
 async function genericFlows(client: Nika): Promise<void> {

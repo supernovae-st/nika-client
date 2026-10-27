@@ -6,6 +6,7 @@ gates:
 
 ```sh
 npm ci
+npm run typecheck
 npm test
 npm run build
 npm run check:coverage

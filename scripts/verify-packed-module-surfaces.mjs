@@ -219,7 +219,8 @@ try {
   // The other documented programs, verbatim from examples/ (the README quick
   // start among them): typechecked below against the packed types. They need a
   // real engine or a server to run, which the gauntlets and docs/testing.md own.
-  const TYPED_EXAMPLES = ['quick-start', 'watch-and-cancel', 'server-recovery'].map((name) => `${name}.mts`);
+  const TYPED_EXAMPLES = ['quick-start', 'watch-and-cancel', 'server-recovery', 'artifacts']
+    .map((name) => `${name}.mts`);
   for (const example of TYPED_EXAMPLES) {
     await copyFile(path.join(root, 'examples', example.replace(/\.mts$/, '.ts')), path.join(consumer, example));
   }
@@ -264,6 +265,13 @@ try {
     '// @ts-expect-error a resident protocol word is not a lifecycle kind',
     "const residentWord: NikaRunEventKind = 'execution.started';",
     'void nativeWord; void residentWord;',
+    '// A task a resumed run reused: its lifecycle word and its frame, one variant of NikaEvent.',
+    `import type { NikaTaskCacheHitEvent } from '${packageName}';`,
+    "const reusedWord: NikaRunEventKind = 'task.cache_hit';",
+    'declare const reusedFrame: NikaTaskCacheHitEvent;',
+    "const reusedKind: 'task_cache_hit' = reusedFrame.kind;",
+    'const reusedEvent: NikaEvent = reusedFrame;',
+    'void reusedWord; void reusedKind; void reusedEvent;',
     '// @ts-expect-error the handle grows no proof, catalog, or authoring door',
     'owned.verify;',
     '// @ts-expect-error a bare id is no handle: recovery goes through attachRun',

@@ -3,6 +3,7 @@ import { spawn } from 'node:child_process';
 import { getEventListeners } from 'node:events';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Nika, NikaConfigurationError } from '../src/index.js';
+import type { NikaCompileRequest } from '../src/index.js';
 import { compileSignal, normalizeCompileOptions } from '../src/lib/compile.js';
 
 vi.mock('node:child_process', async (original) => {
@@ -100,7 +101,8 @@ describe.each(['native', 'http'])('compile %s validates direct inputs without ca
   it.each(['intent', 'workflow', 'change', 'answers', 'unknown'])('refuses a request accessor on %s', async (key) => {
     const get = vi.fn(() => { throw new Error('caller getter ran'); });
     const { client, fetch } = setup();
-    const request = Object.defineProperty({}, key, { get, enumerable: true });
+    // A getter holds the field it names, which a request type cannot spell.
+    const request = Object.defineProperty({}, key, { get, enumerable: true }) as NikaCompileRequest;
     await expect(client.compile(request)).rejects.toBeInstanceOf(NikaConfigurationError);
     expect(get).not.toHaveBeenCalled();
     expect(spawn).not.toHaveBeenCalled();

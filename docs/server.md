@@ -366,9 +366,11 @@ neither: the package refuses them beside one (`snapshotInputs`,
 HTTP: the package refuses them with a typed error instead of dropping them.
 The server applies its own per-run ceiling to manual jobs
 (`nika serve --run-cost-ceiling`, 1 USD by default; `none` turns it off).
-<!-- TODO(0.124.0): re-check this sentence against supernovae-st/nika#1846 (C-D3) once it merges: the door and the status of the refusal. -->
-From engine 0.124 that ceiling also refuses a paid media call the engine's
-catalog cannot price, as `maxCostUsd` does locally (see
+From engine 0.124 that ceiling covers paid media too: a priced image or
+speech call is floored and billed against it, and one the engine's price
+table cannot price is refused before any request. The server still admits
+such a job (`202`): it settles `failed` with `error.code` `NIKA-1709` before
+any task runs, and its result has no `settlement` (see
 [errors.md](errors.md#troubleshooting)).
 Bound a server run through its workflow too: its model and `max_tokens`. A
 server `check()` refuses `model` and `nativeStrict` the same way; its
@@ -424,7 +426,11 @@ await nika.schedule('hello.nika', {
 - **Overlap.** `afterSkip` needs `overlap: "skip"`, the engine's default, so
   leaving `overlap` out works too.
 - **Budget.** A schedule's `maxCostUsd` must be a positive number: `0` is
-  refused, where a local `run()` accepts it.
+  refused, where a local `run()` accepts it. An occurrence runs under the
+  lower of it and the server's own ceiling, when the server keeps one. From
+  engine 0.124 that cap covers paid media too: an occurrence whose workflow
+  makes a paid image or speech call the engine's price table cannot price
+  fails with `NIKA-1709` before any task runs, as a manual job does.
 - **Older state.** Treat any `status.finding` recovered from older state as
   not runnable. The engine refuses a new active declaration it cannot plan
   before storing it. The planning facts in a status are the engine's, and new

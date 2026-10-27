@@ -105,7 +105,8 @@ export type NikaRunStatus =
 /**
  * A machine check report. Unknown engine fields deliberately ride through:
  * from engine 0.124, for example, a local report on a workflow that calls a
- * child workflow lists those calls in `composed_calls`, untyped here.
+ * child workflow lists those calls in `composed_calls`, and one that makes a
+ * paid image or speech call lists it in `cost.media`, both untyped here.
  */
 export interface NikaCheckResult {
   report_version?: number;
@@ -468,7 +469,12 @@ export type NikaRunCause =
  * subscription seat and, from engine 0.124, the keyless system voice of
  * `nika:tts_generate`), never free · `partially_priced` · `priced`. A native
  * task frame names why its cost is absent in its `cost_unpriced` row
- * (`mock_provider`, `local_model`, `subscription_quota`…).
+ * (`mock_provider`, `local_model`, `subscription_quota`…). From engine 0.124
+ * a paid image or speech call is billed from the engine's dated price table
+ * (its bill under `by_source['nika:image_generate']` or
+ * `by_source['nika:tts_generate']`), or counted unpriced with
+ * `missing_catalog_price` when the table cannot price it, or
+ * `provider_did_not_report_usage` when its response reported nothing to bill.
  */
 export type NikaCostQualifier =
   | 'priced'

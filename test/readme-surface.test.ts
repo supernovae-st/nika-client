@@ -126,6 +126,39 @@ describe('packed public documentation', () => {
     expect(readme).toContain('`installer: npm-payload`');
   });
 
+  it('teaches paid media under a cost cap as engine 0.124 merged it', () => {
+    // nika#1846 (engine main 89606a28d): what stays unpriced is refused under
+    // any cap, and the ways out are named.
+    for (const word of ['`NIKA-1709`', '`NIKA-1704`', '`gpt-4o-mini-tts`', '`gpt-image-1.5`',
+      '`gpt-image-1-mini`', '`provider: system`', '`gpt-image-2`', '`tts-1-hd`']) {
+      expect(errors).toContain(word);
+    }
+    // The server door, read from the engine: the job is admitted, then the
+    // runtime's launch gate refuses it before any task, with no settlement.
+    for (const surface of [server, httpApi, runs]) {
+      expect(surface).toContain('`NIKA-1709`');
+      expect(surface).toMatch(/no\s+`settlement`/);
+    }
+    expect(server).toMatch(/admits\s+such a job \(`202`\)/);
+    // What the spend reads: the bill under the tool's key, an unpriced call never zero.
+    expect(runs).toContain("spend.by_source['nika:image_generate']");
+    expect(runs).toContain('`cost_unpriced: missing_catalog_price`');
+    expect(runs).toContain('`cost.media`');
+    // The keyless voice runs under any cap, so "no cap" is scoped to the
+    // paid calls the table cannot price.
+    expect(errors).not.toContain('only a run with no cap makes an unpriced call');
+    expect(errors).toMatch(/Only a run with no cap makes a paid call the table cannot\s+price/);
+  });
+
+  it('keeps the release stance word for word where it is stated', () => {
+    const stance = '0.124 is the current release line. Work stays focused on maintenance, '
+      + 'security and the media capabilities workflows need; native video is planned for 0.125.';
+    const flat = (text: string) => text.replace(/\s+/g, ' ');
+    for (const file of ['README.md', 'SECURITY.md', 'AGENTS.md']) {
+      expect(flat(readFileSync(repo(file), 'utf8')), file).toContain(stance);
+    }
+  });
+
   it('documents the resident frame fields as the pinned 0.123 contract, and evidence as no verdict', () => {
     for (const word of ['`at`', '`evidence`', '`mirror_lost`', '`write_failed`', '`record_refused`']) {
       expect(httpApi).toContain(word);

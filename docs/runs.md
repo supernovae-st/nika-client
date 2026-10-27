@@ -67,7 +67,10 @@ a child workflow (`invoke: { workflow: ./child.nika }`) reads the children,
 and engine 0.124 judges each call as the tasks the child stands for: a
 lethal trifecta (`NIKA-SEC-009`) or a confirm gate that does not stop an
 effect (`NIKA-SEC-014`) is refused through a child as it is inline. The
-report lists those calls in `composed_calls`, which rides untyped.
+report lists those calls in `composed_calls`, which rides untyped. From
+engine 0.124 a local report also lists each paid image or speech call in
+`cost.media`, untyped too: its provider, and its model, its floor, the rate
+that sets it and the price table's date when they are known.
 
 The same audit, for humans, is `./node_modules/.bin/nika check hello.nika`.
 
@@ -118,7 +121,8 @@ way to answer a gate. On a local engine the question is on the native
 `nika run --resume <trace> --answer <task>=<value>`. From engine 0.124, a
 command a Codex seat asks to run outside its sandbox always pauses, whatever
 `permits.exec` grants, and its question names the command and the reason on
-one line (`Run command: curl -sS https://example.com (reason: …)`). A
+one line (`Run command: curl -sS https://example.com (reason: …)`). One
+`--answer` decides one ask: an attempt that `retry:` replays asks again. A
 server's frames do not carry the question: the job reads `paused`.
 
 `result.settlement` carries the engine's own account of the ending: its
@@ -129,6 +133,20 @@ voice (`nika:tts_generate` with `provider: system`) counts as an unpriced
 call, like a mock or local model: a run whose only spend is that voice
 settles with `spend.qualifier` `unpriced` and `unpriced_calls: 1`, and its
 native task frame names why (`cost_unpriced: local_model`).
+
+Paid image and speech calls count from engine 0.124 too. A call the
+engine's dated price table prices adds its bill to `spend.total_cost_usd`,
+under `spend.by_source['nika:image_generate']` or
+`spend.by_source['nika:tts_generate']`, and keeps it when the call fails
+after its provider billed: a local `task_failed` frame then carries it as
+`cost_usd`. A paid call the table cannot price runs only with no cost cap,
+and counts in `unpriced_calls` (`cost_unpriced: missing_catalog_price`), so
+the run settles `unpriced` or `partially_priced`, never `priced`. Under a
+cap, `maxCostUsd` or the server's ceiling, it is refused before any request.
+A call the workflow writes out refuses the run with `NIKA-1709`: `run()`
+rejects on a local engine, and a server job settles `failed` with that code
+and no `settlement`. A call only the run decides fails its task with
+`NIKA-1704` (see [errors.md](errors.md#troubleshooting)).
 
 ## Pass your app's data: `inputs`
 

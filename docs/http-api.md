@@ -64,7 +64,9 @@ Any other non-2xx body is discarded and reported as a redacted
 - Remote `check()` refuses `model` and `nativeStrict`; remote `run()` refuses
   `model`, `maxCostUsd` and the deprecated `vars`. The server applies its own
   per-run ceiling to manual jobs (`nika serve --run-cost-ceiling`, 1 USD by
-  default).
+  default). From engine 0.124 a job whose paid image or speech call the
+  engine's price table cannot price is still admitted (202), then settles
+  `failed` with `NIKA-1709` before any task runs and with no `settlement`.
 - Remote `run()` sends `inputs` as `JobByName.inputs` only for a served name
   and only when `GET /health` advertises `jobInputs`. That capability, not a
   202, is the negotiation: a resident from before the envelope accepts the

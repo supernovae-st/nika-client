@@ -34,11 +34,18 @@ reads (the
 lists it):
 
 - **More workflows are refused before they run.** A child workflow is judged
-  through the task that calls it, untrusted content is followed through a
-  file a builtin reads (`NIKA-SEC-009`, `NIKA-SEC-014`), a field a harness
-  seat cannot carry blocks `run_ready`, and `temperature` on OpenAI's
-  fixed-sampling models is refused. Run `./node_modules/.bin/nika check` on
-  your workflows before you switch.
+  through the task that calls it, and untrusted content is followed through
+  a file a builtin reads (`NIKA-SEC-009`, `NIKA-SEC-014`). A gate inside the
+  child does not clear its caller: give the parent a blocking `nika:prompt`
+  of its own before the call, and bind a confirm gate's answer on a call
+  whose child acts (`with: { go: "${{ tasks.ask.output }}" }` and
+  `when: ${{ with.go == true }}`). On an `infer:` seated over ACP
+  (`run.access.protocol: acp`), `temperature`, `max_tokens`, an enabled
+  `thinking` budget or a `vision:` URL blocks `run_ready`; a seat route
+  without ACP does not send them, and check does not flag them.
+  `temperature` on `openai/gpt-5`, `gpt-5-mini`, `gpt-5-nano` and the
+  o-series is refused. Run `./node_modules/.bin/nika check` on your
+  workflows before you switch.
 - **A failed harness turn fails its task** (`NIKA-1804`, `NIKA-1805`) where
   0.123 settled it `succeeded` with the error text as its output.
 - **A refused `vars` pair names its code** (`unknown_input`,
@@ -48,11 +55,26 @@ lists it):
   itself.
 - **The keyless system voice is unpriced local work**: a run whose only spend
   it is settles `unpriced`.
-<!-- TODO(0.124.0): re-check these two items against supernovae-st/nika#1846 (C-D3) and supernovae-st/nika-spec#400 with its engine PR (V-1) once they merge. -->
-- **Under a cost cap, a paid media call the catalog cannot price is refused**
-  (`NIKA-1709`) before any request.
-- **A `vision:` file is a read**: it needs a `permits:` block whose `fs.read`
-  admits it (`NIKA-AUTH-006`, `NIKA-SEC-004`).
+- **Under a cost cap, paid media is priced or refused.** The engine bills
+  image and speech calls from a dated price table against `maxCostUsd`, a
+  project `ceiling:`, a server's `--run-cost-ceiling` or a schedule's
+  `maxCostUsd`, as it already did xAI images: OpenAI `gpt-image-2`,
+  `gpt-image-2.5-sunburst` and `gpt-image-2.5-flare` (these two from the
+  usage they report), five Gemini image models, OpenAI `tts-1` and
+  `tts-1-hd`, and nine ElevenLabs models. Any other paid media call is
+  refused before any request (`NIKA-1709`, or `NIKA-1704` when only the run
+  decides it), OpenAI's default voice `gpt-4o-mini-tts`, `gpt-image-1.5` and
+  `gpt-image-1-mini` included, so a beat on one of them reads `UNREADY` at
+  `nika arm`. Move speech to `tts-1`, `tts-1-hd`, a priced ElevenLabs model
+  or the keyless `provider: system` voice, and images to `gpt-image-2` or a
+  2.5 model.
+<!-- TODO(0.124.0 V-1 merge): re-check this item against the merged supernovae-st/nika#1851 (written from its head dfe29896b), or drop it if the change did not land. -->
+- **A `vision:` file is a read.** Grant each file in `permits.fs.read`: with
+  no `permits:` block it is refused (`NIKA-AUTH-006`); outside the grant, or
+  under a block that grants no read at all, a computed path included, it is
+  refused too (`NIKA-SEC-004`). `./node_modules/.bin/nika check
+  --infer-permits <file>` prints the block for a literal path. A secret in a
+  vision entry now needs `egress: [{ to: "infer" }]`.
 
 ## Steps
 

@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "engine": "nika 0.124.0 (866ed914b)",
-  "package": "supernovae-st-nika-0.124.0.tgz",
-  "package_sha256": "39f5e19da976f4c7cfc100d4fa51ad7ffea6c34b7bac83679739e4dcdf6eff7c",
+  "engine": "nika 0.124.1 (bec4f5271)",
+  "package": "supernovae-st-nika-0.124.1.tgz",
+  "package_sha256": "091183996d2ef784924ed4fa94a490ea2933e9fae7c1652082ac273cb7bfc545",
   "install_mode": "npm pack + isolated npm install --omit=optional + explicit NIKA_BIN",
   "projects": [
     {
@@ -112,7 +112,7 @@
         "verdict": "sealed",
         "reason": "sealed",
         "verified": true,
-        "trace_id": "01a17f5beffa70bea7268a7a5ab15762"
+        "trace_id": "01a18218c76b73e39c679308480f56bf"
       },
       "mismatched_trace_rejected": true,
       "deterministic_cost_cap_usd": 0,

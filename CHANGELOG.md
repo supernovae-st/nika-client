@@ -7,6 +7,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.124.1] - 2026-10-28
+
+### Added
+
+- `NikaCheckVerdicts.network_tasks`: the tasks of a local check whose own
+  effects can still reach the network, sorted: a fetch or webhook to a real
+  host, an MCP tool, a paid media call (engine 0.124.1, nika#1856). A local
+  report from engine 0.124.1 always carries it, `[]` when no task can;
+  0.124.0 wrote no such key. `access_ready` judges the model routes only,
+  and a `mock/echo` rehearsal stubs the model, never these tasks: the
+  report's PERMITS row judges them. A server's check answers a compact
+  acknowledgement, not this report, and carries none.
+
+### Changed
+
+- **Release train 0.124.1, in lockstep with engine `v0.124.1`**, the first
+  maintenance release of the 0.124 line. The machine protocol stays 2.
+  `package.json` is 0.124.1 and `sync:native-versions` moved the four native
+  payload manifests, the `optionalDependencies` and the lockfile with it.
+  `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name the commit engine tag
+  `v0.124.1` names (`nika 0.124.1 (bec4f5271)`), and the committed gauntlet
+  ledgers were replayed against that verified public binary, with the same
+  behavioral verdicts as on 0.124.0: the 100 corpus output hashes are
+  unchanged.
+- The pinned `openapi.json` and `src/generated/openapi.d.ts` are the served
+  document of the released engine 0.124.1. It differs from 0.124.0's in
+  `info.version` only, and the types generated from it are unchanged: no
+  route, schema or closed set moved.
+- **What engine 0.124.1 changes in the data an app reads.** The machine
+  protocol stays 2, no `nika serve` route, schema or closed set changes, and
+  the package reads every change below without new code:
+  - A local check no longer calls a `mock/echo` rehearsal network-free. Its
+    ACCESS row read `mock · never dials · nothing to judge`; it now reads
+    `this model route never dials` and names under it the tasks that can
+    still reach the network (three, then `+N more`), and the layers line of
+    a file with no `infer:` or `agent:` task reads
+    `access ready n/a · no model route` where it read
+    `access ready n/a · nothing dials`. `check()` lists every such task in
+    `verdicts.network_tasks` (above). Measured on the released binaries: a
+    `mock/echo` file whose `grab` task calls `nika:fetch` on
+    `api.github.com` reports `network_tasks: ['grab']`, and a file whose only
+    task calls `nika:tts_generate` reports that task.
+  - On a seat's direct one-shot (`codex exec`, `claude -p`, Grok Build,
+    GitHub Copilot CLI: a seat route without `run.access.protocol: acp`), an
+    `infer:` task with `vision:` files is refused with `NIKA-432` before the
+    seat starts, where engine 0.124.0 ran it without its images: that
+    command carries the prompt, system and model, never an image. A local
+    `check()` blocks `run_ready` on it with a `seat · …` entry in
+    `verdicts.blockers` that names `NIKA-432` and the way out:
+    `run.access: { via: <seat>, protocol: acp }` where that seat's ACP
+    one-shot carries the files and the rest of the task, otherwise an API
+    route. `temperature`, `max_tokens` and `thinking` are still neither sent
+    nor refused there.
+  - A finding's `span` in a file saved with a UTF-8 byte-order mark counts
+    the mark (nika#1608): engine 0.124.0 indexed the text after it, so a
+    range fell three bytes short of the file. A file without a mark is
+    unchanged.
+  - A server's artifact manifest lists each file a `for_each` fan-out saved
+    (`nika:chart` called once per item, for example), one entry per item with
+    its journaled size and digest, once every item settled ok; engine
+    0.124.0 listed none of them. A fan-out with a recovered or failed item
+    still lists none.
+  - The command line the package installs (`./node_modules/.bin/nika`)
+    also changes where the package calls nothing: `nika explain` answers
+    `NIKA-MCP-003` to `NIKA-MCP-006` and leads `NIKA-PARSE-001` with the
+    causes its refusal names, and the audited line of `nika check` adds the
+    paid media calls and the least they cost
+    (`est out ≤$0.0000 + 1 paid media call from $0.0001` for one `tts-1`
+    call), while a check report's `cost` keeps its shape. What changes in
+    `nika run --dry-run` and `nika arm` is in the engine's
+    [0.124.1 release notes](https://github.com/supernovae-st/nika/releases/tag/v0.124.1).
+- `test/engine-live.test.ts` (run with `NIKA_BIN`) checks a `mock/echo`
+  rehearsal whose `nika:fetch` reaches a real host and a two-item
+  `nika:chart` fan-out on a server. Both pass on the released 0.124.1 and
+  fail on 0.124.0.
+
+### Documentation
+
+- The README, `docs/upgrading-to-0.123.md`, `docs/compile.md` and
+  `docs/migrating-to-0.116.md` name 0.124.1 as the engine this package
+  bundles: the upgrade steps install 0.124.1 and print
+  `nika 0.124.1 (bec4f5271)`, the engine history adds 0.124.1 (machine
+  protocol 2, the compile code of 0.124.0, a served document that differs
+  only by its version), and the upgrade page links the engine's 0.124.1
+  release notes. The README's `nika check` excerpt was measured again on the
+  released 0.124.1: its ACCESS row now reads `this model route never dials`,
+  the ten other lines it shows are unchanged, and a sentence under it says
+  what a `mock/echo` rehearsal still reaches. The recordings stay the ones
+  made from the published 0.124.0, the same release line; each caption keeps
+  naming the version it was recorded on.
+- `docs/runs.md`, `docs/server.md`, `docs/errors.md` and the upgrade page
+  describe the engine 0.124.1 changes above: `verdicts.network_tasks`, the
+  byte-order mark in a `span`, the direct-seat `vision:` refusal in the
+  troubleshooting table, and the fan-out files a manifest lists.
+
 ## [0.124.0] - 2026-10-28
 
 ### Added

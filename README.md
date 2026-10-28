@@ -143,14 +143,14 @@ no network.
 `nika check` is the static audit that runs before any model is called: what
 the workflow will do, which models and tools it uses, what it may touch and
 what it can cost. An excerpt of its report for the file above, on engine
-0.124.0:
+0.124.1:
 
 ```text
 nika check · hello.nika
  ✔ PLAN     1 wave · 1 task · max parallelism 1
       wave 1 greeting (infer · mock/echo)
  ✔ MODELS   1 model resolves in this binary · this machine's paths on the ACCESS line
- ✔ ACCESS   mock/echo → mock (mock · local · observed) · mock · never dials · nothing to judge
+ ✔ ACCESS   mock/echo → mock (mock · local · observed) · mock · this model route never dials
  ✔ COST     $0.0000 – $0.0000 worst-case output ceiling · prompts, exec + mcp unpriced · prices 2026-10-12
  …
  ✔ PERMITS  literal + const: args fit the boundary · computed programs, paths + symlinks are the RUN's verdict
@@ -159,6 +159,11 @@ nika check · hello.nika
  ✔ audited · 1 task · 1 wave · permits {} · est out ≤$0.0000 · 0 hints · risk low
  layers · valid ✔ · access ready ✔ · capacity fit ✔ · run ready ✔
 ```
+
+`mock/echo` stands in for the model only. A task's own fetch, MCP tool or
+paid media call still reaches the network in a rehearsal, so from engine
+0.124.1 the ACCESS row names such tasks under its line, and `check()` lists
+them in `verdicts.network_tasks` (this file has none).
 
 ▶ [Watch compile, check, run and verify on the command line](https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/full-loop.optimized.gif):
 the same loop your code drives, all four commands captured from the real
@@ -628,8 +633,8 @@ The `package.json` subpath is exported for CommonJS, ESM build tools and CI
 pin checks. It reports the installed package, not a moving registry tag.
 
 **Package and engine move together.** Each package version bundles the engine
-with the same number, the one it was tested with: 0.124.0 bundles
-`nika 0.124.0 (866ed914b)` and speaks its machine protocol, 2, as 0.123 did.
+with the same number, the one it was tested with: 0.124.1 bundles
+`nika 0.124.1 (bec4f5271)` and speaks its machine protocol, 2, as 0.123 did.
 It refuses an engine or server on another generation (0.122 and older speak 1)
 at its identity probe (`nika --sdk-identity`, `GET /health`), before any job,
 with `NikaCompatibilityError`: upgrade the package and every `nika serve`

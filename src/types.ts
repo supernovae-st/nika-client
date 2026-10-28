@@ -135,6 +135,13 @@ export interface NikaCheckVerdicts {
   run_ready?: boolean;
   /** What stands in the way, in the engine's words. */
   blockers?: string[];
+  /**
+   * The tasks whose own effects can still reach the network, sorted: a fetch
+   * or webhook to a real host, an MCP tool, a paid media call (engine 0.124.1
+   * and later). `access_ready` judges model routes only; the report's PERMITS
+   * row judges these, and a `mock/echo` rehearsal stubs none of them.
+   */
+  network_tasks?: string[];
   [key: string]: unknown;
 }
 
@@ -676,7 +683,8 @@ export interface NikaArtifact {
   name: string;
   /**
    * `file`: a file a builtin saved (`nika:chart`, `nika:image_generate`,
-   * `nika:tts_generate`, `nika:image_fx`, `nika:image_compose`), or the file
+   * `nika:tts_generate`, `nika:image_fx`, `nika:image_compose`; from engine
+   * 0.124.1 each item's file of a `for_each` fan-out too), or the file
    * the engine wrote from an agent's image under `images: { save: }` (engine
    * 0.124: the same bytes as that image's `agent_image` entry).
    * `agent_image`: an image an agent's harness sent, kept by the server.
@@ -1033,7 +1041,9 @@ export interface NikaCheckFinding {
   /**
    * The part of the workflow file the finding names, when it names one: byte
    * offsets into the file, `start` inclusive and `end` exclusive. From engine
-   * 0.124 a parse refusal in a local check report carries one too.
+   * 0.124 a parse refusal in a local check report carries one too. From
+   * 0.124.1 the offsets count a leading byte-order mark; 0.124.0 counted
+   * from the byte after it.
    */
   span?: NikaSourceSpan;
   [key: string]: unknown;

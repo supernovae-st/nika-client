@@ -62,8 +62,11 @@ Each finding keeps the engine's fields (`NikaCheckFinding`): `code`,
 `message`, `severity`, `gate`, `kind`, `task`, `docs_url`, and `span`, the
 byte range of the workflow file it names (`start` inclusive, `end`
 exclusive), so an editor can underline it. From engine 0.124 a parse refusal
-in a local report carries a `span` too. A local check of a workflow that calls
-a child workflow (`invoke: { workflow: ./child.nika }`) reads the children,
+in a local report carries a `span` too, and from 0.124.1 the range indexes
+the file as saved, a leading byte-order mark included (0.124.0 indexed it
+from the byte after the mark, three bytes short). A local check of a
+workflow that calls a child workflow (`invoke: { workflow: ./child.nika }`)
+reads the children,
 and engine 0.124 judges each call as the tasks the child stands for: a
 lethal trifecta (`NIKA-SEC-009`) or a confirm gate that does not stop an
 effect (`NIKA-SEC-014`) is refused through a child as it is inline. The
@@ -71,6 +74,15 @@ report lists those calls in `composed_calls`, which rides untyped. From
 engine 0.124 a local report also lists each paid image or speech call in
 `cost.media`, untyped too: its provider, and its model, its floor, the rate
 that sets it and the price table's date when they are known.
+
+`verdicts.access_ready` judges the model routes only. From engine 0.124.1 a
+local report's `verdicts.network_tasks` lists, sorted, the tasks whose own
+effects can still reach the network: a fetch or webhook to a real host, an
+MCP tool, a paid media call. A `mock/echo` rehearsal stubs the model, never
+these tasks, and the report's PERMITS row judges them. For a `mock/echo` file
+whose `grab` task calls `nika:fetch` on `api.github.com`, `network_tasks` is
+`['grab']`; the ACCESS row reads `this model route never dials` and names
+`grab` under it, where engine 0.124.0 printed `never dials · nothing to judge`.
 
 The same audit, for humans, is `./node_modules/.bin/nika check hello.nika`.
 
@@ -448,7 +460,8 @@ From engine 0.124, an `agent:` task that declares
 `images: { save: ./out/banner.png }` has the engine write the image its
 harness sent to that path, and the manifest lists that file
 (`file/out/banner.png`) beside the image itself (`agent_image/1.png`),
-the same bytes under two names.
+the same bytes under two names. From engine 0.124.1 it also lists each file
+a `for_each` fan-out saved, one entry per item, once every item settled ok.
 
 Neither `machineBufferBytes` nor `requestTimeout` bounds a download. A local
 run has no artifact manifest: its files are where its workflow wrote them, in
@@ -590,5 +603,5 @@ for await (const e of run.events()) {
 
 **How long they stay.** The wrappers shipped unchanged next to the Run-owned
 lifecycle from 0.120.0, the first version published to npm with it, and they
-are still here in 0.124.0. If a later version removes them, its release notes
+are still here in 0.124.1. If a later version removes them, its release notes
 say so.

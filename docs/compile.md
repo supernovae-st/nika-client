@@ -441,17 +441,19 @@ with `compileTrialInputs`, and `nika serve --decision-model` with
 protocol, and a default served document that differs from 0.123.0's only by
 its version. 0.123.2 keeps machine protocol 2; its served document adds the
 two artifact routes and declares answers 0.123.1 already sent, and its compile
-door is unchanged. 0.124.0, the engine this package version bundles, keeps
-machine protocol 2 and the compile door of 0.123.2: its compile code is
-unchanged, and its served document differs from 0.123.2's only by its version
-and the artifacts route's description. This package refuses an engine on
+door is unchanged. 0.124.0 keeps machine protocol 2 and the compile door of
+0.123.2: its compile code is unchanged, and its served document differs from
+0.123.2's only by its version and the artifacts route's description. 0.124.1,
+the engine this package version bundles, is a maintenance release of that
+line: the same machine protocol and compile code, and a served document that
+differs from 0.124.0's only by its version. This package refuses an engine on
 protocol 1 at its identity. An engine without a flag
 answers with a usage error; a server without a field answers
 `422 malformed_compile_request`. Point `NIKA_BIN` (or `bin`) at the engine you
 mean to use.
 
 The pinned `openapi.json` and `src/generated/openapi.d.ts` are the default
-document of the released engine 0.124.0 resident, regenerated from the
+document of the released engine 0.124.1 resident, regenerated from the
 released `nika serve`. The generation-2 types are written by hand from the
 engine source at tag `v0.123.0`: `crates/nika-serve/src/server/compile/v2.rs`,
 `author.rs` and `openapi-native.json` (the rounds, the judged answer round

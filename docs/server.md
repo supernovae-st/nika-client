@@ -291,7 +291,11 @@ holds a run key (see below).
   task can declare `images: { save: ./out/banner.png }`: the engine writes
   the image's received bytes there, and the manifest lists that file too
   (`file/out/banner.png`, the received digest) beside `agent_image/1.png`,
-  the same bytes under two names.
+  the same bytes under two names. From engine 0.124.1 a `for_each` fan-out
+  that calls `nika:chart`, or another builtin whose files are listed, once
+  per item has each item's file listed, with its journaled size and digest,
+  once every item settled ok; a fan-out with a recovered or failed item still
+  lists none of its files.
 - **Settled jobs only.** A queued, running or paused job answers 409
   `job_not_settled`: `await run.result()` first. An interrupted job never
   sealed its journal and answers 409 `artifact_journal_unavailable`.

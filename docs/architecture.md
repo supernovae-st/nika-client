@@ -147,7 +147,7 @@ Some operations deliberately have one authority:
    `NikaRunOwnershipError`. `nika.events(run)` keeps yielding the protocol
    vocabulary unchanged. The wrappers shipped unchanged next to the Run-owned
    lifecycle from 0.120.0, the first published version that carries it, and
-   are still here in 0.124.0; a later version that removes them says so in
+   are still here in 0.124.1; a later version that removes them says so in
    its release notes.
 9. An interrupted observation is a typed transport error carrying its cursor
    (`NikaObservationInterrupted`), never an engine failure: the run may still

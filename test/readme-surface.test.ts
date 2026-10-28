@@ -126,6 +126,23 @@ describe('packed public documentation', () => {
     expect(readme).toContain('`installer: npm-payload`');
   });
 
+  it('teaches the data engine 0.124.1 changes for an app', () => {
+    const upgrading = page('upgrading-to-0.123.md');
+    // nika#1856: a mock rehearsal stubs the model only. The README excerpt is
+    // the 0.124.1 report, and the pages name the tasks that still dial.
+    expect(readme).toContain('mock · this model route never dials');
+    expect(readme).not.toContain('never dials · nothing to judge');
+    for (const surface of [readme, runs, upgrading]) expect(surface).toContain('verdicts.network_tasks');
+    // A direct seat refuses `vision:` instead of running the task without the images.
+    for (const surface of [errors, upgrading]) {
+      expect(surface).toContain('`NIKA-432`');
+      expect(surface).toMatch(/from (?:engine )?0\.124\.1[^|]*`vision:`/);
+    }
+    // A fan-out's files are listed, and a span counts a byte-order mark.
+    for (const surface of [runs, server]) expect(surface).toContain('`for_each` fan-out');
+    expect(runs).toContain('byte-order mark');
+  });
+
   it('teaches paid media under a cost cap as engine 0.124 merged it', () => {
     // nika#1846 (engine main 89606a28d): what stays unpriced is refused under
     // any cap, and the ways out are named.

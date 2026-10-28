@@ -21,7 +21,8 @@ import { MACHINE_PROTOCOL_VERSION } from '../src/lib/engine-identity.js';
 // The SDK against a real engine, end to end: the public API on both doors,
 // driving the binary `NIKA_BIN` names (the SDK's own override), and a
 // `nika serve --bind` this file starts from the same binary. Skipped without
-// `NIKA_BIN`. Written for engine 0.123 (machine protocol 2): run it as
+// `NIKA_BIN`. Written for engine 0.123 (machine protocol 2); the network-task
+// and fan-out cases read what engine 0.124.1 adds. Run it as
 //
 //   NIKA_BIN=/absolute/path/to/nika npx vitest run test/engine-live.test.ts
 //
@@ -95,6 +96,44 @@ const WORKFLOWS: Record<string, string> = {
     '        data: [{ region: "north", total: 10 }, { region: "south", total: 4 }]',
     '        chart: { type: bar, x: region, y: total }',
     '        out: "./out/totals.svg"',
+    '',
+  ].join('\n'),
+  // One `nika:chart` call per item: a `for_each` fan-out that saves two SVGs.
+  'fan.nika': [
+    'nika: fan',
+    'permits:',
+    '  fs: { write: ["./out/**"] }',
+    '  tools: ["nika:chart"]',
+    'tasks:',
+    '  draw:',
+    '    for_each: { items: [a, b] }',
+    '    invoke:',
+    '      tool: "nika:chart"',
+    '      args:',
+    '        data: [{ region: "north", total: 10 }, { region: "south", total: 4 }]',
+    '        chart: { type: bar, x: region, y: total }',
+    '        out: "./out/fan-${{ item }}.svg"',
+    '',
+  ].join('\n'),
+  // A `mock/echo` rehearsal whose `grab` task calls `nika:fetch` on a real
+  // host. It is only ever checked here, never run, so nothing dials.
+  'dials.nika': [
+    'nika: dials',
+    'permits:',
+    '  net: { http: ["api.github.com"] }',
+    '  tools: ["nika:fetch"]',
+    'tasks:',
+    '  grab:',
+    '    invoke:',
+    '      tool: "nika:fetch"',
+    '      args: { url: "https://api.github.com/zen" }',
+    '  say:',
+    '    with:',
+    '      zen: ${{ tasks.grab.output }}',
+    '    infer:',
+    '      model: mock/echo',
+    '      prompt: "Summarize: ${{ with.zen }}"',
+    '      max_tokens: 16',
     '',
   ].join('\n'),
   // Echoes a literal input into its outputs: a result as large as the caller makes it.
@@ -311,6 +350,17 @@ describe.skipIf(!live)('the SDK against a real machine-protocol-2 engine (NIKA_B
       expect(refused.verdicts?.blockers?.[0]).toContain('pin `bogus-seat` refused');
     }, SLOW);
 
+    it('names the tasks a mock rehearsal still reaches the network through', async () => {
+      // Engine 0.124.1: ACCESS READY judges model routes only, and a mock model
+      // stubs no tool. Check names `grab`, whose nika:fetch dials a real host,
+      // without dialing it.
+      const quiet = await local().check('hello.nika');
+      expect(quiet.verdicts).toMatchObject({ access_ready: true, run_ready: true, network_tasks: [] });
+      const dials = await local().check('dials.nika');
+      expect(dials).toMatchObject({ clean: true, exitCode: 0 });
+      expect(dials.verdicts).toMatchObject({ access_ready: true, run_ready: true, network_tasks: ['grab'] });
+    }, SLOW);
+
     it('settles a result above 64 KiB by default, and names the line size past a smaller bound', async () => {
       const result = await (await local().run('big-echo.nika', { inputs: { blob: BLOB } })).result();
       expect(result).toMatchObject({ status: 'succeeded', exitCode: 0 });
@@ -341,7 +391,8 @@ describe.skipIf(!live)('the SDK against a real machine-protocol-2 engine (NIKA_B
     it('admits a served workflow by name and settles it with its receipt', async () => {
       const nika = remote();
       expect(await nika.listWorkflows()).toEqual([
-        'big-echo.nika', 'chart.nika', 'hello.nika', 'long-wait.nika', 'refused.nika', 'wait.nika',
+        'big-echo.nika', 'chart.nika', 'dials.nika', 'fan.nika', 'hello.nika', 'long-wait.nika',
+        'refused.nika', 'wait.nika',
       ]);
       const run = await nika.run('hello.nika', { idempotencyKey: 'live-by-name' });
       const seen = await kinds(run.events());
@@ -535,6 +586,26 @@ describe.skipIf(!live)('the SDK against a real machine-protocol-2 engine (NIKA_B
         name: 'NikaCompatibilityError', capability: 'artifacts', transport: 'native-process',
       });
       await localRun.result();
+    }, SLOW);
+
+    it('lists each file a for_each fan-out saved, one entry per item', async () => {
+      // Engine 0.124.1 reads a fan-out's tool from the task's own journal;
+      // 0.124.0 listed none of its files.
+      const run = await remote().run('fan.nika', { idempotencyKey: 'live-fan-out' });
+      expect(await run.result()).toMatchObject({ status: 'succeeded', transport: 'http' });
+      const { artifacts } = await run.artifacts();
+      expect(artifacts.map((entry) => entry.name).sort()).toEqual(['file/out/fan-a.svg', 'file/out/fan-b.svg']);
+      for (const entry of artifacts) {
+        const written = readFileSync(path.join(project, entry.path!));
+        expect(entry).toMatchObject({
+          kind: 'file',
+          task: 'draw',
+          mime: 'image/svg+xml',
+          size: written.length,
+          sha256: createHash('sha256').update(written).digest('hex'),
+        });
+        expect(Buffer.from(await run.readArtifact(entry)).equals(written)).toBe(true);
+      }
     }, SLOW);
 
     it('serves no artifact from a server without a run key, which seals no journal', async () => {

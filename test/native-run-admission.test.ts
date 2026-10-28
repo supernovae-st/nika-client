@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, expectTypeOf, it } from 'vites
 import { Nika, NikaOperationError, NikaProtocolError, isNikaRunSucceeded } from '../src/index.js';
 import type {
   NikaCheckFinding,
+  NikaCheckVerdicts,
   NikaEvent,
   NikaLocalConfig,
   NikaOperationFinding,
@@ -578,5 +579,7 @@ describe.skipIf(!posix)('native run admission (issue #121)', () => {
     // The source range a finding names: byte offsets, end exclusive.
     expectTypeOf<NikaCheckFinding['span']>().toEqualTypeOf<NikaSourceSpan | undefined>();
     expectTypeOf<NikaSourceSpan>().toEqualTypeOf<{ start: number; end: number }>();
+    // Engine 0.124.1: the tasks whose own effects can still reach the network.
+    expectTypeOf<NikaCheckVerdicts['network_tasks']>().toEqualTypeOf<string[] | undefined>();
   });
 });

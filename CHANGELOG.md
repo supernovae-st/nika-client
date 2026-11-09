@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `readNikaAccessSelection(event)` and `readNikaAccessRequirement(event)`:
+  typed readers of the two rows an `infer:` or `agent:` task's terminal
+  frame carries on a local run. `access_requirement` is the contract the
+  workflow file declares under `run.access` and `run.reasoning`;
+  `access_selection` is the per-call receipt (`nika/access-selection@1`)
+  that keeps apart what the file asked, what the engine sent and what the
+  route read back, for the model and the effort. Both accept an engine frame
+  or the `NikaRunEvent` that wraps it, return `undefined` when the frame
+  carries no such row (a task that called no model, a file that declares no
+  contract, any frame from `nika serve`, which keeps these rows in the
+  sealed journal) and throw `NikaProtocolError` on a row that is present and
+  malformed. New types: `NikaAccessRequirement`, `NikaAccessSelection`,
+  `NikaSelectedValue`, `NikaConfiguredSource`.
+- The service tier of a workflow (`run.access.service_tier`, engine 0.124.2):
+  `NikaServiceTier` (`standard` · `fast`), `NikaServiceTierEvidence` and
+  `NikaAttestedValue`. A selection carries a `service_tier` block only when
+  the file declares a tier: `requested` (the file's word), `offered`,
+  `transmitted` and `configured` (the route's own values, `off` and `on` on
+  codex-acp), and `turn` and `effective`, which read `{ value: null,
+  evidence: 'unknown' }` on an ACP session because no ACP answer names the
+  tier a turn carried or the tier that served it. An absent block means the
+  file asked for none, never `standard`. A file that declares the key needs
+  an engine that lists `accessServiceTier` in `supportedCapabilities`
+  (`nika --sdk-identity`, `/health`): an older engine refuses the key at
+  parse, and a server without the token answers 422 for that file.
+
 ## [0.124.1] - 2026-10-28
 
 ### Added

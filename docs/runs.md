@@ -254,6 +254,69 @@ message). Over HTTP the pin is part of the request bytes an idempotency key
 binds: a retry sends the same pin, and another pin under the same key is an
 `idempotency_conflict`. Measured on engine 0.123.1.
 
+## The file's own access contract: `run.access`
+
+A workflow file can declare its route itself, under `run.access` and
+`run.reasoning`. The package sends nothing for it: the engine reads the file.
+
+```yaml
+run:
+  access:
+    via: codex
+    protocol: acp
+    fallback: none
+    service_tier: fast   # engine 0.124.2 and later
+  reasoning:
+    effort: low
+```
+
+`service_tier` takes the words `standard` and `fast`. Leaving it out is not
+`standard`: the engine then sends no speed selection and the route keeps its
+own tier. Only a route with a measured speed control carries it (the codex
+seat over ACP today); every other route refuses the key before any model call
+(`NIKA-1800` at check and before task 1, `NIKA-1805` when the session refuses
+it). An engine older than 0.124.2 refuses the key at parse.
+
+Before you run a file that declares a tier, require the capability on the door
+you use: `accessServiceTier` in `supportedCapabilities` (`nika
+--sdk-identity` locally, `/health` on a server).
+
+On a local run, each `infer:` or `agent:` task's terminal frame carries what
+the file asked and what the route did. Two readers parse those rows:
+
+```ts
+import { readNikaAccessRequirement, readNikaAccessSelection } from '@supernovae-st/nika';
+
+for await (const event of run.events()) {
+  if (event.kind !== 'task.completed') continue;
+  const asked = readNikaAccessRequirement(event);   // { via, protocol, fallback, service_tier, effort }
+  const selection = readNikaAccessSelection(event); // nika/access-selection@1
+  const tier = selection?.service_tier;
+  if (tier) {
+    console.log(event.task, tier.requested, tier.transmitted, tier.configured, tier.effective.evidence);
+    // render_image fast on on unknown
+  }
+}
+```
+
+The receipt keeps its facts apart, and so should what you show:
+
+| Fact | Where | Meaning |
+|---|---|---|
+| Requested | `service_tier.requested` | the file's word (`standard`, `fast`) |
+| Offered | `service_tier.offered` | the values the route listed for its option when the tier was judged |
+| Transmitted | `service_tier.transmitted` | the route's own value the engine sent (codex-acp: `on`, `off`) |
+| Configured | `service_tier.configured` | the value the route reported after the selection |
+| Carried on the turn | `service_tier.turn` | `{ value: null, evidence: 'unknown' }` on an ACP session |
+| Effective | `service_tier.effective` | `{ value: null, evidence: 'unknown' }` unless a provider reports it |
+
+A configured `on` is not proof that a turn ran on the fast tier: an ACP
+answer names neither the tier it carried nor the one that served it. Both
+readers return `undefined` when the frame carries no such row (a task that
+called no model, a file that declares no contract, or any frame from `nika
+serve`, which keeps these rows in the sealed journal), and throw
+`NikaProtocolError` on a row that is present and malformed.
+
 ## Watch a run: `run.events()`
 
 `run.events()` yields `NikaRunEvent`s: a lifecycle `kind` that means the same

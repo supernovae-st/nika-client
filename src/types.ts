@@ -169,7 +169,12 @@ export interface NikaTaskStartedEvent extends NikaEventFields {
   kind: 'task_started';
 }
 
-/** A task settled. Per-task payloads ride the open fields. */
+/**
+ * A task settled. Per-task payloads ride the open fields. On a native run,
+ * an `infer:` or `agent:` task's frame carries the rows `access_requirement`
+ * and `access_selection`: read them with `readNikaAccessRequirement` and
+ * `readNikaAccessSelection`.
+ */
 export interface NikaTaskCompletedEvent extends NikaEventFields {
   kind: 'task_completed';
 }
@@ -898,6 +903,106 @@ export type NikaAccessPin =
   | 'opencode'
   | 'qwen-code'
   | (string & {});
+
+/**
+ * The words a workflow file can ask of its route under
+ * `run.access.service_tier` (engine 0.124.2 and later). They are the
+ * language's words: a route's own value (`on`, `priority`) is never one.
+ * Known words aid completion without closing the set.
+ */
+export type NikaServiceTier = 'standard' | 'fast' | (string & {});
+
+/**
+ * The access contract a workflow file declares under `run.access` and
+ * `run.reasoning`, as the engine records it: on the opening frame and on the
+ * terminal frame of each `infer:` or `agent:` task (the `access_requirement`
+ * row). A dimension the file does not declare is absent. An absent
+ * `service_tier` is not `standard`: the route keeps its own tier.
+ */
+export interface NikaAccessRequirement {
+  via?: string;
+  protocol?: 'api' | 'acp' | (string & {});
+  fallback?: 'none' | (string & {});
+  service_tier?: NikaServiceTier;
+  effort?: string;
+  [key: string]: unknown;
+}
+
+/** How a value the session read back was learned. Never a response attestation. */
+export type NikaConfiguredSource =
+  | 'session_config'
+  | 'confirmed_selection'
+  | 'accepted_request'
+  | (string & {});
+
+/**
+ * One dimension of a call's access selection (the model or the effort), with
+ * its facts kept apart: what the file asked, the option it travelled through,
+ * the exact value sent, and the value the route reported after the selection.
+ * `null` means not applicable or not observed, never a copied fact.
+ */
+export interface NikaSelectedValue {
+  requested: string | null;
+  option: string | null;
+  transmitted: string | null;
+  configured: string | null;
+  configured_source: NikaConfiguredSource | null;
+  [key: string]: unknown;
+}
+
+/**
+ * A fact only a witness can establish. `evidence` reads `unknown` exactly
+ * when `value` is `null`.
+ */
+export interface NikaAttestedValue {
+  value: string | null;
+  evidence: 'unknown' | (string & {});
+  [key: string]: unknown;
+}
+
+/**
+ * What one call's declared service tier became. Present on a selection only
+ * when the file declared a tier.
+ *
+ * `requested` is the file's word. `offered`, `transmitted` and `configured`
+ * are the route's own values (codex-acp: `off` and `on`). `turn` (the tier
+ * carried on the turn) and `effective` (the tier that served it) read
+ * `unknown` on an ACP session, which names neither: a configured value is
+ * not proof that a turn ran on that tier.
+ */
+export interface NikaServiceTierEvidence {
+  requested: NikaServiceTier | null;
+  option: string | null;
+  offered: string[] | null;
+  transmitted: string | null;
+  configured: string | null;
+  configured_source: NikaConfiguredSource | null;
+  turn: NikaAttestedValue;
+  effective: NikaAttestedValue;
+  [key: string]: unknown;
+}
+
+/**
+ * The access selection receipt of one `infer:` or `agent:` call
+ * (`nika/access-selection@1`), carried as the `access_selection` row of the
+ * task's terminal frame. Read it with `readNikaAccessSelection`.
+ */
+export interface NikaAccessSelection {
+  schema: 'nika/access-selection@1' | (string & {});
+  protocol: 'api' | 'acp' | (string & {}) | null;
+  model: NikaSelectedValue;
+  effort: NikaSelectedValue;
+  responder: {
+    model: string | null;
+    evidence: 'api_response' | 'cli_reported' | 'unknown' | (string & {});
+    [key: string]: unknown;
+  };
+  /** Only when the file declared `run.access.service_tier`. */
+  service_tier?: NikaServiceTierEvidence;
+  /** What the route moved during the turn (`model=<v>`, `effort=<v>`, `service_tier=<v>`). */
+  changed_mid_turn?: string[];
+  [key: string]: unknown;
+}
 
 export interface NikaCheckOptions {
   model?: string;

@@ -461,6 +461,7 @@ not see the keys you export in your shell, so pass them with
 | `run` | yes; `model` and `maxCostUsd` allowed | yes; `idempotencyKey` required; `model` and `maxCostUsd` refused |
 | `run` `access` | `--access=<pin>`; a pin the engine refuses settles the run `failed`, cause `refused` | by served name (`JobByName.access`); a pin the execution refuses settles the job `failed`; an empty pin refused at admission (422); a snapshot refuses it |
 | `run` `inputs` | literal JSON over stdin; the engine must advertise `inputsLiteral` | literal JSON by served name; the server must advertise `jobInputs`; a snapshot refuses them |
+| A file that declares `run.access.service_tier` | the engine must advertise `accessServiceTier`; the task frames carry `access_requirement` and `access_selection` (`readNikaAccessSelection`) | the server must advertise `accessServiceTier`, or it answers 422 for that file; the tier is a field of the file, never of the request; the per-call receipt stays in the sealed journal and no frame carries it |
 | `run` `vars` (deprecated) | the `--var` operator channel, unchanged | refused |
 | `attachRun` | refused: a local run belongs to its process | reattaches to a durable job, from an optional event cursor |
 | `run.status()` | refused; await `run.result()` | the durable status |

@@ -40,6 +40,93 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/access-offers/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the sessions of a workflow's declared ACP route offer now
+         * @description Reads, without a prompt, what the sessions of the served workflow's own `run.access` route list for its models: the models, the reasoning efforts and the service tiers. The route and the models are the file's: a request names a served workflow and nothing else. Each session is opened as a run opens it and ended before any prompt. A row is an observation with a time, kept 60 s (15 s when unavailable) and served again meanwhile; one reading runs at a time. An offer authorizes nothing: POST /v1/jobs still selects, reads back and refuses on its own session. `{name}` is sent as for GET /v1/workflows/{name}. Advertised by `accessSessionOffer` on /health; an engine without the token answers 404.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description The served name, `/` separators sent literally (it spans several path segments) */
+                    name: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The offer document, also when the file selects no ACP sessions (status not_applicable) or a session gave no offer (a row with status unavailable) */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AccessOffer"];
+                    };
+                };
+                /** @description Error envelope */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Error envelope */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Error envelope */
+                408: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Error envelope */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+                /** @description Error envelope */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/check": {
         parameters: {
             query?: never;
@@ -1209,6 +1296,104 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AccessOffer: {
+            /** @description The file's `run.access` and `run.reasoning.effort` as the engine reads them (the `access_requirement` receipt's keys); absent when the file declares neither */
+            declared?: {
+                effort?: string;
+                /** @enum {string} */
+                fallback?: "none";
+                /** @enum {string} */
+                protocol?: "api" | "acp";
+                /** @enum {string} */
+                service_tier?: "standard" | "fast";
+                via?: string;
+            };
+            /**
+             * @description This door holds no prompt: a session is opened, asked what it lists and ended
+             * @constant
+             */
+            prompts_sent: 0;
+            /** @description Present with not_applicable */
+            reason?: string;
+            /** @description One row per session shape the workflow's tasks run in and per model they resolve to: completion rows first, then agent rows */
+            routes: components["schemas"]["AccessOfferRoute"][];
+            /** @description Sessions the workflow names beyond the eight one request reads */
+            routes_omitted: number;
+            /** @constant */
+            schema: "nika/access-offer@1";
+            /**
+             * @description read: the routes below were asked. not_applicable: the file selects no ACP sessions (no `run.access.via` under `run.access.protocol: acp`, or no `infer:`/`agent:` task with a static model); no session was opened and `reason` says why
+             * @enum {string}
+             */
+            status: "read" | "not_applicable";
+            workflow: string;
+        };
+        AccessOfferListing: {
+            /** @description The value the session holds now: what a run that declares none keeps on a session like this one */
+            current?: string;
+            /** @description The values, in the session's order. A run accepts a declared value only when it equals one of them exactly */
+            offered?: string[];
+            omitted?: number;
+            /** @description The session option's own id */
+            option?: string;
+            reason?: string;
+            /**
+             * @description offered: the session lists the option for the model. not_offered: it lists none. unobserved: not read, and `reason` says why (the model does not hold, the option is ambiguous or in another form, or no speed control is measured for this adapter release)
+             * @enum {string}
+             */
+            status: "offered" | "not_offered" | "unobserved";
+        };
+        AccessOfferRoute: {
+            /** @description The adapter's own report on `initialize`; a value that is not a short graphic-ASCII token is absent */
+            adapter?: {
+                name?: string;
+                version?: string;
+            };
+            /** @description With unavailable: NIKA-1803 (adapter absent, silent or outside its pin), NIKA-1804 (session death) or NIKA-1805 (refused) */
+            code?: string;
+            effort?: components["schemas"]["AccessOfferListing"];
+            /** Format: date-time */
+            fresh_until: string;
+            model: {
+                /** @description The native id the session holds (confirmed, legacy_list), its own model (session_default) or the one it answered instead (not_confirmed) */
+                current?: string;
+                /** @description The model values the session lists, in its order */
+                offered?: string[];
+                /** @description Listed values not carried: beyond 64, or not a token */
+                omitted?: number;
+                /** @description The model as the file names it */
+                requested: string;
+                /**
+                 * @description confirmed: listed, selected for this session only and read back. session_default: the file names `default`. legacy_list: only the session's legacy model list names it, which answers no configuration. not_offered: the session does not list it. not_confirmed: listed, and the session answered another model. Efforts and tiers are read only under confirmed and session_default
+                 * @enum {string}
+                 */
+                status?: "confirmed" | "session_default" | "legacy_list" | "not_offered" | "not_confirmed";
+            };
+            /**
+             * Format: date-time
+             * @description When this row was read. A row is served again until `fresh_until` (60 s after an observed reading, 15 s after an unavailable one)
+             */
+            observed_at: string;
+            /**
+             * @description completion: the route's one-shot completion profile, which `infer:` tasks run under. agent: its agent session, which `agent:` tasks run in
+             * @enum {string}
+             */
+            profile: "completion" | "agent";
+            /** @constant */
+            protocol: "acp";
+            /** @description With unavailable: the engine's sentence, no path in it */
+            reason?: string;
+            service_tier?: components["schemas"]["AccessOfferListing"];
+            /**
+             * @description observed: the session answered. unavailable: it gave no offer; `code` and `reason` say why, as a run on the route would meet it before its prompt
+             * @enum {string}
+             */
+            status: "observed" | "unavailable";
+            /** @description The tasks that resolve to this model in this shape */
+            tasks: string[];
+            /** @description The file's `run.access.via` */
+            via: string;
+        };
         Artifact: {
             /**
              * Format: uuid

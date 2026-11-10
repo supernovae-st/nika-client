@@ -5,11 +5,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { verifyReleaseEvidence } from '../scripts/verify-release-evidence.mjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
-const VERSION = '0.124.2';
-// The engine the 0.124.2 ledgers record: the public v0.124.2 binary's
-// `nika --version`, the commit tag v0.124.2 names.
-const ENGINE = 'nika 0.124.2 (47f277883)';
-const PACKAGE = 'supernovae-st-nika-0.124.2.tgz';
+const VERSION = '0.124.3';
+// The engine the 0.124.3 ledgers record: the public v0.124.3 binary's
+// `nika --version`, the commit tag v0.124.3 names.
+const ENGINE = 'nika 0.124.3 (7cc1384b5)';
+const PACKAGE = 'supernovae-st-nika-0.124.3.tgz';
 const currentEvidence = [
   'gauntlet/projects-depth/results.json',
   'gauntlet/results/hostile.json',

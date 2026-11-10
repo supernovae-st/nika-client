@@ -156,7 +156,7 @@ describe('packed public documentation', () => {
     expect(runs).toContain("| Carried on the turn | `service_tier.turn` | `{ value: null, evidence: 'unknown' }` on an ACP session |");
     expect(upgrading).toContain('**A file can ask its route for a service tier** (0.124.2)');
     // The package names the engine it bundles.
-    expect(readme).toContain('0.124.2 bundles\n`nika 0.124.2 (47f277883)`');
+    expect(readme).toContain('0.124.3 bundles\n`nika 0.124.3 (7cc1384b5)`');
   });
 
   it('teaches the access offer engine 0.124.3 adds to a server', () => {
@@ -168,7 +168,8 @@ describe('packed public documentation', () => {
     expect(server).toContain('`prompts_sent` is always `0`');
     expect(server).toContain('never read from another model');
     expect(server).toContain('An offer authorizes nothing.');
-    for (const surface of [api, server]) expect(surface).toContain('accessSessionOffer');
+    for (const surface of [api, server, page('upgrading-to-0.123.md')]) expect(surface).toContain('accessSessionOffer');
+    expect(page('upgrading-to-0.123.md')).toContain("**A server can be asked what a file's route offers** (0.124.3)");
   });
 
   it('teaches paid media under a cost cap as engine 0.124 merged it', () => {

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.124.2] - 2026-11-10
+
 ### Added
 
 - `readNikaAccessSelection(event)` and `readNikaAccessRequirement(event)`:
@@ -34,6 +36,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an engine that lists `accessServiceTier` in `supportedCapabilities`
   (`nika --sdk-identity`, `/health`): an older engine refuses the key at
   parse, and a server without the token answers 422 for that file.
+
+### Changed
+
+- **Release train 0.124.2, in lockstep with engine `v0.124.2`.** The machine
+  protocol stays 2. `package.json` is 0.124.2 and `sync:native-versions` moved
+  the four native payload manifests, the `optionalDependencies` and the
+  lockfile with it. `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name the commit
+  engine tag `v0.124.2` names (`nika 0.124.2 (47f277883)`), and the committed
+  gauntlet ledgers were replayed against that verified public binary, with
+  the same behavioral verdicts as on 0.124.1: the 100 corpus output hashes
+  are unchanged.
+- The pinned `openapi.json` and `src/generated/openapi.d.ts` are the served
+  document of the released engine 0.124.2. It differs from 0.124.1's in
+  `info.version` only, and the types generated from it are unchanged: no
+  route, schema or closed set moved. The service tier is a field of the
+  workflow file, so no request gains a field, and the engine's identity
+  lists one more capability, `accessServiceTier`.
+- `test/engine-live.test.ts` (run with `NIKA_BIN`) passes unchanged on the
+  released 0.124.2.
+
+### Documentation
+
+- The README, `docs/upgrading-to-0.123.md`, `docs/compile.md` and
+  `docs/migrating-to-0.116.md` name 0.124.2 as the engine this package
+  bundles: the upgrade steps install 0.124.2 and print
+  `nika 0.124.2 (47f277883)`, the engine history adds 0.124.2 (machine
+  protocol 2, the compile code of 0.124.1, a served document that differs
+  only by its version), and the upgrade page links the engine's 0.124.2
+  release notes and lists the service tier among the changes an app reads.
+  The README's `nika check` excerpt was measured again on the released
+  0.124.2: every line it shows is unchanged.
+- `CLAUDE.md` is a thin entry that makes Claude Code load `AGENTS.md`, the
+  repository's agent instructions.
 
 ## [0.124.1] - 2026-10-28
 
@@ -1494,7 +1529,9 @@ Initial public release. Full rewrite from v0.1.0.
 - Error hierarchy completely redesigned
 - License changed from MIT to AGPL-3.0-or-later
 
-[Unreleased]: https://github.com/supernovae-st/nika-client/compare/v0.124.0...HEAD
+[Unreleased]: https://github.com/supernovae-st/nika-client/compare/v0.124.2...HEAD
+[0.124.2]: https://github.com/supernovae-st/nika-client/compare/v0.124.1...v0.124.2
+[0.124.1]: https://github.com/supernovae-st/nika-client/compare/v0.124.0...v0.124.1
 [0.124.0]: https://github.com/supernovae-st/nika-client/compare/v0.123.2...v0.124.0
 [0.123.2]: https://github.com/supernovae-st/nika-client/compare/v0.123.1...v0.123.2
 [0.123.1]: https://github.com/supernovae-st/nika-client/compare/v0.123.0...v0.123.1

@@ -34,6 +34,8 @@ import type {
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
   NikaTransportKind,
+  NikaAccessOffer,
+  NikaAccessOfferOptions,
   NikaWorkflowMetadata,
 } from './types.js';
 
@@ -202,6 +204,19 @@ export class Nika {
   /** Read path-free metadata for one contained workflow. */
   workflow(name: string): Promise<NikaWorkflowMetadata> {
     return this.transport.workflow(workflowName(name));
+  }
+
+  /**
+   * Ask a `nika serve` what the sessions of a served workflow's own declared
+   * ACP route offer now: the models, the reasoning efforts and the service
+   * tiers, read without a prompt. The route and the models are the file's; a
+   * workflow that declares no ACP route answers `status: 'not_applicable'` and
+   * opens no session. The answer is an observation with a time and authorizes
+   * nothing: a run still selects, reads back and refuses on its own session.
+   * Needs a server that lists `accessSessionOffer` (engine 0.124.3).
+   */
+  accessOffer(workflow: string, options: NikaAccessOfferOptions = {}): Promise<NikaAccessOffer> {
+    return this.transport.accessOffer(workflowName(workflow), options);
   }
 
   /**
@@ -391,6 +406,10 @@ export {
 
 export type {
   NikaAccessPin,
+  NikaAccessOffer,
+  NikaAccessOfferListing,
+  NikaAccessOfferOptions,
+  NikaAccessOfferRoute,
   NikaAccessRequirement,
   NikaAccessSelection,
   NikaArtifact,

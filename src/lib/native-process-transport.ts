@@ -26,6 +26,8 @@ import type {
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
   NikaTransportKind,
+  NikaAccessOffer,
+  NikaAccessOfferOptions,
   NikaWorkflowMetadata,
   NikaSettlement,
 } from '../types.js';
@@ -49,6 +51,7 @@ import {
   removeCompileScratch,
 } from './compile.js';
 import { accessFlag, accessPin } from './access.js';
+import { ACCESS_OFFER_CAPABILITY } from './access-offer.js';
 import { captureEngine } from './engine-capture.js';
 import {
   verifyNikaEngine,
@@ -268,6 +271,14 @@ export class NativeProcessTransport implements Transport {
       'workflowCatalog',
       this.kind,
       'The contained workflow catalog belongs to a resident nika serve authority',
+    );
+  }
+
+  async accessOffer(_workflow: string, _options: NikaAccessOfferOptions): Promise<NikaAccessOffer> {
+    throw new NikaCompatibilityError(
+      ACCESS_OFFER_CAPABILITY,
+      this.kind,
+      'An access offer is read by a resident nika serve authority for a workflow it serves',
     );
   }
 

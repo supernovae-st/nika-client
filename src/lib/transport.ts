@@ -24,6 +24,8 @@ import type {
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
   NikaTransportKind,
+  NikaAccessOffer,
+  NikaAccessOfferOptions,
   NikaWorkflowMetadata,
 } from '../types.js';
 
@@ -54,6 +56,7 @@ export interface Transport {
   attachRun(id: string, options: NikaAttachRunOptions): Promise<TransportRun>;
   listWorkflows(): Promise<readonly string[]>;
   workflow(name: string): Promise<NikaWorkflowMetadata>;
+  accessOffer(workflow: string, options: NikaAccessOfferOptions): Promise<NikaAccessOffer>;
   schedule(workflow: string, options: NikaScheduleOptions): Promise<NikaScheduleApplyResult>;
   scheduleStatus(id: string): Promise<NikaScheduleStatus>;
   traceVerify(

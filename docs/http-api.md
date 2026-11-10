@@ -15,6 +15,7 @@ Any other non-2xx body is discarded and reported as a redacted
 | `GET /v1/openapi.json` | generation only | authenticated OpenAPI 3.1 document |
 | `GET /v1/workflows` | `listWorkflows()` | contained relative workflow names |
 | `GET /v1/workflows/{name}` | `workflow(name)` | path-free metadata, never source bytes |
+| `GET /v1/access-offers/{name}` | `accessOffer(workflow)` | capability-gated (`accessSessionOffer`, engine 0.124.3); what the sessions of the workflow's own declared ACP route offer now, read without a prompt; see [Ask what a route offers](server.md#ask-what-a-route-offers) |
 | `POST /v1/compile` | `compile()` | capability-gated stateless source authoring; 200 ready/incomplete/refused, no job; generation 2 needs `compileNativeV2` |
 | `POST /v1/check` | `check()` | validates a served name (with an optional `access` pin) or immutable snapshot bytes without a job |
 | `POST /v1/jobs` | `run()` | admits a served name (with optional `access` and `inputs`) or exact snapshot bytes with an idempotency key |

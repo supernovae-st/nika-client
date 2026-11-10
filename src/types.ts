@@ -1081,6 +1081,114 @@ export interface NikaRunOptions {
   idempotencyKey?: string;
 }
 
+/** One dependent offer of a session: its reasoning efforts or its service tiers. */
+export interface NikaAccessOfferListing {
+  /**
+   * `offered`: the session lists the option for the model. `not_offered`: it
+   * lists none. `unobserved`: not read, and `reason` says why (the model does
+   * not hold, the option is ambiguous or in another form, or no speed control
+   * is measured for this adapter release).
+   */
+  status: 'offered' | 'not_offered' | 'unobserved';
+  /** The session option's own id (codex-acp: `reasoning_effort`, `fast-mode`). */
+  option?: string;
+  /**
+   * The values, in the session's order. For efforts, the exact values a run
+   * accepts on `run.reasoning.effort` (no case folding, no alias); for
+   * service tiers, the language's words (`standard`, `fast`).
+   */
+  offered?: string[];
+  /** Listed values the server did not carry (beyond 64, or not a short token). */
+  omitted?: number;
+  /** The value the session holds now: what a run that declares none keeps on a session like this one. */
+  current?: string;
+  reason?: string;
+}
+
+/** What one session of a workflow's declared ACP route answered, without a prompt. */
+export interface NikaAccessOfferRoute {
+  /** The file's `run.access.via`. */
+  via: string;
+  protocol: 'acp';
+  /**
+   * `completion`: the route's one-shot completion profile, which `infer:`
+   * tasks run under. `agent`: its agent session, which `agent:` tasks run in.
+   */
+  profile: 'completion' | 'agent';
+  /** The tasks that resolve to this model in this shape. */
+  tasks: string[];
+  /**
+   * `observed`: the session answered. `unavailable`: it gave no offer; `code`
+   * and `reason` say why, as a run on the route would meet it before its prompt.
+   */
+  status: 'observed' | 'unavailable';
+  /** When this row was read (RFC 3339). The server serves it again until `fresh_until`. */
+  observed_at: string;
+  fresh_until: string;
+  /** With `unavailable`: `NIKA-1803`, `NIKA-1804` or `NIKA-1805`. */
+  code?: string;
+  reason?: string;
+  /** The adapter's own report on `initialize`. */
+  adapter?: { name?: string; version?: string };
+  model: {
+    /** The model as the file names it. */
+    requested: string;
+    /**
+     * `confirmed`: listed, selected for this session only and read back.
+     * `session_default`: the file names `default`. `legacy_list`: only the
+     * session's legacy model list names it. `not_offered`: the session does
+     * not list it. `not_confirmed`: listed, and the session answered another
+     * model. Efforts and tiers are read only under `confirmed` and
+     * `session_default`. Absent on an `unavailable` row.
+     */
+    status?: 'confirmed' | 'session_default' | 'legacy_list' | 'not_offered' | 'not_confirmed';
+    /** The native id the session holds, its own model, or the one it answered instead. */
+    current?: string;
+    /** The model values the session lists, in its order. */
+    offered?: string[];
+    omitted?: number;
+  };
+  effort?: NikaAccessOfferListing;
+  service_tier?: NikaAccessOfferListing;
+}
+
+/**
+ * `nika/access-offer@1`: what the sessions of a served workflow's own declared
+ * ACP route offer now, read by the server without a prompt. An observation
+ * with a time: it authorizes nothing, and a run still selects, reads back and
+ * refuses on its own session.
+ */
+export interface NikaAccessOffer {
+  schema: 'nika/access-offer@1';
+  workflow: string;
+  /**
+   * `read`: the routes were asked. `not_applicable`: the file selects no ACP
+   * sessions (no `run.access.via` under `run.access.protocol: acp`, or no
+   * `infer:`/`agent:` task with a static model); no session was opened and
+   * `reason` says why.
+   */
+  status: 'read' | 'not_applicable';
+  reason?: string;
+  /** The file's `run.access` and `run.reasoning.effort`, as the engine reads them. */
+  declared?: NikaAccessRequirement;
+  /** Always 0: the server's door holds no prompt. */
+  prompts_sent: 0;
+  /** One row per session shape and model: completion rows first, then agent rows. At most eight. */
+  routes: NikaAccessOfferRoute[];
+  /** Sessions the workflow names beyond the eight one request reads. */
+  routes_omitted: number;
+}
+
+export interface NikaAccessOfferOptions {
+  /** Stops this request. The server ends the session it was reading. */
+  signal?: AbortSignal;
+  /**
+   * The whole call's deadline in milliseconds. Default 100 000: the server
+   * bounds a request at 90 s, and a first reading opens one session per row.
+   */
+  timeoutMs?: number;
+}
+
 /** Resume observation of an already-admitted durable HTTP job. */
 export interface NikaAttachRunOptions {
   /** Last SSE sequence durably consumed by the caller. Default: 0. */
@@ -1113,6 +1221,7 @@ export type NikaOperation =
   | 'cancel'
   | 'listWorkflows'
   | 'workflow'
+  | 'accessOffer'
   | 'traceVerify'
   | 'schedule'
   | 'scheduleStatus'

@@ -479,6 +479,7 @@ Create the client once: it drives the bundled engine by default, or a
 | `compile(request, options?)` | Writes or edits a candidate workflow, without running it; `nextCompileRequest()` builds an answer round | `NikaCompileOutcome` |
 | `attachRun(id, options?)` | Picks a server job back up after a restart | a `NikaRun` |
 | `listWorkflows()` · `workflow(name)` | Lists or describes the workflows a server serves | names · metadata |
+| `accessOffer(workflow, options?)` | Asks a server what the sessions of a served workflow's declared ACP route offer now (models, reasoning efforts, service tiers), without a prompt | `NikaAccessOffer` |
 | `schedule(workflow, options)` · `scheduleStatus(id)` | Creates, changes or reads a schedule on a server | the applied schedule · its status |
 
 | `NikaRun` member | What it gives you |

@@ -452,6 +452,68 @@ not see the keys you export in your shell, so pass them with
 [OS schedulers](https://docs.nika.sh/sdk/operations/os-schedulers) and the
 [known limits](https://docs.nika.sh/changelog/known-limits).
 
+## Ask what a route offers
+
+A workflow file can declare how its model calls travel: `run.access` (`via`,
+`protocol`, `fallback`, `service_tier`) and `run.reasoning.effort`. A run
+learns what its session offers on the way to its prompt and says so only when
+it refuses. From engine 0.124.3 a server can be asked first:
+
+```ts
+const offer = await nika.accessOffer('workflows/brief.nika');
+if (offer.status === 'not_applicable') {
+  console.log(offer.reason);            // the file selects no ACP sessions
+} else {
+  for (const route of offer.routes) {
+    if (route.status === 'unavailable') {
+      console.log(route.profile, route.code, route.reason);
+      continue;
+    }
+    console.log(route.profile, route.model.status, route.effort?.offered, route.service_tier?.offered);
+    // completion confirmed [ 'low', 'medium', 'high' ] [ 'standard', 'fast' ]
+  }
+}
+```
+
+- **The route is the file's.** The call names a served workflow and nothing
+  else. The server asks only when the file declares `run.access.via` under
+  `run.access.protocol: acp`; any other workflow answers
+  `status: 'not_applicable'` with the reason, and no session is opened.
+- **No prompt is sent.** The server opens each session as a run opens it,
+  selects the file's model for that session only, lists what the session has
+  for that model and ends it. `prompts_sent` is always `0`: an offer uses no
+  turn of the subscription.
+- **One row per session shape and model.** `completion` is the route's
+  one-shot profile, which `infer:` tasks run under; `agent` is its agent
+  session, which `agent:` tasks run in. `tasks` names the tasks of each row.
+- **`effort.offered` is exact.** It holds the values a run accepts on
+  `run.reasoning.effort` for that model, with no case folding and no alias.
+  `effort.current` is what a run that declares no effort keeps on a session
+  like this one. `service_tier.offered` holds the language's words
+  (`standard`, `fast`).
+- **A model the session does not list is a state, not an error.**
+  `model.status` is then `not_offered` (with the models it does list in
+  `model.offered`), and the efforts and tiers are `unobserved`: they are
+  never read from another model. The same holds for `legacy_list` and
+  `not_confirmed`.
+- **A session that gives no offer is a row.** `status: 'unavailable'` carries
+  the code a run would meet before its prompt (`NIKA-1803` adapter absent,
+  silent or outside its pin; `NIKA-1804` session death; `NIKA-1805` refused)
+  and a reason.
+- **A row has a time.** `observed_at` and `fresh_until` say when it was read
+  and until when the server serves it again (60 seconds, 15 when
+  unavailable). One reading runs at a time on the server; a ninth concurrent
+  request is refused with `NikaOperationError` `access_offer_busy`.
+
+The call has its own deadline, 100 seconds by default (`timeoutMs`), because
+a first reading opens a session per row; `signal` stops it. It needs a server
+that lists `accessSessionOffer`: on another server, and on the local engine,
+it rejects with `NikaCompatibilityError` before any request.
+
+An offer authorizes nothing. A model, an effort or a tier can leave a route
+between the offer and the run: `run()` is admitted as before, and the run
+selects, reads back and refuses on its own session.
+
 ## Local engine or server: what differs
 
 | Operation | Local engine | `nika serve` |
@@ -472,6 +534,7 @@ not see the keys you export in your shell, so pass them with
 | `run.artifacts()` · `run.downloadArtifact()` · `run.readArtifact()` | refused: a local run's files are where its workflow wrote them | the files a settled job's sealed journal records, each download proven against its recorded size and SHA-256, when the server lists `artifacts` |
 | `schedule` / `scheduleStatus` | refused | the server's schedules |
 | `listWorkflows` / `workflow` | refused | the served workflow catalog, without paths |
+| `accessOffer` | refused: an offer is read by a server for a workflow it serves | what the sessions of the workflow's declared ACP route offer now, when the server advertises `accessSessionOffer` |
 | `compile` | the engine's `compile` capability; `authoringModel`, `decisionModel`, `fresh` and `output` allowed | `POST /v1/compile`, when advertised; `cognition` and `replay_token` need `compileNativeV2` |
 
 The vocabulary is one; the number of events is not. A local engine reports

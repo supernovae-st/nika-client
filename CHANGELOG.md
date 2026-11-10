@@ -7,6 +7,72 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.124.3] - 2026-11-10
+
+### Added
+
+- `nika.accessOffer(workflow, options?)`: asks a `nika serve` what the
+  sessions of a served workflow's own declared ACP route offer now, without
+  a prompt (`GET /v1/access-offers/{name}`, engine 0.124.3). The answer is
+  the engine's `nika/access-offer@1` document, read strictly: the file's
+  declared route, then one row per session shape (`completion` for `infer:`
+  tasks, `agent` for `agent:` tasks) and model. A row carries `observed_at`
+  and `fresh_until`, the state of the file's model on that session, and the
+  exact reasoning efforts and the service tiers the session lists for that
+  model. `prompts_sent` is `0`: an offer uses no turn. A workflow that
+  declares no ACP route answers `status: 'not_applicable'` and opens no
+  session. A session that gives no offer is a row with
+  `status: 'unavailable'` and the code a run would meet before its prompt.
+  A model the session does not list is a row state, and its efforts and
+  tiers are then `unobserved` instead of being read from another model.
+- The call needs a server that lists `accessSessionOffer` in
+  `supportedCapabilities`: on another server, and on the local engine, it
+  rejects with `NikaCompatibilityError` before any request. It has its own
+  deadline, 100 seconds by default (`timeoutMs`), because a first reading
+  opens a session per row, and it takes a `signal`. A deadline passed
+  throws `NikaTransportError` and a malformed answer `NikaProtocolError`.
+  The server reads one offer at a time: a ninth concurrent request is
+  refused with `NikaOperationError` (`access_offer_busy`).
+- New types: `NikaAccessOffer`, `NikaAccessOfferRoute`,
+  `NikaAccessOfferListing` and `NikaAccessOfferOptions`. An offer is an
+  observation with a time and authorizes nothing: `run()` is admitted as
+  before, and the run selects, reads back and refuses on its own session.
+
+### Changed
+
+- **Release train 0.124.3, in lockstep with engine `v0.124.3`.** The machine
+  protocol stays 2. `package.json` is 0.124.3 and `sync:native-versions` moved
+  the four native payload manifests, the `optionalDependencies` and the
+  lockfile with it. `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name the commit
+  engine tag `v0.124.3` names (`nika 0.124.3 (7cc1384b5)`), and the committed
+  gauntlet ledgers were replayed against that verified public binary, with
+  the same behavioral verdicts as on 0.124.2: the 100 corpus output hashes
+  are unchanged.
+- The pinned `openapi.json` and `src/generated/openapi.d.ts` are the served
+  document of the released engine 0.124.3. Beside `info.version`, it adds
+  one path, `GET /v1/access-offers/{name}`, and the three schemas of its
+  answer (`AccessOffer`, `AccessOfferRoute`, `AccessOfferListing`). No other
+  route, schema or closed set moved, and the engine's identity lists one
+  more capability, `accessSessionOffer`.
+- `test/engine-live.test.ts` (run with `NIKA_BIN`) passes unchanged on the
+  released 0.124.3.
+
+### Documentation
+
+- `docs/server.md` gains « Ask what a route offers »: whose route is read,
+  why no prompt is sent, what a row holds, the states that are not errors
+  and how long a row is kept. `docs/http-api.md` lists the route and the
+  README's method table lists `accessOffer`.
+- The README, `docs/upgrading-to-0.123.md`, `docs/compile.md` and
+  `docs/migrating-to-0.116.md` name 0.124.3 as the engine this package
+  bundles: the upgrade steps install 0.124.3 and print
+  `nika 0.124.3 (7cc1384b5)`, the engine history adds 0.124.3 (machine
+  protocol 2, the compile code of 0.124.2, a served document that adds the
+  offer route), and the upgrade page links the engine's 0.124.3 release
+  notes and lists the offer among the changes an app reads. The README's
+  `nika check` excerpt was measured again on the released 0.124.3: every
+  line it shows is unchanged.
+
 ## [0.124.2] - 2026-11-10
 
 ### Added
@@ -1529,7 +1595,8 @@ Initial public release. Full rewrite from v0.1.0.
 - Error hierarchy completely redesigned
 - License changed from MIT to AGPL-3.0-or-later
 
-[Unreleased]: https://github.com/supernovae-st/nika-client/compare/v0.124.2...HEAD
+[Unreleased]: https://github.com/supernovae-st/nika-client/compare/v0.124.3...HEAD
+[0.124.3]: https://github.com/supernovae-st/nika-client/compare/v0.124.2...v0.124.3
 [0.124.2]: https://github.com/supernovae-st/nika-client/compare/v0.124.1...v0.124.2
 [0.124.1]: https://github.com/supernovae-st/nika-client/compare/v0.124.0...v0.124.1
 [0.124.0]: https://github.com/supernovae-st/nika-client/compare/v0.123.2...v0.124.0

@@ -143,7 +143,7 @@ no network.
 `nika check` is the static audit that runs before any model is called: what
 the workflow will do, which models and tools it uses, what it may touch and
 what it can cost. An excerpt of its report for the file above, on engine
-0.124.2:
+0.124.3:
 
 ```text
 nika check · hello.nika
@@ -479,6 +479,7 @@ Create the client once: it drives the bundled engine by default, or a
 | `compile(request, options?)` | Writes or edits a candidate workflow, without running it; `nextCompileRequest()` builds an answer round | `NikaCompileOutcome` |
 | `attachRun(id, options?)` | Picks a server job back up after a restart | a `NikaRun` |
 | `listWorkflows()` · `workflow(name)` | Lists or describes the workflows a server serves | names · metadata |
+| `accessOffer(workflow, options?)` | Asks a server what the sessions of a served workflow's declared ACP route offer now (models, reasoning efforts, service tiers), without a prompt | `NikaAccessOffer` |
 | `schedule(workflow, options)` · `scheduleStatus(id)` | Creates, changes or reads a schedule on a server | the applied schedule · its status |
 
 | `NikaRun` member | What it gives you |
@@ -633,8 +634,8 @@ The `package.json` subpath is exported for CommonJS, ESM build tools and CI
 pin checks. It reports the installed package, not a moving registry tag.
 
 **Package and engine move together.** Each package version bundles the engine
-with the same number, the one it was tested with: 0.124.2 bundles
-`nika 0.124.2 (47f277883)` and speaks its machine protocol, 2, as 0.123 did.
+with the same number, the one it was tested with: 0.124.3 bundles
+`nika 0.124.3 (7cc1384b5)` and speaks its machine protocol, 2, as 0.123 did.
 It refuses an engine or server on another generation (0.122 and older speak 1)
 at its identity probe (`nika --sdk-identity`, `GET /health`), before any job,
 with `NikaCompatibilityError`: upgrade the package and every `nika serve`

@@ -36,9 +36,16 @@ import type {
   NikaSettlement,
   NikaTraceVerifyOptions,
   NikaTraceVerifyResult,
+  NikaAccessOffer,
+  NikaAccessOfferOptions,
   NikaWorkflowMetadata,
 } from '../types.js';
 import { accessPin } from './access.js';
+import {
+  ACCESS_OFFER_CAPABILITY,
+  ACCESS_OFFER_TIMEOUT_MS,
+  parseAccessOffer,
+} from './access-offer.js';
 import {
   ARTIFACT_SHA256_HEADER,
   ARTIFACTS_CAPABILITY,
@@ -574,6 +581,53 @@ export class HttpTransport implements Transport {
       throw new NikaProtocolError(this.kind, 'Workflow metadata response was malformed');
     }
     return object as unknown as NikaWorkflowMetadata;
+  }
+
+  async accessOffer(name: string, options: NikaAccessOfferOptions): Promise<NikaAccessOffer> {
+    refuseLegacyContainedName(name);
+    const timeoutMs = options.timeoutMs ?? ACCESS_OFFER_TIMEOUT_MS;
+    if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
+      throw new RangeError('timeoutMs must be a positive safe integer');
+    }
+    const path = `/v1/access-offers/${workflowPath(name)}`;
+    const identity = await this.ensureServerIdentity();
+    if (!identity.supportedCapabilities.includes(ACCESS_OFFER_CAPABILITY)) {
+      throw this.gap(
+        ACCESS_OFFER_CAPABILITY,
+        `The connected nika serve ${identity.engineVersion} does not advertise ${ACCESS_OFFER_CAPABILITY} `
+        + `(advertised: ${identity.supportedCapabilities.join(', ') || 'nothing'}): it reads no session `
+        + 'offer. Nothing was requested',
+      );
+    }
+    // One deadline for the whole call: a first reading opens a session per row, which
+    // outlasts the per-request timeout the other routes keep.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const caller = options.signal;
+    const stop = () => controller.abort(caller?.reason);
+    caller?.addEventListener('abort', stop, { once: true });
+    if (caller?.aborted) stop();
+    try {
+      const outcome = await this.jsonOutcome(path, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      }, true, [200], 'accessOffer', false, false);
+      if ('refusal' in outcome) throw this.refused(path, outcome);
+      return parseAccessOffer(outcome.object, name, this.kind);
+    } catch (cause) {
+      if (controller.signal.aborted && !caller?.aborted) {
+        throw new NikaTransportError(
+          this.kind,
+          `Access offer timed out after ${timeoutMs}ms`,
+          { cause: cause instanceof Error ? cause : undefined },
+        );
+      }
+      throw cause;
+    } finally {
+      clearTimeout(timer);
+      caller?.removeEventListener('abort', stop);
+    }
   }
 
   async schedule(
@@ -2182,6 +2236,7 @@ function operationFindings(values: unknown[]): NikaOperationFinding[] | undefine
 function pathForOperation(operation: NikaOperation): string {
   if (operation === 'schedule') return 'schedule apply';
   if (operation === 'scheduleStatus') return 'schedule status';
+  if (operation === 'accessOffer') return 'access offer';
   return operation;
 }
 

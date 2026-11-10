@@ -385,10 +385,14 @@ export {
   isNikaRunSealedEvent,
   isNikaRunSettledEvent,
   isNikaTerminalEvent,
+  readNikaAccessRequirement,
+  readNikaAccessSelection,
 } from './events.js';
 
 export type {
   NikaAccessPin,
+  NikaAccessRequirement,
+  NikaAccessSelection,
   NikaArtifact,
   NikaArtifactDownload,
   NikaArtifactDownloadOptions,
@@ -397,6 +401,7 @@ export type {
   NikaArtifactsOptions,
   NikaCancelResult,
   NikaAttachRunOptions,
+  NikaAttestedValue,
   NikaCheckFinding,
   NikaCheckOptions,
   NikaCheckResult,
@@ -453,6 +458,10 @@ export type {
   NikaRunSealedEvent,
   NikaRunSettledEvent,
   NikaRunStatus,
+  NikaConfiguredSource,
+  NikaSelectedValue,
+  NikaServiceTier,
+  NikaServiceTierEvidence,
   NikaScheduleAfterSkip,
   NikaScheduleApplyResult,
   NikaScheduleClaim,

@@ -88,6 +88,13 @@ Pass a receipt back unchanged, and store it with what it proves.
   `chain_head`. Store it with the job id. A scheduled job's `origin` names the
   firing; see [server.md](server.md#schedules).
 
+A run receipt is not the per-call access receipt. What a model call asked of
+its route and what the route read back (`nika/access-selection@1`: model,
+effort and, when the file declares one, the service tier) is a row of the
+task's frame in the journal the seal covers, not a field of the run receipt.
+On a local run, read it with `readNikaAccessSelection`
+([runs.md](runs.md#the-files-own-access-contract-runaccess)).
+
 A trace can hold model outputs and file contents, so keep `.nika/` out of
 git and treat traces as application data.
 

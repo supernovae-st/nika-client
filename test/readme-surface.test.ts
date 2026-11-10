@@ -143,6 +143,22 @@ describe('packed public documentation', () => {
     expect(runs).toContain('byte-order mark');
   });
 
+  it('teaches the service tier engine 0.124.2 adds to a file', () => {
+    const upgrading = page('upgrading-to-0.123.md');
+    // nika#1865: the tier is a field of the workflow file, read back on a local run's frames.
+    expect(runs).toContain('service_tier: fast   # engine 0.124.2 and later');
+    expect(runs).toContain('`service_tier` takes the words `standard` and `fast`. Leaving it out is not');
+    for (const surface of [runs, server, upgrading]) {
+      expect(surface).toContain('accessServiceTier');
+      expect(surface).toMatch(/readNikaAccessS(?:election)?/);
+    }
+    // What a turn carried and what served it are never guessed.
+    expect(runs).toContain("| Carried on the turn | `service_tier.turn` | `{ value: null, evidence: 'unknown' }` on an ACP session |");
+    expect(upgrading).toContain('**A file can ask its route for a service tier** (0.124.2)');
+    // The package names the engine it bundles.
+    expect(readme).toContain('0.124.2 bundles\n`nika 0.124.2 (47f277883)`');
+  });
+
   it('teaches paid media under a cost cap as engine 0.124 merged it', () => {
     // nika#1846 (engine main 89606a28d): what stays unpriced is refused under
     // any cap, and the ways out are named.

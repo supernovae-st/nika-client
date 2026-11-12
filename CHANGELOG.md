@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.124.4] - 2026-11-12
+
+### Changed
+
+- **Release train 0.124.4, in lockstep with engine `v0.124.4`.** The machine
+  protocol stays 2. `package.json` is 0.124.4 and `sync:native-versions` moved
+  the four native payload manifests, the `optionalDependencies` and the
+  lockfile with it. `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name the commit
+  engine tag `v0.124.4` names (`nika 0.124.4 (9753cf41b)`), and the committed
+  gauntlet ledgers were replayed against that verified public binary, with
+  the same behavioral verdicts as on 0.124.3: the 100 corpus output hashes
+  are unchanged.
+- The pinned `openapi.json` and `src/generated/openapi.d.ts` are the served
+  document of the released engine 0.124.4. It differs from 0.124.3's in
+  `info.version` only, and the types generated from it are unchanged: no
+  route, schema or closed set moved, and a plain `nika serve` lists the
+  capabilities 0.124.3 listed. What engine 0.124.4 adds belongs to a
+  server's operator: a server started with `nika serve --cost-policy` lists
+  one more capability, `costStandingPolicyV1`, and the document it serves
+  adds `cost_admission` to a job's settlement and four schemas
+  (`CostAdmission`, `CostAdmissionChoice`, `CostCapEvidence`,
+  `StandingCostRule`).
+- The package adds no export and no type for that admission. A job a
+  standing rule admitted is read as any other job: the closed `Job` and
+  `JobEvent` gain no key, and the `cost_admission` its settlement carries
+  (`nika/cost-admission@1`) rides `result.settlement` untyped.
+  `test/http-wire-cost-admission.test.ts` pins that reading on a
+  contract-shaped settlement, valid against the schema the released binary
+  serves; no engine wrote it.
+- `test/engine-live.test.ts` (run with `NIKA_BIN`) passes unchanged on the
+  released 0.124.4.
+
+### Documentation
+
+- The README, `docs/upgrading-to-0.123.md`, `docs/compile.md` and
+  `docs/migrating-to-0.116.md` name 0.124.4 as the engine this package
+  bundles: the upgrade steps install 0.124.4 and print
+  `nika 0.124.4 (9753cf41b)`, the engine history adds 0.124.4 (machine
+  protocol 2, the compile code of 0.124.3, a default served document that
+  differs only by its version), and the upgrade page links the engine's
+  0.124.4 release notes and lists the standing cost policy among the changes
+  an app reads. `docs/http-api.md` says what a settlement carries on a
+  server that holds a policy. The README's `nika check` excerpt was measured
+  again on the released 0.124.4: every line it shows is unchanged.
+
 ## [0.124.3] - 2026-11-10
 
 ### Added
@@ -1595,7 +1640,8 @@ Initial public release. Full rewrite from v0.1.0.
 - Error hierarchy completely redesigned
 - License changed from MIT to AGPL-3.0-or-later
 
-[Unreleased]: https://github.com/supernovae-st/nika-client/compare/v0.124.3...HEAD
+[Unreleased]: https://github.com/supernovae-st/nika-client/compare/v0.124.4...HEAD
+[0.124.4]: https://github.com/supernovae-st/nika-client/compare/v0.124.3...v0.124.4
 [0.124.3]: https://github.com/supernovae-st/nika-client/compare/v0.124.2...v0.124.3
 [0.124.2]: https://github.com/supernovae-st/nika-client/compare/v0.124.1...v0.124.2
 [0.124.1]: https://github.com/supernovae-st/nika-client/compare/v0.124.0...v0.124.1

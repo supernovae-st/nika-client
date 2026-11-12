@@ -279,6 +279,17 @@ whose `status` contradicts the record carrying it, keeps fields it does not
 know, and never derives a settlement from an exit code; a job the resident
 lost (`interrupted`) carries none.
 
+From engine 0.124.4 a server started with `nika serve --cost-policy` (health
+capability `costStandingPolicyV1`) adds one field to the settlement of a job
+that policy admitted, on the terminal frame and on the durable job:
+`cost_admission`, the closed `nika/cost-admission@1` object that server's
+own `GET /v1/openapi.json` describes (`authority: 'standing_policy'`, a
+`price` of `unknown` or `host_declared`, the bounded `choice` with the rule
+under `choice.standing`, and the `host` cap evidence). The pinned
+`openapi.json` is the default document and does not declare it. The SDK
+keeps the field as read, untyped, and validates none of it; beside the
+settlement, as a key of the frame or of the job, it is still refused.
+
 ## Frame time and journal evidence (engine 0.123)
 
 Both resident projections are closed, and the SDK refuses any field it does

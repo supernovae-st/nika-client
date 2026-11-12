@@ -1,7 +1,7 @@
 # Upgrading to 0.123
 
-`@supernovae-st/nika` 0.124.3 bundles engine 0.124.3
-(`nika 0.124.3 (7cc1384b5)`) and speaks its machine protocol, **2**, as 0.123
+`@supernovae-st/nika` 0.124.4 bundles engine 0.124.4
+(`nika 0.124.4 (9753cf41b)`) and speaks its machine protocol, **2**, as 0.123
 did. Engines and servers up to 0.122 speak protocol 1. Each package version
 pairs with one protocol generation, so the move from 0.120.x is one rule:
 
@@ -68,6 +68,19 @@ lists it):
   on another server, and on the local engine, it rejects with
   `NikaCompatibilityError` before any request
   ([ask what a route offers](server.md#ask-what-a-route-offers)).
+- **A server can run an unpriced route under its operator's standing rule**
+  (0.124.4): `nika serve --cost-policy` names an API route the engine's
+  catalog does not price and bounds the runs on it, and a job inside the
+  rule then needs no per-run cost review. The engine records that admission
+  in the job's settlement, as `cost_admission` (`nika/cost-admission@1`):
+  the rule, its bounds, and whether the price is `unknown` or
+  `host_declared`. This package does not type it: it rides
+  `result.settlement` untyped, as every settlement field the package does
+  not know does. A server started with the flag lists
+  `costStandingPolicyV1` in `supportedCapabilities` and describes the field
+  in the document it serves; without the flag, a 0.124.4 server lists the
+  capabilities and serves the document 0.124.3 did, its version aside
+  ([settlement](http-api.md#settlement)).
 - **A failed harness turn fails its task** (`NIKA-1804`, `NIKA-1805`) where
   0.123 settled it `succeeded` with the error text as its output.
 - **A refused `vars` pair names its code** (`unknown_input`,
@@ -99,12 +112,12 @@ lists it):
 
 ## Steps
 
-1. **Update the package.** `npm install @supernovae-st/nika@0.124.3`, then
+1. **Update the package.** `npm install @supernovae-st/nika@0.124.4`, then
    check what you installed:
 
    ```sh
-   node -p "require('@supernovae-st/nika/package.json').version"   # 0.124.3
-   ./node_modules/.bin/nika --version                              # nika 0.124.3 (7cc1384b5)
+   node -p "require('@supernovae-st/nika/package.json').version"   # 0.124.4
+   ./node_modules/.bin/nika --version                              # nika 0.124.4 (9753cf41b)
    ```
 
 2. **Point `NIKA_BIN` at a 0.123 or later engine, or unset it.** An explicit `bin` or
@@ -112,24 +125,24 @@ lists it):
    command refuses a protocol-1 engine there too
    (`NIKA_BIN=<a 0.122 binary> npx nika --version` exits 1).
 
-3. **Upgrade each server.** Install engine 0.124.3 where your `nika serve`
+3. **Upgrade each server.** Install engine 0.124.4 where your `nika serve`
    runs (`brew install supernovae-st/tap/nika`,
    `curl -LsSf https://nika.sh/install.sh | sh`, or the container image
-   `ghcr.io/supernovae-st/nika:0.124.3`), stop the old server as usual
+   `ghcr.io/supernovae-st/nika:0.124.4`), stop the old server as usual
    (Ctrl-C drains running and queued jobs for up to 30 seconds), and start
    the new one with the same flags. Then check its identity:
 
    ```sh
-   curl -s http://127.0.0.1:8787/health   # "engineVersion":"0.124.3", "machineProtocolVersion":2
+   curl -s http://127.0.0.1:8787/health   # "engineVersion":"0.124.4", "machineProtocolVersion":2
    ```
 
 4. **Run your tests against the new pair.** Nothing in `check`, `run`,
    `events`, `result`, `cancel`, `attachRun`, `schedule` or `traceVerify`
    changed its signature: 0.123.0, 0.124.0 and 0.124.2 only add exports,
-   0.124.1 one optional field, `verdicts.network_tasks`, and 0.124.3 one
-   method, `accessOffer`, with its types. The changes are in the data
-   those methods return: from 0.123, in the section above; from 0.120.x,
-   below.
+   0.124.1 one optional field, `verdicts.network_tasks`, 0.124.3 one
+   method, `accessOffer`, with its types, and 0.124.4 nothing. The changes
+   are in the data those methods return: from 0.123, in the section above;
+   from 0.120.x, below.
 
 ## What changed in the data from 0.120
 
@@ -164,7 +177,8 @@ changes are in its release notes
 [0.124.0](https://github.com/supernovae-st/nika/releases/tag/v0.124.0),
 [0.124.1](https://github.com/supernovae-st/nika/releases/tag/v0.124.1),
 [0.124.2](https://github.com/supernovae-st/nika/releases/tag/v0.124.2),
-[0.124.3](https://github.com/supernovae-st/nika/releases/tag/v0.124.3)),
+[0.124.3](https://github.com/supernovae-st/nika/releases/tag/v0.124.3),
+[0.124.4](https://github.com/supernovae-st/nika/releases/tag/v0.124.4)),
 and what 0.124 does not do yet is on the
 [known limits](https://docs.nika.sh/changelog/known-limits) page.
 

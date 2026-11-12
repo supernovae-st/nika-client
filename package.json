@@ -1,6 +1,6 @@
 {
   "name": "@supernovae-st/nika",
-  "version": "0.124.3",
+  "version": "0.124.4",
   "description": "One TypeScript SDK for local and remote Nika execution",
   "repository": {
     "type": "git",
@@ -70,10 +70,10 @@
     "prepublishOnly": "npm run build"
   },
   "optionalDependencies": {
-    "@supernovae-st/nika-darwin-arm64": "0.124.3",
-    "@supernovae-st/nika-darwin-x64": "0.124.3",
-    "@supernovae-st/nika-linux-arm64": "0.124.3",
-    "@supernovae-st/nika-linux-x64": "0.124.3"
+    "@supernovae-st/nika-darwin-arm64": "0.124.4",
+    "@supernovae-st/nika-darwin-x64": "0.124.4",
+    "@supernovae-st/nika-linux-arm64": "0.124.4",
+    "@supernovae-st/nika-linux-x64": "0.124.4"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",

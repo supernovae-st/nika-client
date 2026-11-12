@@ -156,7 +156,7 @@ describe('packed public documentation', () => {
     expect(runs).toContain("| Carried on the turn | `service_tier.turn` | `{ value: null, evidence: 'unknown' }` on an ACP session |");
     expect(upgrading).toContain('**A file can ask its route for a service tier** (0.124.2)');
     // The package names the engine it bundles.
-    expect(readme).toContain('0.124.3 bundles\n`nika 0.124.3 (7cc1384b5)`');
+    expect(readme).toContain('0.124.4 bundles\n`nika 0.124.4 (9753cf41b)`');
   });
 
   it('teaches the access offer engine 0.124.3 adds to a server', () => {
@@ -170,6 +170,24 @@ describe('packed public documentation', () => {
     expect(server).toContain('An offer authorizes nothing.');
     for (const surface of [api, server, page('upgrading-to-0.123.md')]) expect(surface).toContain('accessSessionOffer');
     expect(page('upgrading-to-0.123.md')).toContain("**A server can be asked what a file's route offers** (0.124.3)");
+  });
+
+  it('teaches the standing cost policy engine 0.124.4 adds to a server', () => {
+    const upgrading = page('upgrading-to-0.123.md');
+    // nika#1876: the operator's rule admits the run, the job gains no key, and its
+    // settlement carries the admission, which this package keeps without typing it.
+    expect(upgrading).toContain("**A server can run an unpriced route under its operator's standing rule**\n  (0.124.4)");
+    for (const surface of [upgrading, httpApi, page('compile.md')]) {
+      expect(surface).toContain('`nika serve --cost-policy`');
+      expect(surface).toContain('`costStandingPolicyV1`');
+      expect(surface).toContain('`cost_admission`');
+    }
+    for (const surface of [upgrading, httpApi]) {
+      expect(surface).toContain('`nika/cost-admission@1`');
+      expect(surface).toContain('untyped');
+    }
+    expect(httpApi).toContain('is the default document and does not declare it');
+    expect(httpApi).toContain('as a key of the frame or of the job, it is still refused');
   });
 
   it('teaches paid media under a cost cap as engine 0.124 merged it', () => {

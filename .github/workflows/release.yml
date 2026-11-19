@@ -73,7 +73,7 @@ jobs:
             "nika-linux-arm64-$VERSION.tar.gz"
             "nika-linux-x64-$VERSION.tar.gz"
           )
-          release_json=$(gh release view "v$VERSION" --repo supernovae-st/nika --json assets,isDraft,tagName)
+          release_json=$(gh release view "v$VERSION" --repo nika-open/nika --json assets,isDraft,tagName)
           if [ "$(jq -r .isDraft <<<"$release_json")" != false ]; then
             echo "::error::nika v$VERSION is still a draft"
             exit 1
@@ -91,7 +91,7 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: supernovae-st/nika
+          repository: nika-open/nika
           path: nika-source
           ref: "v${{ env.VERSION }}"
           token: ${{ secrets.NIKA_REPO_TOKEN || github.token }}
@@ -111,7 +111,7 @@ jobs:
           set -euo pipefail
           mkdir -p engine-assets
           gh release download "v$VERSION" \
-            --repo supernovae-st/nika \
+            --repo nika-open/nika \
             --dir engine-assets \
             --pattern "nika-macos-arm64-$VERSION.tar.gz" \
             --pattern "nika-macos-x64-$VERSION.tar.gz" \

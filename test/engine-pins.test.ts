@@ -13,7 +13,7 @@ describe('the engine qualification pins', () => {
   // checks every engine-backed gate against it. A release moves both to the
   // commit its engine tag names, in one change: two files that disagree would
   // qualify one engine and name another.
-  it('name one exact supernovae-st/nika commit, the same in both files', () => {
+  it('name one exact nika-open/nika commit, the same in both files', () => {
     const qualification = pinned('ENGINE_QUAL_PIN');
     expect(qualification).toHaveLength(1);
     expect(qualification[0]).toMatch(/^[0-9a-f]{40}$/);

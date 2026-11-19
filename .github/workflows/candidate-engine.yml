@@ -1,5 +1,5 @@
 name: Candidate engine qualification
-# Premerge qualification against an exact supernovae-st/nika commit.
+# Premerge qualification against an exact nika-open/nika commit.
 # Not a release receipt. ci.yml type-drift and release-evidence-replay stay
 # bound to the public asset for package.json and may be truthfully red.
 
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       engine_sha:
-        description: Exact 40-hex supernovae-st/nika commit
+        description: Exact 40-hex nika-open/nika commit
         required: true
         type: string
   pull_request:
@@ -37,7 +37,7 @@ jobs:
             sha=$(grep -E '^[0-9a-f]{40}$' ENGINE_CANDIDATE | head -1 || true)
           fi
           if ! [[ "$sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "::error::candidate engine SHA must be an exact 40-hex supernovae-st/nika commit"
+            echo "::error::candidate engine SHA must be an exact 40-hex nika-open/nika commit"
             exit 1
           fi
           echo "engine_sha=$sha" >> "$GITHUB_OUTPUT"
@@ -54,7 +54,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: supernovae-st/nika
+          repository: nika-open/nika
           ref: ${{ env.ENGINE_SHA }}
           path: _nika_candidate
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

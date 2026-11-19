@@ -74,11 +74,11 @@ try {
   const source = await readJson(path.join(packageRoot, 'SOURCE.json'), 'SOURCE.json');
   assertExactKeys(source, ['repository', 'tag', 'commit', 'releaseAsset', 'sourceArchive'], 'SOURCE.json');
   const expectedSource = {
-    repository: 'https://github.com/supernovae-st/nika',
+    repository: 'https://github.com/nika-open/nika',
     tag: `v${expectedVersion}`,
     commit: engineCommit,
     releaseAsset: target.asset,
-    sourceArchive: `https://github.com/supernovae-st/nika/archive/refs/tags/v${expectedVersion}.tar.gz`,
+    sourceArchive: `https://github.com/nika-open/nika/archive/refs/tags/v${expectedVersion}.tar.gz`,
   };
   for (const [key, expected] of Object.entries(expectedSource)) {
     if (source[key] !== expected) {

@@ -242,11 +242,11 @@ function nativeFixture(options: NativeFixtureOptions = {}) {
   chmodSync(executable, 0o755);
   writeFileSync(path.join(packageRoot, 'LICENSE'), 'AGPL fixture\n');
   writeFileSync(path.join(packageRoot, 'SOURCE.json'), JSON.stringify({
-    repository: 'https://github.com/supernovae-st/nika',
+    repository: 'https://github.com/nika-open/nika',
     tag: `v${version}`,
     commit: options.sourceCommit ?? engineSha,
     releaseAsset: asset,
-    sourceArchive: `https://github.com/supernovae-st/nika/archive/refs/tags/v${version}.tar.gz`,
+    sourceArchive: `https://github.com/nika-open/nika/archive/refs/tags/v${version}.tar.gz`,
   }));
   writeFileSync(path.join(packageRoot, 'INTEGRITY.json'), JSON.stringify({
     algorithm: 'sha256',

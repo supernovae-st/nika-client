@@ -28,7 +28,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          tag="$(gh release view --repo supernovae-st/nika --json tagName --jq .tagName)"
+          tag="$(gh release view --repo nika-open/nika --json tagName --jq .tagName)"
           [[ "$tag" =~ ^v[0-9][0-9.]*$ ]] || { echo "::error::unexpected tag: $tag"; exit 1; }
           ver="${tag#v}"
           npm_v="$(curl -fsSL https://registry.npmjs.org/@nika-open%2Fnika | python3 -c 'import json,sys;print(json.load(sys.stdin)["dist-tags"]["latest"])')"

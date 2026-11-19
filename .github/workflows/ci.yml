@@ -83,7 +83,7 @@ jobs:
           asset_root="$RUNNER_TEMP/nika-release-asset"
           mkdir -p "$asset_root"
           gh release download "v$version" \
-            --repo supernovae-st/nika \
+            --repo nika-open/nika \
             --dir "$asset_root" \
             --pattern "$asset" \
             --pattern SHA256SUMS
@@ -153,7 +153,7 @@ jobs:
           asset_root="$RUNNER_TEMP/nika-type-drift"
           mkdir -p "$asset_root"
           gh release download "v$version" \
-            --repo supernovae-st/nika \
+            --repo nika-open/nika \
             --dir "$asset_root" \
             --pattern "nika-linux-x64-$version.tar.gz" \
             --pattern SHA256SUMS
@@ -300,7 +300,7 @@ jobs:
       - name: Check version alignment with nika
         run: |
           SDK_VERSION=$(node -p "require('./package.json').version")
-          NIKA_VERSION=$(curl -sf https://api.github.com/repos/supernovae-st/nika/releases/latest | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).tag_name.replace('v','')" 2>/dev/null || echo "unknown")
+          NIKA_VERSION=$(curl -sf https://api.github.com/repos/nika-open/nika/releases/latest | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).tag_name.replace('v','')" 2>/dev/null || echo "unknown")
 
           echo "SDK version:  $SDK_VERSION"
           echo "Nika version: $NIKA_VERSION"

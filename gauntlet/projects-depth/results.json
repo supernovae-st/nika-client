@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "engine": "nika 0.124.4 (9753cf41b)",
-  "package": "supernovae-st-nika-0.124.4.tgz",
-  "package_sha256": "f1640210a0c26adff983c74259632c410cffdd250825cd23494275b5aa03b502",
+  "package": "nika-open-nika-0.124.4.tgz",
+  "package_sha256": "a7752625f61e3b7d11a0e42d90eeaec7ddef5b6c3d004fdaaf1d34e8e811babd",
   "install_mode": "npm pack + isolated npm install --omit=optional + explicit NIKA_BIN",
   "projects": [
     {
@@ -32,8 +32,8 @@
       "deterministic_cost_cap_usd": 0,
       "installed_from_pack": true,
       "app_identity": {
-        "source_sha256": "e50ce519c385c26f55c12487ac6c104d63719073758fd0eab19faaa5b650ccc2",
-        "executed_sha256": "e50ce519c385c26f55c12487ac6c104d63719073758fd0eab19faaa5b650ccc2",
+        "source_sha256": "3f3e18834595228c59aab8dc9082975577d7aaad4c15669ababb5740779177e1",
+        "executed_sha256": "3f3e18834595228c59aab8dc9082975577d7aaad4c15669ababb5740779177e1",
         "byte_identical": true
       }
     },
@@ -56,8 +56,8 @@
       "deterministic_cost_cap_usd": 0,
       "installed_from_pack": true,
       "app_identity": {
-        "source_sha256": "4030b748a12894777e6e931091c984dcc0a34e004f9070c79fac7918fa60a04e",
-        "executed_sha256": "4030b748a12894777e6e931091c984dcc0a34e004f9070c79fac7918fa60a04e",
+        "source_sha256": "4c7bb6a952666bf8340621729e4564330b54fc7752d028cca2091919dfccc7ea",
+        "executed_sha256": "4c7bb6a952666bf8340621729e4564330b54fc7752d028cca2091919dfccc7ea",
         "byte_identical": true
       }
     },
@@ -112,7 +112,7 @@
         "verdict": "sealed",
         "reason": "sealed",
         "verified": true,
-        "trace_id": "01a1cf927d64770295e8200afbcfbe07"
+        "trace_id": "01a1f62d2010756f83d4f5b41461a640"
       },
       "mismatched_trace_rejected": true,
       "deterministic_cost_cap_usd": 0,
@@ -122,12 +122,12 @@
         "forced": false,
         "reaped": true
       },
-      "executed_app_sha256": "cb24d524bbb1db612de74e716dc0638fc30206627069688989fe40dbc21f6e9d",
-      "sdk_entry": "node_modules/@supernovae-st/nika/dist/index.js",
+      "executed_app_sha256": "60b6ea45cc93c484e17e8584d7cf9db76d719fb09adae80d424ca9ac1016a847",
+      "sdk_entry": "node_modules/@nika-open/nika/dist/index.js",
       "installed_from_pack": true,
       "app_identity": {
-        "source_sha256": "cb24d524bbb1db612de74e716dc0638fc30206627069688989fe40dbc21f6e9d",
-        "executed_sha256": "cb24d524bbb1db612de74e716dc0638fc30206627069688989fe40dbc21f6e9d",
+        "source_sha256": "60b6ea45cc93c484e17e8584d7cf9db76d719fb09adae80d424ca9ac1016a847",
+        "executed_sha256": "60b6ea45cc93c484e17e8584d7cf9db76d719fb09adae80d424ca9ac1016a847",
         "byte_identical": true
       }
     },
@@ -146,8 +146,8 @@
       "deterministic_cost_cap_usd": 0,
       "installed_from_pack": true,
       "app_identity": {
-        "source_sha256": "417519d2ecb8dc9c465a1456802b601eff58e6d356753e52b7b862d4e139fcda",
-        "executed_sha256": "417519d2ecb8dc9c465a1456802b601eff58e6d356753e52b7b862d4e139fcda",
+        "source_sha256": "6fc410afb20b214ae02f23aa368415fffb7682d242b211cc813dd758b89f03c4",
+        "executed_sha256": "6fc410afb20b214ae02f23aa368415fffb7682d242b211cc813dd758b89f03c4",
         "byte_identical": true
       }
     },
@@ -168,8 +168,8 @@
       "deterministic_cost_cap_usd": 0,
       "installed_from_pack": true,
       "app_identity": {
-        "source_sha256": "e4017fdf8e49a69a0a28e6a8da6af4a646d5ad23b78981ff67f2e2b69441f718",
-        "executed_sha256": "e4017fdf8e49a69a0a28e6a8da6af4a646d5ad23b78981ff67f2e2b69441f718",
+        "source_sha256": "8f6325f02f19f29eefc1c521fe974d9e7d75fa7207f76c422d7cad56e04451d8",
+        "executed_sha256": "8f6325f02f19f29eefc1c521fe974d9e7d75fa7207f76c422d7cad56e04451d8",
         "byte_identical": true
       }
     },
@@ -203,8 +203,8 @@
       "deterministic_cost_cap_usd": 0,
       "installed_from_pack": true,
       "app_identity": {
-        "source_sha256": "ffc4b55065e2526d932747de5ae3b149acd398bdb96ee16520c7f07a1bc3adec",
-        "executed_sha256": "ffc4b55065e2526d932747de5ae3b149acd398bdb96ee16520c7f07a1bc3adec",
+        "source_sha256": "e569ac5ade2768bb32e56d1fc34577424ed84ba6c0e9a9045db744f95616ddee",
+        "executed_sha256": "e569ac5ade2768bb32e56d1fc34577424ed84ba6c0e9a9045db744f95616ddee",
         "byte_identical": true
       }
     }

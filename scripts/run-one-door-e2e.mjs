@@ -94,7 +94,7 @@ try {
     assert.equal(publicVersion, version, 'public SDK and repository release train');
     assert.match(engine.version, new RegExp(`^nika ${version.replaceAll('.', '\\.')} \\([0-9a-f]+\\)$`));
   }
-  let dependency = `@supernovae-st/nika@${publicVersion}`;
+  let dependency = `@nika-open/nika@${publicVersion}`;
   if (!publicVersion) {
     await owned.run('npm', ['run', 'build'], { cwd: root, env, timeoutMs: 60_000 });
     const [packed] = JSON.parse(await owned.run('npm', [
@@ -114,7 +114,7 @@ try {
   const nativeEngine = publicVersion
     ? await probe(path.join(consumer, 'node_modules/.bin/nika'), consumerEnv)
     : engine;
-  const nativePackage = `@supernovae-st/nika-${process.platform}-${process.arch}`;
+  const nativePackage = `@nika-open/nika-${process.platform}-${process.arch}`;
   const nativeBinary = publicVersion ? path.join(consumer, 'node_modules', nativePackage, 'bin/nika') : binary;
   if (publicVersion) {
     nativeEngine.native_package = nativePackage;
@@ -129,7 +129,7 @@ try {
   }
   const installedLock = JSON.parse(readFileSync(path.join(consumer, 'package-lock.json'), 'utf8'));
   const installedPackages = Object.entries(installedLock.packages)
-    .filter(([key]) => key.startsWith('node_modules/@supernovae-st/nika-') && existsSync(path.join(consumer, key)))
+    .filter(([key]) => key.startsWith('node_modules/@nika-open/nika-') && existsSync(path.join(consumer, key)))
     .map(([key, value]) => ({ path: key, version: value.version, resolved: value.resolved,
       integrity: value.integrity ?? null }));
 

@@ -27,7 +27,7 @@ function fixture(
   mkdirSync(packageRoot);
   mkdirSync(tarballs);
   writeFileSync(path.join(packageRoot, 'package.json'), JSON.stringify({
-    name: '@supernovae-st/nika',
+    name: '@nika-open/nika',
     version,
     type: 'module',
     exports: {
@@ -44,11 +44,11 @@ function fixture(
     nikaRelease: { preparedCommit, version },
     ...manifestOverrides,
   }));
-  const filename = 'supernovae-st-nika-0.116.0.tgz';
+  const filename = 'nika-open-nika-0.116.0.tgz';
   execFileSync('tar', ['-czf', path.join(tarballs, filename), '-C', root, 'package']);
   const report = path.join(root, 'pack.json');
   writeFileSync(report, JSON.stringify([{
-    name: '@supernovae-st/nika',
+    name: '@nika-open/nika',
     version,
     filename,
     files: [
@@ -221,7 +221,7 @@ function nativeFixture(options: NativeFixtureOptions = {}) {
   mkdirSync(binDirectory, { recursive: true });
   mkdirSync(tarballs);
 
-  const packageName = '@supernovae-st/nika-linux-x64';
+  const packageName = '@nika-open/nika-linux-x64';
   const asset = `nika-linux-x64-${version}.tar.gz`;
   const archiveSha = 'c'.repeat(64);
   const baseBinary = elf64(options.elfMachine ?? 62, options.identityVersion ?? version);
@@ -257,7 +257,7 @@ function nativeFixture(options: NativeFixtureOptions = {}) {
     executable: { file: 'bin/nika', sha256: options.executableSha ?? executableSha },
   }));
 
-  const filename = 'supernovae-st-nika-linux-x64-0.116.0.tgz';
+  const filename = 'nika-open-nika-linux-x64-0.116.0.tgz';
   execFileSync('tar', ['-czf', path.join(tarballs, filename), '-C', root, 'package']);
   const report = path.join(root, 'pack.json');
   writeFileSync(report, JSON.stringify([{

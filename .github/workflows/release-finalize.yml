@@ -58,11 +58,11 @@ jobs:
             exit 1
           fi
           packages=(
-            @supernovae-st/nika-darwin-arm64
-            @supernovae-st/nika-darwin-x64
-            @supernovae-st/nika-linux-arm64
-            @supernovae-st/nika-linux-x64
-            @supernovae-st/nika
+            @nika-open/nika-darwin-arm64
+            @nika-open/nika-darwin-x64
+            @nika-open/nika-linux-arm64
+            @nika-open/nika-linux-x64
+            @nika-open/nika
           )
           for package_name in "${packages[@]}"; do
             published="$(npm view "$package_name@$VERSION" version)"

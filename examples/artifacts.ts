@@ -21,7 +21,7 @@ import { mkdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { Nika } from '@supernovae-st/nika';
+import { Nika } from '@nika-open/nika';
 
 const [workflow = 'chart.nika', wanted] = process.argv.slice(2);
 const url = process.env.NIKA_URL;

@@ -5,16 +5,16 @@ import { lstat, open, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const TARGETS = new Map([
-  ['@supernovae-st/nika-darwin-arm64', {
+  ['@nika-open/nika-darwin-arm64', {
     os: 'darwin', cpu: 'arm64', libc: null, assetPlatform: 'macos', assetArch: 'arm64',
   }],
-  ['@supernovae-st/nika-darwin-x64', {
+  ['@nika-open/nika-darwin-x64', {
     os: 'darwin', cpu: 'x64', libc: null, assetPlatform: 'macos', assetArch: 'x64',
   }],
-  ['@supernovae-st/nika-linux-arm64', {
+  ['@nika-open/nika-linux-arm64', {
     os: 'linux', cpu: 'arm64', libc: 'glibc', assetPlatform: 'linux', assetArch: 'arm64',
   }],
-  ['@supernovae-st/nika-linux-x64', {
+  ['@nika-open/nika-linux-x64', {
     os: 'linux', cpu: 'x64', libc: 'glibc', assetPlatform: 'linux', assetArch: 'x64',
   }],
 ]);

@@ -58,10 +58,10 @@ interface NativeManifest {
 const NATIVE_FILES = ['bin/nika', 'LICENSE', 'SOURCE.json', 'INTEGRITY.json'];
 
 const NATIVE_TARGETS = [
-  { directory: 'darwin-arm64', name: '@supernovae-st/nika-darwin-arm64', os: 'darwin', cpu: 'arm64' },
-  { directory: 'darwin-x64', name: '@supernovae-st/nika-darwin-x64', os: 'darwin', cpu: 'x64' },
-  { directory: 'linux-arm64-gnu', name: '@supernovae-st/nika-linux-arm64', os: 'linux', cpu: 'arm64', libc: 'glibc' },
-  { directory: 'linux-x64-gnu', name: '@supernovae-st/nika-linux-x64', os: 'linux', cpu: 'x64', libc: 'glibc' },
+  { directory: 'darwin-arm64', name: '@nika-open/nika-darwin-arm64', os: 'darwin', cpu: 'arm64' },
+  { directory: 'darwin-x64', name: '@nika-open/nika-darwin-x64', os: 'darwin', cpu: 'x64' },
+  { directory: 'linux-arm64-gnu', name: '@nika-open/nika-linux-arm64', os: 'linux', cpu: 'arm64', libc: 'glibc' },
+  { directory: 'linux-x64-gnu', name: '@nika-open/nika-linux-x64', os: 'linux', cpu: 'x64', libc: 'glibc' },
 ] as const;
 
 describe('native package lock coverage', () => {
@@ -151,7 +151,7 @@ describe('native package lock coverage', () => {
 
 function assertRootManifest(manifest: RootManifest): void {
   expect(manifest).toMatchObject({
-    name: '@supernovae-st/nika',
+    name: '@nika-open/nika',
     type: 'module',
     exports: {
       '.': {

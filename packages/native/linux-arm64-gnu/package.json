@@ -1,5 +1,5 @@
 {
-  "name": "@supernovae-st/nika-linux-arm64",
+  "name": "@nika-open/nika-linux-arm64",
   "version": "0.124.4",
   "description": "Nika native engine payload for Linux arm64 GNU",
   "license": "AGPL-3.0-or-later",
@@ -27,7 +27,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/supernovae-st/nika-client.git",
+    "url": "https://github.com/nika-open/nika-client.git",
     "directory": "packages/native/linux-arm64-gnu"
   }
 }

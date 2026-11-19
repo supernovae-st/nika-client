@@ -511,7 +511,7 @@ describe('HTTP engine resolution boundary', () => {
   it('defers the typed engine-unavailable refusal to capture time', async () => {
     const fetch = vi.fn();
     const transport = lazyTransport(fetch, () => {
-      throw new NikaEngineUnavailable('darwin', 'arm64', '@supernovae-st/nika-darwin-arm64');
+      throw new NikaEngineUnavailable('darwin', 'arm64', '@nika-open/nika-darwin-arm64');
     });
     await expect(transport.check('./flow.nika', {}))
       .rejects.toBeInstanceOf(NikaEngineUnavailable);

@@ -1,13 +1,13 @@
 {
-  "name": "@supernovae-st/nika",
+  "name": "@nika-open/nika",
   "version": "0.124.4",
   "description": "One TypeScript SDK for local and remote Nika execution",
   "repository": {
     "type": "git",
-    "url": "https://github.com/supernovae-st/nika-client.git"
+    "url": "https://github.com/nika-open/nika-client.git"
   },
-  "homepage": "https://github.com/supernovae-st/nika-client#readme",
-  "author": "SuperNovae Studio <nika@supernovae.studio>",
+  "homepage": "https://github.com/nika-open/nika-client#readme",
+  "author": "Thibaut Mélen · SuperNovae Studio <nika@supernovae.studio> (https://github.com/ThibautMelen)",
   "keywords": [
     "nika",
     "workflow",
@@ -70,10 +70,10 @@
     "prepublishOnly": "npm run build"
   },
   "optionalDependencies": {
-    "@supernovae-st/nika-darwin-arm64": "0.124.4",
-    "@supernovae-st/nika-darwin-x64": "0.124.4",
-    "@supernovae-st/nika-linux-arm64": "0.124.4",
-    "@supernovae-st/nika-linux-x64": "0.124.4"
+    "@nika-open/nika-darwin-arm64": "0.124.4",
+    "@nika-open/nika-darwin-x64": "0.124.4",
+    "@nika-open/nika-linux-arm64": "0.124.4",
+    "@nika-open/nika-linux-x64": "0.124.4"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",
@@ -86,5 +86,5 @@
     "node": ">=22"
   },
   "license": "Apache-2.0",
-  "mcpName": "io.github.supernovae-st/nika"
+  "mcpName": "io.github.nika-open/nika"
 }

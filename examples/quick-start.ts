@@ -1,4 +1,4 @@
-import { Nika, isNikaRunSucceeded } from '@supernovae-st/nika';
+import { Nika, isNikaRunSucceeded } from '@nika-open/nika';
 
 const nika = new Nika({ cwd: process.cwd() });
 

@@ -11,11 +11,13 @@ const healStep = workflow.split('      - name: npm follows the engine release\n'
 const script = healStep.split('        run: |\n')[1]
   .split('\n').map((line) => line.replace(/^          /, '')).join('\n');
 
-/* The published package is @supernovae-st/nika since the 2026-09-10 rename;
-   reading the retired @supernovae-st/nika-client dist-tag (frozen at its last
-   publish) made npm always differ from the engine tag, so the guard at the
-   top could never fire and the daily cron dispatched release.yml into its
-   assert-absent wall once per version. These states pin the whole table. */
+/* The package name is @nika-open/nika since the 2026-11-20 move to the
+   nika-open organization, and was @supernovae-st/nika from the 2026-09-10
+   rename until then; reading the retired @supernovae-st/nika-client dist-tag
+   (frozen at its last publish) made npm always differ from the engine tag, so
+   the guard at the top could never fire and the daily cron dispatched
+   release.yml into its assert-absent wall once per version. These states pin
+   the whole table. */
 
 afterEach(async () => {
   await Promise.all(scratch.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
@@ -50,7 +52,7 @@ async function execute({ npmLatest, repoVersion, registryDown = false }) {
     env: {
       PATH: `${dir}:/usr/bin:/bin`,
       GH_TOKEN: 'fixture-only',
-      GITHUB_REPOSITORY: 'supernovae-st/nika-client',
+      GITHUB_REPOSITORY: 'nika-open/nika-client',
       CALL_LOG: log,
     },
     encoding: 'utf8',
@@ -77,7 +79,7 @@ test('npm behind with the matching SDK train merged dispatches the Release workf
   const result = await execute({ npmLatest: '0.120.0', repoVersion: '0.120.1' });
   expect(result.status, result.stderr + result.stdout).toBe(0);
   expect(result.calls).toEqual([
-    'workflow run release.yml --repo supernovae-st/nika-client --ref main -f version=0.120.1',
+    'workflow run release.yml --repo nika-open/nika-client --ref main -f version=0.120.1',
   ]);
 });
 
@@ -88,6 +90,7 @@ test('an unreadable registry fails the step red and never dispatches', async () 
 });
 
 test('the step reads the current package name, not the retired one', () => {
-  expect(script).toContain('https://registry.npmjs.org/@supernovae-st%2Fnika');
+  expect(script).toContain('https://registry.npmjs.org/@nika-open%2Fnika');
   expect(script).not.toContain('nika-client');
+  expect(script).not.toContain('@supernovae-st');
 });

@@ -63,7 +63,7 @@ describe('release commit stamping', () => {
     const fixture = createFixture('0.116.0');
     const mismatchedPath = manifestPaths.at(-1)!;
     writeManifest(fixture, mismatchedPath, {
-      name: '@supernovae-st/nika-linux-x64',
+      name: '@nika-open/nika-linux-x64',
       version: '0.115.0',
     });
 
@@ -139,7 +139,7 @@ function createFixture(version: string): string {
   scratch.push(fixture);
   for (const [index, relativePath] of manifestPaths.entries()) {
     writeManifest(fixture, relativePath, {
-      name: index === 0 ? '@supernovae-st/nika' : `@supernovae-st/native-${index}`,
+      name: index === 0 ? '@nika-open/nika' : `@nika-open/native-${index}`,
       version,
     });
   }

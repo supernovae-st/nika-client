@@ -337,7 +337,7 @@ describe('the local capture path is unchanged', () => {
   ])('routes %s to the local engine, never to the by-name door', async (_name, workflow) => {
     const fetch = vi.fn();
     const unavailable = () => {
-      throw new NikaEngineUnavailable('darwin', 'arm64', '@supernovae-st/nika-darwin-arm64');
+      throw new NikaEngineUnavailable('darwin', 'arm64', '@nika-open/nika-darwin-arm64');
     };
     await expect(transport(fetch, unavailable).startRun(workflow, { idempotencyKey: 'test-admission' }))
       .rejects.toBeInstanceOf(NikaEngineUnavailable);

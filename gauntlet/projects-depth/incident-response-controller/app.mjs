@@ -131,10 +131,10 @@ export async function stopIncidentServer(server, graceMs = 5_000) {
 async function main() {
   const engine = process.env.NIKA_BIN;
   assert(engine, 'NIKA_BIN is required');
-  const sdkEntry = realpathSync(fileURLToPath(import.meta.resolve('@supernovae-st/nika')));
-  const installedPackage = path.join(process.cwd(), 'node_modules', '@supernovae-st', 'nika');
+  const sdkEntry = realpathSync(fileURLToPath(import.meta.resolve('@nika-open/nika')));
+  const installedPackage = path.join(process.cwd(), 'node_modules', '@nika-open', 'nika');
   assert(sdkEntry.startsWith(`${installedPackage}${path.sep}`), 'SDK must resolve inside this installed npm-pack consumer');
-  const { Nika } = await import('@supernovae-st/nika');
+  const { Nika } = await import('@nika-open/nika');
   const executedAppSha256 = createHash('sha256').update(readFileSync(fileURLToPath(import.meta.url))).digest('hex');
   const runtime = path.join(process.cwd(), '.runtime');
   mkdirSync(runtime, { recursive: true });

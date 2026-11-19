@@ -57,7 +57,7 @@ function packedFixture(engineVersion: string): { client: string; native: string 
   mkdirSync(tarballs);
 
   writeFileSync(path.join(clientRoot, 'package.json'), JSON.stringify({
-    name: '@supernovae-st/nika',
+    name: '@nika-open/nika',
     version: VERSION,
     type: 'module',
     exports: './dist/index.js',
@@ -124,10 +124,10 @@ function pack(packageRoot: string, tarballs: string): string {
 
 function nativePackageForHost(): string {
   const name = ({
-    'darwin-arm64': '@supernovae-st/nika-darwin-arm64',
-    'darwin-x64': '@supernovae-st/nika-darwin-x64',
-    'linux-arm64': '@supernovae-st/nika-linux-arm64',
-    'linux-x64': '@supernovae-st/nika-linux-x64',
+    'darwin-arm64': '@nika-open/nika-darwin-arm64',
+    'darwin-x64': '@nika-open/nika-darwin-x64',
+    'linux-arm64': '@nika-open/nika-linux-arm64',
+    'linux-x64': '@nika-open/nika-linux-x64',
   } as Record<string, string>)[`${process.platform}-${process.arch}`];
   if (!name) throw new Error(`unsupported test host ${process.platform}-${process.arch}`);
   return name;

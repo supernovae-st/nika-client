@@ -1,5 +1,5 @@
 {
-  "name": "@supernovae-st/nika-darwin-x64",
+  "name": "@nika-open/nika-darwin-x64",
   "version": "0.124.4",
   "description": "Nika native engine payload for macOS x64",
   "license": "AGPL-3.0-or-later",
@@ -24,7 +24,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/supernovae-st/nika-client.git",
+    "url": "https://github.com/nika-open/nika-client.git",
     "directory": "packages/native/darwin-x64"
   }
 }

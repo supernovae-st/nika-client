@@ -1,6 +1,6 @@
 # Examples
 
-Small programs that use `@supernovae-st/nika` the way an application does.
+Small programs that use `@nika-open/nika` the way an application does.
 Each one imports the package by name, runs on Node.js 22.18 or newer as a
 `.ts` file as is, and works keyless and offline with `mock/echo`,
 `nika:wait` or `nika:chart`.
@@ -73,6 +73,6 @@ root as its header shows.
 ## Use them in your app
 
 Copy an example and the workflow it runs into your project, then run it
-there: `npm install @supernovae-st/nika` provides the package, and
+there: `npm install @nika-open/nika` provides the package, and
 `./node_modules/.bin/nika` the same commands as `node ../dist/bin/nika.js`
 above.

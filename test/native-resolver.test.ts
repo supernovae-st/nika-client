@@ -25,7 +25,7 @@ describe('native binary resolver', () => {
       arch: 'x64',
       glibc: true,
       resolvePackageJson,
-    })).toBe('/payload/@supernovae-st/nika-linux-x64/bin/nika');
+    })).toBe('/payload/@nika-open/nika-linux-x64/bin/nika');
   });
 
   it('rejects empty explicit values instead of falling through', () => {
@@ -81,7 +81,7 @@ describe('native binary resolver', () => {
     expect(caught).toMatchObject({
       name: 'NikaEngineUnavailable',
       code: 'NIKA_ENGINE_UNAVAILABLE',
-      packageName: '@supernovae-st/nika-darwin-arm64',
+      packageName: '@nika-open/nika-darwin-arm64',
     });
     // The refusal teaches every valid path and names the one it will not take.
     const message = String((caught as Error).message);

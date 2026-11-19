@@ -286,7 +286,7 @@ describe('packed public documentation', () => {
       expect(surface).not.toMatch(/(?:measured|captured)[^.]*on engine 0\.120\.3/i);
     }
     // Engine media is pinned to the release tag that carries it, never to a moving branch.
-    expect(readme).not.toContain('supernovae-st/nika/main/media/');
+    expect(readme).not.toContain('nika-open/nika/main/media/');
     // The hero is this repository's recording of the quick start on 0.123.0, not
     // the engine's typescript-client clip captured with 0.120.3.
     expect(readme).not.toContain('typescript-client.optimized.gif');
@@ -303,11 +303,12 @@ describe('packed public documentation', () => {
 
   it('exports package metadata so consumers can prove the installed pin', () => {
     expect(manifest.exports?.['./package.json']).toBe('./package.json');
-    expect(readme).toContain("require('@supernovae-st/nika/package.json').version");
+    expect(readme).toContain("require('@nika-open/nika/package.json').version");
   });
 
   it('does not regress to removed APIs or claim a webhook verifier', () => {
     for (const publicSurface of [...shipped, ...mediaScripts]) {
+      expect(publicSurface).not.toContain("from '@nika-open/nika/local'");
       expect(publicSurface).not.toContain("from '@supernovae-st/nika/local'");
       expect(publicSurface).not.toContain('new LocalNika');
       expect(publicSurface).not.toContain('runToEnd(');
@@ -341,12 +342,12 @@ describe('media the pages embed', () => {
   // pages ship in the package and are read in node_modules too, where media/,
   // examples/ and scripts/ do not exist, so they name those files by their URL.
   const OWN = [
-    'https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/',
-    'https://github.com/supernovae-st/nika-client/blob/main/',
-    'https://github.com/supernovae-st/nika-client/tree/main/',
+    'https://raw.githubusercontent.com/nika-open/nika-client/HEAD/',
+    'https://github.com/nika-open/nika-client/blob/main/',
+    'https://github.com/nika-open/nika-client/tree/main/',
   ];
   // A src naming one of our media files: relative, or by its raw HEAD URL.
-  const OWN_MEDIA = String.raw`(?:(?![a-z]+:)[^"]*|https://raw\.githubusercontent\.com/supernovae-st/nika-client/HEAD/)media/`;
+  const OWN_MEDIA = String.raw`(?:(?![a-z]+:)[^"]*|https://raw\.githubusercontent\.com/nika-open/nika-client/HEAD/)media/`;
   // Every reference a page makes into this repository: src, srcset, href, markdown links.
   const ownReferences = [...pages].flatMap(([file, text]) =>
     [...text.matchAll(/(?:src|srcset|href)="([^"]+)"|\]\(([^)\s]+)\)/g)]
@@ -433,7 +434,7 @@ describe('media the pages embed', () => {
         );
         if (new RegExp(`<img\\b[^>]*src="${OWN_MEDIA}gifs/`).test(block)) {
           expect(block, `${file}: our GIF without its own still, in the form its renderer resolves`).toMatch(
-            /srcset="https:\/\/raw\.githubusercontent\.com\/supernovae-st\/nika-client\/HEAD\/media\/stills\/[^"]+\.png"/,
+            /srcset="https:\/\/raw\.githubusercontent\.com\/nika-open\/nika-client\/HEAD\/media\/stills\/[^"]+\.png"/,
           );
         }
       }

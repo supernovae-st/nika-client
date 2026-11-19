@@ -32,8 +32,10 @@ package version. Historical ledgers are limited to an explicit allowlist and
 must remain labelled as non-gating evidence.
 
 CI adds a behavioral provenance replay. It downloads the Linux x64 asset for
-the exact root package version, verifies its GitHub attestation and published
-`SHA256SUMS` entry, then reruns all 100 deterministic workflows, the hostile suite, all five mini-SaaS projects, all six depth projects,
+the exact root package version from `nika-open/nika`, verifies its GitHub
+attestation (signed by `nika-open/nika` from v0.124.5; releases up to v0.124.4
+verify against `supernovae-st/nika`, the identity that signed them before the
+repository moved) and published `SHA256SUMS` entry, then reruns all 100 deterministic workflows, the hostile suite, all five mini-SaaS projects, all six depth projects,
 the two-process recovery scenario, and five scenarios through six execution
 doors from a freshly packed SDK. The runner
 mints an ephemeral run-signing key. Its
@@ -96,7 +98,7 @@ was originally written.
 
 The last public-only first-contact wave (2026-09-01, on the 0.115 client and
 engine 0.116.2) and its convergent debt are recorded in
-[`gauntlet/personas/REPORT.md`](https://github.com/supernovae-st/nika-client/blob/main/gauntlet/personas/REPORT.md); it predates
+[`gauntlet/personas/REPORT.md`](https://github.com/nika-open/nika-client/blob/main/gauntlet/personas/REPORT.md); it predates
 the current API, and no persona wave has run on 0.123.0.
 
 ## Socratic risk matrix
@@ -163,7 +165,7 @@ tagged engine assets, starts the released Linux binary, proves the live
 OpenAPI/types pin, embeds the exact prepared commit and release version in all
 five package manifests before packing, and publishes four payloads plus the SDK
 through npm trusted publishing with GitHub OIDC and Sigstore provenance bound
-to the workflow identity. Every package registers organization `supernovae-st`,
+to the workflow identity. Every package registers organization `nika-open`,
 repository `nika-client`, workflow filename `release.yml`, and environment
 `npm-publish`, with direct `npm publish` enabled. The GitHub-hosted publish job
 uses Node 24, npm 11.19.1 and `id-token: write`; it receives no npm write token.
@@ -208,7 +210,7 @@ typechecks every program under `examples/` against the packed types.
 and requires alt text on every image and a reduced-motion still for every GIF.
 `node scripts/media/validate.mjs --typecheck` checks the recordings themselves
 against their tapes, budgets and transcripts; it needs the render tools listed
-in [media/README.md](https://github.com/supernovae-st/nika-client/blob/main/media/README.md).
+in [media/README.md](https://github.com/nika-open/nika-client/blob/main/media/README.md).
 
 For a frozen engine that advertises `compile` on both native and Serve doors:
 
@@ -231,7 +233,7 @@ route itself first shipped with engine commit
 foundation test, not general intent authoring or execution admission
 qualification.
 
-The [2026-09-19 source-build receipt](https://github.com/supernovae-st/nika-client/blob/main/evidence/compile-4334e58b-20260919.json)
+The [2026-09-19 source-build receipt](https://github.com/nika-open/nika-client/blob/main/evidence/compile-4334e58b-20260919.json)
 records 14 cases across both doors and both module systems at that producer,
 with exact outcome parity and no resident-state or project-file mutation. Its
 engine is a clean source build predating the published v0.120.3 binary; its SDK

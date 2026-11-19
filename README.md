@@ -7,7 +7,7 @@
   </a>
 </p>
 
-<h1 align="center">@supernovae-st/nika</h1>
+<h1 align="center">@nika-open/nika</h1>
 
 <p align="center">
   <strong>Run AI workflows from your TypeScript app, and prove what they did.</strong><br>
@@ -15,23 +15,23 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@supernovae-st/nika"><img src="https://img.shields.io/npm/v/@supernovae-st/nika?label=npm" alt="npm version"></a>
-  <a href="https://github.com/supernovae-st/nika-client/actions/workflows/ci.yml"><img src="https://github.com/supernovae-st/nika-client/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
-  <a href="https://github.com/supernovae-st/nika/releases/latest"><img src="https://img.shields.io/github/v/release/supernovae-st/nika?label=engine" alt="Engine release"></a>
+  <a href="https://www.npmjs.com/package/@nika-open/nika"><img src="https://img.shields.io/npm/v/@nika-open/nika?label=npm" alt="npm version"></a>
+  <a href="https://github.com/nika-open/nika-client/actions/workflows/ci.yml"><img src="https://github.com/nika-open/nika-client/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
+  <a href="https://github.com/nika-open/nika/releases/latest"><img src="https://img.shields.io/github/v/release/nika-open/nika?label=engine" alt="Engine release"></a>
   <a href="https://docs.nika.sh"><img src="https://img.shields.io/badge/docs-docs.nika.sh-8b8cf8.svg" alt="Documentation"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="Apache-2.0"></a>
   <br>
-  <a href="https://scorecard.dev/viewer/?uri=github.com/supernovae-st/nika-client"><img src="https://api.scorecard.dev/projects/github.com/supernovae-st/nika-client/badge" alt="OpenSSF Scorecard"></a>
-  <a href="https://www.npmjs.com/package/@supernovae-st/nika"><img src="https://img.shields.io/badge/npm-provenance-2ea44f.svg" alt="Published with provenance through GitHub Actions trusted publishing"></a>
-  <a href="https://www.npmjs.com/package/@supernovae-st/nika"><img src="https://img.shields.io/npm/dm/@supernovae-st/nika?label=downloads" alt="npm downloads"></a>
-  <a href="https://archive.softwareheritage.org/browse/origin/?origin_url=https://github.com/supernovae-st/nika-client"><img src="https://archive.softwareheritage.org/badge/origin/https://github.com/supernovae-st/nika-client/" alt="Archived by Software Heritage"></a>
+  <a href="https://scorecard.dev/viewer/?uri=github.com/nika-open/nika-client"><img src="https://api.scorecard.dev/projects/github.com/nika-open/nika-client/badge" alt="OpenSSF Scorecard"></a>
+  <a href="https://www.npmjs.com/package/@nika-open/nika"><img src="https://img.shields.io/badge/npm-provenance-2ea44f.svg" alt="Published with provenance through GitHub Actions trusted publishing"></a>
+  <a href="https://www.npmjs.com/package/@nika-open/nika"><img src="https://img.shields.io/npm/dm/@nika-open/nika?label=downloads" alt="npm downloads"></a>
+  <a href="https://archive.softwareheritage.org/browse/origin/?origin_url=https://github.com/nika-open/nika-client"><img src="https://archive.softwareheritage.org/badge/origin/https://github.com/nika-open/nika-client/" alt="Archived by Software Heritage"></a>
 </p>
 
 **Watch this README's quick start run as written: install, one signing key, `run()`, a typed result, a verified receipt.**
 
 <p align="center">
   <picture>
-    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/media/stills/sdk-quickstart.png">
+    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/nika-open/nika-client/HEAD/media/stills/sdk-quickstart.png">
     <img src="media/gifs/sdk-quickstart.gif" alt="A terminal runs npm install @supernovae-st/nika@0.124.0, which adds 2 packages: nika and nika-darwin-arm64. ./node_modules/.bin/nika --version prints nika 0.124.0 (866ed914b), and NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init mints a run-signing key. The screen shows hello.nika and demo.mts from this README, then node demo.mts prints mock(echo) · Say hello from the Nika SDK. and receipt verified" width="960">
   </picture>
 </p>
@@ -76,14 +76,14 @@ For example:
 
 | You can build | How this package helps |
 |---|---|
-| **A webhook that runs a workflow per event** | On your `nika serve`, pass the verified payload as `inputs` and the sender's delivery id as `idempotencyKey`: a retried delivery reuses the same job instead of running twice ([server.md](https://github.com/supernovae-st/nika-client/blob/main/docs/server.md#retries-without-duplicates)). |
-| **A release gate that can say no** | Run the checks in parallel inside one workflow, allow or refuse the deploy from its result, and keep the verified receipt ([runs.md](https://github.com/supernovae-st/nika-client/blob/main/docs/runs.md#read-the-result), [receipts.md](https://github.com/supernovae-st/nika-client/blob/main/docs/receipts.md)). |
-| **A monitor that runs on a schedule** | Declare the cadence on your `nika serve` with `schedule()`, change it safely by revision, and reconnect after a restart ([server.md](https://github.com/supernovae-st/nika-client/blob/main/docs/server.md#schedules)). |
-| **An incident assistant you can stop** | Follow each step with `run.events()` and stop it cleanly with `run.cancel()` ([`watch-and-cancel.ts`](https://github.com/supernovae-st/nika-client/blob/main/examples/watch-and-cancel.ts)). |
+| **A webhook that runs a workflow per event** | On your `nika serve`, pass the verified payload as `inputs` and the sender's delivery id as `idempotencyKey`: a retried delivery reuses the same job instead of running twice ([server.md](https://github.com/nika-open/nika-client/blob/main/docs/server.md#retries-without-duplicates)). |
+| **A release gate that can say no** | Run the checks in parallel inside one workflow, allow or refuse the deploy from its result, and keep the verified receipt ([runs.md](https://github.com/nika-open/nika-client/blob/main/docs/runs.md#read-the-result), [receipts.md](https://github.com/nika-open/nika-client/blob/main/docs/receipts.md)). |
+| **A monitor that runs on a schedule** | Declare the cadence on your `nika serve` with `schedule()`, change it safely by revision, and reconnect after a restart ([server.md](https://github.com/nika-open/nika-client/blob/main/docs/server.md#schedules)). |
+| **An incident assistant you can stop** | Follow each step with `run.events()` and stop it cleanly with `run.cancel()` ([`watch-and-cancel.ts`](https://github.com/nika-open/nika-client/blob/main/examples/watch-and-cancel.ts)). |
 
-Runnable programs live in [`examples/`](https://github.com/supernovae-st/nika-client/tree/main/examples).
+Runnable programs live in [`examples/`](https://github.com/nika-open/nika-client/tree/main/examples).
 The release tests in
-[`gauntlet/projects-depth`](https://github.com/supernovae-st/nika-client/tree/main/gauntlet/projects-depth)
+[`gauntlet/projects-depth`](https://github.com/nika-open/nika-client/tree/main/gauntlet/projects-depth)
 exercise each row as a fresh Node app that installs this package from its npm
 tarball and runs against the real engine. They are release tests, not
 templates to copy: they also exercise the deprecated `vars`,
@@ -99,7 +99,7 @@ in step 3 runs as is on Node.js 22.18 or newer; on an older 22.x, name it
 `nika` command at `./node_modules/.bin/nika`.
 
 ```sh
-npm install @supernovae-st/nika
+npm install @nika-open/nika
 NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init   # once per machine: a key that signs each run's record
 ```
 
@@ -165,7 +165,7 @@ paid media call still reaches the network in a rehearsal, so from engine
 0.124.1 the ACCESS row names such tasks under its line, and `check()` lists
 them in `verdicts.network_tasks` (this file has none).
 
-▶ [Watch compile, check, run and verify on the command line](https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/full-loop.optimized.gif):
+▶ [Watch compile, check, run and verify on the command line](https://raw.githubusercontent.com/nika-open/nika/v0.123.0/media/gifs/full-loop.optimized.gif):
 the same loop your code drives, all four commands captured from the real
 CLI (engine 0.121.0), the run a `mock/echo` rehearsal.
 
@@ -174,7 +174,7 @@ CLI (engine 0.121.0), the run a `mock/echo` rehearsal.
 **3 · Run it and verify it from TypeScript.** Save this as `demo.mts`:
 
 ```ts
-import { Nika, isNikaRunSucceeded } from '@supernovae-st/nika';
+import { Nika, isNikaRunSucceeded } from '@nika-open/nika';
 
 const nika = new Nika({ cwd: process.cwd() });
 
@@ -225,7 +225,7 @@ Local and mock models and the keyless system voice are never blocked.
 > On Linux, a key that `nika key init --force` put in the Secret Service can
 > be copied instead, from a terminal: `./node_modules/.bin/nika key align`.
 
-The same file is [`examples/quick-start.ts`](https://github.com/supernovae-st/nika-client/blob/main/examples/quick-start.ts),
+The same file is [`examples/quick-start.ts`](https://github.com/nika-open/nika-client/blob/main/examples/quick-start.ts),
 next to examples that watch, cancel and recover runs.
 
 ## What happens underneath
@@ -234,7 +234,7 @@ next to examples that watch, cancel and recover runs.
 
 <p align="center">
   <picture>
-    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/media/stills/sdk-doors.png">
+    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/nika-open/nika-client/HEAD/media/stills/sdk-doors.png">
     <img src="media/gifs/sdk-doors.gif" alt="Animated diagram. The README's demo.mts on the left; the @supernovae-st/nika package in the middle; two doors on the right: new Nika() leads to the bundled engine nika 0.124.0 as a child process, new Nika({ url, token }) to nika serve, and lines 3 and 6 of demo.mts switch between them: the constructor takes url, token and allowInsecureHttp, and run() takes an idempotencyKey in place of maxCostUsd. A refused list-files.nika gets NIKA-SEC-004 and no run exists; hello.nika runs; six local events or two server events reach the app; six hash-chained journal lines end with run_sealed; traceVerify() answers verified locally and sealed on the server; one changed byte gives BROKEN at line 5" width="960">
   </picture>
 </p>
@@ -248,7 +248,7 @@ your working directory:
 sequenceDiagram
   autonumber
   participant App as Your code
-  participant SDK as @supernovae-st/nika
+  participant SDK as @nika-open/nika
   participant Engine as nika engine (child process)
   App->>SDK: nika.run('hello.nika', { maxCostUsd: 0 })
   SDK->>Engine: nika --sdk-identity (once per client)
@@ -287,7 +287,7 @@ A run gives you three different facts, and each has its own evidence:
 
 <p align="center">
   <picture>
-    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/media/stills/sdk-admitted-executed-sealed.png">
+    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/nika-open/nika-client/HEAD/media/stills/sdk-admitted-executed-sealed.png">
     <img src="media/gifs/sdk-admitted-executed-sealed.gif" alt="node gate.mts on a workflow that runs ls under permits: {} prints check refused · exit 2, NIKA-SEC-004 and its fix, then run not started: no run, no events, no trace. A one-line permits fix checks clean and runs. node prove.mts with no signing key prints sealed false and not verified · receipt_mismatch; after NIKA_KEYCHAIN=off nika key init it prints sealed true and verified. node tamper.mts changes one byte of the trace, and node verify.mts prints not verified and the engine's BROKEN at line 5" width="960">
   </picture>
 </p>
@@ -296,10 +296,10 @@ A run gives you three different facts, and each has its own evidence:
 - **The file is the boundary.** A workflow lists what it may reach in
   `permits:`, and the check catches the task that reaches past it before any
   model is called.
-  ▶ [The same audit on the command line](https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/permits-audit.optimized.gif) (captured on engine 0.121.0)
+  ▶ [The same audit on the command line](https://raw.githubusercontent.com/nika-open/nika/v0.123.0/media/gifs/permits-audit.optimized.gif) (captured on engine 0.121.0)
 - **Failures you planned for.** `on_error: recover` absorbs a missing live
   feed: the run finishes, the output says stale, the trace records the
-  failure. ▶ [Watch a missing feed absorbed](https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/on-error-recover.optimized.gif) (the CLI, captured on engine 0.121.0)
+  failure. ▶ [Watch a missing feed absorbed](https://raw.githubusercontent.com/nika-open/nika/v0.123.0/media/gifs/on-error-recover.optimized.gif) (the CLI, captured on engine 0.121.0)
 
 ## Two doors: your machine or your server
 
@@ -337,7 +337,7 @@ From another terminal, the same app talks to it:
 
 ```ts
 import { readFile } from 'node:fs/promises';
-import { Nika } from '@supernovae-st/nika';
+import { Nika } from '@nika-open/nika';
 
 const token = (await readFile('.nika/serve.token', 'utf8')).trim();
 const nika = new Nika({ url: 'http://127.0.0.1:8787', token, allowInsecureHttp: true });
@@ -359,16 +359,16 @@ true sealed
 so your app needs no local engine for it. A server with a signing key answers
 `sealed`; one without answers `ok`. Store `run.id` (the job id) and the last
 `event.sequence` you processed, and a new process picks the job back up with
-`attachRun`. [docs/server.md](https://github.com/supernovae-st/nika-client/blob/main/docs/server.md)
+`attachRun`. [docs/server.md](https://github.com/nika-open/nika-client/blob/main/docs/server.md)
 covers setup, retries, recovery, restarts, artifacts, connection rules and schedules,
-and [`examples/server-recovery.ts`](https://github.com/supernovae-st/nika-client/blob/main/examples/server-recovery.ts)
+and [`examples/server-recovery.ts`](https://github.com/nika-open/nika-client/blob/main/examples/server-recovery.ts)
 recovers a job across two processes.
 
 **Watch the server lines above run, then one job, a retry and a wrong token.**
 
 <p align="center">
   <picture>
-    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/media/stills/sdk-remote.png">
+    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/nika-open/nika-client/HEAD/media/stills/sdk-remote.png">
     <img src="media/gifs/sdk-remote.gif" alt="The terminal types this README's server setup: a one-line nika.yaml, a token minted into .nika/serve.token with umask 077, .nika/ appended to .gitignore, NIKA_KEYCHAIN=off nika key init, and nika serve --bind 127.0.0.1:8787 --workflows . --token-file .nika/serve.token in the background; curl /health shows engineVersion 0.124.0 and machine protocol 2. node remote.mts prints served hello.nika, check clean, a job id, #1 run.started running, #2 run.settled succeeded, the greeting, verify verified · sealed, retry the same job: it did not run twice, and bad token 401 unauthorized" width="960">
   </picture>
 </p>
@@ -408,8 +408,8 @@ server run takes no per-run model: the workflow names it.
 
 <p align="center">
   <picture>
-    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/posters/nika-hero.png">
-    <img src="https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/nika-hero.optimized.gif" alt="nika check audits a meeting-actions workflow, then nika run executes it on a local model through Ollama and writes the meeting's action items to a typed JSON file" width="860">
+    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/nika-open/nika/v0.123.0/media/posters/nika-hero.png">
+    <img src="https://raw.githubusercontent.com/nika-open/nika/v0.123.0/media/gifs/nika-hero.optimized.gif" alt="nika check audits a meeting-actions workflow, then nika run executes it on a local model through Ollama and writes the meeting's action items to a typed JSON file" width="860">
   </picture>
 </p>
 <p align="center"><sub>The same engine from the command line, on a real job: the audit first, then a run on a local model that writes a meeting's action items as typed JSON. The audit was captured on engine 0.121.0; the run was captured on engine 0.109.2 (August 2026) with a real local model (<code>ollama/llama3.2:3b</code>).</sub></p>
@@ -449,7 +449,7 @@ All four rows were measured with the quick-start file on engine 0.123.0.
 <p align="center">
   <img src="media/stills/sdk-admitted-executed-sealed.png" alt="node prove.mts with no signing key prints run succeeded, receipt sealed false · 5 events and verify not verified · invalid · receipt_mismatch. NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init mints a key, and node prove.mts prints receipt sealed true · 6 events and verify verified. node tamper.mts changes one byte on line 4 of the trace, and node verify.mts prints not verified · invalid and engine BROKEN at line 5" width="860">
 </p>
-<p align="center"><sub>The last screen of the recording above. With no signing key the run succeeds with <code>sealed false</code> and <code>receipt_mismatch</code>; step 1's <code>nika key init</code> seals the next run, and <code>traceVerify()</code> answers <code>verified</code>; after one changed byte on line 4 of its trace, the stored receipt no longer verifies and the engine names the line: <code>BROKEN at line 5</code>. Captured from <code>@supernovae-st/nika</code> 0.124.0 and its bundled engine; the runs are <code>mock/echo</code> rehearsals.<br>▶ <a href="https://raw.githubusercontent.com/supernovae-st/nika/v0.123.0/media/gifs/trace-proof.optimized.gif">The chain check on the command line</a>: an illustration over a real <code>nika trace verify</code>, captured on engine 0.121.0</sub></p>
+<p align="center"><sub>The last screen of the recording above. With no signing key the run succeeds with <code>sealed false</code> and <code>receipt_mismatch</code>; step 1's <code>nika key init</code> seals the next run, and <code>traceVerify()</code> answers <code>verified</code>; after one changed byte on line 4 of its trace, the stored receipt no longer verifies and the engine names the line: <code>BROKEN at line 5</code>. Captured from <code>@supernovae-st/nika</code> 0.124.0 and its bundled engine; the runs are <code>mock/echo</code> rehearsals.<br>▶ <a href="https://raw.githubusercontent.com/nika-open/nika/v0.123.0/media/gifs/trace-proof.optimized.gif">The chain check on the command line</a>: an illustration over a real <code>nika trace verify</code>, captured on engine 0.121.0</sub></p>
 
 **Signing keys.** The engine your app starts and `nika serve` sign with
 `~/.nika/keys/` or the explicit `NIKA_RUN_KEY_FILE` and `NIKA_RUN_PUB_FILE`
@@ -462,7 +462,7 @@ it and writes the next one there (records it signed stay verifiable).
 `nika key align` copies a Secret Service key to the files. In CI, give the
 engine the explicit pair. Never copy a private run key into SDK
 configuration, source control, workflow inputs or an HTTP request.
-[docs/receipts.md](https://github.com/supernovae-st/nika-client/blob/main/docs/receipts.md)
+[docs/receipts.md](https://github.com/nika-open/nika-client/blob/main/docs/receipts.md)
 covers what a receipt carries, every server verdict and key custody.
 
 ## API reference
@@ -518,7 +518,7 @@ on a server, which takes them by served name only); without it `run()`
 rejects with `NikaCompatibilityError`, and the package
 never falls back to `--var`. `vars` is deprecated: it is the local `--var`
 operator channel and has no HTTP form. Keep secrets out of `inputs`.
-[docs/runs.md](https://github.com/supernovae-st/nika-client/blob/main/docs/runs.md#pass-your-apps-data-inputs)
+[docs/runs.md](https://github.com/nika-open/nika-client/blob/main/docs/runs.md#pass-your-apps-data-inputs)
 lists what the engine and the package refuse.
 
 **Pin the access path with `access`.** The workflow's `model:` picks the
@@ -537,7 +537,7 @@ the workflow's model cannot use (`NIKA-1801`), never taking another path, and
 `run.result()` settles `failed` with that code. A server refuses an empty pin
 at admission (`NikaOperationError`, `status` 422), and a local file's
 snapshot takes none.
-[docs/runs.md](https://github.com/supernovae-st/nika-client/blob/main/docs/runs.md#pin-the-access-path-access)
+[docs/runs.md](https://github.com/nika-open/nika-client/blob/main/docs/runs.md#pin-the-access-path-access)
 gives each door's answers.
 
 <details>
@@ -571,12 +571,12 @@ passing them to a local client throws `NikaConfigurationError`.
 
 | Topic | Page |
 |---|---|
-| `check()`, results, `inputs`, `run.events()` and its bounds, cancellation, typed frames, the deprecated wrappers | [docs/runs.md](https://github.com/supernovae-st/nika-client/blob/main/docs/runs.md) |
-| `nika serve`: setup, idempotent runs, `attachRun`, restarts, artifacts, schedules | [docs/server.md](https://github.com/supernovae-st/nika-client/blob/main/docs/server.md) |
-| Receipts, `traceVerify()` on both doors, signing keys | [docs/receipts.md](https://github.com/supernovae-st/nika-client/blob/main/docs/receipts.md) |
-| `compile()`: from an intention to a checked candidate, answer rounds, provider rounds | [docs/compile.md](https://github.com/supernovae-st/nika-client/blob/main/docs/compile.md) |
-| Every error, server refusals, troubleshooting | [docs/errors.md](https://github.com/supernovae-st/nika-client/blob/main/docs/errors.md) |
-| The words these pages use | [docs/glossary.md](https://github.com/supernovae-st/nika-client/blob/main/docs/glossary.md) |
+| `check()`, results, `inputs`, `run.events()` and its bounds, cancellation, typed frames, the deprecated wrappers | [docs/runs.md](https://github.com/nika-open/nika-client/blob/main/docs/runs.md) |
+| `nika serve`: setup, idempotent runs, `attachRun`, restarts, artifacts, schedules | [docs/server.md](https://github.com/nika-open/nika-client/blob/main/docs/server.md) |
+| Receipts, `traceVerify()` on both doors, signing keys | [docs/receipts.md](https://github.com/nika-open/nika-client/blob/main/docs/receipts.md) |
+| `compile()`: from an intention to a checked candidate, answer rounds, provider rounds | [docs/compile.md](https://github.com/nika-open/nika-client/blob/main/docs/compile.md) |
+| Every error, server refusals, troubleshooting | [docs/errors.md](https://github.com/nika-open/nika-client/blob/main/docs/errors.md) |
+| The words these pages use | [docs/glossary.md](https://github.com/nika-open/nika-client/blob/main/docs/glossary.md) |
 
 ## Troubleshooting
 
@@ -584,7 +584,7 @@ passing them to a local client throws `NikaConfigurationError`.
 |---|---|
 | `not verified: receipt_mismatch` after a successful run | Create a key the engine your app starts can read: `NIKA_KEYCHAIN=off ./node_modules/.bin/nika key init`. On a Mac whose keychain holds a key from Nika 0.122 or older, that mints a new key as files; on Linux, `./node_modules/.bin/nika key align` from a terminal copies a key that `nika key init --force` stored in the Secret Service instead. |
 | `NikaEngineUnavailable` from `new Nika()` | No engine payload for this machine: use Node.js 22 or newer on macOS or glibc Linux, keep optional dependencies (no `--omit=optional`); on Windows or musl (Alpine), set an absolute `bin`/`NIKA_BIN` or connect to a `nika serve` by URL. |
-| `NikaCompatibilityError` with `capability: 'engineIdentity'` | The engine or server does not speak machine protocol 2 (0.123 or later). Upgrade it with the package: [docs/upgrading-to-0.123.md](https://github.com/supernovae-st/nika-client/blob/main/docs/upgrading-to-0.123.md). |
+| `NikaCompatibilityError` with `capability: 'engineIdentity'` | The engine or server does not speak machine protocol 2 (0.123 or later). Upgrade it with the package: [docs/upgrading-to-0.123.md](https://github.com/nika-open/nika-client/blob/main/docs/upgrading-to-0.123.md). |
 | `NikaConfigurationError` about `bin` or `NIKA_BIN` | Give an absolute path; a bare name or a relative path is refused. |
 | `nika serve` exits: `token file must be mode 0600` | `chmod 600 .nika/serve.token`; the token must be 32–512 visible ASCII bytes. |
 | `nika serve` exits: `nothing armed — this project has no nika.yaml` | Add a one-line `nika.yaml` in the folder you serve: `nika: my-project`. |
@@ -592,12 +592,12 @@ passing them to a local client throws `NikaConfigurationError`.
 | `NikaProtocolError: … exceeded … bytes (machineBufferBytes)` | A frame or record was larger than the bound: set `machineBufferBytes` to the size the message names, or remove a lowered value (the 16 MiB default holds any server result); `attachRun(jobId)` reads a server job again. |
 
 More causes, and every error class, are in
-[docs/errors.md](https://github.com/supernovae-st/nika-client/blob/main/docs/errors.md).
+[docs/errors.md](https://github.com/nika-open/nika-client/blob/main/docs/errors.md).
 
 ## Install and versions
 
 ```sh
-npm install @supernovae-st/nika
+npm install @nika-open/nika
 ```
 
 **Status.** 0.124 is the current release line. Work stays focused on
@@ -610,7 +610,7 @@ you build on it.
   warns (`EBADENGINE`) and skips the engine payload, so `new Nika()` throws
   `NikaEngineUnavailable`.
 - **macOS or Linux for the bundled engine.** npm installs the one platform
-  package that matches your machine (`@supernovae-st/nika-<os>-<arch>`: macOS
+  package that matches your machine (`@nika-open/nika-<os>-<arch>`: macOS
   on Apple silicon or Intel, Linux on x64 or arm64 with glibc). On any other
   platform, `new Nika()` throws `NikaEngineUnavailable`: point `bin` or
   `NIKA_BIN` at a compatible engine, or connect to a `nika serve` by URL.
@@ -626,7 +626,7 @@ you build on it.
 **Pin the version you tested, then check what you installed:**
 
 ```sh
-node -p "require('@supernovae-st/nika/package.json').version"
+node -p "require('@nika-open/nika/package.json').version"
 ./node_modules/.bin/nika --version
 ```
 
@@ -639,26 +639,36 @@ with the same number, the one it was tested with: 0.124.4 bundles
 It refuses an engine or server on another generation (0.122 and older speak 1)
 at its identity probe (`nika --sdk-identity`, `GET /health`), before any job,
 with `NikaCompatibilityError`: upgrade the package and every `nika serve`
-together ([docs/upgrading-to-0.123.md](https://github.com/supernovae-st/nika-client/blob/main/docs/upgrading-to-0.123.md)).
+together ([docs/upgrading-to-0.123.md](https://github.com/nika-open/nika-client/blob/main/docs/upgrading-to-0.123.md)).
 The older 0.120.3 package pairs only with engines 0.120.x. The standalone CLI
-(GitHub releases, `brew install supernovae-st/tap/nika`,
+(GitHub releases, `brew install nika-open/tap/nika`,
 `curl -LsSf https://nika.sh/install.sh | sh`, the
-`ghcr.io/supernovae-st/nika` image) is released separately; this package
+`ghcr.io/nika-open/nika` image, where 0.124.4 and earlier stay at
+`ghcr.io/supernovae-st/nika`) is released separately; this package
 never uses it.
 
 **Stay current:**
 
 ```sh
-npm update @supernovae-st/nika     # the package and its engine, together
+npm update @nika-open/nika         # the package and its engine, together
 ./node_modules/.bin/nika doctor    # diagnoses this machine and prints fixes; changes nothing
 ```
 
-**The old package name.** Up to 0.115.0 this package was published as
-`@supernovae-st/nika-client`. That name gets no further releases. It is not
-marked deprecated on npm, so installing it still succeeds without a warning
-and gives you the retired 0.115.0 API (the `LocalNika`/HTTP split), not the
-`Nika` client documented here: install `@supernovae-st/nika`. The repository
-keeps its name, `supernovae-st/nika-client`.
+**The old package names.** The repositories moved to the `nika-open`
+organization on 2026-11-20, and the package with them: it is
+`@nika-open/nika`. Up to 0.124.4 it was published as `@supernovae-st/nika`,
+and up to 0.115.0 as `@supernovae-st/nika-client`; neither name gets further
+releases. Replace the old dependency, then its imports:
+
+```sh
+npm uninstall @supernovae-st/nika && npm install @nika-open/nika
+```
+
+`@supernovae-st/nika-client` is not marked deprecated on npm, so installing
+it still succeeds without a warning and gives you the retired 0.115.0 API
+(the `LocalNika`/HTTP split), not the `Nika` client documented here. The
+repository is `nika-open/nika-client`; GitHub redirects the old
+`supernovae-st/nika-client` path.
 
 ## Security
 
@@ -680,30 +690,30 @@ keeps its name, `supernovae-st/nika-client`.
   of configuration, source control, workflow inputs and HTTP requests.
 
 To report a vulnerability privately, follow
-[SECURITY.md](https://github.com/supernovae-st/nika-client/blob/main/SECURITY.md).
+[SECURITY.md](https://github.com/nika-open/nika-client/blob/main/SECURITY.md).
 
 ## Documentation
 
 - **In this package** (`docs/`, also on GitHub):
-  [runs](https://github.com/supernovae-st/nika-client/blob/main/docs/runs.md),
-  [server](https://github.com/supernovae-st/nika-client/blob/main/docs/server.md),
-  [receipts](https://github.com/supernovae-st/nika-client/blob/main/docs/receipts.md),
-  [compile](https://github.com/supernovae-st/nika-client/blob/main/docs/compile.md),
-  [errors](https://github.com/supernovae-st/nika-client/blob/main/docs/errors.md),
-  [upgrading to 0.123](https://github.com/supernovae-st/nika-client/blob/main/docs/upgrading-to-0.123.md),
-  [glossary](https://github.com/supernovae-st/nika-client/blob/main/docs/glossary.md)
-  and the [HTTP contract](https://github.com/supernovae-st/nika-client/blob/main/docs/http-api.md).
-  For contributors: [architecture](https://github.com/supernovae-st/nika-client/blob/main/docs/architecture.md)
-  and [testing and release evidence](https://github.com/supernovae-st/nika-client/blob/main/docs/testing.md).
-  History: [migrating to 0.116](https://github.com/supernovae-st/nika-client/blob/main/docs/migrating-to-0.116.md)
-  and the [changelog](https://github.com/supernovae-st/nika-client/blob/main/CHANGELOG.md).
+  [runs](https://github.com/nika-open/nika-client/blob/main/docs/runs.md),
+  [server](https://github.com/nika-open/nika-client/blob/main/docs/server.md),
+  [receipts](https://github.com/nika-open/nika-client/blob/main/docs/receipts.md),
+  [compile](https://github.com/nika-open/nika-client/blob/main/docs/compile.md),
+  [errors](https://github.com/nika-open/nika-client/blob/main/docs/errors.md),
+  [upgrading to 0.123](https://github.com/nika-open/nika-client/blob/main/docs/upgrading-to-0.123.md),
+  [glossary](https://github.com/nika-open/nika-client/blob/main/docs/glossary.md)
+  and the [HTTP contract](https://github.com/nika-open/nika-client/blob/main/docs/http-api.md).
+  For contributors: [architecture](https://github.com/nika-open/nika-client/blob/main/docs/architecture.md)
+  and [testing and release evidence](https://github.com/nika-open/nika-client/blob/main/docs/testing.md).
+  History: [migrating to 0.116](https://github.com/nika-open/nika-client/blob/main/docs/migrating-to-0.116.md)
+  and the [changelog](https://github.com/nika-open/nika-client/blob/main/CHANGELOG.md).
 - **The SDK guide** on docs.nika.sh: [overview](https://docs.nika.sh/sdk/overview),
   [quickstart](https://docs.nika.sh/sdk/start/quickstart),
   [methods](https://docs.nika.sh/sdk/reference/methods),
   [receipts](https://docs.nika.sh/sdk/runtime/receipts) and the
   [remote client](https://docs.nika.sh/sdk/remote/client).
-- **Upstream:** [the engine](https://github.com/supernovae-st/nika) and
-  [the language specification](https://github.com/supernovae-st/nika-spec).
+- **Upstream:** [the engine](https://github.com/nika-open/nika) and
+  [the language specification](https://github.com/nika-open/nika-spec).
 
 ## Contributing
 
@@ -729,9 +739,9 @@ NIKA_BIN=/absolute/path/to/nika npm run gauntlet:hostile    # concurrency, cance
 
 `gauntlet/` also holds 100 distinct use-case workflows and the provider
 evidence, and
-[docs/testing.md](https://github.com/supernovae-st/nika-client/blob/main/docs/testing.md)
+[docs/testing.md](https://github.com/nika-open/nika-client/blob/main/docs/testing.md)
 explains every test layer. The HTTP types mirror the pinned
-[`openapi.json`](https://github.com/supernovae-st/nika-client/blob/main/openapi.json)
+[`openapi.json`](https://github.com/nika-open/nika-client/blob/main/openapi.json)
 of `nika serve`: never add a field the engine does not send.
 
 The recordings on this page are rendered, never edited:
@@ -745,23 +755,23 @@ the tools and the rules.
 
 | | Repository | What it gives you |
 |---|---|---|
-| 🦋 | [nika](https://github.com/supernovae-st/nika) | The engine and CLI: write, check, run and verify AI workflows |
-| 📖 | [nika-docs](https://github.com/supernovae-st/nika-docs) | The documentation, live at [docs.nika.sh](https://docs.nika.sh) |
-| 📜 | [nika-spec](https://github.com/supernovae-st/nika-spec) | The language specification and the suite that proves an engine follows it |
-| 🧩 | [nika-vscode](https://github.com/supernovae-st/nika-vscode) | The editor extension, frozen at 0.120 and not qualified with 0.124: use `nika lsp` and the JSON Schema |
-| 🟦 | **[nika-client](https://github.com/supernovae-st/nika-client)** | **Run and verify workflows from TypeScript** |
-| ✅ | [nika-action](https://github.com/supernovae-st/nika-action) | A GitHub Action that posts a `nika check` verdict on your pull requests |
-| 🚀 | [nika-actions-starter](https://github.com/supernovae-st/nika-actions-starter) | A ready template: workflows, editor setup and CI from the first push |
-| 📦 | [nika-registry](https://github.com/supernovae-st/nika-registry) | Shareable workflows, pinned and re-verified |
-| 🤖 | [nika-plugins](https://github.com/supernovae-st/nika-plugins) | Teaches your coding agent (Claude Code, Codex, Cursor…) to write Nika |
-| 🍺 | [homebrew-tap](https://github.com/supernovae-st/homebrew-tap) | `brew install supernovae-st/tap/nika` |
-| 🐙 | [gh-nika](https://github.com/supernovae-st/gh-nika) | The Nika CLI as a GitHub CLI extension |
-| 🏛️ | [nika-estate](https://github.com/supernovae-st/nika-estate) | Where each file in Nika's core repositories comes from, declared and re-checkable |
+| 🦋 | [nika](https://github.com/nika-open/nika) | The engine and CLI: write, check, run and verify AI workflows |
+| 📖 | [nika-docs](https://github.com/nika-open/nika-docs) | The documentation, live at [docs.nika.sh](https://docs.nika.sh) |
+| 📜 | [nika-spec](https://github.com/nika-open/nika-spec) | The language specification and the suite that proves an engine follows it |
+| 🧩 | [nika-vscode](https://github.com/nika-open/nika-vscode) | The editor extension, frozen at 0.120 and not qualified with 0.124: use `nika lsp` and the JSON Schema |
+| 🟦 | **[nika-client](https://github.com/nika-open/nika-client)** | **Run and verify workflows from TypeScript** |
+| ✅ | [nika-action](https://github.com/nika-open/nika-action) | A GitHub Action that posts a `nika check` verdict on your pull requests |
+| 🚀 | [nika-actions-starter](https://github.com/nika-open/nika-actions-starter) | A ready template: workflows, editor setup and CI from the first push |
+| 📦 | [nika-registry](https://github.com/nika-open/nika-registry) | Shareable workflows, pinned and re-verified |
+| 🤖 | [nika-plugins](https://github.com/nika-open/nika-plugins) | Teaches your coding agent (Claude Code, Codex, Cursor…) to write Nika |
+| 🍺 | [homebrew-tap](https://github.com/nika-open/homebrew-tap) | `brew install nika-open/tap/nika` |
+| 🐙 | [gh-nika](https://github.com/nika-open/gh-nika) | The Nika CLI as a GitHub CLI extension |
+| 🏛️ | [nika-estate](https://github.com/nika-open/nika-estate) | Where each file in Nika's core repositories comes from, declared and re-checkable |
 <!-- /city:map -->
 
 ## License
 
-[Apache-2.0](https://github.com/supernovae-st/nika-client/blob/main/LICENSE).
+[Apache-2.0](https://github.com/nika-open/nika-client/blob/main/LICENSE).
 The engine this package runs is licensed separately, under
 AGPL-3.0-or-later; importing this package does not impose the engine's
 copyleft license on your application.

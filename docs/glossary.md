@@ -2,7 +2,7 @@
 
 The words these pages use, defined once. The engine's own vocabulary is in the
 [Nika documentation](https://docs.nika.sh) and the
-[language specification](https://github.com/supernovae-st/nika-spec).
+[language specification](https://github.com/nika-open/nika-spec).
 
 | Word | Meaning |
 |---|---|

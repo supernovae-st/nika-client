@@ -83,9 +83,9 @@ is an animated diagram of how the package runs a workflow through either door
   takes 25 seconds and shows the two doors side by side, where the capture
   ran them one after the other.
 - **Rendered by** the engine repository's motion pipeline
-  ([`scripts/media/motion/intent-to-proof`](https://github.com/supernovae-st/nika/tree/v0.124.0/scripts/media/motion/intent-to-proof)
+  ([`scripts/media/motion/intent-to-proof`](https://github.com/nika-open/nika/tree/v0.124.0/scripts/media/motion/intent-to-proof)
   at the `v0.124.0` tag, `866ed914b`, whose clip and capture script are the
-  ones [supernovae-st/nika#1824](https://github.com/supernovae-st/nika/pull/1824)
+  ones [nika-open/nika#1824](https://github.com/nika-open/nika/pull/1824)
   added), which refuses to render when a captured fact changes; the render
   passed the pipeline's strict readability audit. The capture
   (`node scripts/media/capture/sdk-doors.mjs --version 0.124.0`) and the

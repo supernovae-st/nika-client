@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The package moves to the `nika-open` organization.** The repositories
+  moved from `supernovae-st` to `nika-open` on 2026-11-20. The package is
+  published as `@nika-open/nika` and its native payloads as
+  `@nika-open/nika-<os>-<arch>`, from `nika-open/nika-client`: every manifest's
+  `repository`, and so npm provenance, names that repository, and `mcpName` is
+  `io.github.nika-open/nika`. Versions up to 0.124.4 stay installable as
+  `@supernovae-st/nika`, which gets no further versions: replace the
+  dependency and its imports. Release evidence, packed-install checks and the
+  publication gates follow the new tarball name `nika-open-nika-<version>.tgz`,
+  and native `SOURCE.json` names the engine source `nika-open/nika`. The
+  packed ledgers (mini-SaaS, recovery, depth projects) were regenerated from a
+  fresh pack against the verified public `nika 0.124.4 (9753cf41b)` binary:
+  only the package name, its digest, the consumer app digests and fresh
+  identifiers moved, and a full replay matched every committed ledger.
+- Engine release assets are read from `nika-open/nika`. Their attestations
+  stay bound to the identity that signed them: a release up to v0.124.4
+  verifies against `supernovae-st/nika`, a later one against `nika-open/nika`.
+- The `ci.yml` jobs that declared no permissions run with `contents: read`.
+
 ## [0.124.4] - 2026-11-12
 
 ### Changed
@@ -1640,7 +1661,7 @@ Initial public release. Full rewrite from v0.1.0.
 - Error hierarchy completely redesigned
 - License changed from MIT to AGPL-3.0-or-later
 
-[Unreleased]: https://github.com/supernovae-st/nika-client/compare/v0.124.4...HEAD
+[Unreleased]: https://github.com/nika-open/nika-client/compare/v0.124.4...HEAD
 [0.124.4]: https://github.com/supernovae-st/nika-client/compare/v0.124.3...v0.124.4
 [0.124.3]: https://github.com/supernovae-st/nika-client/compare/v0.124.2...v0.124.3
 [0.124.2]: https://github.com/supernovae-st/nika-client/compare/v0.124.1...v0.124.2

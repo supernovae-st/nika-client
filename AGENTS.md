@@ -5,11 +5,11 @@ Vendor-neutral agent entry per the AGENTS.md convention (agents.md).
 ## What this repo is
 
 The TypeScript client SDK for Nika — the open workflow language for AI —
-published as `@supernovae-st/nika`. One `Nika` class: without `url` it starts
+published as `@nika-open/nika`. One `Nika` class: without `url` it starts
 the bundled engine (or `bin`/`NIKA_BIN`) as a child process; with
 `{ url, token }` it talks to a live `nika serve --bind` over HTTP
-(`--workflows` + `--token-file`). The engine is `supernovae-st/nika` (AGPL);
-the language spec is `supernovae-st/nika-spec` (Apache-2.0). Each package
+(`--workflows` + `--token-file`). The engine is `nika-open/nika` (AGPL);
+the language spec is `nika-open/nika-spec` (Apache-2.0). Each package
 version bundles the engine with the same number and speaks its machine
 protocol (2 for 0.123 and 0.124). 0.124 is the current release line. Work
 stays focused on maintenance, security and the media capabilities workflows

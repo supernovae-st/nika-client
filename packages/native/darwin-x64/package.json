@@ -1,6 +1,6 @@
 {
   "name": "@nika-open/nika-darwin-x64",
-  "version": "0.124.4",
+  "version": "0.124.5",
   "description": "Nika native engine payload for macOS x64",
   "license": "AGPL-3.0-or-later",
   "os": [

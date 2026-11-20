@@ -452,19 +452,22 @@ file, never of a request, and its health answer lists one more capability,
 `accessServiceTier`. 0.124.3 keeps the machine protocol and the compile code
 once more. Its served document adds one route,
 `GET /v1/access-offers/{name}`, with the schemas of its answer, and its
-health answer lists `accessSessionOffer`. 0.124.4, the engine this package
-version bundles, keeps both again, and its default served document differs
-from 0.124.3's only by its version: the standing cost policy it adds is a
-flag the operator gives at startup (`nika serve --cost-policy`), never a
-field of a request. Only a server started with that flag lists one more
-capability, `costStandingPolicyV1`, and describes the `cost_admission` of a
-job's settlement in the document it serves. This package refuses an engine
+health answer lists `accessSessionOffer`. 0.124.4 keeps both again, and its
+default served document differs from 0.124.3's only by its version: the
+standing cost policy it adds is a flag the operator gives at startup
+(`nika serve --cost-policy`), never a field of a request. Only a server
+started with that flag lists one more capability, `costStandingPolicyV1`,
+and describes the `cost_admission` of a job's settlement in the document it
+serves. 0.124.5, the engine this package version bundles, is the first
+release published from `nika-open/nika` and keeps both once more: its
+default served document differs from 0.124.4's only by its version, and its
+health answer lists the same capabilities. This package refuses an engine
 on protocol 1 at its identity. An engine without a flag answers with a usage
 error; a server without a field answers `422 malformed_compile_request`.
 Point `NIKA_BIN` (or `bin`) at the engine you mean to use.
 
 The pinned `openapi.json` and `src/generated/openapi.d.ts` are the default
-document of the released engine 0.124.4 resident, regenerated from the
+document of the released engine 0.124.5 resident, regenerated from the
 released `nika serve`. The generation-2 types are written by hand from the
 engine source at tag `v0.123.0`: `crates/nika-serve/src/server/compile/v2.rs`,
 `author.rs` and `openapi-native.json` (the rounds, the judged answer round

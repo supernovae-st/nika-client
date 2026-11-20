@@ -19,7 +19,7 @@ import {
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const committedResults = path.join(ROOT, 'gauntlet', 'results');
-const ENGINE = 'nika 0.124.4 (9753cf41b)';
+const ENGINE = 'nika 0.124.5 (8b640a9b7)';
 const STABLE_CANCELLED_KIND = 'execution.cancelled|execution.settled';
 // The 200 shape: the resident cancelled the job before its execution started.
 const CANCELLED_BEFORE_EXECUTION = {
@@ -429,7 +429,7 @@ describe('public release evidence replay', () => {
   it('refuses a pack filename that is not a plain basename', () => {
     const replay = createReplay();
     const depth = readJson(replay, 'depth-projects.json');
-    depth.package = '../nika-open-nika-0.124.4.tgz';
+    depth.package = '../nika-open-nika-0.124.5.tgz';
     writeJson(replay, 'depth-projects.json', depth);
 
     expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
@@ -716,7 +716,7 @@ function createReplay(): string {
   writeJson(replay, 'depth-projects.json', depth);
   writeJson(replay, 'depth-package.json', {
     name: '@nika-open/nika',
-    version: '0.124.4',
+    version: '0.124.5',
     filename: depth.package,
     size: bytes.length,
     integrity: sha512Integrity(artifact),

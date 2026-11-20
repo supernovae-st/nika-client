@@ -10,17 +10,19 @@ const commit = 'a'.repeat(40);
 const asset = 'nika-macos-arm64-0.118.7.tar.gz';
 const tag = 'v0.118.7';
 
-async function fixture(body) {
+async function fixture(body, version = '0.118.7') {
+  const archiveName = `nika-macos-arm64-${version}.tar.gz`;
+  const releaseTag = `v${version}`;
   const root = mkdtempSync(path.join(tmpdir(), 'nika-artifact-proof-'));
-  const archive = path.join(root, asset);
+  const archive = path.join(root, archiveName);
   const sums = path.join(root, 'SHA256SUMS');
   const bytes = Buffer.from('not executable: verifier tests never extract or run it');
   const hash = createHash('sha256').update(bytes).digest('hex');
   writeFileSync(archive, bytes);
-  writeFileSync(sums, `${hash}  ${asset}\n`);
-  const release = { tag_name: tag, draft: false, prerelease: false, published_at: '2026-09-04T20:00:00Z',
-    assets: [{ name: asset, state: 'uploaded', size: bytes.length,
-      browser_download_url: `https://github.com/supernovae-st/nika/releases/download/${tag}/${asset}` }] };
+  writeFileSync(sums, `${hash}  ${archiveName}\n`);
+  const release = { tag_name: releaseTag, draft: false, prerelease: false, published_at: '2026-09-04T20:00:00Z',
+    assets: [{ name: archiveName, state: 'uploaded', size: bytes.length,
+      browser_download_url: `https://github.com/nika-open/nika/releases/download/${releaseTag}/${archiveName}` }] };
   const calls = [];
   const run = (command, args, options) => {
     calls.push({ command, args, options });
@@ -35,13 +37,41 @@ test('native archive proof binds bytes to the exact hosted workflow, tag and sou
   await fixture(async ({ archive, sums, calls, run, hash }) => {
     assert.deepEqual(await verifyEngineArchive(archive, sums, '0.118.7', commit, run),
       { tag, commit, asset, sha256: hash });
-    assert.deepEqual(calls.at(-1).args, ['attestation', 'verify', archive,
+    const [download, verify] = calls.slice(-2);
+    assert.deepEqual(download.args, ['attestation', 'download', archive,
+      '--owner', 'supernovae-st', '--predicate-type', 'https://slsa.dev/provenance/v1']);
+    assert.deepEqual(verify.args, ['attestation', 'verify', archive,
+      '--bundle', path.join(download.options.cwd, `sha256:${hash}.jsonl`),
       '--repo', 'supernovae-st/nika', '--cert-identity',
       `https://github.com/supernovae-st/nika/.github/workflows/release.yml@refs/tags/${tag}`,
       '--source-ref', `refs/tags/${tag}`, '--source-digest', commit,
       '--predicate-type', 'https://slsa.dev/provenance/v1', '--deny-self-hosted-runners']);
     assert(calls.every(({ command, options }) => command === 'gh' && options.timeout === 90_000));
   });
+});
+
+test.each([
+  ['0.124.4', 'supernovae-st/nika'],
+  ['0.124.5', 'nika-open/nika'],
+  ['0.125.0', 'nika-open/nika'],
+])('engine %s reads nika-open/nika and verifies against its signer %s', async (version, signer) => {
+  await fixture(async ({ archive, sums, calls, run }) => {
+    await verifyEngineArchive(archive, sums, version, commit, run);
+    assert.deepEqual(calls.slice(0, 2).map(({ args }) => args), [
+      ['api', `repos/nika-open/nika/releases/tags/v${version}`],
+      ['api', `repos/nika-open/nika/commits/v${version}`],
+    ]);
+    const verify = calls.at(-1).args;
+    const identity = verify.indexOf('--repo');
+    assert.deepEqual(verify.slice(identity, identity + 4), ['--repo', signer, '--cert-identity',
+      `https://github.com/${signer}/.github/workflows/release.yml@refs/tags/v${version}`]);
+    // An attestation signed before the move is fetched where it stayed, the old
+    // organization, and verified offline; a later one is fetched from the repository.
+    const signedBeforeMove = signer === 'supernovae-st/nika';
+    assert.equal(calls.length, signedBeforeMove ? 4 : 3);
+    assert.equal(verify.includes('--bundle'), signedBeforeMove);
+    if (signedBeforeMove) assert.deepEqual(calls[2].args.slice(3, 5), ['--owner', 'supernovae-st']);
+  }, version);
 });
 
 test.each(['draft', 'prerelease', 'unpublished', 'wrong-tag', 'duplicate', 'size', 'source'])('archive proof refuses %s metadata before attestation', async (kind) => {
@@ -99,7 +129,7 @@ test('both CI consumers and release packaging use the one strict archive verifie
   const release = readFileSync(new URL('../.github/workflows/release.yml', import.meta.url), 'utf8');
   assert.equal(ci.match(/scripts\/verify-engine-archive\.mjs/g)?.length, 2);
   assert.equal(release.match(/scripts\/verify-engine-archive\.mjs/g)?.length, 1);
-  assert(!`${ci}\n${release}`.includes('gh attestation verify "$asset" --repo supernovae-st/nika'));
+  assert(!`${ci}\n${release}`.includes('gh attestation verify "$asset" --repo nika-open/nika'));
 });
 
 test('an executable states one identity of its own; the provenance pins it embeds are data', async () => {

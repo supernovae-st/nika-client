@@ -44,11 +44,11 @@ await chmod(outputBin, 0o755);
 await copyFile(path.resolve(args.license), path.join(packageDir, 'LICENSE'));
 
 const source = {
-  repository: 'https://github.com/supernovae-st/nika',
+  repository: 'https://github.com/nika-open/nika',
   tag: `v${rootManifest.version}`,
   commit: args['source-commit'],
   releaseAsset: args.asset,
-  sourceArchive: `https://github.com/supernovae-st/nika/archive/refs/tags/v${rootManifest.version}.tar.gz`,
+  sourceArchive: `https://github.com/nika-open/nika/archive/refs/tags/v${rootManifest.version}.tar.gz`,
 };
 const integrity = {
   algorithm: 'sha256',

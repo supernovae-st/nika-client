@@ -1,4 +1,4 @@
-import { Nika } from '@supernovae-st/nika';
+import { Nika } from '@nika-open/nika';
 
 const nika = new Nika({ cwd: process.cwd(), eventBufferSize: 64 });
 const checked = await nika.check('workflow.nika', { nativeStrict: true });

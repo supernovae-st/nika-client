@@ -49,12 +49,12 @@ try {
   await run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', '--omit=optional', '--offline', tarball], consumer);
   copyFileSync(path.join(root, 'scripts/packed-consumers/compile-parity.cjs'), path.join(consumer, 'scenario.cjs'));
   writeFileSync(path.join(consumer, 'consumer.cjs'), [
-    "const sdk = require('@supernovae-st/nika');", "const scenario = require('./scenario.cjs');",
+    "const sdk = require('@nika-open/nika');", "const scenario = require('./scenario.cjs');",
     "const config = JSON.parse(require('node:fs').readFileSync(process.argv[2], 'utf8'));",
     'scenario(sdk, config).then((result) => process.stdout.write(JSON.stringify(result)));',
   ].join('\n'));
   writeFileSync(path.join(consumer, 'consumer.mjs'), [
-    "import * as sdk from '@supernovae-st/nika';", "import scenario from './scenario.cjs';",
+    "import * as sdk from '@nika-open/nika';", "import scenario from './scenario.cjs';",
     "import { readFileSync } from 'node:fs';",
     'process.stdout.write(JSON.stringify(await scenario(sdk, JSON.parse(readFileSync(process.argv[2], "utf8")))));',
   ].join('\n'));

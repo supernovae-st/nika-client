@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { Nika } from '@supernovae-st/nika';
+import { Nika } from '@nika-open/nika';
 
 const nika = new Nika({ cwd: process.cwd() });
 const server = createServer(async (request, response) => {

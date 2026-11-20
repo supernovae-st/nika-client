@@ -407,11 +407,11 @@ describe('public release evidence replay', () => {
   it('refuses a depth-package.json that names a different archive', () => {
     const replay = createReplay();
     const manifest = readJson(replay, 'depth-package.json');
-    manifest.filename = 'supernovae-st-nika-0.0.0.tgz';
+    manifest.filename = 'nika-open-nika-0.0.0.tgz';
     writeJson(replay, 'depth-package.json', manifest);
 
     expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
-      'depth-package.json filename supernovae-st-nika-0.0.0.tgz does not match ledger',
+      'depth-package.json filename nika-open-nika-0.0.0.tgz does not match ledger',
     );
   });
 
@@ -429,7 +429,7 @@ describe('public release evidence replay', () => {
   it('refuses a pack filename that is not a plain basename', () => {
     const replay = createReplay();
     const depth = readJson(replay, 'depth-projects.json');
-    depth.package = '../supernovae-st-nika-0.124.4.tgz';
+    depth.package = '../nika-open-nika-0.124.4.tgz';
     writeJson(replay, 'depth-projects.json', depth);
 
     expect(() => verifyReleaseReplay(ROOT, replay)).toThrow(
@@ -683,7 +683,7 @@ function depthReport(incident: Record<string, unknown>): any {
   return {
     schema_version: 1,
     engine: ENGINE,
-    package: 'supernovae-st-nika-0.118.7.tgz',
+    package: 'nika-open-nika-0.118.7.tgz',
     projects: [{
       project: 'incident-response-controller',
       status: 'succeeded',
@@ -715,7 +715,7 @@ function createReplay(): string {
   depth.package_sha256 = createHash('sha256').update(bytes).digest('hex');
   writeJson(replay, 'depth-projects.json', depth);
   writeJson(replay, 'depth-package.json', {
-    name: '@supernovae-st/nika',
+    name: '@nika-open/nika',
     version: '0.124.4',
     filename: depth.package,
     size: bytes.length,

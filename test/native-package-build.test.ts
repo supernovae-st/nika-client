@@ -72,7 +72,7 @@ function createFixture(machine: number) {
   mkdirSync(packageDir, { recursive: true });
   writeFileSync(path.join(root, 'package.json'), JSON.stringify({ version: VERSION }));
   writeFileSync(path.join(packageDir, 'package.json'), JSON.stringify({
-    name: '@supernovae-st/nika-linux-x64',
+    name: '@nika-open/nika-linux-x64',
     version: VERSION,
     os: ['linux'],
     cpu: ['x64'],

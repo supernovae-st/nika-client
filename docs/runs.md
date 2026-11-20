@@ -8,7 +8,7 @@ differ, it says so. Server specifics live in [server.md](server.md), proof in
 [receipts.md](receipts.md), and every error in [errors.md](errors.md).
 
 ```ts
-import { Nika, isNikaRunSucceeded } from '@supernovae-st/nika';
+import { Nika, isNikaRunSucceeded } from '@nika-open/nika';
 
 const nika = new Nika();
 const run = await nika.run<{ answer: number }>('flow.nika', { maxCostUsd: 0.05 });
@@ -89,7 +89,7 @@ The same audit, for humans, is `./node_modules/.bin/nika check hello.nika`.
 ## Read the result
 
 ```ts
-import { Nika, isNikaRunSucceeded } from '@supernovae-st/nika';
+import { Nika, isNikaRunSucceeded } from '@nika-open/nika';
 
 const run = await new Nika().run<{ answer: number }>('flow.nika');
 const result = await run.result();
@@ -285,7 +285,7 @@ On a local run, each `infer:` or `agent:` task's terminal frame carries what
 the file asked and what the route did. Two readers parse those rows:
 
 ```ts
-import { readNikaAccessRequirement, readNikaAccessSelection } from '@supernovae-st/nika';
+import { readNikaAccessRequirement, readNikaAccessSelection } from '@nika-open/nika';
 
 for await (const event of run.events()) {
   if (event.kind !== 'task.completed') continue;
@@ -355,11 +355,11 @@ no such frame.
 
 <p align="center">
   <picture>
-    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/media/stills/sdk-events.png">
-    <img src="https://raw.githubusercontent.com/supernovae-st/nika-client/HEAD/media/gifs/sdk-events.gif" alt="nika check brief.nika plans 3 waves and 4 tasks. watch.mts loops over run.events() and prints each event's time and kind. node watch.mts prints 16 events: at 0.0 s run.started, four task.scheduled, audience and risks started and completed; at 2.0 s review started, an engine.event (permit_checked), review completed, brief started and completed, an engine.event (workflow_completed) and run.settled succeeded; then result succeeded · cause normal · 4/4 tasks ok" width="860">
+    <source media="(prefers-reduced-motion: reduce)" srcset="https://raw.githubusercontent.com/nika-open/nika-client/HEAD/media/stills/sdk-events.png">
+    <img src="https://raw.githubusercontent.com/nika-open/nika-client/HEAD/media/gifs/sdk-events.gif" alt="nika check brief.nika plans 3 waves and 4 tasks. watch.mts loops over run.events() and prints each event's time and kind. node watch.mts prints 16 events: at 0.0 s run.started, four task.scheduled, audience and risks started and completed; at 2.0 s review started, an engine.event (permit_checked), review completed, brief started and completed, an engine.event (workflow_completed) and run.settled succeeded; then result succeeded · cause normal · 4/4 tasks ok" width="860">
   </picture>
 </p>
-<p align="center"><sub><code>watch.mts</code> prints each event of a four-task workflow with the time it arrived: sixteen events, the engine's <code>permit_checked</code> and <code>workflow_completed</code> frames as <code>engine.event</code> (their kind on <code>event.raw</code>), then <code>result()</code>: <code>succeeded · cause normal · 4/4 tasks ok</code>. The two-second gap is a <code>nika:wait</code> task, whose start engine 0.124.0 streams only when it completes. Recorded from <code>@supernovae-st/nika</code> 0.124.0 and its bundled engine; the run is a <code>mock/echo</code> rehearsal.<br>▶ <a href="https://github.com/supernovae-st/nika-client/blob/main/media/videos/sdk-events.mp4?raw=true">MP4</a> · <a href="https://github.com/supernovae-st/nika-client/blob/main/media/transcripts/sdk-events.txt">transcript</a> · <a href="https://github.com/supernovae-st/nika-client/tree/main/scripts/media/scenes/sdk-events">the workflow and the program</a></sub></p>
+<p align="center"><sub><code>watch.mts</code> prints each event of a four-task workflow with the time it arrived: sixteen events, the engine's <code>permit_checked</code> and <code>workflow_completed</code> frames as <code>engine.event</code> (their kind on <code>event.raw</code>), then <code>result()</code>: <code>succeeded · cause normal · 4/4 tasks ok</code>. The two-second gap is a <code>nika:wait</code> task, whose start engine 0.124.0 streams only when it completes. Recorded from <code>@supernovae-st/nika</code> 0.124.0 and its bundled engine; the run is a <code>mock/echo</code> rehearsal.<br>▶ <a href="https://github.com/nika-open/nika-client/blob/main/media/videos/sdk-events.mp4?raw=true">MP4</a> · <a href="https://github.com/nika-open/nika-client/blob/main/media/transcripts/sdk-events.txt">transcript</a> · <a href="https://github.com/nika-open/nika-client/tree/main/scripts/media/scenes/sdk-events">the workflow and the program</a></sub></p>
 
 | `event.kind` | Local engine frame (`event.raw.kind`) | Server frame (`event.raw.kind`) |
 |---|---|---|
@@ -574,7 +574,7 @@ request or view; it never cancels the run.
   the reply itself (200, `status: 'cancelled'`). A job that already ended
   replays its result with `accepted: false` and `status: 'already_settled'`.
 
-[`examples/watch-and-cancel.ts`](https://github.com/supernovae-st/nika-client/blob/main/examples/watch-and-cancel.ts) prints each
+[`examples/watch-and-cancel.ts`](https://github.com/nika-open/nika-client/blob/main/examples/watch-and-cancel.ts) prints each
 event as it arrives and cancels after a delay or on Ctrl+C, on either door.
 
 ## Typed engine frames, outputs and ids

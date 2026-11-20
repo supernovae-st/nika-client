@@ -16,7 +16,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
-import { Nika } from '@supernovae-st/nika';
+import { Nika } from '@nika-open/nika';
 
 interface Checkpoint {
   idempotencyKey: string;

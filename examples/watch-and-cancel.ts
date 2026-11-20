@@ -17,7 +17,7 @@
  * a local engine also reports each task.
  */
 import { randomUUID } from 'node:crypto';
-import { Nika } from '@supernovae-st/nika';
+import { Nika } from '@nika-open/nika';
 
 const [workflow = 'wait.nika', cancelAfter = '1000'] = process.argv.slice(2);
 const url = process.env.NIKA_URL;

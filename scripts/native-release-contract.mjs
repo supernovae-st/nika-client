@@ -1,23 +1,38 @@
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createReadStream } from 'node:fs';
-import { lstat, open, readFile } from 'node:fs/promises';
+import { lstat, mkdtemp, open, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const TARGETS = new Map([
-  ['@supernovae-st/nika-darwin-arm64', {
+  ['@nika-open/nika-darwin-arm64', {
     os: 'darwin', cpu: 'arm64', libc: null, assetPlatform: 'macos', assetArch: 'arm64',
   }],
-  ['@supernovae-st/nika-darwin-x64', {
+  ['@nika-open/nika-darwin-x64', {
     os: 'darwin', cpu: 'x64', libc: null, assetPlatform: 'macos', assetArch: 'x64',
   }],
-  ['@supernovae-st/nika-linux-arm64', {
+  ['@nika-open/nika-linux-arm64', {
     os: 'linux', cpu: 'arm64', libc: 'glibc', assetPlatform: 'linux', assetArch: 'arm64',
   }],
-  ['@supernovae-st/nika-linux-x64', {
+  ['@nika-open/nika-linux-x64', {
     os: 'linux', cpu: 'x64', libc: 'glibc', assetPlatform: 'linux', assetArch: 'x64',
   }],
 ]);
+
+// The engine repository moved from supernovae-st to nika-open on 2026-11-20.
+// GitHub serves its releases and commits under the new owner, but a signed
+// attestation keeps the workflow identity that produced it: releases up to
+// v0.124.4 were signed by supernovae-st/nika, later releases by nika-open/nika.
+const ENGINE_REPOSITORY = 'nika-open/nika';
+const LAST_RELEASE_SIGNED_BY_SUPERNOVAE_ST = [0, 124, 4];
+
+export function engineReleaseSigner(version) {
+  const parts = version.split('.').map(Number);
+  const index = parts.findIndex((part, at) => part !== LAST_RELEASE_SIGNED_BY_SUPERNOVAE_ST[at]);
+  const signedBefore = index === -1 || parts[index] < LAST_RELEASE_SIGNED_BY_SUPERNOVAE_ST[index];
+  return signedBefore ? 'supernovae-st/nika' : ENGINE_REPOSITORY;
+}
 
 export function nativeTarget(packageName, version) {
   const target = TARGETS.get(packageName);
@@ -170,27 +185,43 @@ export async function verifyEngineArchive(archive, sums, version, expectedCommit
   const indexed = checksumForAsset(await readFile(sums, 'utf8'), asset);
   const sha256 = await sha256File(archive);
   if (sha256 !== indexed) throw new Error(`archive digest mismatch for ${asset}`);
-  const invoke = (args) => run('gh', args, { encoding: 'utf8', timeout: 90_000,
-    killSignal: 'SIGKILL', maxBuffer: 4 * 1024 * 1024 });
-  const release = JSON.parse(invoke(['api', `repos/supernovae-st/nika/releases/tags/${tag}`]));
+  const invoke = (args, options = {}) => run('gh', args, { encoding: 'utf8', timeout: 90_000,
+    killSignal: 'SIGKILL', maxBuffer: 4 * 1024 * 1024, ...options });
+  const release = JSON.parse(invoke(['api', `repos/${ENGINE_REPOSITORY}/releases/tags/${tag}`]));
   if (release.tag_name !== tag || release.draft !== false || release.prerelease !== false
     || typeof release.published_at !== 'string' || !Number.isFinite(Date.parse(release.published_at))) {
     throw new Error('archive proof requires the exact published stable release');
   }
   const assets = release.assets?.filter((entry) => entry.name === asset);
   if (assets?.length !== 1 || assets[0].state !== 'uploaded' || assets[0].size !== archiveStat.size
-    || assets[0].browser_download_url !== `https://github.com/supernovae-st/nika/releases/download/${tag}/${asset}`) {
+    || assets[0].browser_download_url !== `https://github.com/${ENGINE_REPOSITORY}/releases/download/${tag}/${asset}`) {
     throw new Error('archive metadata is missing, ambiguous or differs from the downloaded file');
   }
-  const { sha: commit } = JSON.parse(invoke(['api', `repos/supernovae-st/nika/commits/${tag}`]));
+  const { sha: commit } = JSON.parse(invoke(['api', `repos/${ENGINE_REPOSITORY}/commits/${tag}`]));
   if (!isCommit(commit) || (expectedCommit !== undefined && commit !== expectedCommit)) {
     throw new Error('released tag differs from the expected source commit');
   }
-  invoke(['attestation', 'verify', path.resolve(archive),
-    '--repo', 'supernovae-st/nika', '--cert-identity',
-    `https://github.com/supernovae-st/nika/.github/workflows/release.yml@refs/tags/${tag}`,
+  const signer = engineReleaseSigner(version);
+  const policy = ['--repo', signer, '--cert-identity',
+    `https://github.com/${signer}/.github/workflows/release.yml@refs/tags/${tag}`,
     '--source-ref', `refs/tags/${tag}`, '--source-digest', commit,
-    '--predicate-type', 'https://slsa.dev/provenance/v1', '--deny-self-hosted-runners']);
+    '--predicate-type', 'https://slsa.dev/provenance/v1', '--deny-self-hosted-runners'];
+  if (signer === ENGINE_REPOSITORY) {
+    invoke(['attestation', 'verify', path.resolve(archive), ...policy]);
+  } else {
+    // An earlier release's attestation stayed with the organization that signed
+    // it (measured 2026-11-20: only orgs/supernovae-st/attestations serves it).
+    // Fetch its bundle there, then verify the same policy offline.
+    const bundles = await mkdtemp(path.join(tmpdir(), 'nika-attestation-'));
+    try {
+      invoke(['attestation', 'download', path.resolve(archive), '--owner', signer.split('/')[0],
+        '--predicate-type', 'https://slsa.dev/provenance/v1'], { cwd: bundles });
+      invoke(['attestation', 'verify', path.resolve(archive),
+        '--bundle', path.join(bundles, `sha256:${sha256}.jsonl`), ...policy]);
+    } finally {
+      await rm(bundles, { recursive: true, force: true });
+    }
+  }
   if (await sha256File(archive) !== sha256) throw new Error('archive changed during provenance verification');
   return { tag, commit, asset, sha256 };
 }

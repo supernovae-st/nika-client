@@ -85,7 +85,7 @@ export function stableCancellationTerminalKind(kind) {
 }
 
 const PACK_SHA256 = /^[0-9a-f]{64}$/;
-const PACK_LEAF = /^supernovae-st-nika-\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\.tgz$/;
+const PACK_LEAF = /^nika-open-nika-\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?\.tgz$/;
 
 export function sha256File(filePath) {
   return createHash("sha256").update(readFileSync(filePath)).digest("hex");
@@ -157,10 +157,10 @@ export function assertReplayPackProvenance(report, replayResults) {
   if (manifest.integrity !== integrity) {
     throw new Error("depth-package.json integrity does not match packed tarball");
   }
-  if (manifest.name !== undefined && manifest.name !== "@supernovae-st/nika") {
-    throw new Error(`depth-package.json name ${String(manifest.name)} is not @supernovae-st/nika`);
+  if (manifest.name !== undefined && manifest.name !== "@nika-open/nika") {
+    throw new Error(`depth-package.json name ${String(manifest.name)} is not @nika-open/nika`);
   }
-  const versionFromLeaf = provenance.package.slice("supernovae-st-nika-".length, -".tgz".length);
+  const versionFromLeaf = provenance.package.slice("nika-open-nika-".length, -".tgz".length);
   if (manifest.version !== undefined && manifest.version !== versionFromLeaf) {
     throw new Error(
       `depth-package.json version ${String(manifest.version)} does not match ${versionFromLeaf}`,

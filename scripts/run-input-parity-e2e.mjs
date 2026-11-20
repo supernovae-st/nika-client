@@ -108,7 +108,7 @@ try {
   copyFileSync(path.join(root, 'scripts/input-parity/consumer-scenario.cjs'),
     path.join(consumer, 'consumer-scenario.cjs'));
   writeFileSync(path.join(consumer, 'consumer.cjs'), [
-    "const sdk = require('@supernovae-st/nika');",
+    "const sdk = require('@nika-open/nika');",
     "const action = require('./consumer-scenario.cjs');",
     "const config = JSON.parse(require('node:fs').readFileSync(process.argv[2], 'utf8'));",
     'action(sdk, config).then((row) => process.stdout.write(JSON.stringify(row)));',
@@ -116,7 +116,7 @@ try {
   ].join('\n'));
   writeFileSync(path.join(consumer, 'consumer.mjs'), [
     "import { readFileSync } from 'node:fs';",
-    "import * as sdk from '@supernovae-st/nika';",
+    "import * as sdk from '@nika-open/nika';",
     "import action from './consumer-scenario.cjs';",
     "const config = JSON.parse(readFileSync(process.argv[2], 'utf8'));",
     'process.stdout.write(JSON.stringify(await action(sdk, config)));',

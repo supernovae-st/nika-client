@@ -2,7 +2,7 @@ name: Release
 
 # SECURITY: no github.event text is interpolated directly into shell source.
 # npm trusted publishing exchanges this GitHub-hosted job's OIDC identity.
-# Register all five packages for supernovae-st/nika-client, release.yml,
+# Register all five packages for nika-open/nika-client, release.yml,
 # environment npm-publish, with direct npm publish allowed. No npm write
 # token is supplied. Sigstore provenance remains bound to this workflow.
 on:
@@ -53,7 +53,7 @@ jobs:
 
       - name: Validate checked-in release train
         env:
-          GH_TOKEN: ${{ secrets.NIKA_REPO_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if ! [[ "$VERSION" =~ ^0\.[0-9]+\.[0-9]+$ ]]; then
@@ -73,7 +73,7 @@ jobs:
             "nika-linux-arm64-$VERSION.tar.gz"
             "nika-linux-x64-$VERSION.tar.gz"
           )
-          release_json=$(gh release view "v$VERSION" --repo supernovae-st/nika --json assets,isDraft,tagName)
+          release_json=$(gh release view "v$VERSION" --repo nika-open/nika --json assets,isDraft,tagName)
           if [ "$(jq -r .isDraft <<<"$release_json")" != false ]; then
             echo "::error::nika v$VERSION is still a draft"
             exit 1
@@ -91,10 +91,10 @@ jobs:
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: supernovae-st/nika
+          repository: nika-open/nika
           path: nika-source
           ref: "v${{ env.VERSION }}"
-          token: ${{ secrets.NIKA_REPO_TOKEN || github.token }}
+          token: ${{ github.token }}
 
       - name: Test the tagged engine OpenAPI source and its published-SDK guard
         run: |
@@ -106,12 +106,12 @@ jobs:
 
       - name: Download and verify engine release assets
         env:
-          GH_TOKEN: ${{ secrets.NIKA_REPO_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p engine-assets
           gh release download "v$VERSION" \
-            --repo supernovae-st/nika \
+            --repo nika-open/nika \
             --dir engine-assets \
             --pattern "nika-macos-arm64-$VERSION.tar.gz" \
             --pattern "nika-macos-x64-$VERSION.tar.gz" \
@@ -294,11 +294,11 @@ jobs:
         run: |
           set -euo pipefail
           packages=(
-            @supernovae-st/nika-darwin-arm64
-            @supernovae-st/nika-darwin-x64
-            @supernovae-st/nika-linux-arm64
-            @supernovae-st/nika-linux-x64
-            @supernovae-st/nika
+            @nika-open/nika-darwin-arm64
+            @nika-open/nika-darwin-x64
+            @nika-open/nika-linux-arm64
+            @nika-open/nika-linux-x64
+            @nika-open/nika
           )
           for package_name in "${packages[@]}"; do
             node scripts/npm-publication.mjs assert-absent "$package_name" "$VERSION"
@@ -340,20 +340,20 @@ jobs:
         include:
           - target: linux-x64
             runner: ubuntu-24.04
-            tarball: supernovae-st-nika-linux-x64
-            package: '@supernovae-st/nika-linux-x64'
+            tarball: nika-open-nika-linux-x64
+            package: '@nika-open/nika-linux-x64'
           - target: linux-arm64
             runner: ubuntu-24.04-arm
-            tarball: supernovae-st-nika-linux-arm64
-            package: '@supernovae-st/nika-linux-arm64'
+            tarball: nika-open-nika-linux-arm64
+            package: '@nika-open/nika-linux-arm64'
           - target: darwin-x64
             runner: macos-15-intel
-            tarball: supernovae-st-nika-darwin-x64
-            package: '@supernovae-st/nika-darwin-x64'
+            tarball: nika-open-nika-darwin-x64
+            package: '@nika-open/nika-darwin-x64'
           - target: darwin-arm64
             runner: macos-15
-            tarball: supernovae-st-nika-darwin-arm64
-            package: '@supernovae-st/nika-darwin-arm64'
+            tarball: nika-open-nika-darwin-arm64
+            package: '@nika-open/nika-darwin-arm64'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -377,7 +377,7 @@ jobs:
         run: |
           npm install --global npm@11.19.1
           node scripts/verify-packed-install.mjs \
-            "release-candidate/release-tarballs/supernovae-st-nika-$VERSION.tgz" \
+            "release-candidate/release-tarballs/nika-open-nika-$VERSION.tgz" \
             "release-candidate/release-tarballs/$NATIVE_TARBALL-$VERSION.tgz" \
             "$VERSION" "$PREPARED_SHA" "$NATIVE_PACKAGE"
 
@@ -435,11 +435,11 @@ jobs:
             node scripts/npm-publication.mjs publish "$pkg" "$VERSION" "$tarball"
           }
           tarballs=release-candidate/release-tarballs
-          publish_once "@supernovae-st/nika-darwin-arm64" "$tarballs/supernovae-st-nika-darwin-arm64-$VERSION.tgz"
-          publish_once "@supernovae-st/nika-darwin-x64" "$tarballs/supernovae-st-nika-darwin-x64-$VERSION.tgz"
-          publish_once "@supernovae-st/nika-linux-arm64" "$tarballs/supernovae-st-nika-linux-arm64-$VERSION.tgz"
-          publish_once "@supernovae-st/nika-linux-x64" "$tarballs/supernovae-st-nika-linux-x64-$VERSION.tgz"
-          publish_once "@supernovae-st/nika" "$tarballs/supernovae-st-nika-$VERSION.tgz"
+          publish_once "@nika-open/nika-darwin-arm64" "$tarballs/nika-open-nika-darwin-arm64-$VERSION.tgz"
+          publish_once "@nika-open/nika-darwin-x64" "$tarballs/nika-open-nika-darwin-x64-$VERSION.tgz"
+          publish_once "@nika-open/nika-linux-arm64" "$tarballs/nika-open-nika-linux-arm64-$VERSION.tgz"
+          publish_once "@nika-open/nika-linux-x64" "$tarballs/nika-open-nika-linux-x64-$VERSION.tgz"
+          publish_once "@nika-open/nika" "$tarballs/nika-open-nika-$VERSION.tgz"
 
       - name: Release summary
         run: |

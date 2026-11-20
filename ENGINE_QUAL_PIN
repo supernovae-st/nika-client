@@ -1,4 +1,4 @@
-# Premerge qualification pin: exact supernovae-st/nika commit.
+# Premerge qualification pin: exact nika-open/nika commit.
 # Not ENGINE_PIN and not a release receipt.
 # Release train 0.124.4: the commit engine tag v0.124.4 names (nika#1879),
 # `nika 0.124.4 (9753cf41b)` (test/engine-pins.test.ts keeps ENGINE_CANDIDATE equal).

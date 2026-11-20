@@ -9,7 +9,7 @@ const VERSION = '0.124.4';
 // The engine the 0.124.4 ledgers record: the public v0.124.4 binary's
 // `nika --version`, the commit tag v0.124.4 names.
 const ENGINE = 'nika 0.124.4 (9753cf41b)';
-const PACKAGE = 'supernovae-st-nika-0.124.4.tgz';
+const PACKAGE = 'nika-open-nika-0.124.4.tgz';
 const currentEvidence = [
   'gauntlet/projects-depth/results.json',
   'gauntlet/results/hostile.json',
@@ -96,11 +96,11 @@ describe('release evidence identity', () => {
     writeJson(fixture, 'gauntlet/results/mini-saas.json', {
       schema_version: 1,
       engine: ENGINE,
-      package: 'supernovae-st-nika-0.116.0.tgz',
+      package: 'nika-open-nika-0.116.0.tgz',
     });
 
     expect(() => verifyReleaseEvidence(fixture)).toThrow(
-      `records package supernovae-st-nika-0.116.0.tgz, expected ${PACKAGE}`,
+      `records package nika-open-nika-0.116.0.tgz, expected ${PACKAGE}`,
     );
   });
 

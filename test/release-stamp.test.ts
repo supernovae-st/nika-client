@@ -63,7 +63,7 @@ describe('release commit stamping', () => {
     const fixture = createFixture('0.116.0');
     const mismatchedPath = manifestPaths.at(-1)!;
     writeManifest(fixture, mismatchedPath, {
-      name: '@supernovae-st/nika-linux-x64',
+      name: '@nika-open/nika-linux-x64',
       version: '0.115.0',
     });
 
@@ -95,7 +95,7 @@ describe('release commit stamping', () => {
     expect(workflow).toContain('cargo test --manifest-path nika-source/Cargo.toml');
     expect(workflow).toContain('npm run check:coverage');
     expect(workflow).toContain('scripts/verify-engine-archive.mjs');
-    expect(workflow).not.toContain('gh attestation verify "$asset" --repo supernovae-st/nika');
+    expect(workflow).not.toContain('gh attestation verify "$asset" --repo nika-open/nika');
     expect(workflow).toContain('engine_commit=$(git -C nika-source rev-parse HEAD)');
     expect(workflow).toContain('"$engine_commit" engine-assets/SHA256SUMS');
     expect(workflow).toContain('scripts/verify-packed-install.mjs');
@@ -139,7 +139,7 @@ function createFixture(version: string): string {
   scratch.push(fixture);
   for (const [index, relativePath] of manifestPaths.entries()) {
     writeManifest(fixture, relativePath, {
-      name: index === 0 ? '@supernovae-st/nika' : `@supernovae-st/native-${index}`,
+      name: index === 0 ? '@nika-open/nika' : `@nika-open/native-${index}`,
       version,
     });
   }

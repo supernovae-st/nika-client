@@ -2,7 +2,7 @@
 
 ## Outcome
 
-Six isolated Node consumers install `@supernovae-st/nika` from the tarball produced by `npm pack`; none imports repository source or build output. The runner executes every consumer against an explicit compatible `NIKA_BIN` and writes the machine-readable evidence to `gauntlet/projects-depth/results.json`.
+Six isolated Node consumers install `@nika-open/nika` from the tarball produced by `npm pack`; none imports repository source or build output. The runner executes every consumer against an explicit compatible `NIKA_BIN` and writes the machine-readable evidence to `gauntlet/projects-depth/results.json`.
 
 | Consumer | Depth exercised |
 |---|---|
@@ -48,9 +48,29 @@ The historical paid-provider and three-pass trace ledgers remain useful prior
 evidence, but are explicitly labelled as historical 0.115 observations and are
 not release gates for the current candidate.
 
-## Public 0.124.4 replay
+## Public 0.124.4 replay as `@nika-open/nika`
 
 The current replay uses public release engine `nika 0.124.4 (9753cf41b)`
+(the `nika-macos-arm64-0.124.4.tar.gz` archive of the v0.124.4 GitHub release,
+now served by `nika-open/nika`, checked against its `SHA256SUMS`, the tag
+commit and its build attestation, which `supernovae-st/nika` signed before the
+repository moved) with `nika-open-nika-0.124.4.tgz`, on 2026-11-20, in a
+cleared environment with a scratch `HOME`, a file run-signing key and
+`NIKA_KEYCHAIN=off`. The package was renamed from `@supernovae-st/nika` when
+the repositories moved to the `nika-open` organization; the consumers import
+the new name and nothing else in them changed. The depth, mini-SaaS and
+two-process recovery ledgers were regenerated from a fresh pack: all six
+projects passed (6/6). A full replay into a scratch directory (the corpus, the
+hostile suite, the packed projects, recovery, one-door and compile parity) then
+matched every committed ledger (`check:release-replay`), with the hostile suite
+14/14 over 72 real engine runs. Against the 2026-11-12 ledgers, only the
+package name, the pack digest, the six consumer app digests, the installed SDK
+entry path and one fresh trace and job identifier moved: the 100 corpus output
+hashes and every behavioral verdict are the same.
+
+## Public 0.124.4 replay
+
+The previous public replay used engine `nika 0.124.4 (9753cf41b)`
 (the `nika-macos-arm64-0.124.4.tar.gz` archive of the v0.124.4 GitHub release,
 checked against its `SHA256SUMS`, the tag commit and its build attestation)
 with `supernovae-st-nika-0.124.4.tgz`, on 2026-11-12, in a cleared

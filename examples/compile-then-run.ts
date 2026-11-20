@@ -52,8 +52,8 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { isNikaCompileHeld, isNikaRunSucceeded, Nika, nextCompileRequest } from '@supernovae-st/nika';
-import type { NikaCompileOutcome, NikaCompileRequest } from '@supernovae-st/nika';
+import { isNikaCompileHeld, isNikaRunSucceeded, Nika, nextCompileRequest } from '@nika-open/nika';
+import type { NikaCompileOutcome, NikaCompileRequest } from '@nika-open/nika';
 
 /** Answer rounds before giving up: the engine asks, the file answers, nothing loops forever. */
 const MAX_ROUNDS = 4;

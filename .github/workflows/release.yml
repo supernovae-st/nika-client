@@ -53,7 +53,7 @@ jobs:
 
       - name: Validate checked-in release train
         env:
-          GH_TOKEN: ${{ secrets.NIKA_REPO_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if ! [[ "$VERSION" =~ ^0\.[0-9]+\.[0-9]+$ ]]; then
@@ -94,7 +94,7 @@ jobs:
           repository: nika-open/nika
           path: nika-source
           ref: "v${{ env.VERSION }}"
-          token: ${{ secrets.NIKA_REPO_TOKEN || github.token }}
+          token: ${{ github.token }}
 
       - name: Test the tagged engine OpenAPI source and its published-SDK guard
         run: |
@@ -106,7 +106,7 @@ jobs:
 
       - name: Download and verify engine release assets
         env:
-          GH_TOKEN: ${{ secrets.NIKA_REPO_TOKEN || github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           mkdir -p engine-assets

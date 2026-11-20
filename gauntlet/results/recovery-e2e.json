@@ -1,11 +1,11 @@
 {
-  "engine": "nika 0.124.4 (9753cf41b)",
-  "package": "nika-open-nika-0.124.4.tgz",
+  "engine": "nika 0.124.5 (8b640a9b7)",
+  "package": "nika-open-nika-0.124.5.tgz",
   "process_count": 2,
   "installed_from_pack": true,
   "project": "two-process-durable-recovery",
   "status": "succeeded",
-  "job_id": "eb15600e-e127-4af7-8455-056d76ba10a1",
+  "job_id": "196990a5-f577-477b-abb3-88268d63ab3a",
   "producer_last_event_id": 1,
   "resumed_sequences": [
     2

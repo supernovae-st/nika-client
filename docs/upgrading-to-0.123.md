@@ -1,7 +1,7 @@
 # Upgrading to 0.123
 
-`@nika-open/nika` 0.124.4 bundles engine 0.124.4
-(`nika 0.124.4 (9753cf41b)`) and speaks its machine protocol, **2**, as 0.123
+`@nika-open/nika` 0.124.5 bundles engine 0.124.5
+(`nika 0.124.5 (8b640a9b7)`) and speaks its machine protocol, **2**, as 0.123
 did. Engines and servers up to 0.122 speak protocol 1. Each package version
 pairs with one protocol generation, so the move from 0.120.x is one rule:
 
@@ -112,12 +112,12 @@ lists it):
 
 ## Steps
 
-1. **Update the package.** `npm install @nika-open/nika@0.124.4`, then
+1. **Update the package.** `npm install @nika-open/nika@0.124.5`, then
    check what you installed:
 
    ```sh
-   node -p "require('@nika-open/nika/package.json').version"       # 0.124.4
-   ./node_modules/.bin/nika --version                              # nika 0.124.4 (9753cf41b)
+   node -p "require('@nika-open/nika/package.json').version"       # 0.124.5
+   ./node_modules/.bin/nika --version                              # nika 0.124.5 (8b640a9b7)
    ```
 
 2. **Point `NIKA_BIN` at a 0.123 or later engine, or unset it.** An explicit `bin` or
@@ -125,24 +125,24 @@ lists it):
    command refuses a protocol-1 engine there too
    (`NIKA_BIN=<a 0.122 binary> npx nika --version` exits 1).
 
-3. **Upgrade each server.** Install engine 0.124.4 where your `nika serve`
+3. **Upgrade each server.** Install engine 0.124.5 where your `nika serve`
    runs (`brew install nika-open/tap/nika`,
    `curl -LsSf https://nika.sh/install.sh | sh`, or the container image
-   `ghcr.io/supernovae-st/nika:0.124.4`), stop the old server as usual
+   `ghcr.io/nika-open/nika:0.124.5`), stop the old server as usual
    (Ctrl-C drains running and queued jobs for up to 30 seconds), and start
    the new one with the same flags. Then check its identity:
 
    ```sh
-   curl -s http://127.0.0.1:8787/health   # "engineVersion":"0.124.4", "machineProtocolVersion":2
+   curl -s http://127.0.0.1:8787/health   # "engineVersion":"0.124.5", "machineProtocolVersion":2
    ```
 
 4. **Run your tests against the new pair.** Nothing in `check`, `run`,
    `events`, `result`, `cancel`, `attachRun`, `schedule` or `traceVerify`
    changed its signature: 0.123.0, 0.124.0 and 0.124.2 only add exports,
    0.124.1 one optional field, `verdicts.network_tasks`, 0.124.3 one
-   method, `accessOffer`, with its types, and 0.124.4 nothing. The changes
-   are in the data those methods return: from 0.123, in the section above;
-   from 0.120.x, below.
+   method, `accessOffer`, with its types, and 0.124.4 and 0.124.5 nothing.
+   The changes are in the data those methods return: from 0.123, in the
+   section above; from 0.120.x, below.
 
 ## What changed in the data from 0.120
 
@@ -178,7 +178,8 @@ changes are in its release notes
 [0.124.1](https://github.com/nika-open/nika/releases/tag/v0.124.1),
 [0.124.2](https://github.com/nika-open/nika/releases/tag/v0.124.2),
 [0.124.3](https://github.com/nika-open/nika/releases/tag/v0.124.3),
-[0.124.4](https://github.com/nika-open/nika/releases/tag/v0.124.4)),
+[0.124.4](https://github.com/nika-open/nika/releases/tag/v0.124.4),
+[0.124.5](https://github.com/nika-open/nika/releases/tag/v0.124.5)),
 and what 0.124 does not do yet is on the
 [known limits](https://docs.nika.sh/changelog/known-limits) page.
 

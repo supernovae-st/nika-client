@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "engine": "nika 0.124.4 (9753cf41b)",
-  "package": "nika-open-nika-0.124.4.tgz",
-  "package_sha256": "a7752625f61e3b7d11a0e42d90eeaec7ddef5b6c3d004fdaaf1d34e8e811babd",
+  "engine": "nika 0.124.5 (8b640a9b7)",
+  "package": "nika-open-nika-0.124.5.tgz",
+  "package_sha256": "5df4a59c3da9964bc931b8599242116e59412d750f935e7d91183323a925e204",
   "install_mode": "npm pack + isolated npm install --omit=optional + explicit NIKA_BIN",
   "projects": [
     {
@@ -112,7 +112,7 @@
         "verdict": "sealed",
         "reason": "sealed",
         "verified": true,
-        "trace_id": "01a1f62d2010756f83d4f5b41461a640"
+        "trace_id": "01a1f8bd17ad75da9f66b9fefdbea2d4"
       },
       "mismatched_trace_rejected": true,
       "deterministic_cost_cap_usd": 0,

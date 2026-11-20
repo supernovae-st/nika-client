@@ -1,6 +1,6 @@
 {
   "name": "@nika-open/nika",
-  "version": "0.124.4",
+  "version": "0.124.5",
   "description": "One TypeScript SDK for local and remote Nika execution",
   "repository": {
     "type": "git",
@@ -70,10 +70,10 @@
     "prepublishOnly": "npm run build"
   },
   "optionalDependencies": {
-    "@nika-open/nika-darwin-arm64": "0.124.4",
-    "@nika-open/nika-darwin-x64": "0.124.4",
-    "@nika-open/nika-linux-arm64": "0.124.4",
-    "@nika-open/nika-linux-x64": "0.124.4"
+    "@nika-open/nika-darwin-arm64": "0.124.5",
+    "@nika-open/nika-darwin-x64": "0.124.5",
+    "@nika-open/nika-linux-arm64": "0.124.5",
+    "@nika-open/nika-linux-x64": "0.124.5"
   },
   "devDependencies": {
     "@types/node": "^26.4.1",

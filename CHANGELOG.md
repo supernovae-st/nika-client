@@ -7,8 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.124.5] - 2026-11-20
+
 ### Changed
 
+- **Release train 0.124.5, in lockstep with engine `v0.124.5`.** The machine
+  protocol stays 2. `package.json` is 0.124.5 and `sync:native-versions` moved
+  the four native payload manifests, the `optionalDependencies` and the
+  lockfile with it. `ENGINE_QUAL_PIN` and `ENGINE_CANDIDATE` name the commit
+  engine tag `v0.124.5` names (`nika 0.124.5 (8b640a9b7)`), the first engine
+  release published from `nika-open/nika`.
+- The pinned `openapi.json` and `src/generated/openapi.d.ts` are the served
+  document of the released engine 0.124.5. It differs from 0.124.4's in
+  `info.version` only, and the types generated from it are unchanged: no
+  route, schema or closed set moved, and a plain `nika serve` lists the
+  capabilities 0.124.4 listed. The engine's identity probe still answers
+  machine protocol 2, with the format versions and capabilities of 0.124.4.
+- The five committed gauntlet ledgers were recorded again against that
+  verified public binary: the 100-workflow corpus, the hostile suite (14/14,
+  72 real engine runs), the five mini-SaaS projects, the six depth projects
+  and the two-process recovery. Every behavioral verdict is the one 0.124.4
+  recorded, and the 100 corpus output hashes and the six consumer app
+  digests are unchanged: only the engine and package identities, the pack
+  digest, one fresh trace and job identifier and timings moved. A full
+  replay into a scratch directory, one-door and compile parity included,
+  then matched every committed ledger (`check:release-replay`).
+- `test/engine-live.test.ts` (run with `NIKA_BIN`) passes unchanged on the
+  released 0.124.5.
 - **The package moves to the `nika-open` organization.** The repositories
   moved from `supernovae-st` to `nika-open` on 2026-11-20. The package is
   published as `@nika-open/nika` and its native payloads as
@@ -18,15 +43,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `@supernovae-st/nika`, which gets no further versions: replace the
   dependency and its imports. Release evidence, packed-install checks and the
   publication gates follow the new tarball name `nika-open-nika-<version>.tgz`,
-  and native `SOURCE.json` names the engine source `nika-open/nika`. The
-  packed ledgers (mini-SaaS, recovery, depth projects) were regenerated from a
-  fresh pack against the verified public `nika 0.124.4 (9753cf41b)` binary:
-  only the package name, its digest, the consumer app digests and fresh
-  identifiers moved, and a full replay matched every committed ledger.
+  and native `SOURCE.json` names the engine source `nika-open/nika`. Under the
+  new name and still on the public `nika 0.124.4 (9753cf41b)` binary, the
+  packed ledgers (mini-SaaS, recovery, depth projects) were first regenerated
+  from a fresh pack: only the package name, its digest, the consumer app
+  digests and fresh identifiers moved.
 - Engine release assets are read from `nika-open/nika`. Their attestations
   stay bound to the identity that signed them: a release up to v0.124.4
   verifies against `supernovae-st/nika`, a later one against `nika-open/nika`.
 - The `ci.yml` jobs that declared no permissions run with `contents: read`.
+
+### Documentation
+
+- The README, `docs/upgrading-to-0.123.md`, `docs/compile.md`,
+  `docs/migrating-to-0.116.md`, `docs/runs.md` and `docs/architecture.md`
+  name 0.124.5 as the engine this package bundles: the upgrade steps install
+  0.124.5, print `nika 0.124.5 (8b640a9b7)` and name the image
+  `ghcr.io/nika-open/nika:0.124.5`, the engine history adds 0.124.5 (machine
+  protocol 2, the compile code of 0.124.4, a default served document that
+  differs only by its version), and the upgrade page links the engine's
+  0.124.5 release notes. The README's `nika check` excerpt was measured again
+  on the released 0.124.5: every line it shows is unchanged.
 
 ## [0.124.4] - 2026-11-12
 
@@ -1661,7 +1698,8 @@ Initial public release. Full rewrite from v0.1.0.
 - Error hierarchy completely redesigned
 - License changed from MIT to AGPL-3.0-or-later
 
-[Unreleased]: https://github.com/nika-open/nika-client/compare/v0.124.4...HEAD
+[Unreleased]: https://github.com/nika-open/nika-client/compare/v0.124.5...HEAD
+[0.124.5]: https://github.com/nika-open/nika-client/compare/v0.124.4...v0.124.5
 [0.124.4]: https://github.com/supernovae-st/nika-client/compare/v0.124.3...v0.124.4
 [0.124.3]: https://github.com/supernovae-st/nika-client/compare/v0.124.2...v0.124.3
 [0.124.2]: https://github.com/supernovae-st/nika-client/compare/v0.124.1...v0.124.2

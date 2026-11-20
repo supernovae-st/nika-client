@@ -1,6 +1,6 @@
 {
-  "engine": "nika 0.124.4 (9753cf41b)",
-  "package": "nika-open-nika-0.124.4.tgz",
+  "engine": "nika 0.124.5 (8b640a9b7)",
+  "package": "nika-open-nika-0.124.5.tgz",
   "install_mode": "npm pack + npm install --omit=optional + explicit NIKA_BIN",
   "projects": [
     {
